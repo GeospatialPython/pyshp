@@ -100,7 +100,7 @@ class Reader:
 			except IOError: pass
 			try:
 				self.shx = file("%s.shx" % shapeName, "rb")
-				self.__shapeIndex()
+			#	self.__shapeIndex()
 			except IOError: pass
 			try:
 				self.dbf = file("%s.dbf" % shapeName, "rb")
@@ -152,7 +152,7 @@ class Reader:
 		if shapeType == 0:
 			record.points = []
 		# All shape types capable of having a bounding box
-		if shapeType in (3,5,8,13,15,18,23,25,28,31):
+		elif shapeType in (3,5,8,13,15,18,23,25,28,31):
 			record.bbox = _Array('d', unpack("<4d", f.read(32)))
 		# Shape types with parts
 		if shapeType in (3,5,13,15,23,25,31):
@@ -203,8 +203,7 @@ class Reader:
 			f.seek(100)
 			for r in range(numRecords):
 				# Offsets are 16-bit words just like the file length
-				offset = unpack(">i", f.read(4))[0] * 2
-				self._offsets.append(offset)
+				self._offsets.append(unpack(">i", f.read(4))[0] * 2)
 				f.seek(f.tell() + 4)
 		if i:
 			return self._offsets[i]
@@ -224,12 +223,9 @@ class Reader:
 
 	def shapes(self):
 		"""Returns all shapes in a shapefile."""
-		f = self.shp
-		if not self.shpLength:
-			self.__shpHeader()
-		f.seek(100)
+		self.shp.seek(100)
 		shapes = []
-		while f.tell() < self.shpLength:
+		while self.shp.tell() < self.shpLength:
 			shapes.append(self.__shape())
 		return shapes
 
@@ -424,9 +420,9 @@ class Writer:
 			shapeType = self.shapeType
 			if shapeTypes:
 				shapeType = shapeTypes[shapes.index(s)]
-			for p in s.points:
-				x.append(p[0])
-				y.append(p[1])
+			px, py = zip(*s.points)[:2]
+			x.extend(px)
+			y.extend(py)
 		return [min(x), min(y), max(x), max(y)]
 
 	def __zbox(self, shapes, shapeTypes=[]):
@@ -482,27 +478,22 @@ class Writer:
 		method to read or write them is warranted."""
 		f = self.__getFileObj(fileObj)
 		f.seek(0)
-		# File code
-		f.write(pack(">i", 9994))
-		# Unused bytes
-		f.write(pack(">5i", 0,0,0,0,0))
+		# File code, Unused bytes
+		f.write(pack(">6i", 9994,0,0,0,0,0))
 		# File length (Bytes / 2 = 16-bit words)
 		if headerType == 'shp':
 			f.write(pack(">i", self.__shpFileLength()))
 		elif headerType == 'shx':
 			f.write(pack('>i', ((100 + (len(self._shapes) * 8)) / 2)))
-		# Version
-		f.write(pack("<i", 1000))
-		# Shape type
-		f.write(pack("<i", self.shapeType))
+		# Version, Shape type                                  
+		f.write(pack("<2i", 1000, self.shapeType))
 		# The shapefile's bounding box (lower left, upper right)
-		[f.write(pack("<d", b)) for b in self.bbox()]
+		f.write(pack("<4d", *self.bbox()))
 		# Elevation
 		z = self.zbox()
-		f.write(pack("<2d", z[0], z[1]))
 		# Measure
 		m = self.mbox()
-		f.write(pack("<2d", m[0], m[1]))
+		f.write(pack("<4d", z[0], z[1], m[0], m[1]))
 
 	def __dbfHeader(self):
 		"""Writes the dbf header and field descriptors."""
@@ -537,19 +528,18 @@ class Writer:
 		"""Write the shp records"""
 		f = self.__getFileObj(self.shp)
 		f.seek(100)
+		recNum = 1
 		for s in self._shapes:
 			self._offsets.append(f.tell())
-			# Record number
-			f.write(pack(">i", self._shapes.index(s) + 1))
-			# Content length place holder
-			f.write(pack(">i", 0))
+			# Record number, Content length place holder
+			f.write(pack(">2i", recNum, 0))
+			recNum += 1
 			start = f.tell()
 			# Shape Type
 			f.write(pack("<i", s.shapeType))
 			# All shape types capable of having a bounding box
 			if s.shapeType in (3,5,8,13,15,18,23,25,28,31):
-				(minx, miny, maxx, maxy) = self.__bbox([s])
-				f.write(pack("<4d", minx, miny, maxx, maxy))
+				f.write(pack("<4d", *self.__bbox([s])))
 			# Shape types with parts
 			if s.shapeType in (3,5,13,15,23,25,31):
 				# Number of parts
@@ -569,22 +559,17 @@ class Writer:
 			# Write points
 			if s.shapeType in (3,5,8,13,15,23,25,31):
 				for part in s.parts:
-					for point in s.points:
-						f.write(pack("<2d", point[0], point[1]))
+					[f.write(pack("<2d", *p[:2])) for p in s.points]	
 			# Write z extremes and values
 			if s.shapeType in (13,15,18,31):
-				(zmin, zmax) = self.__zbox(s.parts)
-				f.write(pack("<2d", zmin, zmax))
+				f.write(pack("<2d", *self.__zbox(s.parts)))
 				for part in s.parts:
-					for point in part:
-						f.write(pack("<d", point[2]))
+					[f.write(pack("<d", *p)) for p in part]
 			# Write m extremes and values
 			if s.shapeType in (9,13,15,18,23,25,31):
-				(mmin, mmax) = self.__mbox(s.parts)
-				f.write(pack("<2d", mmin, mmax))
+				f.write(pack("<2d", *self.__mbox(s.parts)))
 				for part in s.parts:
-					for point in part:
-						f.write(pack("<d", point[3]))
+					[f.write(pack("<d", p[3])) for p in part]
 			# Write a single point
 			if s.shapeType in (1,11,21):
 				for p in s.points:
@@ -597,8 +582,7 @@ class Writer:
 			# Write a single M value
 			if s.shapeType in (11, 21):
 				for part in s.parts:
-					for point in parts:
-						f.write(pack("<d", point[3]))
+					[f.write(pack("<d", p[3])) for p in part]
 			# Finalize record length as 16-bit words
 			finish = f.tell()
 			length = (finish - start) / 2
@@ -690,8 +674,7 @@ class Writer:
 		# Compensate for deletion flag
 		if self.fields[0][0].startswith("Deletion"): fieldCount -= 1
 		if recordList:
-			for i in range(fieldCount):
-				record.append(recordList[i])
+			[record.append(recordList[i]) for i in range(fieldCount)]
 		elif recordDict:
 				for field in self.fields:
 					if recordDict.get(field[0], None):
