@@ -2,7 +2,7 @@
 
 Python Shapefile Library
 ========================
-:Author: Joel Lawhead
+:Author: Joel Lawhead <jlawhead@geospatialpython.com>
 :Revised: November 26, 2010
 
 Overview
@@ -51,9 +51,11 @@ Reading Geometry
 ++++++++++++++++
 
 A shapefile's geometry is the collection of points or shapes made from verticies 
-and arcs representing physical locations.
+and implied arcs representing physical locations.  All types of shapefiles
+just store points.  The metadata about the points determine how they are handled by
+software.
 
-You can get the a list of the shapefiles geometry by calling the shapes()
+You can get the a list of the shapefile's geometry by calling the shapes()
 method. 
 
 >>> shapes = sf.shapes()
@@ -77,15 +79,15 @@ Each shape record contains the following attributes:
 
  - bbox: If the shape type contains multiple points this tuple describes the 
    upper left (x,y) coordinate and lower right corner coordinate creating a 
-   complete box around the points. If the shapeType is a single point 
-   (shapeType == 0) then an AttributeError will be raised.
+   complete box around the points. If the shapeType is a Null 
+   (shapeType == 0) then an AttributeError is raised.
  
 >>> shapes[3].bbox
 [-122.485792, 37.786931000000003, -122.446285, 37.811019000000002]
  
- - parts: If the shape record has multiple parts this attribute contains the
-   index of the first point of each part. If there is only one part then a tuple
-   containing 0 is returned.
+ - parts: Parts simply group collections of points into shapes. If the shape record 
+   has multiple parts this attribute contains the index of the first point of each part. 
+   If there is only one part then a list containing 0 is returned.  
  
 >>> shapes[3].parts
 [0]
@@ -123,10 +125,12 @@ field is a Python list with the following information:
 - Field name: the name describing the data at this column index.
 	
 - Field type: the type of data at this column index. Types can be: Character, Numbers, Longs, Dates, or Memo.
+  The "Memo" type has no meaning within a GIS and is part of the xbase spec instead.
 	
-- Field length: the length of the data found at this column index.
+- Field length: the length of the data found at this column index.  Older GIS software may truncate this
+  length to 8 or 11 characters for "Character" fields.
 	
-- Decimal length: the number of decimal places found in Number fields.
+- Decimal length: the number of decimal places found in "Number" fields.
 	
 To see the fields for the Reader object above (sf) call the "fields" attribute:
 
@@ -162,7 +166,8 @@ Each record is a list containing an attribute corresponding to each field in the
 field list.
 
 For example in the 4th record of the blockgroups shapefile the 2nd and 3rd 
-fields are the blockgroup id and the 1990 population count:
+fields are the blockgroup id and the 1990 population count of 
+that San Francisco blockgroup:
 
 >>> records[3][1:3]
 ['060750601001', 4715]
@@ -188,7 +193,7 @@ list of field values as demonstrated in the "Reading Records" section.
 
 >>> shapeRecs = sf.shapeRecords()
 
-Let's read the blockgroup key an the population for the 4th blockgroup:
+Let's read the blockgroup key and the population for the 4th blockgroup:
 >>> shapeRecs[3].record[1:3]
 ['060750601001', 4715]
 
@@ -222,8 +227,8 @@ maintaining some degree of automatic validation to make sure you don't
 accidentally write an invalid file.
 
 The PSL can write just one of the component files such as the shp or dbf file
-without writing the others. Therefore in addition to being a complete 
-shapefile library it can also be used as a basic dbf library. Dbf files are
+without writing the others. So in addition to being a complete 
+shapefile library, it can also be used as a basic dbf (xbase) library. Dbf files are
 a common database format which are often useful as a standalone simple 
 database format. And even shp files occasionaly have uses as a standalone 
 format. Some web-based GIS systems use an user-uploaded shp file to specify
