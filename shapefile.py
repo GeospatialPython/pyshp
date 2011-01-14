@@ -2,7 +2,7 @@
 shapefile.py
 Provides read and write support for ESRI Shapefiles.
 author: jlawhead<at>nvs-inc.com
-date: 20101127
+date: 20110113
 """
 
 from struct import pack, unpack, calcsize
@@ -488,12 +488,18 @@ class Writer:
 		# Version, Shape type                                  
 		f.write(pack("<2i", 1000, self.shapeType))
 		# The shapefile's bounding box (lower left, upper right)
-		f.write(pack("<4d", *self.bbox()))
+		try:
+			f.write(pack("<4d", *self.bbox()))
+		except struct.error:
+			raise ShapefileException("Failed to write shapefile bounding box. Floats required.")
 		# Elevation
 		z = self.zbox()
 		# Measure
 		m = self.mbox()
-		f.write(pack("<4d", z[0], z[1], m[0], m[1]))
+		try:
+			f.write(pack("<4d", z[0], z[1], m[0], m[1]))
+		except struct.error:
+			raise ShapefileException("Failed to write shapefile elevation and measure values. Floats required.")
 
 	def __dbfHeader(self):
 		"""Writes the dbf header and field descriptors."""
@@ -539,7 +545,10 @@ class Writer:
 			f.write(pack("<i", s.shapeType))
 			# All shape types capable of having a bounding box
 			if s.shapeType in (3,5,8,13,15,18,23,25,28,31):
-				f.write(pack("<4d", *self.__bbox([s])))
+				try:
+					f.write(pack("<4d", *self.__bbox([s])))
+				except struct.error:
+					raise ShapefileException("Falied to write bounding box for record %s. Expected floats." % recNum)
 			# Shape types with parts
 			if s.shapeType in (3,5,13,15,23,25,31):
 				# Number of parts
@@ -559,30 +568,48 @@ class Writer:
 			# Write points
 			if s.shapeType in (3,5,8,13,15,23,25,31):
 				for part in s.parts:
-					[f.write(pack("<2d", *p[:2])) for p in s.points]	
+					try:
+						[f.write(pack("<2d", *p[:2])) for p in s.points]
+					except struct.error:
+						raise ShapefileException("Failed to write points for record %s. Expected floats." % recNum)	
 			# Write z extremes and values
 			if s.shapeType in (13,15,18,31):
-				f.write(pack("<2d", *self.__zbox(s.parts)))
+				try:
+					f.write(pack("<2d", *self.__zbox(s.parts)))
+				except struct.error:
+					raise ShapefileException("Failed to write elevation extremes for record %s. Expected floats." % recNum)
 				for part in s.parts:
 					[f.write(pack("<d", *p)) for p in part]
 			# Write m extremes and values
 			if s.shapeType in (9,13,15,18,23,25,31):
-				f.write(pack("<2d", *self.__mbox(s.parts)))
+				try:
+					f.write(pack("<2d", *self.__mbox(s.parts)))
+				except struct.error:
+					raise ShapefileException("Failed to write measure extremes for record %s. Expected floats" % recNum)	
 				for part in s.parts:
 					[f.write(pack("<d", p[3])) for p in part]
 			# Write a single point
 			if s.shapeType in (1,11,21):
 				for p in s.points:
-					f.write(pack("<2d", p[0], p[1]))
+					try:
+						f.write(pack("<2d", p[0], p[1]))
+					except struct.error:
+						raise ShapefileException("Failed to write point for record %s. Expected floats." % recNum)
 			# Write a single Z value
 			if s.shapeType == 11:
 				for part in s.parts:
 					for point in parts:
-						f.write(pack("<d", point[2]))
+						try:
+							f.write(pack("<d", point[2]))
+						except struct.error:
+							 raise ShapefileException("Failed to write elevation value for record %s. Expected floats." % recNum)
 			# Write a single M value
 			if s.shapeType in (11, 21):
 				for part in s.parts:
-					[f.write(pack("<d", p[3])) for p in part]
+					try:
+						[f.write(pack("<d", p[3])) for p in part]
+					except struct.error:
+						raise ShapefileException("Failed to write measure value for record %s. Expected floats." % recNum)
 			# Finalize record length as 16-bit words
 			finish = f.tell()
 			length = (finish - start) / 2
@@ -663,10 +690,10 @@ class Writer:
 
 	def record(self, *recordList, **recordDict):
 		"""Creates a dbf attribute record. You can submit either a sequence of
-		field values or a dictionary with field names and values. Before
+		field values or keyword arguments of field names and values. Before
 		adding records you must add fields for the record values using the
 		fields() method. If the record values exceed the number of fields the
-		extra ones won't be added. In the case of using a dictionary to specify
+		extra ones won't be added. In the case of using keyword arguments to specify
 		field/value pairs only fields matching the already registered fields
 		will be added."""
 		record = []
@@ -677,8 +704,12 @@ class Writer:
 			[record.append(recordList[i]) for i in range(fieldCount)]
 		elif recordDict:
 				for field in self.fields:
-					if recordDict.get(field[0], None):
-						record.append(recordDict[field[0]])
+					if recordDict.has_key(field[0]):
+						val = recordDict[field[0]]
+						if val: 
+							record.append(val)
+						else: 
+							record.append("")					
 		if record:
 			self.records.append(record)
 

@@ -393,6 +393,15 @@ The following attempts to create a complete shapefile:
 >>> w.record('Second','Line')
 >>> w.save('shapefiles/test/line')
 
+You can also add attributes using keyword arguments where the keys are field names.
+
+>>> w = shapefile.Writer(shapefile.POLYLINE)
+>>> w.line(parts=[[[1,5],[5,5],[5,1],[3,3],[1,1]]])
+>>> w.field('FIRST_FLD','C','40')
+>>> w.field('SECOND_FLD','C','40')
+>>> w.record(FIRST_FLD='First', SECOND_FLD='Line')
+>>> w.save('shapefiles/test/line')
+
 Editor Class
 ............
 
