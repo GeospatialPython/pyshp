@@ -3,7 +3,7 @@
 Python Shapefile Library
 ========================
 :Author: Joel Lawhead <jlawhead@geospatialpython.com>
-:Revised: November 26, 2010
+:Revised: January 31, 2011
 
 Overview
 --------
@@ -11,6 +11,10 @@ Overview
 The Python Shapefile Library (PSL) provides read and write support for the ESRI
 Shapefile format. The Shapefile format is a popular Geographic Information
 System vector data format.
+
+This documentation covers the Python 2.x-compatible version of the library.  A
+Python 3-compatible version is available in the Subversion trunk of the pyshp 
+project on Google Code.
 
 This document provides usage examples for using the Python Shapefile Library.
 
@@ -25,7 +29,7 @@ The examples below will use a shapefile created from the U.S. Census Bureau
 Blockgroups data set near San Francisco, CA.
 
 Reading Shapefiles
-..................
+++++++++++++++++++
 
 To read a shapefile create a new "Reader" object and pass it the name of an 
 existing shapefile. The shapefile format is acutally a collection of three
@@ -48,7 +52,7 @@ OR
 OR any of the other 5+ formats which are potentially part of a shapefile.
 
 Reading Geometry
-++++++++++++++++
+................
 
 A shapefile's geometry is the collection of points or shapes made from verticies 
 and implied arcs representing physical locations.  All types of shapefiles
@@ -220,7 +224,7 @@ The blockgroup key and population count:
 2
 
 Writing Shapefiles
-------------------
+++++++++++++++++++
 
 The PSL tries to be as flexible as possible when writing shapefiles while 
 maintaining some degree of automatic validation to make sure you don't 
@@ -403,7 +407,7 @@ You can also add attributes using keyword arguments where the keys are field nam
 >>> w.save('shapefiles/test/line')
 
 Editor Class
-............
++++++++++++++
 
 The Editor class attempts to make changing existing shapefiles easier by handling the reading and writing details behind the scenes.
 
