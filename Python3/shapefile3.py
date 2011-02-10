@@ -5,7 +5,7 @@ author: jlawhead<at>geospatialpython.com
 date: 20110131
 """
 
-from struct import pack, unpack, calcsize
+from struct import pack, unpack, calcsize, error
 import os
 import time
 import array
@@ -488,17 +488,20 @@ class Writer:
 		# Version, Shape type                                  
 		f.write(pack("<2i", 1000, self.shapeType))
 		# The shapefile's bounding box (lower left, upper right)
-		try:
-			f.write(pack("<4d", *self.bbox()))
-		except struct.error:
-			raise ShapefileException("Failed to write shapefile bounding box. Floats required.")
+		if self.shapeType != 0:
+			try:
+				f.write(pack("<4d", *self.bbox()))
+			except error:
+				raise ShapefileException("Failed to write shapefile bounding box. Floats required.")
+		else:
+			f.write(pack("<4d", 0,0,0,0))      
 		# Elevation
 		z = self.zbox()
 		# Measure
 		m = self.mbox()
 		try:
 			f.write(pack("<4d", z[0], z[1], m[0], m[1]))
-		except struct.error:
+		except error:
 			raise ShapefileException("Failed to write shapefile elevation and measure values. Floats required.")
 
 	def __dbfHeader(self):
@@ -548,7 +551,7 @@ class Writer:
 			if s.shapeType in (3,5,8,13,15,18,23,25,28,31):
 				try:
 					f.write(pack("<4d", *self.__bbox([s])))
-				except struct.error:
+				except error:
 					raise ShapefileException("Falied to write bounding box for record %s. Expected floats." % recNum)
 			# Shape types with parts
 			if s.shapeType in (3,5,13,15,23,25,31):
@@ -571,13 +574,13 @@ class Writer:
 				for part in s.parts:
 					try:
 						[f.write(pack("<2d", *p[:2])) for p in s.points]
-					except struct.error:
+					except error:
 						raise ShapefileException("Failed to write points for record %s. Expected floats." % recNum)	
 			# Write z extremes and values
 			if s.shapeType in (13,15,18,31):
 				try:
 					f.write(pack("<2d", *self.__zbox(s.parts)))
-				except struct.error:
+				except error:
 					raise ShapefileException("Failed to write elevation extremes for record %s. Expected floats." % recNum)
 				for part in s.parts:
 					[f.write(pack("<d", *p)) for p in part]
@@ -585,7 +588,7 @@ class Writer:
 			if s.shapeType in (9,13,15,18,23,25,31):
 				try:
 					f.write(pack("<2d", *self.__mbox(s.parts)))
-				except struct.error:
+				except error:
 					raise ShapefileException("Failed to write measure extremes for record %s. Expected floats" % recNum)	
 				for part in s.parts:
 					[f.write(pack("<d", p[3])) for p in part]
@@ -594,7 +597,7 @@ class Writer:
 				for p in s.points:
 					try:
 						f.write(pack("<2d", p[0], p[1]))
-					except struct.error:
+					except error:
 						raise ShapefileException("Failed to write point for record %s. Expected floats." % recNum)
 			# Write a single Z value
 			if s.shapeType == 11:
@@ -602,14 +605,14 @@ class Writer:
 					for point in parts:
 						try:
 							f.write(pack("<d", point[2]))
-						except struct.error:
+						except error:
 							 raise ShapefileException("Failed to write elevation value for record %s. Expected floats." % recNum)
 			# Write a single M value
 			if s.shapeType in (11, 21):
 				for part in s.parts:
 					try:
 						[f.write(pack("<d", p[3])) for p in part]
-					except struct.error:
+					except error:
 						raise ShapefileException("Failed to write measure value for record %s. Expected floats." % recNum)
 			# Finalize record length as 16-bit words
 			finish = f.tell()
