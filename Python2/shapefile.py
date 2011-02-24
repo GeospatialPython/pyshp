@@ -2,7 +2,8 @@
 shapefile.py
 Provides read and write support for ESRI Shapefiles.
 author: jlawhead<at>nvs-inc.com
-date: 20110209
+date: 20110223
+version: 1.0
 """
 
 from struct import pack, unpack, calcsize, error
@@ -174,7 +175,7 @@ class Reader:
 			(zmin, zmax) = unpack("<2d", f.read(16))
 			record.z = _Array('d', unpack("<%sd" % nPoints, f.read(nPoints * 8)))
 		# Read m extremes and values
-		if shapeType in (9,13,15,18,23,25,31):
+		if shapeType in (23,25,28):
 			(mmin, mmax) = unpack("<2d", f.read(16))
 			record.m = _Array('d', unpack("%sd" % nPoints, f.read(nPoints * 8)))
 		# Read a single point
@@ -184,7 +185,7 @@ class Reader:
 		if shapeType == 11:
 			record.z = unpack("<d", f.read(8))
 		# Read a single M value
-		if shapeType in (11, 21):
+		if shapeType == 21:
 			record.m = unpack("<d", f.read(8))
 		return record
 
@@ -205,7 +206,7 @@ class Reader:
 				# Offsets are 16-bit words just like the file length
 				self._offsets.append(unpack(">i", f.read(4))[0] * 2)
 				f.seek(f.tell() + 4)
-		if i:
+		if not i == None:
 			return self._offsets[i]
 
 	def shape(self, i=0):
@@ -394,20 +395,20 @@ class Writer:
 				size += 16
 				# z array
 				size += 8 * nPoints
-			# Read m extremes and values
-			if self.shapeType in (9,13,15,18,23,25,31):
+			# Calc m extremes and values
+			if self.shapeType in (23,25,31):
 				# m extremes
 				size += 16
 				# m array
 				size += 8 * nPoints
-			# Read a single point
+			# Calc a single point
 			if self.shapeType in (1,11,21):
 				size += 16
-			# Read a single Z value
+			# Calc a single Z value
 			if self.shapeType == 11:
 				size += 8
-			# Read a single M value
-			if self.shapeType in (11, 21):
+			# Calc a single M value
+			if self.shapeType == 21:
 				size += 8
 		# Calculate size as 16-bit words
 		size /= 2
@@ -556,7 +557,7 @@ class Writer:
 			if s.shapeType in (3,5,13,15,23,25,31):
 				# Number of parts
 				f.write(pack("<i", len(s.parts)))
-			# Shape types with points
+			# Shape types with multiple points per record
 			if s.shapeType in (3,5,8,13,15,23,25,31):
 				# Number of points
 				f.write(pack("<i", len(s.points)))
@@ -568,49 +569,51 @@ class Writer:
 			if s.shapeType == 31:
 				for pt in s.partTypes:
 					f.write(pack("<i", pt))
-			# Write points
-			if s.shapeType in (3,5,8,13,15,23,25,31):
-				for part in s.parts:
-					try:
-						[f.write(pack("<2d", *p[:2])) for p in s.points]
-					except error:
-						raise ShapefileException("Failed to write points for record %s. Expected floats." % recNum)	
+			# Write points for multiple-point records
+			if s.shapeType in (3,5,8,13,15,23,25,31):	
+				try:
+					[f.write(pack("<2d", *p[:2])) for p in s.points]
+				except error:
+					raise ShapefileException("Failed to write points for record %s. Expected floats." % recNum)	
 			# Write z extremes and values
 			if s.shapeType in (13,15,18,31):
 				try:
-					f.write(pack("<2d", *self.__zbox(s.parts)))
+					f.write(pack("<2d", *self.__zbox([s])))
 				except error:
 					raise ShapefileException("Failed to write elevation extremes for record %s. Expected floats." % recNum)
-				for part in s.parts:
-					[f.write(pack("<d", *p)) for p in part]
-			# Write m extremes and values
-			if s.shapeType in (9,13,15,18,23,25,31):
 				try:
-					f.write(pack("<2d", *self.__mbox(s.parts)))
+					[f.write(pack("<d", p[2])) for p in s.points]
 				except error:
-					raise ShapefileException("Failed to write measure extremes for record %s. Expected floats" % recNum)	
-				for part in s.parts:
-					[f.write(pack("<d", p[3])) for p in part]
+				  raise ShapefileException("Failed to write elevation values for record %s. Expected floats." % recNum)
+			# Write m extremes and values
+			if s.shapeType in (23,25,31):
+				try:
+					f.write(pack("<2d", *self.__mbox([s])))
+				except error:
+					raise ShapefileException("Failed to write measure extremes for record %s. Expected floats" % recNum)
+				try:          	
+					[f.write(pack("<d", p[3])) for p in s.points]
+				except error:
+					raise ShapefileException("Failed to write measure values for record %s. Expected floats" % recNum)					
 			# Write a single point
 			if s.shapeType in (1,11,21):
 				for p in s.points:
 					try:
-						f.write(pack("<2d", p[0], p[1]))
+						f.write(pack("<2d", *p[:2]))
 					except error:
 						raise ShapefileException("Failed to write point for record %s. Expected floats." % recNum)
 			# Write a single Z value
 			if s.shapeType == 11:
-				for part in s.parts:
-					for point in parts:
-						try:
-							f.write(pack("<d", point[2]))
-						except error:
-							 raise ShapefileException("Failed to write elevation value for record %s. Expected floats." % recNum)
-			# Write a single M value
-			if s.shapeType in (11, 21):
-				for part in s.parts:
+				for p in s.points:
 					try:
-						[f.write(pack("<d", p[3])) for p in part]
+						f.write(pack("<d", p[2]))
+					except error:
+						raise ShapefileException("Failed to write elevation value for record %s. Expected floats." % recNum)
+			# Write a single M value
+			if s.shapeType == 21:
+				for p in s.points:
+					try:
+						f.write(pack("<d", p[3]))
 					except error:
 						raise ShapefileException("Failed to write measure value for record %s. Expected floats." % recNum)
 			# Finalize record length as 16-bit words
