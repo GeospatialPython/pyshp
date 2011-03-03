@@ -2,8 +2,8 @@
 shapefile.py
 Provides read and write support for ESRI Shapefiles.
 author: jlawhead<at>nvs-inc.com
-date: 20110223
-version: 1.0
+date: 20110303
+version: 1.0.1
 """
 
 from struct import pack, unpack, calcsize, error
@@ -486,10 +486,10 @@ class Writer:
 			f.write(pack(">i", self.__shpFileLength()))
 		elif headerType == 'shx':
 			f.write(pack('>i', ((100 + (len(self._shapes) * 8)) / 2)))
-		# Version, Shape type                                  
+		# Version, Shape type
 		f.write(pack("<2i", 1000, self.shapeType))
 		# The shapefile's bounding box (lower left, upper right)
-		if self.shapeType != 0:		
+		if self.shapeType != 0:
 			try:
 				f.write(pack("<4d", *self.bbox()))
 			except error:
@@ -570,11 +570,11 @@ class Writer:
 				for pt in s.partTypes:
 					f.write(pack("<i", pt))
 			# Write points for multiple-point records
-			if s.shapeType in (3,5,8,13,15,23,25,31):	
+			if s.shapeType in (3,5,8,13,15,23,25,31):
 				try:
 					[f.write(pack("<2d", *p[:2])) for p in s.points]
 				except error:
-					raise ShapefileException("Failed to write points for record %s. Expected floats." % recNum)	
+					raise ShapefileException("Failed to write points for record %s. Expected floats." % recNum)
 			# Write z extremes and values
 			if s.shapeType in (13,15,18,31):
 				try:
@@ -591,10 +591,10 @@ class Writer:
 					f.write(pack("<2d", *self.__mbox([s])))
 				except error:
 					raise ShapefileException("Failed to write measure extremes for record %s. Expected floats" % recNum)
-				try:          	
+				try:
 					[f.write(pack("<d", p[3])) for p in s.points]
 				except error:
-					raise ShapefileException("Failed to write measure values for record %s. Expected floats" % recNum)					
+					raise ShapefileException("Failed to write measure values for record %s. Expected floats" % recNum)
 			# Write a single point
 			if s.shapeType in (1,11,21):
 				for p in s.points:
@@ -679,6 +679,9 @@ class Writer:
 		for part in parts:
 			polyShape.parts.append(len(polyShape.points))
 			for point in part:
+				# Ensure point is list
+				if not isinstance(point, list):
+					point = list(point)
 				# Make sure point has z and m values
 				while len(point) < 4:
 					point.append(0)
@@ -712,10 +715,10 @@ class Writer:
 				for field in self.fields:
 					if recordDict.has_key(field[0]):
 						val = recordDict[field[0]]
-						if val: 
+						if val:
 							record.append(val)
-						else: 
-							record.append("")					
+						else:
+							record.append("")
 		if record:
 			self.records.append(record)
 
