@@ -185,7 +185,7 @@ class Reader:
 		if shapeType == 11:
 			record.z = unpack("<d", f.read(8))
 		# Read a single M value
-		if shapeType == 21:
+		if shapeType in (11,21):
 			record.m = unpack("<d", f.read(8))
 		return record
 
@@ -408,7 +408,7 @@ class Writer:
 			if self.shapeType == 11:
 				size += 8
 			# Calc a single M value
-			if self.shapeType == 21:
+			if self.shapeType in(11,21):
 				size += 8
 		# Calculate size as 16-bit words
 		size /= 2
@@ -610,7 +610,7 @@ class Writer:
 					except error:
 						raise ShapefileException("Failed to write elevation value for record %s. Expected floats." % recNum)
 			# Write a single M value
-			if s.shapeType == 21:
+			if s.shapeType in (11,21):
 				for p in s.points:
 					try:
 						f.write(pack("<d", p[3]))
