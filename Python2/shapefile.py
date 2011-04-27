@@ -133,7 +133,7 @@ class Reader:
 		self.shpLength = unpack(">i", f.read(4))[0] * 2
 		# Shape type
 		f.seek(32)
-		self.shapeType= unpack("i", f.read(4))[0]
+		self.shapeType= unpack("<i", f.read(4))[0]
 		# The shapefile's bounding box (lower left, upper right)
 		self.bbox = _Array('d', unpack("<4d", f.read(32)))
 		# Elevation
@@ -368,8 +368,12 @@ class Writer:
 			# Add in record header and shape type fields
 			size += 12
 			# nParts and nPoints do not apply to all shapes
-			if self.shapeType not in (0,1):
+			#if self.shapeType not in (0,1):
+			#	nParts = len(s.parts)
+			#	nPoints = len(s.points)
+			if hasattr(s,'parts'):
 				nParts = len(s.parts)
+			if hasattr(s,'points'):
 				nPoints = len(s.points)
 			# All shape types capable of having a bounding box
 			if self.shapeType in (3,5,8,13,15,18,23,25,28,31):
@@ -408,7 +412,7 @@ class Writer:
 			if self.shapeType == 11:
 				size += 8
 			# Calc a single M value
-			if self.shapeType in(11,21):
+			if self.shapeType in (11,21):
 				size += 8
 		# Calculate size as 16-bit words
 		size /= 2
@@ -429,15 +433,9 @@ class Writer:
 	def __zbox(self, shapes, shapeTypes=[]):
 		z = []
 		for s in shapes:
-			shapeType = self.shapeType
-			if shapeTypes:
-				shapeType = shapeTypes[shapes.index(s)]
 			try:
-				if shapeType == 11:
-					z.append(s[2])
-				else:
-					for p in s.points:
-						z.append(p[2])
+				for p in s.points:
+					z.append(p[2])
 			except IndexError:
 				pass
 		if not z: z.append(0)
@@ -446,15 +444,9 @@ class Writer:
 	def __mbox(self, shapes, shapeTypes=[]):
 		m = [0]
 		for s in shapes:
-			shapeType = self.shapeType
-			if shapeTypes:
-				shapeType = shapeTypes[shapes.index(s)]
 			try:
-				if shapeType in (11, 21):
-					m.append(s[2])
-				else:
-					for p in s.points:
-						m.append(p[3])
+				for p in s.points:
+					m.append(p[3])
 			except IndexError:
 				pass
 		return [min(m), max(m)]
@@ -597,25 +589,22 @@ class Writer:
 					raise ShapefileException("Failed to write measure values for record %s. Expected floats" % recNum)
 			# Write a single point
 			if s.shapeType in (1,11,21):
-				for p in s.points:
-					try:
-						f.write(pack("<2d", *p[:2]))
-					except error:
-						raise ShapefileException("Failed to write point for record %s. Expected floats." % recNum)
+				try:
+					f.write(pack("<2d", s.points[0][0], s.points[0][1]))
+				except error:
+					raise ShapefileException("Failed to write point for record %s. Expected floats." % recNum)
 			# Write a single Z value
 			if s.shapeType == 11:
-				for p in s.points:
-					try:
-						f.write(pack("<d", p[2]))
-					except error:
-						raise ShapefileException("Failed to write elevation value for record %s. Expected floats." % recNum)
+				try:
+					f.write(pack("<1d", s.points[0][2]))
+				except error:
+					raise ShapefileException("Failed to write elevation value for record %s. Expected floats." % recNum)
 			# Write a single M value
 			if s.shapeType in (11,21):
-				for p in s.points:
-					try:
-						f.write(pack("<d", p[3]))
-					except error:
-						raise ShapefileException("Failed to write measure value for record %s. Expected floats." % recNum)
+				try:
+					f.write(pack("<1d", s.points[0][3]))
+				except error:
+					raise ShapefileException("Failed to write measure value for record %s. Expected floats." % recNum)
 			# Finalize record length as 16-bit words
 			finish = f.tell()
 			length = (finish - start) / 2
@@ -657,7 +646,7 @@ class Writer:
 
 	def point(self, x, y, z=0, m=0):
 		"""Creates a point shape."""
-		pointShape = _Shape(POINT)
+		pointShape = _Shape(self.shapeType)
 		pointShape.points.append([x, y, z, m])
 		self._shapes.append(pointShape)
 
