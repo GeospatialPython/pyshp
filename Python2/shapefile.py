@@ -2,8 +2,8 @@
 shapefile.py
 Provides read and write support for ESRI Shapefiles.
 author: jlawhead<at>nvs-inc.com
-date: 20110303
-version: 1.0.1
+date: 20110519
+version: 1.0.2
 """
 
 from struct import pack, unpack, calcsize, error
@@ -720,31 +720,31 @@ class Writer:
 
 	def saveShp(self, target):
 		"""Save an shp file."""
-		target = os.path.splitext(target)[0] + '.shp'
+		if not hasattr(target, "write"):
+                        target = os.path.splitext(target)[0] + '.shp'
 		if not self.shapeType:
 			self.shapeType = self._shapes[0].shapeType
 		self.shp = self.__getFileObj(target)
 		self.__shapefileHeader(self.shp, headerType='shp')
 		self.__shpRecords()
-		self.shp.close()
 
 	def saveShx(self, target):
 		"""Save an shx file."""
-		target = os.path.splitext(target)[0] + '.shx'
+		if not hasattr(target, "write"):		
+                        target = os.path.splitext(target)[0] + '.shx'
 		if not self.shapeType:
 			self.shapeType = self._shapes[0].shapeType
 		self.shx = self.__getFileObj(target)
 		self.__shapefileHeader(self.shx, headerType='shx')
-		self.__shxRecords()
-		self.shx.close()
+		self.__shxRecords()	
 
 	def saveDbf(self, target):
 		"""Save a dbf file."""
-		target = os.path.splitext(target)[0] + '.dbf'
+		if not hasattr(target, "write"):		
+                        target = os.path.splitext(target)[0] + '.dbf'
 		self.dbf = self.__getFileObj(target)
 		self.__dbfHeader()
 		self.__dbfRecords()
-		self.dbf.close()
 
 	def save(self, target=""):
 		"""Save the shapefile data to three files or
@@ -752,8 +752,11 @@ class Writer:
 		be written exclusively using saveShp, saveShx, and saveDbf respectively."""
 		# TODO: Create a unique filename for target if None.
 		self.saveShp(target)
+		self.shp.close()
 		self.saveShx(target)
+		self.shx.close()
 		self.saveDbf(target)
+		self.dbf.close()
 
 class Editor(Writer):
 	def __init__(self, shapefile=None, shapeType=POINT, autoBalance=1):
