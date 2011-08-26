@@ -2,8 +2,8 @@
 shapefile.py
 Provides read and write support for ESRI Shapefiles.
 author: jlawhead<at>nvs-inc.com
-date: 20110519
-version: 1.0.2
+date: 20110826
+version: 1.0.4
 """
 
 from struct import pack, unpack, calcsize, error
