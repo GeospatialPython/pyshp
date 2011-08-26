@@ -274,6 +274,9 @@ class Reader:
 													recordContents):
 			if name == 'DeletionFlag':
 				continue
+			if not value.strip():
+                            record.append(value)
+                            return record			
 			if typ == "N":
 				value = value.replace('\0', '').strip()
 				if value == '':
