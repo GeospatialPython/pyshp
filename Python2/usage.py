@@ -3,7 +3,7 @@
 Python Shapefile Library
 ========================
 :Author: Joel Lawhead <jlawhead@geospatialpython.com>
-:Revised: January 31, 2011
+:Revised: August 31, 2011
 
 Overview
 --------
@@ -16,17 +16,29 @@ This documentation covers the Python 2.x-compatible version of the library.  A
 Python 3-compatible version is available in the Subversion trunk of the pyshp 
 project on Google Code.
 
-This document provides usage examples for using the Python Shapefile Library.
+This document provides usage examples for using the Python Shapefile Library.  
+
+Currently the sample census blockgroup shapefile referenced in the examples is
+only available on the google code project site at http://code.google.com/p/pyshp.
+These examples are straight-forward and you can also easily run these simple 
+examples on your own shapefiles manually. Other examples for specific topics are
+continually added to the pyshp wiki on google code and the blog:
+GeospatialPython.com.
+
+I sincerely hope this libarary eliminates the mundane distraction of simply 
+reading and writing data, and allows you to focus on the challenging and FUN
+part of your project. 
 
 Examples
 --------
 
-Before doing anything you must import PSL.
+Before doing anything you must import the library.
 
 >>> import shapefile
 
 The examples below will use a shapefile created from the U.S. Census Bureau
-Blockgroups data set near San Francisco, CA.
+Blockgroups data set near San Francisco, CA and available in the subversion 
+repository of the pyshp google code site.
 
 Reading Shapefiles
 ++++++++++++++++++
