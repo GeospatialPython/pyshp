@@ -246,7 +246,12 @@ class Reader:
 		for field in range(numFields):
 			fieldDesc = list(unpack("<11sc4xBB14x", f.read(32)))
 			name = 0
-			fieldDesc[name] = fieldDesc[name][:fieldDesc[name].index("\x00")]
+                        idx = 0
+                        if "\x00" in fieldDesc[name]:
+                                idx = fieldDesc[name].index("\x00")
+                        else:
+                                idx = len(fieldDesc[name]) - 1
+                        fieldDesc[name] = fieldDesc[name][:idx]
 			fieldDesc[name] = fieldDesc[name].lstrip()
 			self.fields.append(fieldDesc)
 		terminator = f.read(1)
