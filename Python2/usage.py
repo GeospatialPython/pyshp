@@ -101,8 +101,11 @@ Each shape record contains the following attributes:
    complete box around the points. If the shapeType is a Null 
    (shapeType == 0) then an AttributeError is raised.
  
->>> shapes[3].bbox
-[-122.485792, 37.786931000000003, -122.446285, 37.811019000000002]
+>>> # Get the bounding box of the 4th shape.
+>>> # Round coordinates to 3 decimal places
+>>> bbox = shapes[3].bbox 
+>>> [round(coord,3) for coord in bbox]
+[-122.486, 37.787, -122.446, 37.811]
  
  - parts: Parts simply group collections of points into shapes. If the shape record 
    has multiple parts this attribute contains the index of the first point of each part. 
@@ -116,8 +119,11 @@ Each shape record contains the following attributes:
  
 >>> len(shapes[3].points)
 173
->>> shapes[3].points[7]
-[-122.471063, 37.787402999999998]
+>>> # Get the 8th point of the fourth shape
+>>> # Truncate coordinates to 3 decimal places
+>>> shape = shapes[3].points[7]
+>>> [round(coord,3) for coord in shape]
+[-122.471, 37.787]
 
 To read a single shape by calling its index use the shape() method. The index
 is the shape's count from 0. So to read the 8th shape record you would
@@ -125,8 +131,10 @@ use its index which is 7.
 
 >>> s = sf.shape(7)
 
->>> s.bbox
-[-122.449637, 37.801490000000001, -122.442109, 37.807957999999999]
+>>> # Read the bbox of the 8th shape to verify 
+>>> # Round coordinates to 3 decimal places
+>>> [round(coord,3) for coord in s.bbox]
+[-122.45, 37.801, -122.442, 37.808]
 
 Reading Records
 ................
