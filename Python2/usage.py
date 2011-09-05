@@ -25,6 +25,9 @@ examples on your own shapefiles manually. Other examples for specific topics are
 continually added to the pyshp wiki on google code and the blog:
 GeospatialPython.com.
 
+Important: For information about map projections, shapefiles,
+and Python please visit:http://code.google.com/p/pyshp/wiki/MapProjections
+
 I sincerely hope this libarary eliminates the mundane distraction of simply 
 reading and writing data, and allows you to focus on the challenging and FUN
 part of your project. 
