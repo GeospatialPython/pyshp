@@ -246,12 +246,12 @@ class Reader:
 		for field in range(numFields):
 			fieldDesc = list(unpack("<11sc4xBB14x", f.read(32)))
 			name = 0
-                        idx = 0
-                        if "\x00" in fieldDesc[name]:
-                                idx = fieldDesc[name].index("\x00")
-                        else:
-                                idx = len(fieldDesc[name]) - 1
-                        fieldDesc[name] = fieldDesc[name][:idx]
+			idx = 0
+			if "\x00" in fieldDesc[name]:
+				idx = fieldDesc[name].index("\x00")
+			else:
+				idx = len(fieldDesc[name]) - 1
+			fieldDesc[name] = fieldDesc[name][:idx]
 			fieldDesc[name] = fieldDesc[name].lstrip()
 			self.fields.append(fieldDesc)
 		terminator = f.read(1)
@@ -280,7 +280,7 @@ class Reader:
 			if name == 'DeletionFlag':
 				continue
 			elif not value.strip():
-                            record.append(value)			
+				record.append(value)			
 			elif typ == "N":
 				value = value.replace('\0', '').strip()
 				if value == '':
@@ -290,8 +290,11 @@ class Reader:
 				else:
 					value = int(value)
 			elif typ == 'D':
-				y, m, d = int(value[:4]), int(value[4:6]), int(value[6:8])
-				value = [y, m, d]
+                                try:
+                                        y, m, d = int(value[:4]), int(value[4:6]), int(value[6:8])
+                                        value = [y, m, d]
+                                except:
+                                        value = value.strip()
 			elif typ == 'L':
 				value = (value in 'YyTt' and 'T') or \
 							(value in 'NnFf' and 'F') or '?'
@@ -495,7 +498,7 @@ class Writer:
 				raise ShapefileException("Failed to write shapefile bounding box. Floats required.")
 		else:
 			f.write(pack("<4d", 0,0,0,0))
-    # Elevation
+		# Elevation
 		z = self.zbox()
 		# Measure
 		m = self.mbox()
@@ -630,22 +633,22 @@ class Writer:
 			f.write(pack(">i", self._lengths[i]))
 
 	def __dbfRecords(self):
-	    """Writes the dbf records."""
-	    f = self.__getFileObj(self.dbf)
-	    for record in self.records:
-	        if not self.fields[0][0].startswith("Deletion"):
-	            f.write(' ') # deletion flag
-	        for (fieldName, fieldType, size, decimal), value in zip(self.fields, record):
-	            fieldType = fieldType.upper()
-	            size = int(size)
-	            if fieldType.upper() == "N":
-	                value = str(value).rjust(size)
-	            elif fieldType == 'L':
-	                value = str(value)[0].upper()
-	            else:
-	                value = str(value)[:size].ljust(size)
-	            assert len(value) == size
-	            f.write(value)
+		"""Writes the dbf records."""
+		f = self.__getFileObj(self.dbf)
+		for record in self.records:
+			if not self.fields[0][0].startswith("Deletion"):
+				f.write(' ') # deletion flag
+			for (fieldName, fieldType, size, decimal), value in zip(self.fields, record):
+				fieldType = fieldType.upper()
+				size = int(size)
+				if fieldType.upper() == "N":
+					value = str(value).rjust(size)
+				elif fieldType == 'L':
+					value = str(value)[0].upper()
+				else:
+					value = str(value)[:size].ljust(size)
+				assert len(value) == size
+				f.write(value)
 
 	def null(self):
 		"""Creates a null shape."""
@@ -728,7 +731,7 @@ class Writer:
 	def saveShp(self, target):
 		"""Save an shp file."""
 		if not hasattr(target, "write"):
-                        target = os.path.splitext(target)[0] + '.shp'
+			target = os.path.splitext(target)[0] + '.shp'
 		if not self.shapeType:
 			self.shapeType = self._shapes[0].shapeType
 		self.shp = self.__getFileObj(target)
@@ -738,7 +741,7 @@ class Writer:
 	def saveShx(self, target):
 		"""Save an shx file."""
 		if not hasattr(target, "write"):		
-                        target = os.path.splitext(target)[0] + '.shx'
+			target = os.path.splitext(target)[0] + '.shx'
 		if not self.shapeType:
 			self.shapeType = self._shapes[0].shapeType
 		self.shx = self.__getFileObj(target)
@@ -748,7 +751,7 @@ class Writer:
 	def saveDbf(self, target):
 		"""Save a dbf file."""
 		if not hasattr(target, "write"):		
-                        target = os.path.splitext(target)[0] + '.dbf'
+			target = os.path.splitext(target)[0] + '.dbf'
 		self.dbf = self.__getFileObj(target)
 		self.__dbfHeader()
 		self.__dbfRecords()
