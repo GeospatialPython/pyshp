@@ -3,7 +3,7 @@ shapefile.py
 Provides read and write support for ESRI Shapefiles.
 author: jlawhead<at>nvs-inc.com
 date: 20110904
-version: 1.0.7
+version: 1.0.8
 """
 
 from struct import pack, unpack, calcsize, error
@@ -281,6 +281,7 @@ class Reader:
                 continue
             elif not value.strip():
                 record.append(value)
+                continue
             elif typ == "N":
                 value = value.replace('\0', '').strip()
                 if value == '':
