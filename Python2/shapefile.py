@@ -1,9 +1,9 @@
 """
 shapefile.py
 Provides read and write support for ESRI Shapefiles.
-author: jlawhead<at>nvs-inc.com
-date: 20110904
-version: 1.0.8
+author: jlawhead<at>geospatialpython.com
+date: 20110921
+version: 1.1.0
 """
 
 from struct import pack, unpack, calcsize, error
@@ -75,7 +75,7 @@ class Reader:
     efficiently as possible. Shapefiles are usually not large
     but they can be.
     """
-    def __init__(self, shapefile=None):
+    def __init__(self, *args, **kwargs):
         self.shp = None
         self.shx = None
         self.dbf = None
@@ -85,7 +85,30 @@ class Reader:
         self.numRecords = None
         self.fields = []
         self.__dbfHdrLength = 0
-        self.load(shapefile)
+        # See if a shapefile name was passed as an argument
+        if len(args) > 0:
+            if type(args[0]) is type("stringTest"):
+                self.load(args[0])
+                return
+        if "shp" in kwargs.keys():
+            if hasattr(kwargs["shp"], "read"):
+                self.shp = kwargs["shp"]
+                if hasattr(self.shp, "seek"):
+                    self.shp.seek(0)
+            if "shx" in kwargs.keys():
+                if hasattr(kwargs["shx"], "read"):
+                    self.shx = kwargs["shx"]
+                    if hasattr(self.shx, "seek"):
+                        self.shx.seek(0)
+        if "dbf" in kwargs.keys():
+            if hasattr(kwargs["dbf"], "read"):
+                self.dbf = kwargs["dbf"]
+                if hasattr(self.dbf, "seek"):
+                    self.dbf.seek(0)
+        if self.shp or self.dbf:        
+            self.load()
+        else:
+            raise ShapefileException("Shapefile Reader requires a shapefile or file-like object.")
 
     def load(self, shapefile=None):
         """Opens a shapefile from a filename or file-like
@@ -97,22 +120,30 @@ class Reader:
             self.shapeName = shapeName
             try:
                 self.shp = file("%s.shp" % shapeName, "rb")
-                self.__shpHeader()
-            except IOError: pass
+            except IOError:
+                raise ShapefileException("Unable to open %s.shp" % shapeName)
             try:
                 self.shx = file("%s.shx" % shapeName, "rb")
-            #       self.__shapeIndex()
-            except IOError: pass
+            except IOError:
+                raise ShapefileException("Unable to open %s.shx" % shapeName)
             try:
                 self.dbf = file("%s.dbf" % shapeName, "rb")
-                self.__dbfHeader()
-            except IOError: pass
+            except IOError:
+                raise ShapefileException("Unable to open %s.dbf" % shapeName)
+        if self.shp:
+            self.__shpHeader()
+        if self.dbf:
+            self.__dbfHeader()
 
     def __getFileObj(self, f):
         """Checks to see if the requested shapefile file object is
         available. If not a ShapefileException is raised."""
         if not f:
-            raise ShapefileException("Required file not available.")
+            raise ShapefileException("Shapefile Reader requires a shapefile or file-like object.")
+        if self.shp and self.shpLength is None:
+            self.load()
+        if self.dbf and len(self.fields) == 0:
+            self.load()
         return f
 
     def __restrictIndex(self, i):
@@ -127,19 +158,21 @@ class Reader:
 
     def __shpHeader(self):
         """Reads the header information from a .shp or .shx file."""
-        f = self.__getFileObj(self.shp)
+        if not self.shp:
+            raise ShapefileException("Shapefile Reader requires a shapefile or file-like object. (no shp file found")
+        shp = self.shp
         # File length (16-bit word * 2 = bytes)
-        f.seek(24)
-        self.shpLength = unpack(">i", f.read(4))[0] * 2
+        shp.seek(24)
+        self.shpLength = unpack(">i", shp.read(4))[0] * 2
         # Shape type
-        f.seek(32)
-        self.shapeType= unpack("<i", f.read(4))[0]
+        shp.seek(32)
+        self.shapeType= unpack("<i", shp.read(4))[0]
         # The shapefile's bounding box (lower left, upper right)
-        self.bbox = _Array('d', unpack("<4d", f.read(32)))
+        self.bbox = _Array('d', unpack("<4d", shp.read(32)))
         # Elevation
-        self.elevation = _Array('d', unpack("<2d", f.read(16)))
+        self.elevation = _Array('d', unpack("<2d", shp.read(16)))
         # Measure
-        self.measure = _Array('d', unpack("<2d", f.read(16)))
+        self.measure = _Array('d', unpack("<2d", shp.read(16)))
 
     def __shape(self):
         """Returns the header info and geometry for a single shape."""
@@ -175,9 +208,10 @@ class Reader:
             (zmin, zmax) = unpack("<2d", f.read(16))
             record.z = _Array('d', unpack("<%sd" % nPoints, f.read(nPoints * 8)))
         # Read m extremes and values
-        if shapeType in (23,25,28):
+        if shapeType in (13,15,18,23,25,28,31):
             (mmin, mmax) = unpack("<2d", f.read(16))
-            record.m = _Array('d', unpack("%sd" % nPoints, f.read(nPoints * 8)))
+            # Measure values less than -10e38 are nodata values according to the spec
+            record.m = [m if m > -10e38 else None for m in _Array('d', unpack("%sd" % nPoints, f.read(nPoints * 8)))]
         # Read a single point
         if shapeType in (1,11,21):
             record.points = [_Array('d', unpack("<2d", f.read(16)))]
@@ -192,59 +226,64 @@ class Reader:
     def __shapeIndex(self, i=None):
         """Returns the offset in a .shp file for a shape based on information
         in the .shx index file."""
-        f = self.__getFileObj(self.shx)
-        if not f:
+        shx = self.shx
+        if not shx:
             return None
         if not self._offsets:
             # File length (16-bit word * 2 = bytes) - header length
-            f.seek(24)
-            shxRecordLength = (unpack(">i", f.read(4))[0] * 2) - 100
+            shx.seek(24)
+            shxRecordLength = (unpack(">i", shx.read(4))[0] * 2) - 100
             numRecords = shxRecordLength / 8
             # Jump to the first record.
-            f.seek(100)
+            shx.seek(100)
             for r in range(numRecords):
                 # Offsets are 16-bit words just like the file length
-                self._offsets.append(unpack(">i", f.read(4))[0] * 2)
-                f.seek(f.tell() + 4)
+                self._offsets.append(unpack(">i", shx.read(4))[0] * 2)
+                shx.seek(shx.tell() + 4)
         if not i == None:
             return self._offsets[i]
 
     def shape(self, i=0):
         """Returns a shape object for a shape in the the geometry
         record file."""
-        f = self.shp
+        shp = self.__getFileObj(self.shp)
         i = self.__restrictIndex(i)
         offset = self.__shapeIndex(i)
         if not offset:
             # Shx index not available so use the full list.
             shapes = self.shapes()
             return shapes[i]
-        f.seek(offset)
+        shp.seek(offset)
         return self.__shape()
 
     def shapes(self):
         """Returns all shapes in a shapefile."""
-        self.shp.seek(100)
+        shp = self.__getFileObj(self.shp)
+        shp.seek(100)
         shapes = []
-        while self.shp.tell() < self.shpLength:
+        while shp.tell() < self.shpLength:
             shapes.append(self.__shape())
         return shapes
 
     def __dbfHeaderLength(self):
         """Retrieves the header length of a dbf file header."""
         if not self.__dbfHdrLength:
-            f = self.__getFileObj(self.dbf)
+            if not self.dbf:
+                raise ShapefileException("Shapefile Reader requires a shapefile or file-like object. (no dbf file found)")
+            dbf = self.dbf
             (self.numRecords, self.__dbfHdrLength) = \
-                    unpack("<xxxxLH22x", f.read(32))
+                    unpack("<xxxxLH22x", dbf.read(32))
         return self.__dbfHdrLength
 
     def __dbfHeader(self):
         """Reads a dbf header. Xbase-related code borrows heavily from ActiveState Python Cookbook Recipe 362715 by Raymond Hettinger"""
-        f = self.__getFileObj(self.dbf)
+        if not self.dbf:
+            raise ShapefileException("Shapefile Reader requires a shapefile or file-like object. (no dbf file found)")
+        dbf = self.dbf
         headerLength = self.__dbfHeaderLength()
         numFields = (headerLength - 33) // 32
         for field in range(numFields):
-            fieldDesc = list(unpack("<11sc4xBB14x", f.read(32)))
+            fieldDesc = list(unpack("<11sc4xBB14x", dbf.read(32)))
             name = 0
             idx = 0
             if "\x00" in fieldDesc[name]:
@@ -254,7 +293,7 @@ class Reader:
             fieldDesc[name] = fieldDesc[name][:idx]
             fieldDesc[name] = fieldDesc[name].lstrip()
             self.fields.append(fieldDesc)
-        terminator = f.read(1)
+        terminator = dbf.read(1)
         assert terminator == "\r"
         self.fields.insert(0, ('DeletionFlag', 'C', 1, 0))
 
@@ -757,17 +796,24 @@ class Writer:
         self.__dbfHeader()
         self.__dbfRecords()
 
-    def save(self, target=""):
+    def save(self, target=None, shp=None, shx=None, dbf=None):
         """Save the shapefile data to three files or
-        three file-like objects. SHP and DBF files can
+        three file-like objects. SHP and DBF files can also
         be written exclusively using saveShp, saveShx, and saveDbf respectively."""
         # TODO: Create a unique filename for target if None.
-        self.saveShp(target)
-        self.shp.close()
-        self.saveShx(target)
-        self.shx.close()
-        self.saveDbf(target)
-        self.dbf.close()
+        if shp:
+            self.saveShp(shp)
+        if shx:
+            self.saveShx(shx)
+        if dbf:
+            self.saveDbf(dbf)
+        elif target:
+            self.saveShp(target)
+            self.shp.close()
+            self.saveShx(target)
+            self.shx.close()
+            self.saveDbf(target)
+            self.dbf.close()
 
 class Editor(Writer):
     def __init__(self, shapefile=None, shapeType=POINT, autoBalance=1):

@@ -3,32 +3,39 @@
 Python Shapefile Library
 ========================
 :Author: Joel Lawhead <jlawhead@geospatialpython.com>
-:Revised: August 31, 2011
+:Revised: September 21, 2011
 
 Overview
 --------
 
-The Python Shapefile Library (PSL) provides read and write support for the ESRI
+The Python Shapefile Library (pyshp) provides read and write support for the ESRI
 Shapefile format. The Shapefile format is a popular Geographic Information
-System vector data format.
+System vector data format created by Esri.  For more information about this format 
+please read the well-written "ESRI Shapefile Technical Description - July 1998".  
+The Esri document describes the shp and shx file formats.  However a third file
+format called dbf is also required.  This format is documented on the web as the
+"XBase File Format Description" and is a simple file-based database format created
+in the 1960's.  Both the Esri and XBase file-formats are very simple in design and
+memory efficient which is part of the reason the shapefile format remains popular
+despite the numerous ways to store and exchange GIS data available today. 
 
 This documentation covers the Python 2.x-compatible version of the library.  A
 Python 3-compatible version is available in the Subversion trunk of the pyshp 
 project on Google Code.
 
-This document provides usage examples for using the Python Shapefile Library.  
+This document provides examples for using pyshp to read and write shapefiles.  
 
 Currently the sample census blockgroup shapefile referenced in the examples is
 only available on the google code project site at http://code.google.com/p/pyshp.
-These examples are straight-forward and you can also easily run these simple 
-examples on your own shapefiles manually. Other examples for specific topics are
-continually added to the pyshp wiki on google code and the blog:
+These examples are straight-forward and you can also easily run them against your 
+own shapefiles manually with minimal modification. Other examples for specific 
+topics are continually added to the pyshp wiki on google code and the blog
 GeospatialPython.com.
 
 Important: For information about map projections, shapefiles,
-and Python please visit:http://code.google.com/p/pyshp/wiki/MapProjections
+and Python please visit: http://code.google.com/p/pyshp/wiki/MapProjections
 
-I sincerely hope this libarary eliminates the mundane distraction of simply 
+I sincerely hope this library eliminates the mundane distraction of simply 
 reading and writing data, and allows you to focus on the challenging and FUN
 part of your project. 
 
@@ -64,7 +71,22 @@ OR
 >>> sf = shapefile.Reader("shapefiles/blockgroups.dbf")
 
 
-OR any of the other 5+ formats which are potentially part of a shapefile.
+OR any of the other 5+ formats which are potentially part of a shapefile. 
+The library does not care
+
+You can ALSO load shapefiles from any Python file-like object using keyword
+arguments to specify any of the three files.  This feature is very powerful
+and allows you to load shapefiles from a url, from a zip file, serialized
+object, or in some cases a database.
+
+>>> myshp = file("shapefiles/blockgroups.shp", "rb")
+>>> mydbf = file("shapefiles/blockgroups.dbf", "rb")
+>>> r = shapefile.Reader(shp=myshp, dbf=mydbf)
+
+Notice in the examples above the shx file is never used.  The shx file is a 
+very simple fixed-record index for the variable length records in the shp file.
+This file is optional for reading.  If it's available pyshp will use the shx file
+to access shape records a little faster but will do just fine without it.
 
 Reading Geometry
 ................
