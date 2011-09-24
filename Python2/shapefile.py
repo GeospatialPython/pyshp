@@ -2,8 +2,8 @@
 shapefile.py
 Provides read and write support for ESRI Shapefiles.
 author: jlawhead<at>geospatialpython.com
-date: 20110921
-version: 1.1.0
+date: 20110923
+version: 1.1.1
 """
 
 from struct import pack, unpack, calcsize, error
@@ -935,13 +935,13 @@ class Editor(Writer):
 # Begin Testing
 def test():
     import doctest
-    import usage
+    import pyshp_usage
     doctest.NORMALIZE_WHITESPACE = 1
-    doctest.testmod(usage, verbose=1)
+    doctest.testmod(pyshp_usage, verbose=1)
 
 if __name__ == "__main__":
     """
-    Doctests are contained in the module 'usage.py'. This library was developed
+    Doctests are contained in the module 'pyshp_usage.py'. This library was developed
     using Python 2.3. Python 2.4 and above have some excellent improvements in the built-in
     testing libraries but for now unit testing is done using what's available in
     2.3.
