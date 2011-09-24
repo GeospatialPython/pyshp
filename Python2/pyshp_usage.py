@@ -451,14 +451,14 @@ You can also add attributes using keyword arguments where the keys are field nam
 >>> w.record(FIRST_FLD='First', SECOND_FLD='Line')
 >>> w.save('shapefiles/test/line')
 
-Editor Class
-+++++++++++++
+Editing Shapefiles
+++++++++++++++++++
 
 The Editor class attempts to make changing existing shapefiles easier by handling the reading and writing details behind the scenes.
 
 Let's add shapes to existing shapefiles:
 
-Add a point to a point shapefile:
+Add a point to a point shapefile
  
 >>> e = shapefile.Editor(shapefile="shapefiles/test/point.shp")
 >>> e.point(0,0,10,2)
