@@ -5,6 +5,8 @@ Python Shapefile Library
 :Author: Joel Lawhead <jlawhead@geospatialpython.com>
 :Revised: September 23, 2011
 
+.. contents::
+
 Overview
 --------
 
@@ -74,7 +76,10 @@ OR
 OR any of the other 5+ formats which are potentially part of a shapefile. 
 The library does not care
 
-You can ALSO load shapefiles from any Python file-like object using keyword
+Reading Shapefiles from File-Like Objects
+.........................................
+
+You can also load shapefiles from any Python file-like object using keyword
 arguments to specify any of the three files.  This feature is very powerful
 and allows you to load shapefiles from a url, from a zip file, serialized
 object, or in some cases a database.
@@ -491,6 +496,7 @@ Remove the last shape in the polygon shapefile.
 >>> e = shapefile.Editor(shapefile="shapefiles/test/polygon.shp")
 >>> e.delete(-1)
 >>> e.save('shapefiles/test/polygon')
+
 """
 
 

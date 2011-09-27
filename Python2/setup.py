@@ -1,14 +1,16 @@
 from setuptools import setup
-import pyshp_usage
+
+with open('README.txt') as file:
+    long_description = file.read()
 
 setup(name='pyshp',
-      version='1.1.1',
+      version='1.1.2',
       description='Pure Python read/write support for ESRI Shapefile format',
-      long_description=pyshp_usage.__doc__.strip(),
+      long_description=long_description,
       author='Joel Lawhead',
       author_email='jlawhead@geospatialpython.com',
       url='http://code.google.com/p/pyshp',
-      py_modules=['shapefile','pyshp_usage'],
+      py_modules=['shapefile'],
       license='MIT',
       zip_safe=False,
       keywords='gis geospatial geographic shapefile shapefiles',
