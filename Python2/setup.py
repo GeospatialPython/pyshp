@@ -4,7 +4,7 @@ with open('README.txt') as file:
     long_description = file.read()
 
 setup(name='pyshp',
-      version='1.1.2',
+      version='1.1.3',
       description='Pure Python read/write support for ESRI Shapefile format',
       long_description=long_description,
       author='Joel Lawhead',
