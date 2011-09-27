@@ -3,7 +3,7 @@ shapefile.py
 Provides read and write support for ESRI Shapefiles.
 author: jlawhead<at>geospatialpython.com
 date: 20110927
-version: 1.1.2
+version: 1.1.3
 """
 
 from struct import pack, unpack, calcsize, error

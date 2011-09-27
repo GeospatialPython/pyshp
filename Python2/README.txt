@@ -1,5 +1,3 @@
-"""
-
 Python Shapefile Library
 ========================
 :Author: Joel Lawhead <jlawhead@geospatialpython.com>
@@ -456,6 +454,21 @@ You can also add attributes using keyword arguments where the keys are field nam
 >>> w.record(FIRST_FLD='First', SECOND_FLD='Line')
 >>> w.save('shapefiles/test/line')
 
+Saving to File-Like Objects
+...........................
+
+Just as you can read shapefiles from python file-like objects you can also write them.
+
+>>> import StringIO
+>>> shp = StringIO.StringIO()
+>>> shx = StringIO.StringIO()
+>>> dbf = StringIO.StringIO()
+>>> w.saveShp(shp)
+>>> w.saveShx(shx)
+>>> w.saveDbf(dbf)
+>>> # Normally you would call the "StringIO.getvalue()" method on these objects.
+>>> shp = shx = dbf = None
+
 Editing Shapefiles
 ++++++++++++++++++
 
@@ -496,8 +509,5 @@ Remove the last shape in the polygon shapefile.
 >>> e = shapefile.Editor(shapefile="shapefiles/test/polygon.shp")
 >>> e.delete(-1)
 >>> e.save('shapefiles/test/polygon')
-
-"""
-
 
 
