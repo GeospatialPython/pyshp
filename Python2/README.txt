@@ -1,7 +1,7 @@
 Python Shapefile Library
 ========================
 :Author: Joel Lawhead <jlawhead@geospatialpython.com>
-:Revised: September 23, 2011
+:Revised: October 1, 2011
 
 .. contents::
 
@@ -82,8 +82,8 @@ arguments to specify any of the three files.  This feature is very powerful
 and allows you to load shapefiles from a url, from a zip file, serialized
 object, or in some cases a database.
 
->>> myshp = file("shapefiles/blockgroups.shp", "rb")
->>> mydbf = file("shapefiles/blockgroups.dbf", "rb")
+>>> myshp = open("shapefiles/blockgroups.shp", "rb")
+>>> mydbf = open("shapefiles/blockgroups.dbf", "rb")
 >>> r = shapefile.Reader(shp=myshp, dbf=mydbf)
 
 Notice in the examples above the shx file is never used.  The shx file is a 
@@ -112,8 +112,13 @@ geometry of each shape record.
 
 Each shape record contains the following attributes:
 
->>> dir(shapes[3])
-['__doc__', '__init__', '__module__', 'bbox', 'parts', 'points', 'shapeType']
+>>> for name in dir(shapes[3]):
+...     if not name.startswith('__'):
+...         name
+'bbox'
+'parts'
+'points'
+'shapeType'
 
  - shapeType: an integer representing the type of shape as defined by the
    shapefile specification.
@@ -129,8 +134,8 @@ Each shape record contains the following attributes:
 >>> # Get the bounding box of the 4th shape.
 >>> # Round coordinates to 3 decimal places
 >>> bbox = shapes[3].bbox 
->>> [round(coord,3) for coord in bbox]
-[-122.486, 37.787, -122.446, 37.811]
+>>> ['%.3f' % coord for coord in bbox]
+['-122.486', '37.787', '-122.446', '37.811']
  
  - parts: Parts simply group collections of points into shapes. If the shape record 
    has multiple parts this attribute contains the index of the first point of each part. 
@@ -147,8 +152,8 @@ Each shape record contains the following attributes:
 >>> # Get the 8th point of the fourth shape
 >>> # Truncate coordinates to 3 decimal places
 >>> shape = shapes[3].points[7]
->>> [round(coord,3) for coord in shape]
-[-122.471, 37.787]
+>>> ['%.3f' % coord for coord in shape]
+['-122.471', '37.787']
 
 To read a single shape by calling its index use the shape() method. The index
 is the shape's count from 0. So to read the 8th shape record you would
@@ -158,8 +163,8 @@ use its index which is 7.
 
 >>> # Read the bbox of the 8th shape to verify 
 >>> # Round coordinates to 3 decimal places
->>> [round(coord,3) for coord in s.bbox]
-[-122.45, 37.801, -122.442, 37.808]
+>>> ['%.3f' % coord for coord in s.bbox]
+['-122.450', '37.801', '-122.442', '37.808']
 
 Reading Records
 ................
@@ -459,10 +464,13 @@ Saving to File-Like Objects
 
 Just as you can read shapefiles from python file-like objects you can also write them.
 
->>> import StringIO
->>> shp = StringIO.StringIO()
->>> shx = StringIO.StringIO()
->>> dbf = StringIO.StringIO()
+>>> try:
+...     from StringIO import StringIO
+... except ImportError:
+...     from io import BytesIO as StringIO
+>>> shp = StringIO()
+>>> shx = StringIO()
+>>> dbf = StringIO()
 >>> w.saveShp(shp)
 >>> w.saveShx(shx)
 >>> w.saveDbf(dbf)

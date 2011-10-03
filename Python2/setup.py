@@ -1,12 +1,9 @@
 from setuptools import setup
 
-with open('README.txt') as file:
-    long_description = file.read()
-
 setup(name='pyshp',
-      version='1.1.3',
+      version='1.1.4',
       description='Pure Python read/write support for ESRI Shapefile format',
-      long_description=long_description,
+      long_description=open('README.txt').read(),
       author='Joel Lawhead',
       author_email='jlawhead@geospatialpython.com',
       url='http://code.google.com/p/pyshp',

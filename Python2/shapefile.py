@@ -3,11 +3,13 @@ shapefile.py
 Provides read and write support for ESRI Shapefiles.
 author: jlawhead<at>geospatialpython.com
 date: 20110927
-version: 1.1.3
+version: 1.1.4
+Compatible with Python versions 2.4-3.x
 """
 
 from struct import pack, unpack, calcsize, error
 import os
+import sys
 import time
 import array
 #
@@ -26,6 +28,44 @@ POLYLINEM = 23
 POLYGONM = 25
 MULTIPOINTM = 28
 MULTIPATCH = 31
+
+PYTHON3 = sys.version_info[0] == 3
+
+def b(v):
+    if PYTHON3:
+        if isinstance(v, str):
+            # For python 3 encode str to bytes.
+            return v.encode('utf-8')
+        elif isinstance(v, bytes):
+            # Already bytes.
+            return v
+        else:
+            # Error.
+            raise Exception('Unknown input type')
+    else:
+        # For python 2 assume str passed in and return str.
+        return v
+
+def u(v):
+    if PYTHON3:
+        if isinstance(v, bytes):
+            # For python 3 decode bytes to str.
+            return v.decode('utf-8')
+        elif isinstance(v, str):
+            # Already str.
+            return v
+        else:
+            # Error.
+            raise Exception('Unknown input type')
+    else:
+        # For python 2 assume str passed in and return str.
+        return v
+
+def is_string(v):
+    if PYTHON3:
+        return isinstance(v, str)
+    else:
+        return isinstance(v, basestring)
 
 class _Array(array.array):
     """Converts python tuples to lits of the appropritate type.
@@ -119,15 +159,15 @@ class Reader:
             (shapeName, ext) = os.path.splitext(shapefile)
             self.shapeName = shapeName
             try:
-                self.shp = file("%s.shp" % shapeName, "rb")
+                self.shp = open("%s.shp" % shapeName, "rb")
             except IOError:
                 raise ShapefileException("Unable to open %s.shp" % shapeName)
             try:
-                self.shx = file("%s.shx" % shapeName, "rb")
+                self.shx = open("%s.shx" % shapeName, "rb")
             except IOError:
                 raise ShapefileException("Unable to open %s.shx" % shapeName)
             try:
-                self.dbf = file("%s.dbf" % shapeName, "rb")
+                self.dbf = open("%s.dbf" % shapeName, "rb")
             except IOError:
                 raise ShapefileException("Unable to open %s.dbf" % shapeName)
         if self.shp:
@@ -211,7 +251,12 @@ class Reader:
         if shapeType in (13,15,18,23,25,28,31):
             (mmin, mmax) = unpack("<2d", f.read(16))
             # Measure values less than -10e38 are nodata values according to the spec
-            record.m = [m if m > -10e38 else None for m in _Array('d', unpack("%sd" % nPoints, f.read(nPoints * 8)))]
+            record.m = []
+            for m in _Array('d', unpack("%sd" % nPoints, f.read(nPoints * 8))):
+                if m > -10e38:
+                    record.m.append(m)
+                else:
+                    record.m.append(None)
         # Read a single point
         if shapeType in (1,11,21):
             record.points = [_Array('d', unpack("<2d", f.read(16)))]
@@ -233,7 +278,7 @@ class Reader:
             # File length (16-bit word * 2 = bytes) - header length
             shx.seek(24)
             shxRecordLength = (unpack(">i", shx.read(4))[0] * 2) - 100
-            numRecords = shxRecordLength / 8
+            numRecords = shxRecordLength // 8
             # Jump to the first record.
             shx.seek(100)
             for r in range(numRecords):
@@ -286,15 +331,17 @@ class Reader:
             fieldDesc = list(unpack("<11sc4xBB14x", dbf.read(32)))
             name = 0
             idx = 0
-            if "\x00" in fieldDesc[name]:
-                idx = fieldDesc[name].index("\x00")
+            if b("\x00") in fieldDesc[name]:
+                idx = fieldDesc[name].index(b("\x00"))
             else:
                 idx = len(fieldDesc[name]) - 1
             fieldDesc[name] = fieldDesc[name][:idx]
+            fieldDesc[name] = u(fieldDesc[name])
             fieldDesc[name] = fieldDesc[name].lstrip()
+            fieldDesc[1] = u(fieldDesc[1])
             self.fields.append(fieldDesc)
         terminator = dbf.read(1)
-        assert terminator == "\r"
+        assert terminator == b("\r")
         self.fields.insert(0, ('DeletionFlag', 'C', 1, 0))
 
     def __recordFmt(self):
@@ -310,7 +357,7 @@ class Reader:
         f = self.__getFileObj(self.dbf)
         recFmt = self.__recordFmt()
         recordContents = unpack(recFmt[0], f.read(recFmt[1]))
-        if recordContents[0] != ' ':
+        if recordContents[0] != b(' '):
             # deleted record
             return None
         record = []
@@ -322,23 +369,24 @@ class Reader:
                 record.append(value)
                 continue
             elif typ == "N":
-                value = value.replace('\0', '').strip()
-                if value == '':
+                value = value.replace(b('\0'), b('')).strip()
+                if value == b(''):
                     value = 0
                 elif deci:
                     value = float(value)
                 else:
                     value = int(value)
-            elif typ == 'D':
+            elif typ == b('D'):
                 try:
                     y, m, d = int(value[:4]), int(value[4:6]), int(value[6:8])
                     value = [y, m, d]
                 except:
                     value = value.strip()
-            elif typ == 'L':
-                value = (value in 'YyTt' and 'T') or \
-                                        (value in 'NnFf' and 'F') or '?'
+            elif typ == b('L'):
+                value = (value in b('YyTt') and b('T')) or \
+                                        (value in b('NnFf') and b('F')) or b('?')
             else:
+                value = u(value)
                 value = value.strip()
             record.append(value)
         return record
@@ -361,7 +409,7 @@ class Reader:
         records = []
         f = self.__getFileObj(self.dbf)
         f.seek(self.__dbfHeaderLength())
-        for i in xrange(self.numRecords):
+        for i in range(self.numRecords):
             r = self.__record()
             if r:
                 records.append(r)
@@ -407,7 +455,7 @@ class Writer:
             pth = os.path.split(f)[0]
             if pth and not os.path.exists(pth):
                 os.makedirs(pth)
-            return file(f, "wb")
+            return open(f, "wb")
 
     def __shpFileLength(self):
         """Calculates the file length of the shp file."""
@@ -465,7 +513,7 @@ class Writer:
             if self.shapeType in (11,21):
                 size += 8
         # Calculate size as 16-bit words
-        size /= 2
+        size //= 2
         return size
 
     def __bbox(self, shapes, shapeTypes=[]):
@@ -475,7 +523,7 @@ class Writer:
             shapeType = self.shapeType
             if shapeTypes:
                 shapeType = shapeTypes[shapes.index(s)]
-            px, py = zip(*s.points)[:2]
+            px, py = list(zip(*s.points))[:2]
             x.extend(px)
             y.extend(py)
         return [min(x), min(y), max(x), max(y)]
@@ -527,7 +575,7 @@ class Writer:
         if headerType == 'shp':
             f.write(pack(">i", self.__shpFileLength()))
         elif headerType == 'shx':
-            f.write(pack('>i', ((100 + (len(self._shapes) * 8)) / 2)))
+            f.write(pack('>i', ((100 + (len(self._shapes) * 8)) // 2)))
         # Version, Shape type
         f.write(pack("<2i", 1000, self.shapeType))
         # The shapefile's bounding box (lower left, upper right)
@@ -568,13 +616,15 @@ class Writer:
         # Field descriptors
         for field in self.fields:
             name, fieldType, size, decimal = field
-            name = name.replace(' ', '_')
-            name = name.ljust(11).replace(' ', '\x00')
+            name = b(name)
+            name = name.replace(b(' '), b('_'))
+            name = name.ljust(11).replace(b(' '), b('\x00'))
+            fieldType = b(fieldType)
             size = int(size)
             fld = pack('<11sc4xBB14x', name, fieldType, size, decimal)
             f.write(fld)
         # Terminator
-        f.write('\r')
+        f.write(b('\r'))
 
     def __shpRecords(self):
         """Write the shp records"""
@@ -657,7 +707,7 @@ class Writer:
                     raise ShapefileException("Failed to write measure value for record %s. Expected floats." % recNum)
             # Finalize record length as 16-bit words
             finish = f.tell()
-            length = (finish - start) / 2
+            length = (finish - start) // 2
             self._lengths.append(length)
             # start - 4 bytes is the content length field
             f.seek(start-4)
@@ -669,7 +719,7 @@ class Writer:
         f = self.__getFileObj(self.shx)
         f.seek(100)
         for i in range(len(self._shapes)):
-            f.write(pack(">i", self._offsets[i]/2))
+            f.write(pack(">i", self._offsets[i] // 2))
             f.write(pack(">i", self._lengths[i]))
 
     def __dbfRecords(self):
@@ -677,7 +727,7 @@ class Writer:
         f = self.__getFileObj(self.dbf)
         for record in self.records:
             if not self.fields[0][0].startswith("Deletion"):
-                f.write(' ') # deletion flag
+                f.write(b(' ')) # deletion flag
             for (fieldName, fieldType, size, dec), value in zip(self.fields, record):
                 fieldType = fieldType.upper()
                 size = int(size)
@@ -688,6 +738,7 @@ class Writer:
                 else:
                     value = str(value)[:size].ljust(size)
                 assert len(value) == size
+                value = b(value)
                 f.write(value)
 
     def null(self):
@@ -752,7 +803,7 @@ class Writer:
             [record.append(recordList[i]) for i in range(fieldCount)]
         elif recordDict:
             for field in self.fields:
-                if recordDict.has_key(field[0]):
+                if field[0] in recordDict:
                     val = recordDict[field[0]]
                     if val:
                         record.append(val)
@@ -820,7 +871,7 @@ class Editor(Writer):
         self.autoBalance = autoBalance
         if not shapefile:
             Writer.__init__(self, shapeType)
-        elif isinstance(shapefile, basestring):
+        elif is_string(shapefile):
             base = os.path.splitext(shapefile)[0]
             if os.path.isfile("%s.shp" % base):
                 r = Reader(base)
