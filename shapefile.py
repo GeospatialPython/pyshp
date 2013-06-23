@@ -2,16 +2,18 @@
 shapefile.py
 Provides read and write support for ESRI Shapefiles.
 author: jlawhead<at>geospatialpython.com
-date: 20110927
-version: 1.1.4
+date: 20130622
+version: 1.1.7
 Compatible with Python versions 2.4-3.x
 """
+__version__ = "1.1.7"
 
 from struct import pack, unpack, calcsize, error
 import os
 import sys
 import time
 import array
+import tempfile
 #
 # Constants for shape types
 NULL = 0
@@ -30,6 +32,9 @@ MULTIPOINTM = 28
 MULTIPATCH = 31
 
 PYTHON3 = sys.version_info[0] == 3
+
+if PYTHON3:
+    xrange = range
 
 def b(v):
     if PYTHON3:
@@ -73,6 +78,16 @@ class _Array(array.array):
     def __repr__(self):
         return str(self.tolist())
 
+def signed_area(coords):
+    """Return the signed area enclosed by a ring using the linear time
+    algorithm at http://www.cgafaq.info/wiki/Polygon_Area. A value <= 0
+    indicates a counter-clockwise oriented ring.
+    """
+    xs, ys = map(list, zip(*coords))
+    xs.append(xs[1])
+    ys.append(ys[1])
+    return sum(xs[i]*(ys[i+1]-ys[i-1]) for i in range(1, len(coords)))/2.0
+
 class _Shape:
     def __init__(self, shapeType=None):
         """Stores the geometry of the different shape types
@@ -86,6 +101,78 @@ class _Shape:
         list of shapes."""
         self.shapeType = shapeType
         self.points = []
+
+    @property
+    def __geo_interface__(self):
+        if self.shapeType in [POINT, POINTM, POINTZ]:
+            return {
+            'type': 'Point',
+            'coordinates': tuple(self.points[0])
+            }
+        elif self.shapeType in [MULTIPOINT, MULTIPOINTM, MULTIPOINTZ]:
+            return {
+            'type': 'MultiPoint',
+            'coordinates': tuple([tuple(p) for p in self.points])
+            }
+        elif self.shapeType in [POLYLINE, POLYLINEM, POLYLINEZ]:
+            if len(self.parts) == 1:
+                return {
+                'type': 'LineString',
+                'coordinates': tuple([tuple(p) for p in self.points])
+                }
+            else:
+                ps = None
+                coordinates = []
+                for part in self.parts:
+                    if ps == None:
+                        ps = part
+                        continue
+                    else:
+                        coordinates.append(tuple([tuple(p) for p in self.points[ps:part]]))
+                        ps = part
+                else:
+                    coordinates.append(tuple([tuple(p) for p in self.points[part:]]))
+                return {
+                'type': 'MultiLineString',
+                'coordinates': tuple(coordinates)
+                }
+        elif self.shapeType in [POLYGON, POLYGONM, POLYGONZ]:
+            if len(self.parts) == 1:
+                return {
+                'type': 'Polygon',
+                'coordinates': (tuple([tuple(p) for p in self.points]),)
+                }
+            else:
+                ps = None
+                coordinates = []
+                for part in self.parts:
+                    if ps == None:
+                        ps = part
+                        continue
+                    else:
+                        coordinates.append(tuple([tuple(p) for p in self.points[ps:part]]))
+                        ps = part
+                else:
+                    coordinates.append(tuple([tuple(p) for p in self.points[part:]]))
+                polys = []
+                poly = [coordinates[0]]
+                for coord in coordinates[1:]:
+                    if signed_area(coord) < 0:
+                        polys.append(poly)
+                        poly = [coord]
+                    else:
+                        poly.append(coord)
+                polys.append(poly)
+                if len(polys) == 1:
+                    return {
+                    'type': 'Polygon',
+                    'coordinates': tuple(polys[0])
+                    }
+                elif len(polys) > 1:
+                    return {
+                    'type': 'MultiPolygon',
+                    'coordinates': polys
+                    }
 
 class _ShapeRecord:
     """A shape object of any type."""
@@ -127,7 +214,7 @@ class Reader:
         self.__dbfHdrLength = 0
         # See if a shapefile name was passed as an argument
         if len(args) > 0:
-            if type(args[0]) is type("stringTest"):
+            if is_string(args[0]):
                 self.load(args[0])
                 return
         if "shp" in kwargs.keys():
@@ -220,6 +307,8 @@ class Reader:
         record = _Shape()
         nParts = nPoints = zmin = zmax = mmin = mmax = None
         (recNum, recLength) = unpack(">2i", f.read(8))
+        # Determine the start of the next record
+        next = f.tell() + (2 * recLength)
         shapeType = unpack("<i", f.read(4))[0]
         record.shapeType = shapeType
         # For Null shapes create an empty points list for consistency
@@ -247,12 +336,12 @@ class Reader:
         if shapeType in (13,15,18,31):
             (zmin, zmax) = unpack("<2d", f.read(16))
             record.z = _Array('d', unpack("<%sd" % nPoints, f.read(nPoints * 8)))
-        # Read m extremes and values
-        if shapeType in (13,15,18,23,25,28,31):
+        # Read m extremes and values if header m values do not equal 0.0
+        if shapeType in (13,15,18,23,25,28,31) and not 0.0 in self.measure:
             (mmin, mmax) = unpack("<2d", f.read(16))
             # Measure values less than -10e38 are nodata values according to the spec
             record.m = []
-            for m in _Array('d', unpack("%sd" % nPoints, f.read(nPoints * 8))):
+            for m in _Array('d', unpack("<%sd" % nPoints, f.read(nPoints * 8))):
                 if m > -10e38:
                     record.m.append(m)
                 else:
@@ -266,6 +355,10 @@ class Reader:
         # Read a single M value
         if shapeType in (11,21):
             record.m = unpack("<d", f.read(8))
+        # Seek to the end of this record as defined by the record header because
+        # the shapefile spec doesn't require the actual content to meet the header
+        # definition.  Probably allowed for lazy feature deletion. 
+        f.seek(next)
         return record
 
     def __shapeIndex(self, i=None):
@@ -295,9 +388,10 @@ class Reader:
         i = self.__restrictIndex(i)
         offset = self.__shapeIndex(i)
         if not offset:
-            # Shx index not available so use the full list.
-            shapes = self.shapes()
-            return shapes[i]
+            # Shx index not available so iterate the full list.
+            for j,k in enumerate(self.iterShapes()):
+                if j == i:
+                    return k
         shp.seek(offset)
         return self.__shape()
 
@@ -309,6 +403,14 @@ class Reader:
         while shp.tell() < self.shpLength:
             shapes.append(self.__shape())
         return shapes
+
+    def iterShapes(self):
+        """Serves up shapes in a shapefile as an iterator. Useful
+        for handling large shapefiles."""
+        shp = self.__getFileObj(self.shp)
+        shp.seek(100)
+        while shp.tell() < self.shpLength:
+            yield self.__shape()    
 
     def __dbfHeaderLength(self):
         """Retrieves the header length of a dbf file header."""
@@ -415,12 +517,23 @@ class Reader:
                 records.append(r)
         return records
 
+    def iterRecords(self):
+        """Serves up records in a dbf file as an iterator.
+        Useful for large shapefiles or dbf files."""
+        if not self.numRecords:
+            self.__dbfHeader()
+        f = self.__getFileObj(self.dbf)
+        f.seek(self.__dbfHeaderLength())
+        for i in xrange(self.numRecords):
+            r = self.__record()
+            if r:
+                yield r
+
     def shapeRecord(self, i=0):
         """Returns a combination geometry and attribute record for the
         supplied record index."""
         i = self.__restrictIndex(i)
-        return _ShapeRecord(shape=self.shape(i),
-                                                        record=self.record(i))
+        return _ShapeRecord(shape=self.shape(i), record=self.record(i))
 
     def shapeRecords(self):
         """Returns a list of combination geometry/attribute records for
@@ -674,7 +787,8 @@ class Writer:
                 except error:
                     raise ShapefileException("Failed to write elevation extremes for record %s. Expected floats." % recNum)
                 try:
-                    [f.write(pack("<d", p[2])) for p in s.points]
+                    #[f.write(pack("<d", p[2])) for p in s.points]
+                    f.write(pack("<%sd" % len(s.z), *s.z))
                 except error:
                     raise ShapefileException("Failed to write elevation values for record %s. Expected floats." % recNum)
             # Write m extremes and values
@@ -805,10 +919,10 @@ class Writer:
             for field in self.fields:
                 if field[0] in recordDict:
                     val = recordDict[field[0]]
-                    if val:
-                        record.append(val)
-                    else:
+                    if val is None:
                         record.append("")
+                    else:
+                        record.append(val)
         if record:
             self.records.append(record)
 
@@ -850,21 +964,33 @@ class Writer:
     def save(self, target=None, shp=None, shx=None, dbf=None):
         """Save the shapefile data to three files or
         three file-like objects. SHP and DBF files can also
-        be written exclusively using saveShp, saveShx, and saveDbf respectively."""
-        # TODO: Create a unique filename for target if None.
+        be written exclusively using saveShp, saveShx, and saveDbf respectively.
+        If target is specified but not shp,shx, or dbf then the target path and
+        file name are used.  If no options or specified, a unique base file name
+        is generated to save the files and the base file name is returned as a 
+        string. 
+        """
+        # Create a unique file name if one is not defined
         if shp:
             self.saveShp(shp)
         if shx:
             self.saveShx(shx)
         if dbf:
             self.saveDbf(dbf)
-        elif target:
+        elif not shp and not shx and not dbf:
+            generated = False
+            if not target:
+                temp = tempfile.NamedTemporaryFile(prefix="shapefile_",dir=os.getcwd())
+                target = temp.name
+                generated = True         
             self.saveShp(target)
             self.shp.close()
             self.saveShx(target)
             self.shx.close()
             self.saveDbf(target)
             self.dbf.close()
+            if generated:
+                return target
 
 class Editor(Writer):
     def __init__(self, shapefile=None, shapeType=POINT, autoBalance=1):
@@ -991,7 +1117,7 @@ def test():
 
 if __name__ == "__main__":
     """
-    Doctests are contained in the module 'pyshp_usage.py'. This library was developed
+    Doctests are contained in the file 'README.txt'. This library was originally developed
     using Python 2.3. Python 2.4 and above have some excellent improvements in the built-in
     testing libraries but for now unit testing is done using what's available in
     2.3.

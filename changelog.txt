@@ -1,0 +1,35 @@
+2012-06-22 Joel Lawhead <jlawhead@geospatialpython.com>
+
+	*shapefile.py (_Shape.__geo_interface__) Added Python __geo_interface__ convention 
+	to export shapefiles as GeoJSON.
+	
+	*shapefile.py (Reader.__init__) Used is_string() method to detect filenames passed 
+	as unicode strings.
+	
+	*shapefile.py (Reader.iterShapes) Added iterShapes() method to iterate through 
+	geometry records for parsing large files efficiently.
+	
+	*shapefile.py (Reader.iterRecords) Added iterRecords() method to iterate through 
+	dbf records efficiently in large files.
+	
+	*shapefile.py (Reader.shape) Modified shape() method to use iterShapes() if shx 
+	file is not available.
+	
+	*shapefile.py (main) Added __version__ attribute.
+	
+	*shapefile.py (Writer.record) Fixed bug which prevents writing the number 0 to 
+	dbf fields.
+
+	*shapefile.py (Reader.__shape) Updated to calculate and seek the start of the next record. The
+	shapefile spec does not require the content of a geometry record to be as long as the content
+	length defined in the header.  The result is you can delete features without modifying the 
+	record header allowing for empty space in records.
+	
+	*shapefile.py (Writer.save) Added unique file name generator to use if no file names are passed
+	to a writer instance when saving (ex. w.save()).  The unique file name is returned as a string.
+	
+	*README.txt (main) Added tests for iterShapes(), iterRecords(), __geo_interface__()
+	
+	*README.txt (main) Updated "bbox" property documentation to match Esri specification.
+	
+	

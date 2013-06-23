@@ -1,27 +1,29 @@
 Python Shapefile Library
 ========================
 :Author: Joel Lawhead <jlawhead@geospatialpython.com>
-:Revised: October 1, 2011
+:Revised: June 23, 2013
 
 .. contents::
 
 Overview
 --------
 
-The Python Shapefile Library (pyshp) provides read and write support for the ESRI
+The Python Shapefile Library (pyshp) provides read and write support for the Esri
 Shapefile format. The Shapefile format is a popular Geographic Information
 System vector data format created by Esri.  For more information about this format 
-please read the well-written "ESRI Shapefile Technical Description - July 1998".  
+please read the well-written "ESRI Shapefile Technical Description - July 1998"
+located at http://www.esri.com/library/whitepapers/pdfs/shapefile.pdf.  
 The Esri document describes the shp and shx file formats.  However a third file
 format called dbf is also required.  This format is documented on the web as the
 "XBase File Format Description" and is a simple file-based database format created
-in the 1960's.  Both the Esri and XBase file-formats are very simple in design and
+in the 1960's.  For more on this specification see: 
+http://www.clicketyclick.dk/databases/xbase/format/index.html   
+
+Both the Esri and XBase file-formats are very simple in design and
 memory efficient which is part of the reason the shapefile format remains popular
 despite the numerous ways to store and exchange GIS data available today. 
 
-This documentation covers the Python 2.x-compatible version of the library.  A
-Python 3-compatible version is available in the Subversion trunk of the pyshp 
-project on Google Code.
+Pyshp is compatible with Python 2.4-3.x.
 
 This document provides examples for using pyshp to read and write shapefiles.  
 
@@ -30,14 +32,14 @@ only available on the google code project site at http://code.google.com/p/pyshp
 These examples are straight-forward and you can also easily run them against your 
 own shapefiles manually with minimal modification. Other examples for specific 
 topics are continually added to the pyshp wiki on google code and the blog
-GeospatialPython.com.
+http://GeospatialPython.com.
 
 Important: For information about map projections, shapefiles,
 and Python please visit: http://code.google.com/p/pyshp/wiki/MapProjections
 
 I sincerely hope this library eliminates the mundane distraction of simply 
 reading and writing data, and allows you to focus on the challenging and FUN
-part of your project. 
+part of your geospatial project. 
 
 Examples
 --------
@@ -72,7 +74,7 @@ OR
 
 
 OR any of the other 5+ formats which are potentially part of a shapefile. 
-The library does not care
+The library does not care about extensions.
 
 Reading Shapefiles from File-Like Objects
 .........................................
@@ -110,6 +112,11 @@ geometry of each shape record.
 >>> len(shapes)
 663
 
+You can iterate through the shapefile's geometry using the iterShapes() method.
+
+>>> len(list(sf.iterShapes()))
+663
+
 Each shape record contains the following attributes:
 
 >>> for name in dir(shapes[3]):
@@ -127,7 +134,7 @@ Each shape record contains the following attributes:
 5
 
  - bbox: If the shape type contains multiple points this tuple describes the 
-   upper left (x,y) coordinate and lower right corner coordinate creating a 
+   lower left (x,y) coordinate and upper right corner coordinate creating a 
    complete box around the points. If the shapeType is a Null 
    (shapeType == 0) then an AttributeError is raised.
  
@@ -217,6 +224,12 @@ You can get a list of the shapefile's records by calling the records() method:
 >>> records = sf.records()
 
 >>> len(records)
+663
+
+Similar to the geometry methods, you can iterate through dbf records using the 
+recordsIter() method.
+
+>>> len(list(sf.iterRecords()))
 663
 
 Each record is a list containing an attribute corresponding to each field in the
@@ -459,6 +472,20 @@ You can also add attributes using keyword arguments where the keys are field nam
 >>> w.record(FIRST_FLD='First', SECOND_FLD='Line')
 >>> w.save('shapefiles/test/line')
 
+File Names
+..........
+
+File extensions are optional when reading or writing shapfiles.  If you specify them Pyshp
+ignores them anyway. When you save files you can specify a base file name that is used for
+all three file types.  Or you can specify a nmae for one or more file types.  In that case,
+any file types not assigned will not save and only file types with file names will be saved.
+If you do not specify any file names (i.e. save()), then a unique file name is generated with
+the prefix "shapefile\_" followed by random characters which is used for all three files.  The 
+unique file name is returned as a string.
+
+>>> targetName = w.save()
+>>> assert("shapefile_" in targetName)
+
 Saving to File-Like Objects
 ...........................
 
@@ -518,4 +545,16 @@ Remove the last shape in the polygon shapefile.
 >>> e.delete(-1)
 >>> e.save('shapefiles/test/polygon')
 
+Python __geo_interface__
+++++++++++++++++++++++++
+
+The Python __geo_interface__ convention provides a data interchange interface
+among geospatial Python libraries.  The interface returns data as GeoJSON.
+More information on the __geo_interface__ protocol can be found at:
+https://gist.github.com/sgillies/2217756.
+More information on GeoJSON is available at http://geojson.org http://geojson.org.
+ 
+>>> s = sf.shape(0)
+>>> s.__geo_interface__["type"]
+'MultiPolygon'
 
