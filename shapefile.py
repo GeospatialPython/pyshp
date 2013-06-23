@@ -881,7 +881,9 @@ class Writer:
         polyShape.parts = []
         polyShape.points = []
         for part in parts:
-            polyShape.parts.append(len(polyShape.points))
+            # Make sure polygon is closed
+            if shapeType in (5,15,25,31) and part[0] != part[-1]:
+                part.append(part[0])
             for point in part:
                 # Ensure point is list
                 if not isinstance(point, list):
@@ -890,6 +892,7 @@ class Writer:
                 while len(point) < 4:
                     point.append(0)
                 polyShape.points.append(point)
+            polyShape.parts.append(len(polyShape.points))
         if polyShape.shapeType == 31:
             if not partTypes:
                 for part in parts:

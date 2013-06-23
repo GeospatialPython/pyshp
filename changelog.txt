@@ -25,6 +25,8 @@
 	length defined in the header.  The result is you can delete features without modifying the 
 	record header allowing for empty space in records.
 	
+	*shapefile.py (Writer.poly) Added enforcement of closed polygons
+	
 	*shapefile.py (Writer.save) Added unique file name generator to use if no file names are passed
 	to a writer instance when saving (ex. w.save()).  The unique file name is returned as a string.
 	

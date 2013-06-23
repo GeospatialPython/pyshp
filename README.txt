@@ -1,6 +1,7 @@
 Python Shapefile Library
 ========================
 :Author: Joel Lawhead <jlawhead@geospatialpython.com>
+
 :Revised: June 23, 2013
 
 .. contents::
@@ -414,9 +415,9 @@ x, y, and optional z (elevation) and m (measure) value.
 **Adding a Poly shape**
 
 "Poly" shapes can be either polygons or lines.  Shapefile polygons must have at
-least 5 points and the last point must be the same as the first (i.e. you can't
-have a triangle accoring to the shapefile specification even though many popular
-GIS programs support such shapefiles.) A line must have at least two points.
+least 4 points and the last point must be the same as the first. PyShp automatically
+enforces closed polygons.
+A line must have at least two points.
 Because of the similarities between these two shape types they are created using
 a single method called "poly".
 

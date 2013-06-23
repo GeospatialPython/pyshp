@@ -446,7 +446,7 @@ endobj
  /Dest [ 51 0 R
  /XYZ
  62.69291
- 439.8236
+ 451.8236
  0 ]
  /Rect [ 102.6929
  449.7736
@@ -464,7 +464,7 @@ endobj
  /Dest [ 51 0 R
  /XYZ
  62.69291
- 439.8236
+ 451.8236
  0 ]
  /Rect [ 527.0227
  449.7736
@@ -482,7 +482,7 @@ endobj
  /Dest [ 52 0 R
  /XYZ
  62.69291
- 530.6236
+ 554.6236
  0 ]
  /Rect [ 102.6929
  431.7736
@@ -500,7 +500,7 @@ endobj
  /Dest [ 52 0 R
  /XYZ
  62.69291
- 530.6236
+ 554.6236
  0 ]
  /Rect [ 527.0227
  431.7736
@@ -518,7 +518,7 @@ endobj
  /Dest [ 52 0 R
  /XYZ
  62.69291
- 380.4236
+ 404.4236
  0 ]
  /Rect [ 102.6929
  413.7736
@@ -536,7 +536,7 @@ endobj
  /Dest [ 52 0 R
  /XYZ
  62.69291
- 380.4236
+ 404.4236
  0 ]
  /Rect [ 527.0227
  413.7736
@@ -554,7 +554,7 @@ endobj
  /Dest [ 52 0 R
  /XYZ
  62.69291
- 177.6534
+ 201.6534
  0 ]
  /Rect [ 82.69291
  395.7736
@@ -572,7 +572,7 @@ endobj
  /Dest [ 52 0 R
  /XYZ
  62.69291
- 177.6534
+ 201.6534
  0 ]
  /Rect [ 527.0227
  395.7736
@@ -998,7 +998,7 @@ endobj
 % 'R58': class PDFInfo 
 58 0 obj
 << /Author (Joel Lawhead <jlawhead@geospatialpython.com>)
- /CreationDate (D:20130623120808+06'00')
+ /CreationDate (D:20130623131216+06'00')
  /Creator (\(unspecified\))
  /Keywords ()
  /Producer (ReportLab PDF Library - www.reportlab.com)
@@ -1152,7 +1152,7 @@ endobj
 << /Dest [ 51 0 R
  /XYZ
  62.69291
- 439.8236
+ 451.8236
  0 ]
  /Next 72 0 R
  /Parent 67 0 R
@@ -1164,7 +1164,7 @@ endobj
 << /Dest [ 52 0 R
  /XYZ
  62.69291
- 530.6236
+ 554.6236
  0 ]
  /Next 73 0 R
  /Parent 67 0 R
@@ -1176,7 +1176,7 @@ endobj
 << /Dest [ 52 0 R
  /XYZ
  62.69291
- 380.4236
+ 404.4236
  0 ]
  /Parent 67 0 R
  /Prev 72 0 R
@@ -1187,7 +1187,7 @@ endobj
 << /Dest [ 52 0 R
  /XYZ
  62.69291
- 177.6534
+ 201.6534
  0 ]
  /Next 75 0 R
  /Parent 61 0 R
@@ -3136,7 +3136,7 @@ endobj
 % 'R84': class PDFStream 
 84 0 obj
 % page stream
-<< /Length 4819 >>
+<< /Length 5099 >>
 stream
 1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
 q
@@ -3227,14 +3227,14 @@ BT 1 0 0 1 0 2 Tm /F2 10 Tf 12 TL (Adding a Poly shape) Tj T* ET
 Q
 Q
 q
-1 0 0 1 62.69291 530.2236 cm
+1 0 0 1 62.69291 542.2236 cm
 q
 0 0 0 rg
-BT 1 0 0 1 0 50 Tm /F1 10 Tf 12 TL .20332 Tw ("Poly" shapes can be either polygons or lines. Shapefile polygons must have at least 5 points and the last) Tj T* 0 Tw .986654 Tw (point must be the same as the first \(i.e. you can't have a triangle accoring to the shapefile specification) Tj T* 0 Tw .63936 Tw (even though many popular GIS programs support such shapefiles.\) A line must have at least two points.) Tj T* 0 Tw .43061 Tw (Because of the similarities between these two shape types they are created using a single method called) Tj T* 0 Tw ("poly".) Tj T* ET
+BT 1 0 0 1 0 38 Tm /F1 10 Tf 12 TL .20332 Tw ("Poly" shapes can be either polygons or lines. Shapefile polygons must have at least 4 points and the last) Tj T* 0 Tw .863516 Tw (point must be the same as the first. PyShp automatically enforces closed polygons. A line must have at) Tj T* 0 Tw 1.646235 Tw (least two points. Because of the similarities between these two shape types they are created using a) Tj T* 0 Tw (single method called "poly".) Tj T* ET
 Q
 Q
 q
-1 0 0 1 62.69291 497.0236 cm
+1 0 0 1 62.69291 509.0236 cm
 q
 q
 1 0 0 1 0 0 cm
@@ -3254,7 +3254,7 @@ Q
 Q
 Q
 q
-1 0 0 1 62.69291 451.8236 cm
+1 0 0 1 62.69291 463.8236 cm
 q
 q
 1 0 0 1 0 0 cm
@@ -3274,27 +3274,27 @@ Q
 Q
 Q
 q
-1 0 0 1 62.69291 424.8236 cm
+1 0 0 1 62.69291 436.8236 cm
 q
 BT 1 0 0 1 0 2.5 Tm 15 TL /F4 12.5 Tf 0 0 0 rg (Creating Attributes) Tj T* ET
 Q
 Q
 q
-1 0 0 1 62.69291 394.8236 cm
+1 0 0 1 62.69291 406.8236 cm
 q
 0 0 0 rg
 BT 1 0 0 1 0 14 Tm /F1 10 Tf 12 TL .245251 Tw (Creating attributes involves two steps. Step 1 is to create fields to contain attribute values and step 2 is to) Tj T* 0 Tw (populate the fields with values for each shape record.) Tj T* ET
 Q
 Q
 q
-1 0 0 1 62.69291 376.8236 cm
+1 0 0 1 62.69291 388.8236 cm
 q
 0 0 0 rg
 BT 1 0 0 1 0 2 Tm /F1 10 Tf 12 TL (The following attempts to create a complete shapefile:) Tj T* ET
 Q
 Q
 q
-1 0 0 1 62.69291 211.6236 cm
+1 0 0 1 62.69291 223.6236 cm
 q
 q
 1 0 0 1 0 0 cm
@@ -3314,7 +3314,7 @@ Q
 Q
 Q
 q
-1 0 0 1 62.69291 118.4236 cm
+1 0 0 1 62.69291 130.4236 cm
 q
 q
 1 0 0 1 0 0 cm
@@ -3333,17 +3333,8 @@ Q
 Q
 Q
 Q
- 
-endstream
-endobj
-% 'R85': class PDFStream 
-85 0 obj
-% page stream
-<< /Length 4785 >>
-stream
-1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
 q
-1 0 0 1 62.69291 655.8236 cm
+1 0 0 1 62.69291 85.22362 cm
 q
 q
 1 0 0 1 0 0 cm
@@ -3353,24 +3344,53 @@ q
 .662745 .662745 .662745 RG
 .5 w
 .960784 .960784 .862745 rg
-n -6 -6 468.6898 108 re B*
+n -6 -6 468.6898 36 re B*
 Q
 q
-BT 1 0 0 1 0 86 Tm 12 TL /F3 10 Tf 0 0 0 rg (>) Tj (>) Tj (>) Tj ( w = shapefile.Writer\(shapefile.POLYLINE\)) Tj T* (>) Tj (>) Tj (>) Tj ( w.line\(parts=[[[1,5],[5,5],[5,1],[3,3],[1,1]]]\)) Tj T* (>) Tj (>) Tj (>) Tj ( w.poly\(parts=[[[1,3],[5,3]]], shapeType=shapefile.POLYLINE\)) Tj T* (>) Tj (>) Tj (>) Tj ( w.field\('FIRST_FLD','C','40'\)) Tj T* (>) Tj (>) Tj (>) Tj ( w.field\('SECOND_FLD','C','40'\)) Tj T* (>) Tj (>) Tj (>) Tj ( w.record\('First','Line'\)) Tj T* (>) Tj (>) Tj (>) Tj ( w.record\('Second','Line'\)) Tj T* (>) Tj (>) Tj (>) Tj ( w.save\('shapefiles/test/line'\)) Tj T* ET
+BT 1 0 0 1 0 14 Tm 12 TL /F3 10 Tf 0 0 0 rg (>) Tj (>) Tj (>) Tj ( w = shapefile.Writer\(shapefile.POLYLINE\)) Tj T* (>) Tj (>) Tj (>) Tj ( w.line\(parts=[[[1,5],[5,5],[5,1],[3,3],[1,1]]]\)) Tj T* ET
+Q
+Q
+Q
+Q
+Q
+ 
+endstream
+endobj
+% 'R85': class PDFStream 
+85 0 obj
+% page stream
+<< /Length 4631 >>
+stream
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+q
+1 0 0 1 62.69291 679.8236 cm
+q
+q
+1 0 0 1 0 0 cm
+q
+1 0 0 1 6.6 6.6 cm
+q
+.662745 .662745 .662745 RG
+.5 w
+.960784 .960784 .862745 rg
+n -6 -6 468.6898 84 re B*
+Q
+q
+BT 1 0 0 1 0 62 Tm 12 TL /F3 10 Tf 0 0 0 rg (>) Tj (>) Tj (>) Tj ( w.poly\(parts=[[[1,3],[5,3]]], shapeType=shapefile.POLYLINE\)) Tj T* (>) Tj (>) Tj (>) Tj ( w.field\('FIRST_FLD','C','40'\)) Tj T* (>) Tj (>) Tj (>) Tj ( w.field\('SECOND_FLD','C','40'\)) Tj T* (>) Tj (>) Tj (>) Tj ( w.record\('First','Line'\)) Tj T* (>) Tj (>) Tj (>) Tj ( w.record\('Second','Line'\)) Tj T* (>) Tj (>) Tj (>) Tj ( w.save\('shapefiles/test/line'\)) Tj T* ET
 Q
 Q
 Q
 Q
 Q
 q
-1 0 0 1 62.69291 635.8236 cm
+1 0 0 1 62.69291 659.8236 cm
 q
 0 0 0 rg
 BT 1 0 0 1 0 2 Tm /F1 10 Tf 12 TL (You can also add attributes using keyword arguments where the keys are field names.) Tj T* ET
 Q
 Q
 q
-1 0 0 1 62.69291 542.6236 cm
+1 0 0 1 62.69291 566.6236 cm
 q
 q
 1 0 0 1 0 0 cm
@@ -3390,20 +3410,20 @@ Q
 Q
 Q
 q
-1 0 0 1 62.69291 515.6236 cm
+1 0 0 1 62.69291 539.6236 cm
 q
 BT 1 0 0 1 0 2.5 Tm 15 TL /F4 12.5 Tf 0 0 0 rg (File Names) Tj T* ET
 Q
 Q
 q
-1 0 0 1 62.69291 437.6236 cm
+1 0 0 1 62.69291 461.6236 cm
 q
 0 0 0 rg
 BT 1 0 0 1 0 62 Tm /F1 10 Tf 12 TL 1.313318 Tw (File extensions are optional when reading or writing shapfiles. If you specify them Pyshp ignores them) Tj T* 0 Tw .408084 Tw (anyway. When you save files you can specify a base file name that is used for all three file types. Or you) Tj T* 0 Tw .619036 Tw (can specify a nmae for one or more file types. In that case, any file types not assigned will not save and) Tj T* 0 Tw 1.596488 Tw (only file types with file names will be saved. If you do not specify any file names \(i.e. save\(\)\), then a) Tj T* 0 Tw .16186 Tw (unique file name is generated with the prefix "shapefile_" followed by random characters which is used for) Tj T* 0 Tw (all three files. The unique file name is returned as a string.) Tj T* ET
 Q
 Q
 q
-1 0 0 1 62.69291 392.4236 cm
+1 0 0 1 62.69291 416.4236 cm
 q
 q
 1 0 0 1 0 0 cm
@@ -3423,20 +3443,20 @@ Q
 Q
 Q
 q
-1 0 0 1 62.69291 365.4236 cm
+1 0 0 1 62.69291 389.4236 cm
 q
 BT 1 0 0 1 0 2.5 Tm 15 TL /F4 12.5 Tf 0 0 0 rg (Saving to File-Like Objects) Tj T* ET
 Q
 Q
 q
-1 0 0 1 62.69291 347.4236 cm
+1 0 0 1 62.69291 371.4236 cm
 q
 0 0 0 rg
 BT 1 0 0 1 0 2 Tm /F1 10 Tf 12 TL (Just as you can read shapefiles from python file-like objects you can also write them.) Tj T* ET
 Q
 Q
 q
-1 0 0 1 62.69291 189.6534 cm
+1 0 0 1 62.69291 213.6534 cm
 q
 q
 .952737 0 0 .952737 0 0 cm
@@ -3456,27 +3476,27 @@ Q
 Q
 Q
 q
-1 0 0 1 62.69291 159.6534 cm
+1 0 0 1 62.69291 183.6534 cm
 q
 BT 1 0 0 1 0 3 Tm 18 TL /F2 15 Tf 0 0 0 rg (Editing Shapefiles) Tj T* ET
 Q
 Q
 q
-1 0 0 1 62.69291 129.6534 cm
+1 0 0 1 62.69291 153.6534 cm
 q
 0 0 0 rg
 BT 1 0 0 1 0 14 Tm /F1 10 Tf 12 TL .200651 Tw (The Editor class attempts to make changing existing shapefiles easier by handling the reading and writing) Tj T* 0 Tw (details behind the scenes.) Tj T* ET
 Q
 Q
 q
-1 0 0 1 62.69291 111.6534 cm
+1 0 0 1 62.69291 135.6534 cm
 q
 0 0 0 rg
 BT 1 0 0 1 0 2 Tm /F1 10 Tf 12 TL (Let's add shapes to existing shapefiles:) Tj T* ET
 Q
 Q
 q
-1 0 0 1 62.69291 93.65341 cm
+1 0 0 1 62.69291 117.6534 cm
 q
 0 0 0 rg
 BT 1 0 0 1 0 2 Tm /F1 10 Tf 12 TL (Add a point to a point shapefile) Tj T* ET
@@ -3825,27 +3845,27 @@ xref
 0000050147 00000 n
 0000055892 00000 n
 0000061878 00000 n
-0000066796 00000 n
-0000071680 00000 n
-0000076041 00000 n
-0000076251 00000 n
-0000076328 00000 n
-0000076405 00000 n
-0000076482 00000 n
-0000076559 00000 n
-0000076636 00000 n
-0000076713 00000 n
-0000076790 00000 n
-0000076867 00000 n
-0000076944 00000 n
+0000067076 00000 n
+0000071806 00000 n
+0000076167 00000 n
+0000076377 00000 n
+0000076454 00000 n
+0000076531 00000 n
+0000076608 00000 n
+0000076685 00000 n
+0000076762 00000 n
+0000076839 00000 n
+0000076916 00000 n
+0000076993 00000 n
+0000077070 00000 n
 trailer
 << /ID 
  % ReportLab generated PDF document -- digest (http://www.reportlab.com) 
- [(\000\2661R\206\352\220c\350xL\235"S\256C) (\000\2661R\206\352\220c\350xL\235"S\256C)] 
+ [( \375\243\347\3504\203\3442\204\307i\250\251\316\013) ( \375\243\347\3504\203\3442\204\307i\250\251\316\013)] 
 
  /Info 58 0 R
  /Root 57 0 R
  /Size 98 >>
 startxref
-76992
+77118
 %%EOF
