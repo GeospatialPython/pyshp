@@ -34,9 +34,9 @@ endobj
  /Border [ 0
  0
  0 ]
- /Rect [ 224.0523
+ /Rect [ 224.3223
  719.7736
- 370.9323
+ 371.2023
  731.7736 ]
  /Subtype /Link
  /Type /Annot >>
@@ -997,8 +997,8 @@ endobj
 endobj
 % 'R58': class PDFInfo 
 58 0 obj
-<< /Author (Joel Lawhead <jlawhead@geospatialpython.com>)
- /CreationDate (D:20130623131216+06'00')
+<< /Author (Joel Lawhead - jlawhead@geospatialpython.com)
+ /CreationDate (D:20130623132105+06'00')
  /Creator (\(unspecified\))
  /Keywords ()
  /Producer (ReportLab PDF Library - www.reportlab.com)
@@ -1224,7 +1224,7 @@ endobj
 % 'R77': class PDFStream 
 77 0 obj
 % page stream
-<< /Length 7643 >>
+<< /Length 7628 >>
 stream
 1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
 q
@@ -1248,7 +1248,7 @@ Q
 q
 1 0 0 1 91.03937 3 cm
 q
-BT 1 0 0 1 0 2 Tm 12 TL /F1 10 Tf 0 0 0 rg (Joel Lawhead <) Tj 0 0 .501961 rg (jlawhead@geospatialpython.com) Tj 0 0 0 rg (>) Tj T* ET
+BT 1 0 0 1 0 2 Tm 12 TL /F1 10 Tf 0 0 0 rg (Joel Lawhead - ) Tj 0 0 .501961 rg (jlawhead@geospatialpython.com) Tj T* ET
 Q
 Q
 q
@@ -3838,34 +3838,34 @@ xref
 0000017827 00000 n
 0000017996 00000 n
 0000018186 00000 n
-0000025928 00000 n
-0000031638 00000 n
-0000037936 00000 n
-0000044479 00000 n
-0000050147 00000 n
-0000055892 00000 n
-0000061878 00000 n
-0000067076 00000 n
-0000071806 00000 n
-0000076167 00000 n
-0000076377 00000 n
-0000076454 00000 n
-0000076531 00000 n
-0000076608 00000 n
-0000076685 00000 n
-0000076762 00000 n
-0000076839 00000 n
-0000076916 00000 n
-0000076993 00000 n
-0000077070 00000 n
+0000025913 00000 n
+0000031623 00000 n
+0000037921 00000 n
+0000044464 00000 n
+0000050132 00000 n
+0000055877 00000 n
+0000061863 00000 n
+0000067061 00000 n
+0000071791 00000 n
+0000076152 00000 n
+0000076362 00000 n
+0000076439 00000 n
+0000076516 00000 n
+0000076593 00000 n
+0000076670 00000 n
+0000076747 00000 n
+0000076824 00000 n
+0000076901 00000 n
+0000076978 00000 n
+0000077055 00000 n
 trailer
 << /ID 
  % ReportLab generated PDF document -- digest (http://www.reportlab.com) 
- [( \375\243\347\3504\203\3442\204\307i\250\251\316\013) ( \375\243\347\3504\203\3442\204\307i\250\251\316\013)] 
+ [(\237\2408\201\271\357\223\242\341\362>c#I\216\335) (\237\2408\201\271\357\223\242\341\362>c#I\216\335)] 
 
  /Info 58 0 R
  /Root 57 0 R
  /Size 98 >>
 startxref
-77118
+77103
 %%EOF

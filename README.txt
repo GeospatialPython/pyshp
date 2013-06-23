@@ -1,6 +1,7 @@
 Python Shapefile Library
 ========================
-:Author: Joel Lawhead <jlawhead@geospatialpython.com>
+
+:Author: Joel Lawhead - jlawhead@geospatialpython.com
 
 :Revised: June 23, 2013
 
