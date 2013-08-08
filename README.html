@@ -4,7 +4,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <meta name="generator" content="Docutils 0.9: http://docutils.sourceforge.net/" />
-<title>Python Shapefile Library</title>
+<title>PyShp</title>
 <meta name="author" content="Joel Lawhead - jlawhead&#64;geospatialpython.com" />
 <style type="text/css">
 
@@ -150,15 +150,15 @@ code, tt {
 </style>
 </head>
 <body>
-<div class="document" id="python-shapefile-library">
-<h1 class="title">Python Shapefile Library</h1>
+<div class="document" id="pyshp">
+<h1 class="title">PyShp</h1>
 <table class="docinfo" frame="void" rules="none">
 <col class="docinfo-name" />
 <col class="docinfo-content" />
 <tbody valign="top">
 <tr><th class="docinfo-name">Author:</th>
 <td>Joel Lawhead - <a class="last reference external" href="mailto:jlawhead&#64;geospatialpython.com">jlawhead&#64;geospatialpython.com</a></td></tr>
-<tr class="field"><th class="docinfo-name">Revised:</th><td class="field-body">June 23, 2013</td>
+<tr class="field"><th class="docinfo-name">Revised:</th><td class="field-body">July 27, 2013</td>
 </tr>
 </tbody>
 </table>
@@ -191,7 +191,7 @@ code, tt {
 </div>
 <div class="section" id="overview">
 <h1><a class="toc-backref" href="#id1">Overview</a></h1>
-<p>The Python Shapefile Library (pyshp) provides read and write support for the Esri
+<p>PyShp provides read and write support for the Esri
 Shapefile format. The Shapefile format is a popular Geographic Information
 System vector data format created by Esri.  For more information about this format
 please read the well-written &quot;ESRI Shapefile Technical Description - July 1998&quot;
@@ -205,7 +205,7 @@ in the 1960's.  For more on this specification see:
 memory efficient which is part of the reason the shapefile format remains popular
 despite the numerous ways to store and exchange GIS data available today.</p>
 <p>Pyshp is compatible with Python 2.4-3.x.</p>
-<p>This document provides examples for using pyshp to read and write shapefiles.</p>
+<p>This document provides examples for using PyShp to read and write shapefiles.</p>
 <p>Currently the sample census blockgroup shapefile referenced in the examples is
 only available on the google code project site at <a class="reference external" href="http://code.google.com/p/pyshp">http://code.google.com/p/pyshp</a>.
 These examples are straight-forward and you can also easily run them against your
@@ -502,6 +502,21 @@ the shapes must match the shape type setting.</p>
 shapefile specification. It is important to note that numbering system has
 several reserved numbers which have not been used yet therefore the numbers of
 the existing shape types are not sequential.</p>
+<p>You can reference shape types by the numbers or by constants defined by PyShp:
+shapefile.NULL = 0
+shapefile.POINT = 1
+shapefile.POLYLINE = 3
+shapefile.POLYGON = 5
+shapefile.MULTIPOINT = 8
+shapefile.POINTZ = 11
+shapefile.POLYLINEZ = 13
+shapefile.POLYGONZ = 15
+shapefile.MULTIPOINTZ = 18
+shapefile.POINTM = 21
+shapefile.POLYLINEM = 23
+shapefile.POLYGONM = 25
+shapefile.MULTIPOINTM = 28
+shapefile.MULTIPATCH = 31</p>
 <p>There are three ways to set the shape type:
 - Set it when creating the class instance.
 - Set it by assigning a value to an existing class instance.
@@ -510,11 +525,16 @@ the existing shape types are not sequential.</p>
 <pre class="doctest-block">
 &gt;&gt;&gt; w = shapefile.Writer(shapeType=1)
 </pre>
+<p>or we can use the constants as explained above:</p>
+<pre class="doctest-block">
+&gt;&gt;&gt; w = shapefile.Writer(shapefile.POINT)
+</pre>
+<p>As you can see, specifying the shapeType argument explicitly isn't necessary.</p>
 <pre class="doctest-block">
 &gt;&gt;&gt; w.shapeType
 1
 </pre>
-<p>OR you can set it after the Writer is created:</p>
+<p>OR you can set it after the Writer is created by changing the property:</p>
 <pre class="doctest-block">
 &gt;&gt;&gt; w.shapeType = 3
 </pre>
@@ -571,7 +591,7 @@ called without any arguments.</p>
 <p>Point shapes are added using the &quot;point&quot; method. A point is specified by an
 x, y, and optional z (elevation) and m (measure) value.</p>
 <pre class="doctest-block">
-&gt;&gt;&gt; w = shapefile.Writer()
+&gt;&gt;&gt; w = shapefile.Writer(shapefile.POINT)
 </pre>
 <pre class="doctest-block">
 &gt;&gt;&gt; w.point(122, 37) # No elevation or measure values
@@ -587,7 +607,7 @@ x, y, and optional z (elevation) and m (measure) value.</p>
 &gt;&gt;&gt; w.shapes()[1].points
 [[118, 36, 4, 8]]
 </pre>
-<p><strong>Adding a Poly shape</strong></p>
+<p><strong>Adding a Poly Shape</strong></p>
 <p>&quot;Poly&quot; shapes can be either polygons or lines.  Shapefile polygons must have at
 least 4 points and the last point must be the same as the first. PyShp automatically
 enforces closed polygons.
@@ -595,11 +615,35 @@ A line must have at least two points.
 Because of the similarities between these two shape types they are created using
 a single method called &quot;poly&quot;.</p>
 <pre class="doctest-block">
-&gt;&gt;&gt; w = shapefile.Writer()
+&gt;&gt;&gt; w = shapefile.Writer(shapefile.POLYGON)
 </pre>
 <pre class="doctest-block">
 &gt;&gt;&gt; w.poly(shapeType=3, parts=[[[122,37,4,9], [117,36,3,4]], [[115,32,8,8],
 ... [118,20,6,4], [113,24]]])
+</pre>
+<p><strong>Adding a Polygon with Rings</strong></p>
+<p>Polygons consist of rings which mean they are closed.  The first point and last point
+of a ring must be the same. PyShp enforces ring closure if the ring is incomplete when
+you add the shape.  Polygons can have inner rings which create holes.  Holes are defined
+by the order of the points.  Normally points in a ring run clockwise.  If the points
+run counter-clockwise then they form a hole.  If you don't order the points correctly
+you'll just have overlapping polygons.</p>
+<pre class="doctest-block">
+&gt;&gt;&gt; w = shapefile.Writer(shapefile.POLYGON)
+&gt;&gt;&gt; outer_ring = [[10,10],[50,50],[100,10],[50,-50],[10,10]]
+&gt;&gt;&gt; inner_ring = [[40,10],[50,30],[70,10],[50,-30],[40,10]]
+&gt;&gt;&gt; inner_ring.reverse()
+</pre>
+<p>You can use the &quot;shapefile.signed_area()&quot; method to determine if a ring is clockwise
+or counter-clockwise.  A value &gt;= 0 means the ring is counter-clockwise and &lt; 0 means
+the ring is clockwise.  The value returned is also the area of the polygon.</p>
+<pre class="doctest-block">
+&gt;&gt;&gt; # Clockwise ring
+... shapefile.signed_area(outer_ring)
+-4500.0
+&gt;&gt;&gt; # Counter-clockwise ring
+... shapefile.signed_area(inner_ring)
+900.0
 </pre>
 </div>
 <div class="section" id="creating-attributes">
@@ -692,6 +736,26 @@ unique file name is returned as a string.</p>
 &gt;&gt;&gt; e = shapefile.Editor(shapefile=&quot;shapefiles/test/point.shp&quot;)
 &gt;&gt;&gt; e.point(0,0,10,2)
 &gt;&gt;&gt; e.record(&quot;Appended&quot;,&quot;Point&quot;)
+&gt;&gt;&gt; # We added z and m values so
+&gt;&gt;&gt; # change the shapetype
+&gt;&gt;&gt; e.shapeType = shapefile.POINTZ
+&gt;&gt;&gt; e.save('shapefiles/test/point')
+</pre>
+<p>Edit the appended point to change the &quot;y&quot; and &quot;z&quot; value</p>
+<pre class="doctest-block">
+&gt;&gt;&gt; e = shapefile.Editor(shapefile=&quot;shapefiles/test/point.shp&quot;)
+&gt;&gt;&gt;     # Find the point by the attribute
+&gt;&gt;&gt; for s in enumerate(e.records):
+...     i, record = s
+...     if record[0] == &quot;Appended&quot;:
+...         geom = e._shapes[i]
+...         # Change the y value to 5
+...         geom.points[0][1] = 5
+...         # Change the z value to 9
+...         if hasattr(geom, &quot;z&quot;):
+...                 geom.z = (9,)
+...         else:
+...             geom.points[0][2] = 9
 &gt;&gt;&gt; e.save('shapefiles/test/point')
 </pre>
 <p>Add a new line to a line shapefile:</p>
@@ -700,6 +764,7 @@ unique file name is returned as a string.</p>
 &gt;&gt;&gt; e.line(parts=[[[10,5],[15,5],[15,1],[13,3],[11,1]]])
 &gt;&gt;&gt; e.record('Appended','Line')
 &gt;&gt;&gt; e.save('shapefiles/test/line')
+&gt;&gt;&gt; e = None
 </pre>
 <p>Add a new polygon to a polygon shapefile:</p>
 <pre class="doctest-block">
@@ -707,6 +772,7 @@ unique file name is returned as a string.</p>
 &gt;&gt;&gt; e.poly(parts=[[[5.1,5],[9.9,5],[9.9,1],[7.5,3],[5.1,1]]])
 &gt;&gt;&gt; e.record(&quot;Appended&quot;,&quot;Polygon&quot;)
 &gt;&gt;&gt; e.save('shapefiles/test/polygon')
+&gt;&gt;&gt; e = None
 </pre>
 <p>Remove the first point in each shapefile - for a point shapefile that is
 the first shape and record&quot;</p>
@@ -714,12 +780,14 @@ the first shape and record&quot;</p>
 &gt;&gt;&gt; e = shapefile.Editor(shapefile=&quot;shapefiles/test/point.shp&quot;)
 &gt;&gt;&gt; e.delete(0)
 &gt;&gt;&gt; e.save('shapefiles/test/point')
+&gt;&gt;&gt; e = None
 </pre>
 <p>Remove the last shape in the polygon shapefile.</p>
 <pre class="doctest-block">
 &gt;&gt;&gt; e = shapefile.Editor(shapefile=&quot;shapefiles/test/polygon.shp&quot;)
 &gt;&gt;&gt; e.delete(-1)
 &gt;&gt;&gt; e.save('shapefiles/test/polygon')
+&gt;&gt;&gt; e = None
 </pre>
 </div>
 <div class="section" id="python-geo-interface">

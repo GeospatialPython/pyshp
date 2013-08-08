@@ -1,4 +1,25 @@
-2012-06-22 Joel Lawhead <jlawhead@geospatialpython.com>
+VERSION 1.1.9
+
+2013-07-27 Joel Lawhead <jlawhead@geospatialpython.com>
+	*shapefile.py (Writer.__shpRecords) fixed inconsistency between Reader and Writer 
+	when referencing "z" and "m" values.  This bug caused errors only when editing
+	3D shapefiles.
+
+VERSION 1.1.8
+
+2013-07-02 Joel Lawhead <jlawhead@geospatialpython.com>
+	*shapefile.py (Writer.poly()) fixed a bug that resulted in incorrect part indexes
+	*README.txt updated several errors in the documentation.
+
+2013-06-25 Joel Lawhead <jlawhead@geospatialpython.com>
+	*shapefile.py (Reader.shapes(),Reader.iterShapes()) Updated to verify the file length by
+	seeking to the end. A user reported shapefiles in the wild which had incorrect .shp file
+	lengths reported in the header which crashed when reading or iterating shapes.  Most
+	insist on using the .shx file but there's no real reason to do so.
+
+VERSION 1.1.7
+
+2013-06-22 Joel Lawhead <jlawhead@geospatialpython.com>
 
 	*shapefile.py (_Shape.__geo_interface__) Added Python __geo_interface__ convention 
 	to export shapefiles as GeoJSON.
@@ -33,5 +54,6 @@
 	*README.txt (main) Added tests for iterShapes(), iterRecords(), __geo_interface__()
 	
 	*README.txt (main) Updated "bbox" property documentation to match Esri specification.
+
 	
 	

@@ -1,16 +1,16 @@
-Python Shapefile Library
+PyShp
 ========================
 
 :Author: Joel Lawhead - jlawhead@geospatialpython.com
 
-:Revised: June 23, 2013
+:Revised: July 27, 2013
 
 .. contents::
 
 Overview
 --------
 
-The Python Shapefile Library (pyshp) provides read and write support for the Esri
+PyShp provides read and write support for the Esri
 Shapefile format. The Shapefile format is a popular Geographic Information
 System vector data format created by Esri.  For more information about this format 
 please read the well-written "ESRI Shapefile Technical Description - July 1998"
@@ -27,7 +27,7 @@ despite the numerous ways to store and exchange GIS data available today.
 
 Pyshp is compatible with Python 2.4-3.x.
 
-This document provides examples for using pyshp to read and write shapefiles.  
+This document provides examples for using PyShp to read and write shapefiles.  
 
 Currently the sample census blockgroup shapefile referenced in the examples is
 only available on the google code project site at http://code.google.com/p/pyshp.
@@ -327,6 +327,22 @@ shapefile specification. It is important to note that numbering system has
 several reserved numbers which have not been used yet therefore the numbers of 
 the existing shape types are not sequential.
 
+You can reference shape types by the numbers or by constants defined by PyShp:
+shapefile.NULL = 0
+shapefile.POINT = 1
+shapefile.POLYLINE = 3
+shapefile.POLYGON = 5
+shapefile.MULTIPOINT = 8
+shapefile.POINTZ = 11
+shapefile.POLYLINEZ = 13
+shapefile.POLYGONZ = 15
+shapefile.MULTIPOINTZ = 18
+shapefile.POINTM = 21
+shapefile.POLYLINEM = 23
+shapefile.POLYGONM = 25
+shapefile.MULTIPOINTM = 28
+shapefile.MULTIPATCH = 31
+
 There are three ways to set the shape type: 
 - Set it when creating the class instance.
 - Set it by assigning a value to an existing class instance.
@@ -336,10 +352,16 @@ To manually set the shape type for a Writer object when creating the Writer:
 
 >>> w = shapefile.Writer(shapeType=1)
 
+or we can use the constants as explained above:
+
+>>> w = shapefile.Writer(shapefile.POINT)
+
+As you can see, specifying the shapeType argument explicitly isn't necessary.
+
 >>> w.shapeType
 1
 
-OR you can set it after the Writer is created:
+OR you can set it after the Writer is created by changing the property:
 
 >>> w.shapeType = 3
 
@@ -401,7 +423,7 @@ The writer object's shapes list will now have one null shape:
 Point shapes are added using the "point" method. A point is specified by an 
 x, y, and optional z (elevation) and m (measure) value.
 
->>> w = shapefile.Writer()
+>>> w = shapefile.Writer(shapefile.POINT)
 
 >>> w.point(122, 37) # No elevation or measure values
 
@@ -413,7 +435,7 @@ x, y, and optional z (elevation) and m (measure) value.
 >>> w.shapes()[1].points
 [[118, 36, 4, 8]]
 
-**Adding a Poly shape**
+**Adding a Poly Shape**
 
 "Poly" shapes can be either polygons or lines.  Shapefile polygons must have at
 least 4 points and the last point must be the same as the first. PyShp automatically
@@ -422,10 +444,35 @@ A line must have at least two points.
 Because of the similarities between these two shape types they are created using
 a single method called "poly".
 
->>> w = shapefile.Writer()
+>>> w = shapefile.Writer(shapefile.POLYGON)
 
 >>> w.poly(shapeType=3, parts=[[[122,37,4,9], [117,36,3,4]], [[115,32,8,8], 
 ... [118,20,6,4], [113,24]]])
+
+**Adding a Polygon with Rings**
+
+Polygons consist of rings which mean they are closed.  The first point and last point 
+of a ring must be the same. PyShp enforces ring closure if the ring is incomplete when
+you add the shape.  Polygons can have inner rings which create holes.  Holes are defined 
+by the order of the points.  Normally points in a ring run clockwise.  If the points
+run counter-clockwise then they form a hole.  If you don't order the points correctly
+you'll just have overlapping polygons.
+
+>>> w = shapefile.Writer(shapefile.POLYGON)
+>>> outer_ring = [[10,10],[50,50],[100,10],[50,-50],[10,10]]
+>>> inner_ring = [[40,10],[50,30],[70,10],[50,-30],[40,10]]
+>>> inner_ring.reverse()
+
+You can use the "shapefile.signed_area()" method to determine if a ring is clockwise
+or counter-clockwise.  A value >= 0 means the ring is counter-clockwise and < 0 means
+the ring is clockwise.  The value returned is also the area of the polygon.
+
+>>> # Clockwise ring
+... shapefile.signed_area(outer_ring)
+-4500.0
+>>> # Counter-clockwise ring
+... shapefile.signed_area(inner_ring)
+900.0
 
 Creating Attributes
 ...................
@@ -518,6 +565,26 @@ Add a point to a point shapefile
 >>> e = shapefile.Editor(shapefile="shapefiles/test/point.shp")
 >>> e.point(0,0,10,2)
 >>> e.record("Appended","Point")
+>>> # We added z and m values so
+>>> # change the shapetype
+>>> e.shapeType = shapefile.POINTZ
+>>> e.save('shapefiles/test/point')
+
+Edit the appended point to change the "y" and "z" value
+
+>>> e = shapefile.Editor(shapefile="shapefiles/test/point.shp")
+>>>	# Find the point by the attribute
+>>> for s in enumerate(e.records):
+...     i, record = s
+...     if record[0] == "Appended":
+...         geom = e._shapes[i]
+...         # Change the y value to 5
+...         geom.points[0][1] = 5
+...         # Change the z value to 9
+...         if hasattr(geom, "z"):
+...	            geom.z = (9,)
+...         else:
+...             geom.points[0][2] = 9
 >>> e.save('shapefiles/test/point')
 
 Add a new line to a line shapefile:
@@ -526,6 +593,7 @@ Add a new line to a line shapefile:
 >>> e.line(parts=[[[10,5],[15,5],[15,1],[13,3],[11,1]]])
 >>> e.record('Appended','Line')
 >>> e.save('shapefiles/test/line')
+>>> e = None
 
 Add a new polygon to a polygon shapefile:
 
@@ -533,6 +601,7 @@ Add a new polygon to a polygon shapefile:
 >>> e.poly(parts=[[[5.1,5],[9.9,5],[9.9,1],[7.5,3],[5.1,1]]])
 >>> e.record("Appended","Polygon")
 >>> e.save('shapefiles/test/polygon')
+>>> e = None
 
 Remove the first point in each shapefile - for a point shapefile that is 
 the first shape and record"
@@ -540,12 +609,14 @@ the first shape and record"
 >>> e = shapefile.Editor(shapefile="shapefiles/test/point.shp")
 >>> e.delete(0)
 >>> e.save('shapefiles/test/point')
+>>> e = None
 
 Remove the last shape in the polygon shapefile.
 
 >>> e = shapefile.Editor(shapefile="shapefiles/test/polygon.shp")
 >>> e.delete(-1)
 >>> e.save('shapefiles/test/polygon')
+>>> e = None
 
 Python __geo_interface__
 ++++++++++++++++++++++++
