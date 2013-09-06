@@ -3,10 +3,11 @@ shapefile.py
 Provides read and write support for ESRI Shapefiles.
 author: jlawhead<at>geospatialpython.com
 date: 20130727
-version: 1.1.9
+version: 1.2.0
 Compatible with Python versions 2.4-3.x
 """
-__version__ = "1.1.9"
+
+__version__ = "1.2.0"
 
 from struct import pack, unpack, calcsize, error
 import os
@@ -798,14 +799,19 @@ class Writer:
                 except error:
                     raise ShapefileException("Failed to write elevation extremes for record %s. Expected floats." % recNum)
                 try:
-                    #[f.write(pack("<d", p[2])) for p in s.points]
-                    f.write(pack("<%sd" % len(s.z), *s.z))
+                    if hasattr(s,"z"):
+                        f.write(pack("<%sd" % len(s.z), *s.z))
+                    else:
+                        [f.write(pack("<d", p[2])) for p in s.points]  
                 except error:
                     raise ShapefileException("Failed to write elevation values for record %s. Expected floats." % recNum)
             # Write m extremes and values
             if s.shapeType in (13,15,18,23,25,28,31):
                 try:
-                    f.write(pack("<2d", *self.__mbox([s])))
+                    if hasattr(s,"m"):
+                        f.write(pack("<%sd" % len(s.m), *s.m))
+                    else:
+                        f.write(pack("<2d", *self.__mbox([s])))
                 except error:
                     raise ShapefileException("Failed to write measure extremes for record %s. Expected floats" % recNum)
                 try:

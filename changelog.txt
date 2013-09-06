@@ -1,5 +1,10 @@
-VERSION 1.1.9
+VERSION 1.2.0
 
+2013-09-05 Joel Lawhead <jlawhead@geospatialpython.com>
+	*README.txt add example/test for writing a 3D polygon
+
+VERSION 1.1.9
+	
 2013-07-27 Joel Lawhead <jlawhead@geospatialpython.com>
 	*shapefile.py (Writer.__shpRecords) fixed inconsistency between Reader and Writer 
 	when referencing "z" and "m" values.  This bug caused errors only when editing

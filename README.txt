@@ -3,7 +3,9 @@ PyShp
 
 :Author: Joel Lawhead - jlawhead@geospatialpython.com
 
-:Revised: July 27, 2013
+:Version 1.2.0
+
+:Revised: September 5, 2013
 
 .. contents::
 
@@ -294,11 +296,11 @@ The blockgroup key and population count:
 Writing Shapefiles
 ++++++++++++++++++
 
-The PSL tries to be as flexible as possible when writing shapefiles while 
+PyShp tries to be as flexible as possible when writing shapefiles while 
 maintaining some degree of automatic validation to make sure you don't 
 accidentally write an invalid file.
 
-The PSL can write just one of the component files such as the shp or dbf file
+PyShp can write just one of the component files such as the shp or dbf file
 without writing the others. So in addition to being a complete 
 shapefile library, it can also be used as a basic dbf (xbase) library. Dbf files are
 a common database format which are often useful as a standalone simple 
@@ -373,7 +375,7 @@ Geometry and Record Balancing
 
 Because every shape must have a corresponding record it is critical that the
 number of records equals the number of shapes to create a valid shapefile. To
-help prevent accidental misalignment the PSL has an "auto balance" feature to
+help prevent accidental misalignment PyShp has an "auto balance" feature to
 make sure when you add either a shape or a record the two sides of the 
 equation line up. This feature is NOT turned on by default. To activate it
 set the attribute autoBalance to 1 (True):
@@ -474,6 +476,26 @@ the ring is clockwise.  The value returned is also the area of the polygon.
 ... shapefile.signed_area(inner_ring)
 900.0
 
+**Creating 3D Polygons**
+
+Elevation values, known as "Z" values allow you to create 3-dimensional shapefiles. The 
+z value is an extra value specified as part of a point.
+
+>>> w = shapefile.Writer(shapeType=shapefile.POLYGONZ)
+>>> w.poly([[[-89.0, 33, 12], [-90, 31, 11], [-91, 30, 12]]], shapeType=15)
+>>> w.field("NAME")
+>>> w.record("PolyZTest")
+>>> w.save("shapefiles/test/MyPolyZ")
+
+The z values are stored in a seperate shape attribute.
+
+>>> r = shapefile.Reader("shapefiles/test/MyPolyZ")
+>>> s = r.shape(0)
+>>> s.points
+[[-89.0, 33.0], [-90.0, 31.0], [-91.0, 30.0], [-89.0, 33.0]]
+>>> s.z
+[12.0, 11.0, 12.0, 12.0]
+ 
 Creating Attributes
 ...................
 
