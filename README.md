@@ -1,7 +1,6 @@
 ## Contents
 
-* auto-gen TOC:
-{:toc}
+[TOC]
 
 # Overview
 
