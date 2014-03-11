@@ -1,21 +1,7 @@
 ## Contents
 
-  * Overview 
-  * Examples 
-    * Reading Shapefiles 
-      * Reading Shapefiles from File-Like Objects 
-      * Reading Geometry 
-      * Reading Records 
-      * Reading Geometry and Records Simultaneously 
-    * Writing Shapefiles 
-      * Setting the Shape Type 
-      * Geometry and Record Balancing 
-      * Adding Geometry 
-      * Creating Attributes 
-      * File Names 
-      * Saving to File-Like Objects 
-    * Editing Shapefiles 
-    * Python __geo_interface__
+* auto-gen TOC:
+{:toc}
 
 # Overview
 
