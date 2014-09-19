@@ -883,14 +883,14 @@ class Writer:
                 fieldType = fieldType.upper()
                 size = int(size)
                 if fieldType.upper() == "N":
-                    value = str(value).rjust(size)
+                    value = unicode(value).rjust(size)
                 elif fieldType == 'L':
-                    value = str(value)[0].upper()
+                    value = unicode(value)[0].upper()
                 else:
-                    value = str(value)[:size].ljust(size)
+                    value = unicode(value)[:size].ljust(size)
                 assert len(value) == size
                 value = b(value)
-                f.write(value)
+                f.write(value.encode('utf8'))
 
     def null(self):
         """Creates a null shape."""
