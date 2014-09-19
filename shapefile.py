@@ -50,8 +50,12 @@ def b(v):
             # Error.
             raise Exception('Unknown input type')
     else:
-        # For python 2 assume str passed in and return str.
-        return v
+        # For python 2 use unicode support
+        try:
+            return unicode(v).encode('utf-8')
+        except UnicodeDecodeError:
+            # UTF-8 characters in an ascii string? Ignore.
+            return unicode(v, errors='ignore').encode('utf-8')
 
 def u(v):
     if PYTHON3:
@@ -65,8 +69,12 @@ def u(v):
             # Error.
             raise Exception('Unknown input type')
     else:
-        # For python 2 assume str passed in and return str.
-        return v
+        # For python 2 use unicode support
+        try:
+            return unicode(v).decode('utf-8')
+        except UnicodeDecodeError:
+            # UTF-8 characters in an ascii string? Ignore.
+            return unicode(v, errors='ignore').decode('utf-8')
 
 def is_string(v):
     if PYTHON3:
@@ -882,15 +890,16 @@ class Writer:
             for (fieldName, fieldType, size, dec), value in zip(self.fields, record):
                 fieldType = fieldType.upper()
                 size = int(size)
+
                 if fieldType.upper() == "N":
-                    value = unicode(value).rjust(size)
+                    value = b(value).rjust(size)
                 elif fieldType == 'L':
-                    value = unicode(value)[0].upper()
+                    value = b(value)[0].upper()
                 else:
-                    value = unicode(value)[:size].ljust(size)
+                    value = b(value)[:size].ljust(size)
                 assert len(value) == size
-                value = b(value)
-                f.write(value.encode('utf8'))
+
+                f.write(value)
 
     def null(self):
         """Creates a null shape."""
