@@ -482,7 +482,7 @@ class Reader:
                 continue
             elif typ == "N":
                 value = value.replace(b('\0'), b('')).strip()
-                if value == b(''):
+                if value == b('') or value == b('**'):
                     value = 0
                 elif deci:
                     value = float(value)
