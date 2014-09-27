@@ -646,7 +646,8 @@ class Writer:
             shapeType = self.shapeType
             if shapeTypes:
                 shapeType = shapeTypes[shapes.index(s)]
-            px, py = list(zip(*s.points))[:2]
+            if len(s.points):
+                px, py = list(zip(*s.points))[:2]
             x.extend(px)
             y.extend(py)
         return [min(x), min(y), max(x), max(y)]
@@ -821,7 +822,8 @@ class Writer:
             # Write a single point
             if s.shapeType in (1,11,21):
                 try:
-                    f.write(pack("<2d", s.points[0][0], s.points[0][1]))
+                    if len(s.points) and len(s.points[0])>1:
+                        f.write(pack("<2d", s.points[0][0], s.points[0][1]))
                 except error:
                     raise ShapefileException("Failed to write point for record %s. Expected floats." % recNum)
             # Write a single Z value
