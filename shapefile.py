@@ -482,18 +482,22 @@ class Reader:
                 continue
             elif typ == "N":
                 value = value.replace(b('\0'), b('')).strip()
+                value = value.replace(b('*'), b(''))  # QGIS NULL is all '*' chars
                 if value == b(''):
-                    value = 0
+                    value = None
                 elif deci:
                     value = float(value)
                 else:
                     value = int(value)
             elif typ == b('D'):
-                try:
-                    y, m, d = int(value[:4]), int(value[4:6]), int(value[6:8])
-                    value = [y, m, d]
-                except:
-                    value = value.strip()
+                if value.count(b('0')) == len(value):  # QGIS NULL is all '0' chars
+                    value = None
+                else:
+                    try:
+                        y, m, d = int(value[:4]), int(value[4:6]), int(value[6:8])
+                        value = [y, m, d]
+                    except:
+                        value = value.strip()
             elif typ == b('L'):
                 value = (value in b('YyTt') and b('T')) or \
                                         (value in b('NnFf') and b('F')) or b('?')
