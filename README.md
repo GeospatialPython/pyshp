@@ -45,7 +45,7 @@ part of your geospatial project.
 
 Before doing anything you must import the library.
 
-    
+
     >>> import shapefile
 
 The examples below will use a shapefile created from the U.S. Census Bureau
@@ -59,17 +59,17 @@ existing shapefile. The shapefile format is acutally a collection of three
 files. You specify the base filename of the shapefile or the complete filename
 of any of the shapefile component files.
 
-    
+
     >>> sf = shapefile.Reader("shapefiles/blockgroups")
 
 OR
 
-    
+
     >>> sf = shapefile.Reader("shapefiles/blockgroups.shp")
 
 OR
 
-    
+
     >>> sf = shapefile.Reader("shapefiles/blockgroups.dbf")
 
 OR any of the other 5+ formats which are potentially part of a shapefile. The
@@ -82,7 +82,7 @@ arguments to specify any of the three files. This feature is very powerful and
 allows you to load shapefiles from a url, from a zip file, serialized object,
 or in some cases a database.
 
-    
+
     >>> myshp = open("shapefiles/blockgroups.shp", "rb")
     >>> mydbf = open("shapefiles/blockgroups.dbf", "rb")
     >>> r = shapefile.Reader(shp=myshp, dbf=mydbf)
@@ -103,26 +103,26 @@ are handled by software.
 You can get the a list of the shapefile's geometry by calling the shapes()
 method.
 
-    
+
     >>> shapes = sf.shapes()
 
 The shapes method returns a list of Shape objects describing the geometry of
 each shape record.
 
-    
+
     >>> len(shapes)
     663
 
 You can iterate through the shapefile's geometry using the iterShapes()
 method.
 
-    
+
     >>> len(list(sf.iterShapes()))
     663
 
 Each shape record contains the following attributes:
 
-    
+
     >>> for name in dir(shapes[3]):
     ...     if not name.startswith('__'):
     ...         name
@@ -131,28 +131,28 @@ Each shape record contains the following attributes:
     'points'
     'shapeType'
 
-  * shapeType: an integer representing the type of shape as defined by the shapefile specification. 
+  * shapeType: an integer representing the type of shape as defined by the shapefile specification.
 
-    
+
         >>> shapes[3].shapeType
         5
 
-  * bbox: If the shape type contains multiple points this tuple describes the lower left (x,y) coordinate and upper right corner coordinate creating a complete box around the points. If the shapeType is a Null (shapeType == 0) then an AttributeError is raised. 
+  * bbox: If the shape type contains multiple points this tuple describes the lower left (x,y) coordinate and upper right corner coordinate creating a complete box around the points. If the shapeType is a Null (shapeType == 0) then an AttributeError is raised.
 
-    
+
         >>> # Get the bounding box of the 4th shape.
         >>> # Round coordinates to 3 decimal places
         >>> bbox = shapes[3].bbox
         >>> ['%.3f' % coord for coord in bbox]
         ['-122.486', '37.787', '-122.446', '37.811']
 
-  * parts: Parts simply group collections of points into shapes. If the shape record has multiple parts this attribute contains the index of the first point of each part. If there is only one part then a list containing 0 is returned. 
-    
+  * parts: Parts simply group collections of points into shapes. If the shape record has multiple parts this attribute contains the index of the first point of each part. If there is only one part then a list containing 0 is returned.
+
         >>> shapes[3].parts
         [0]
 
-  * points: The points attribute contains a list of tuples containing an (x,y) coordinate for each point in the shape. 
-    
+  * points: The points attribute contains a list of tuples containing an (x,y) coordinate for each point in the shape.
+
         >>> len(shapes[3].points)
         173
         >>> # Get the 8th point of the fourth shape
@@ -165,9 +165,9 @@ To read a single shape by calling its index use the shape() method. The index
 is the shape's count from 0. So to read the 8th shape record you would use its
 index which is 7.
 
-    
+
     >>> s = sf.shape(7)
-    
+
     >>> # Read the bbox of the 8th shape to verify
     >>> # Round coordinates to 3 decimal places
     >>> ['%.3f' % coord for coord in s.bbox]
@@ -185,17 +185,17 @@ The field names of a shapefile are available as soon as you read a shapefile.
 You can call the "fields" attribute of the shapefile as a Python list. Each
 field is a Python list with the following information:
 
-  * Field name: the name describing the data at this column index. 
-  * Field type: the type of data at this column index. Types can be: Character, Numbers, Longs, Dates, or Memo. The "Memo" type has no meaning within a GIS and is part of the xbase spec instead. 
-  * Field length: the length of the data found at this column index. Older GIS software may truncate this length to 8 or 11 characters for "Character" fields. 
-  * Decimal length: the number of decimal places found in "Number" fields. 
+  * Field name: the name describing the data at this column index.
+  * Field type: the type of data at this column index. Types can be: Character, Numbers, Longs, Dates, or Memo. The "Memo" type has no meaning within a GIS and is part of the xbase spec instead.
+  * Field length: the length of the data found at this column index. Older GIS software may truncate this length to 8 or 11 characters for "Character" fields.
+  * Decimal length: the number of decimal places found in "Number" fields.
 
 To see the fields for the Reader object above (sf) call the "fields"
 attribute:
 
-    
+
     >>> fields = sf.fields
-    
+
     >>> assert fields == [("DeletionFlag", "C", 1, 0), ["AREA", "N", 18, 5],
     ... ["BKG_KEY", "C", 12, 0], ["POP1990", "N", 9, 0], ["POP90_SQMI", "N", 10, 1],
     ... ["HOUSEHOLDS", "N", 9, 0],
@@ -217,16 +217,16 @@ attribute:
 
 You can get a list of the shapefile's records by calling the records() method:
 
-    
+
     >>> records = sf.records()
-    
+
     >>> len(records)
     663
 
 Similar to the geometry methods, you can iterate through dbf records using the
 iterRecords() method.
 
-    
+
     >>> len(list(sf.iterRecords()))
     663
 
@@ -237,15 +237,15 @@ For example in the 4th record of the blockgroups shapefile the 2nd and 3rd
 fields are the blockgroup id and the 1990 population count of that San
 Francisco blockgroup:
 
-    
+
     >>> records[3][1:3]
     ['060750601001', 4715]
 
 To read a single record call the record() method with the record's index:
 
-    
+
     >>> rec = sf.record(3)
-    
+
     >>> rec[1:3]
     ['060750601001', 4715]
 
@@ -261,34 +261,36 @@ all shapes as a list of ShapeRecord objects. Each ShapeRecord instance has a
 dicussed in the first section "Reading Geometry". The record attribute is a
 list of field values as demonstrated in the "Reading Records" section.
 
-    
+
     >>> shapeRecs = sf.shapeRecords()
 
-Let's read the blockgroup key and the population for the 4th blockgroup: >>>
-shapeRecs3.record[1:3] ['060750601001', 4715]
+Let's read the blockgroup key and the population for the 4th blockgroup:
+
+
+    >>> shapeRecs3.record[1:3] ['060750601001', 4715]
 
 Now let's read the first two points for that same record:
 
-    
+
     >>> points = shapeRecs[3].shape.points[0:2]
-    
+
     >>> len(points)
     2
 
 The shapeRec() method reads a single shape/record pair at the specified index.
 To get the 4th shape record from the blockgroups shapfile use the third index:
 
-    
+
     >>> shapeRec = sf.shapeRecord(3)
 
 The blockgroup key and population count:
 
-    
+
     >>> shapeRec.record[1:3]
     ['060750601001', 4715]
-    
+
     >>> points = shapeRec.shape.points[0:2]
-    
+
     >>> len(points)
     2
 
@@ -313,7 +315,7 @@ Writer class until you are ready to save the file.
 
 Create an instance of the Writer class to begin creating a shapefile:
 
-    
+
     >>> w = shapefile.Writer()
 
 ### Setting the Shape Type
@@ -332,17 +334,17 @@ it automatically to the type of the first shape by saving the shapefile.
 
 To manually set the shape type for a Writer object when creating the Writer:
 
-    
+
     >>> w = shapefile.Writer(shapeType=1)
-    
+
     >>> w.shapeType
     1
 
 OR you can set it after the Writer is created:
 
-    
+
     >>> w.shapeType = 3
-    
+
     >>> w.shapeType
     3
 
@@ -355,7 +357,7 @@ make sure when you add either a shape or a record the two sides of the
 equation line up. This feature is NOT turned on by default. To activate it set
 the attribute autoBalance to 1 (True):
 
-    
+
     >>> w.autoBalance = 1
 
 You also have the option of manually calling the balance() method each time
@@ -388,14 +390,14 @@ Geometry is added using one of three methods: "null", "point", or "poly". The
 Because Null shape types (shape type 0) have no geometry the "null" method is
 called without any arguments.
 
-    
+
     >>> w = shapefile.Writer()
-    
+
     >>> w.null()
 
 The writer object's shapes list will now have one null shape:
 
-    
+
     >>> assert w.shapes()[0].shapeType == shapefile.NULL
 
 **Adding a Point shape**
@@ -403,16 +405,16 @@ The writer object's shapes list will now have one null shape:
 Point shapes are added using the "point" method. A point is specified by an x,
 y, and optional z (elevation) and m (measure) value.
 
-    
+
     >>> w = shapefile.Writer()
-    
+
     >>> w.point(122, 37) # No elevation or measure values
-    
+
     >>> w.shapes()[0].points
     [[122, 37, 0, 0]]
-    
+
     >>> w.point(118, 36, 4, 8)
-    
+
     >>> w.shapes()[1].points
     [[118, 36, 4, 8]]
 
@@ -424,9 +426,9 @@ automatically enforces closed polygons. A line must have at least two points.
 Because of the similarities between these two shape types they are created
 using a single method called "poly".
 
-    
+
     >>> w = shapefile.Writer()
-    
+
     >>> w.poly(shapeType=3, parts=[[[122,37,4,9], [117,36,3,4]], [[115,32,8,8],
     ... [118,20,6,4], [113,24]]])
 
@@ -438,7 +440,7 @@ shape record.
 
 The following attempts to create a complete shapefile:
 
-    
+
     >>> w = shapefile.Writer(shapefile.POINT)
     >>> w.point(1,1)
     >>> w.point(3,1)
@@ -451,14 +453,14 @@ The following attempts to create a complete shapefile:
     >>> w.record('Third','Point')
     >>> w.record('Fourth','Point')
     >>> w.save('shapefiles/test/point')
-    
+
     >>> w = shapefile.Writer(shapefile.POLYGON)
     >>> w.poly(parts=[[[1,5],[5,5],[5,1],[3,3],[1,1]]])
     >>> w.field('FIRST_FLD','C','40')
     >>> w.field('SECOND_FLD','C','40')
     >>> w.record('First','Polygon')
     >>> w.save('shapefiles/test/polygon')
-    
+
     >>> w = shapefile.Writer(shapefile.POLYLINE)
     >>> w.line(parts=[[[1,5],[5,5],[5,1],[3,3],[1,1]]])
     >>> w.poly(parts=[[[1,3],[5,3]]], shapeType=shapefile.POLYLINE)
@@ -471,7 +473,7 @@ The following attempts to create a complete shapefile:
 You can also add attributes using keyword arguments where the keys are field
 names.
 
-    
+
     >>> w = shapefile.Writer(shapefile.POLYLINE)
     >>> w.line(parts=[[[1,5],[5,5],[5,1],[3,3],[1,1]]])
     >>> w.field('FIRST_FLD','C','40')
@@ -490,7 +492,7 @@ any file names (i.e. save()), then a unique file name is generated with the
 prefix "shapefile_" followed by random characters which is used for all three
 files. The unique file name is returned as a string. _
 
-    
+
     >>> targetName = w.save()
     >>> assert("shapefile_" in targetName)
 
@@ -499,7 +501,7 @@ files. The unique file name is returned as a string. _
 Just as you can read shapefiles from python file-like objects you can also
 write them.
 
-    
+
     >>> try:
     ...     from StringIO import StringIO
     ... except ImportError:
@@ -522,7 +524,7 @@ Let's add shapes to existing shapefiles:
 
 Add a point to a point shapefile
 
-    
+
     >>> e = shapefile.Editor(shapefile="shapefiles/test/point.shp")
     >>> e.point(0,0,10,2)
     >>> e.record("Appended","Point")
@@ -530,7 +532,7 @@ Add a point to a point shapefile
 
 Add a new line to a line shapefile:
 
-    
+
     >>> e = shapefile.Editor(shapefile="shapefiles/test/line.shp")
     >>> e.line(parts=[[[10,5],[15,5],[15,1],[13,3],[11,1]]])
     >>> e.record('Appended','Line')
@@ -538,7 +540,7 @@ Add a new line to a line shapefile:
 
 Add a new polygon to a polygon shapefile:
 
-    
+
     >>> e = shapefile.Editor(shapefile="shapefiles/test/polygon.shp")
     >>> e.poly(parts=[[[5.1,5],[9.9,5],[9.9,1],[7.5,3],[5.1,1]]])
     >>> e.record("Appended","Polygon")
@@ -547,14 +549,14 @@ Add a new polygon to a polygon shapefile:
 Remove the first point in each shapefile - for a point shapefile that is the
 first shape and record"
 
-    
+
     >>> e = shapefile.Editor(shapefile="shapefiles/test/point.shp")
     >>> e.delete(0)
     >>> e.save('shapefiles/test/point')
 
 Remove the last shape in the polygon shapefile.
 
-    
+
     >>> e = shapefile.Editor(shapefile="shapefiles/test/polygon.shp")
     >>> e.delete(-1)
     >>> e.save('shapefiles/test/polygon')
@@ -569,7 +571,7 @@ information on GeoJSON is available at
 [http://geojson.org](http://geojson.org)
 [http://geojson.org](http://geojson.org).
 
-    
+
     >>> s = sf.shape(0)
     >>> s.__geo_interface__["type"]
     'MultiPolygon'
