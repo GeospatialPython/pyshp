@@ -16,6 +16,7 @@ import sys
 import time
 import array
 import tempfile
+import itertools
 
 #
 # Constants for shape types
@@ -566,6 +567,13 @@ class Reader:
         shapeRecords = []
         return [_ShapeRecord(shape=rec[0], record=rec[1]) \
                                 for rec in zip(self.shapes(), self.records())]
+
+    def iterShapeRecords(self):
+        """Returns a generator of combination geometry/attribute records for
+        all records in a shapefile."""
+        for shape, record in itertools.izip(self.iterShapes(), self.iterRecords()):
+            yield _ShapeRecord(shape=shape, record=record)
+
 
 class Writer:
     """Provides write support for ESRI Shapefiles."""
