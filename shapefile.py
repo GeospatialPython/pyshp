@@ -463,7 +463,8 @@ class Reader:
             fieldDesc[1] = u(fieldDesc[1])
             self.fields.append(fieldDesc)
         terminator = dbf.read(1)
-        assert terminator == b("\r")
+        if terminator != b("\r"):
+            raise ShapefileException("Shapefile dbf header lacks expected terminator. (likely corrupt?)")
         self.fields.insert(0, ('DeletionFlag', 'C', 1, 0))
 
     def __recordFmt(self):
@@ -898,7 +899,10 @@ class Writer:
                     value = str(value)[0].upper()
                 else:
                     value = str(value)[:size].ljust(size)
-                assert len(value) == size
+                if len(value) != size:
+                    raise ShapefileException(
+                        "Shapefile Writer unable to pack incorrect sized value"
+                        " (size %d) into field '%s' (size %d)." % (len(value), fieldName, size))
                 value = b(value)
                 f.write(value)
 
