@@ -2,12 +2,13 @@
 shapefile.py
 Provides read and write support for ESRI Shapefiles.
 author: jlawhead<at>geospatialpython.com
-date: 20130727
-version: 1.2.0
+date: 20140507
+version: 1.2.1
 Compatible with Python versions 2.4-3.x
+version changelog: Fixed u() to just return the byte sequence on exception 
 """
 
-__version__ = "1.2.0"
+__version__ = "1.2.1"
 
 from struct import pack, unpack, calcsize, error
 import os
@@ -55,15 +56,24 @@ def b(v):
 
 def u(v):
     if PYTHON3:
-        if isinstance(v, bytes):
-            # For python 3 decode bytes to str.
-            return v.decode('utf-8')
-        elif isinstance(v, str):
-            # Already str.
-            return v
-        else:
-            # Error.
-            raise Exception('Unknown input type')
+        # try/catch added 2014/05/07
+        # returned error on dbf of shapefile
+        # from www.naturalearthdata.com named
+        # "ne_110m_admin_0_countries".
+        # Just returning v as is seemed to fix
+        # the problem.  This function could
+        # be condensed further.
+        try:
+          if isinstance(v, bytes):
+              # For python 3 decode bytes to str.
+              return v.decode('utf-8')
+          elif isinstance(v, str):
+              # Already str.
+              return v
+          else:
+              # Error.
+              raise Exception('Unknown input type')
+        except: return v
     else:
         # For python 2 assume str passed in and return str.
         return v
