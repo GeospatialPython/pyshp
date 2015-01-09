@@ -1,7 +1,31 @@
+VERSION 1.2.2
+
+### upcoming (2015/01/09 05:27 +00:00)
+- [#11](https://github.com/geospatialpython/pyshp/pull/11) Merge pull request #11 from 7mp/master (@7mp)
+- [#1](https://github.com/geospatialpython/pyshp/pull/1) Merge pull request #1 from rgbkrk/patch-1 (@rgbkrk)
+- [#13](https://github.com/geospatialpython/pyshp/pull/13) Merge pull request #13 from jzmiller1/patch-1 (@jzmiller1)
+- [#16](https://github.com/geospatialpython/pyshp/pull/16) Merge pull request #16 from riggsd/null-friendly (@riggsd)
+- [#17](https://github.com/geospatialpython/pyshp/pull/17) Merge pull request #17 from riggsd/no-asserts (@riggsd)
+- [#19](https://github.com/geospatialpython/pyshp/pull/19) Merge pull request #19 from razzius/master (@razzius)
+- [#20](https://github.com/geospatialpython/pyshp/pull/20) Merge pull request #20 from Brideau/patch-1 (@Brideau)
+- [12d69d4](https://github.com/GeospatialPython/pyshp/commit/12d69d47d8c90b445ea22bf5d9530b0c1c710de5) Updated to version 1.2.1 to match PyPI (@GeospatialPython)
+- [05b69dc](https://github.com/GeospatialPython/pyshp/commit/05b69dc6b3d58c0dc9a822f6c4b8d45cf8dc9d94) Updated to version 1.2.1 to match PyPI (@GeospatialPython)
+- [d2e9f1a](https://github.com/GeospatialPython/pyshp/commit/d2e9f1a41d02cf932484111f45c31781d1f7385a) Typo: recordsIter should be iterRecords (@Brideau)
+- [a965aff](https://github.com/GeospatialPython/pyshp/commit/a965aff230aa3f3b85016f7b627609c7e53a2cf9) Format README code sample (@razzius)
+- [66e1802](https://github.com/GeospatialPython/pyshp/commit/66e1802013fd3535baa505e15625afaa895ef819) Raise ShapefileException for runtime errors rather than using `assert()`
+- [d72723c](https://github.com/GeospatialPython/pyshp/commit/d72723c9e38db8e859b79d95a65c00af1c2ba8ba) Return None when parsing (illegal) NULL attribute values in numeric and date fields, like those produced by QGIS
+- [783e68c](https://github.com/GeospatialPython/pyshp/commit/783e68c75b8f20c7656ea470dbc5e9496a8ee0ac) Update link to "XBase File Format Description" (@jzmiller1)
+- [79cc409](https://github.com/GeospatialPython/pyshp/commit/79cc409362a24caf4a21923419490ee95d557dc3) Added `Reader.iterShapeRecords` to help work with larger files
+- [18c5521](https://github.com/GeospatialPython/pyshp/commit/18c5521b89cd1d7968dff8eb03c1ec37ab4307c5) URL Change (@rgbkrk)
+- [202143c](https://github.com/GeospatialPython/pyshp/commit/202143c823407ffea07b5400e77b9ded7169f696) README.md TOC Take 2
+- [2cca75c](https://github.com/GeospatialPython/pyshp/commit/2cca75cd09b27bb19a77ffeb68afc535e3c33802) README.md TOC
+- [8b5e994](https://github.com/GeospatialPython/pyshp/commit/8b5e994905fd4a70c0f7ce6d814346e6666b280c) README.md
+- [f31a3d7](https://github.com/GeospatialPython/pyshp/commit/f31a3d773dd22e65d3e38ad8b034f186a05b4c4d) Update README.txt (@GeospatialPython)
+
 VERSION 1.2.1
 
-2013-12-27 Joel Lawhead <jlawhead@geospatialpython.com>
-	*LICENSE.txt added MIT license to project
+2014-05-11 Joel Lawhead <jlawhead@geospatialpython.com>
+	*shapefile.py (u) fixed bug which failed to properly read some dbf fields in Python 3
 
 VERSION 1.2.0
 
