@@ -224,7 +224,7 @@ You can get a list of the shapefile's records by calling the records() method:
     663
 
 Similar to the geometry methods, you can iterate through dbf records using the
-recordsIter() method.
+iterRecords() method.
 
     
     >>> len(list(sf.iterRecords()))
