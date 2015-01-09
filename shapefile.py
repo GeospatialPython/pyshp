@@ -16,6 +16,7 @@ import sys
 import time
 import array
 import tempfile
+from datetime import date
 
 #
 # Constants for shape types
@@ -483,8 +484,7 @@ class Reader:
             # deleted record
             return None
         record = []
-        for (name, typ, size, deci), value in zip(self.fields,
-                                                                                                recordContents):
+        for (name, typ, size, deci), value in zip(self.fields, recordContents):
             if name == 'DeletionFlag':
                 continue
             elif not value.strip():
@@ -501,7 +501,7 @@ class Reader:
             elif typ == b('D'):
                 try:
                     y, m, d = int(value[:4]), int(value[4:6]), int(value[6:8])
-                    value = [y, m, d]
+                    value = date(y, m, d)
                 except:
                     value = value.strip()
             elif typ == b('L'):
@@ -892,10 +892,12 @@ class Writer:
             for (fieldName, fieldType, size, dec), value in zip(self.fields, record):
                 fieldType = fieldType.upper()
                 size = int(size)
-                if fieldType.upper() == "N":
+                if fieldType == 'N':
                     value = str(value).rjust(size)
                 elif fieldType == 'L':
                     value = str(value)[0].upper()
+                elif fieldType == 'D' and isinstance(value, date):
+                    value = value.strftime('%Y%m%d').ljust(size)
                 else:
                     value = str(value)[:size].ljust(size)
                 assert len(value) == size
@@ -949,9 +951,18 @@ class Writer:
             polyShape.partTypes = partTypes
         self._shapes.append(polyShape)
 
-    def field(self, name, fieldType="C", size="50", decimal=0):
+    def field(self, name, fieldType='C', size=50, decimal=0):
         """Adds a dbf field descriptor to the shapefile."""
+        fieldType = fieldType.upper()
+        size = int(size)
+        decimal = int(decimal)
+        if fieldType == 'D' and size < 8:
+            raise ShapefileException("Date fields require min size of 8 (%d is too small)" % size)
         self.fields.append((name, fieldType, size, decimal))
+
+    def fieldDate(self, name):
+        """Adds a Date type dbf descriptor to the shapefile"""
+        self.field(name, 'D', 8, 0)
 
     def record(self, *recordList, **recordDict):
         """Creates a dbf attribute record. You can submit either a sequence of
