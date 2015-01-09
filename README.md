@@ -24,17 +24,15 @@ Pyshp is compatible with Python 2.4-3.x.
 
 This document provides examples for using pyshp to read and write shapefiles.
 
-Currently the sample census blockgroup shapefile referenced in the examples is
-only available on the google code project site at
-[http://code.google.com/p/pyshp](http://code.google.com/p/pyshp). These
+Currently the sample census blockgroup shapefile referenced in the examples is available on the google code project site at
+[https://github.com/GeospatialPython/pyshp](https://github.com/GeospatialPython/pyshp). These
 examples are straight-forward and you can also easily run them against your
 own shapefiles manually with minimal modification. Other examples for specific
-topics are continually added to the pyshp wiki on google code and the blog
+topics are continually added to the pyshp wiki on GitHub and the blog
 [http://GeospatialPython.com](http://GeospatialPython.com).
 
 Important: For information about map projections, shapefiles, and Python
-please visit: [http://code.google.com/p/pyshp/wiki/MapProjections](http://code
-.google.com/p/pyshp/wiki/MapProjections)
+please visit: [https://github.com/GeospatialPython/pyshp/wiki/Map-Projections](https://github.com/GeospatialPython/pyshp/wiki/Map-Projections)
 
 I sincerely hope this library eliminates the mundane distraction of simply
 reading and writing data, and allows you to focus on the challenging and FUN
@@ -72,7 +70,7 @@ OR
     >>> sf = shapefile.Reader("shapefiles/blockgroups.dbf")
 
 OR any of the other 5+ formats which are potentially part of a shapefile. The
-library does not care about extensions.
+library does not care about file extensions.
 
 ### Reading Shapefiles from File-Like Objects
 
@@ -176,7 +174,7 @@ index which is 7.
 
 A record in a shapefile contains the attributes for each shape in the
 collection of geometry. Records are stored in the dbf file. The link between
-geometry and attributes is the foundation of Geographic Information Systems.
+geometry and attributes is the foundation of all geographic information systems.
 This critical link is implied by the order of shapes and corresponding records
 in the shp geometry file and the dbf attribute file.
 
@@ -276,7 +274,7 @@ Now let's read the first two points for that same record:
     >>> len(points)
     2
 
-The shapeRec() method reads a single shape/record pair at the specified index.
+The shapeRecord() method reads a single shape/record pair at the specified index.
 To get the 4th shape record from the blockgroups shapfile use the third index:
 
 
@@ -292,6 +290,13 @@ The blockgroup key and population count:
 
     >>> len(points)
     2
+    
+There is also an iterShapeRecords() method to iterate through large files:
+
+    >>> shapeRecs = sf.iterShapeRecords()
+    >>> for shape, rec in shapeRecs:
+    ...     # do something here
+    
 
 ## Writing Shapefiles
 
@@ -384,21 +389,6 @@ Geometry is added using one of three methods: "null", "point", or "poly". The
 "null" method is used for null shapes, "point" is used for point shapes, and
 "poly" is used for everything else.
 
-**Adding a Null shape**
-
-Because Null shape types (shape type 0) have no geometry the "null" method is
-called without any arguments.
-
-
-    >>> w = shapefile.Writer()
-
-    >>> w.null()
-
-The writer object's shapes list will now have one null shape:
-
-
-    >>> assert w.shapes()[0].shapeType == shapefile.NULL
-
 **Adding a Point shape**
 
 Point shapes are added using the "point" method. A point is specified by an x,
@@ -431,13 +421,28 @@ using a single method called "poly".
     >>> w.poly(shapeType=3, parts=[[[122,37,4,9], [117,36,3,4]], [[115,32,8,8],
     ... [118,20,6,4], [113,24]]])
 
+**Adding a Null shape**
+
+Because Null shape types (shape type 0) have no geometry the "null" method is
+called without any arguments.  This type of shapefile is rarely used but it is valid.
+
+
+    >>> w = shapefile.Writer()
+
+    >>> w.null()
+
+The writer object's shapes list will now have one null shape:
+
+
+    >>> assert w.shapes()[0].shapeType == shapefile.NULL
+
 ### Creating Attributes
 
 Creating attributes involves two steps. Step 1 is to create fields to contain
 attribute values and step 2 is to populate the fields with values for each
 shape record.
 
-The following attempts to create a complete shapefile:
+The following attempts to create a complete shapefile.  The attribute and field names are not very creative:
 
 
     >>> w = shapefile.Writer(shapefile.POINT)
@@ -483,13 +488,13 @@ names.
 ### File Names
 
 File extensions are optional when reading or writing shapfiles. If you specify
-them Pyshp ignores them anyway. When you save files you can specify a base
+them PyShp ignores them anyway. When you save files you can specify a base
 file name that is used for all three file types. Or you can specify a nmae for
 one or more file types. In that case, any file types not assigned will not
 save and only file types with file names will be saved. If you do not specify
 any file names (i.e. save()), then a unique file name is generated with the
 prefix "shapefile_" followed by random characters which is used for all three
-files. The unique file name is returned as a string. _
+files. The unique file name is returned as a string.
 
 
     >>> targetName = w.save()
@@ -517,7 +522,7 @@ write them.
 ## Editing Shapefiles
 
 The Editor class attempts to make changing existing shapefiles easier by
-handling the reading and writing details behind the scenes.
+handling the reading and writing details behind the scenes.  This class is experimental and should be avoided for production use.  You can do the same thing by reading a shapefile into memory, making changes to the python objects, and write out a new shapefile with the same or different name.
 
 Let's add shapes to existing shapefiles:
 

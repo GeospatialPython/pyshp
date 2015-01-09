@@ -3,9 +3,9 @@ PyShp
 
 :Author: Joel Lawhead - jlawhead@geospatialpython.com
 
-:Version 1.2.1
+:Version 1.2.2
 
-:Revised: May 11, 2014
+:Revised: January 9, 2015
 
 .. contents::
 
@@ -292,6 +292,12 @@ The blockgroup key and population count:
 
 >>> len(points)
 2
+
+There is also an iterShapeRecords() method to iterate through large files:
+
+    >>> shapeRecs = sf.iterShapeRecords()
+    >>> for shape, rec in shapeRecs:
+    ...     # do something here
 
 Writing Shapefiles
 ++++++++++++++++++
