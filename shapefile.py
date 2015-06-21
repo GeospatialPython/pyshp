@@ -5,7 +5,7 @@ author: jlawhead<at>geospatialpython.com
 date: 2015/01/09
 version: 1.2.2
 Compatible with Python versions 2.4-3.x
-version changelog: Fixed u() to just return the byte sequence on exception 
+version changelog: Added `Reader.iterShapeRecords` to help work with larger files
 """
 
 __version__ = "1.2.2"
