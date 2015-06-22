@@ -1085,16 +1085,19 @@ class Editor(Writer):
         """Deletes the specified part of any shape by specifying a shape
         number, part number, or point number."""
         # shape, part, point
-        if shape and part and point:
+        shape_param_exists = shape is not None
+        part_param_exists = part is not None
+        point_param_exists = point is not None
+        if shape_param_exists and part_param_exists and point_param_exists:
             del self._shapes[shape][part][point]
         # shape, part
-        elif shape and part and not point:
+        elif shape_param_exists and part_param_exists and not point_param_exists:
             del self._shapes[shape][part]
         # shape
-        elif shape and not part and not point:
+        elif shape_param_exists and not part_param_exists and not point_param_exists:
             del self._shapes[shape]
         # point
-        elif not shape and not part and point:
+        elif not shape_param_exists and not part_param_exists and point_param_exists:
             for s in self._shapes:
                 if s.shapeType == 1:
                     del self._shapes[point]
@@ -1102,11 +1105,11 @@ class Editor(Writer):
                     for part in s.parts:
                         del s[part][point]
         # part, point
-        elif not shape and part and point:
+        elif not shape_param_exists and part_param_exists and point_param_exists:
             for s in self._shapes:
                 del s[part][point]
         # part
-        elif not shape and part and not point:
+        elif not shape_param_exists and part_param_exists and not point_param_exists:
             for s in self._shapes:
                 del s[part]
 
