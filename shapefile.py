@@ -2,13 +2,13 @@
 shapefile.py
 Provides read and write support for ESRI Shapefiles.
 author: jlawhead<at>geospatialpython.com
-date: 2015/01/09
-version: 1.2.2
+date: 2015/06/22
+version: 1.2.3
 Compatible with Python versions 2.4-3.x
-version changelog: Added `Reader.iterShapeRecords` to help work with larger files
+version changelog: Reader.iterShapeRecords() bugfix for Python 3
 """
 
-__version__ = "1.2.2"
+__version__ = "1.2.3"
 
 from struct import pack, unpack, calcsize, error
 import os
@@ -39,6 +39,9 @@ PYTHON3 = sys.version_info[0] == 3
 
 if PYTHON3:
     xrange = range
+    izip = zip
+else:
+    from itertools import izip
 
 def b(v):
     if PYTHON3:
@@ -571,7 +574,7 @@ class Reader:
     def iterShapeRecords(self):
         """Returns a generator of combination geometry/attribute records for
         all records in a shapefile."""
-        for shape, record in itertools.izip(self.iterShapes(), self.iterRecords()):
+        for shape, record in izip(self.iterShapes(), self.iterRecords()):
             yield _ShapeRecord(shape=shape, record=record)
 
 

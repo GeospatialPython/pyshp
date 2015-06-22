@@ -653,7 +653,7 @@ The Python __geo_interface__ convention provides a data interchange interface
 among geospatial Python libraries.  The interface returns data as GeoJSON.
 More information on the __geo_interface__ protocol can be found at:
 https://gist.github.com/sgillies/2217756.
-More information on GeoJSON is available at http://geojson.org http://geojson.org.
+More information on GeoJSON is available at http://geojson.org.
  
 >>> s = sf.shape(0)
 >>> s.__geo_interface__["type"]
