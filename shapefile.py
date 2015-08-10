@@ -916,8 +916,7 @@ class Writer:
                     value = str(value)[0].upper()
                 elif fieldType == 'D':
                     if isinstance(value, datetime.datetime):
-                        ymd = [str(v).zfill(2) for v in [value.year, value.month, value.day]]
-                        value = '{0}{1}{2}'.format(*ymd)[:size].ljust(size)
+                        value = ''.join([str(v).zfill(2) for v in [value.year, value.month, value.day]])[:size].ljust(size)
                     elif isinstance(value, basestring):
                         if DATE_EXP.match(value):
                             try:
