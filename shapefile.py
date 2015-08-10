@@ -17,6 +17,8 @@ import time
 import array
 import tempfile
 import itertools
+import datetime
+import re
 
 #
 # Constants for shape types
@@ -36,10 +38,12 @@ MULTIPOINTM = 28
 MULTIPATCH = 31
 
 PYTHON3 = sys.version_info[0] == 3
+DATE_EXP = re.compile('\d{4}[-/]\d{2}[-/]\d{2}')
 
 if PYTHON3:
     xrange = range
     izip = zip
+    basestring = str
 else:
     from itertools import izip
 
@@ -209,10 +213,8 @@ class Reader:
     but is not required to read the geometry from the .shp
     file. The "shapefile" argument in the constructor is the
     name of the file you want to open.
-
     You can instantiate a Reader without specifying a shapefile
     and then specify one later with the load() method.
-
     Only the shapefile headers are read upon loading. Content
     within each file is only accessed when required and as
     efficiently as possible. Shapefiles are usually not large
@@ -248,7 +250,7 @@ class Reader:
                 self.dbf = kwargs["dbf"]
                 if hasattr(self.dbf, "seek"):
                     self.dbf.seek(0)
-        if self.shp or self.dbf:        
+        if self.shp or self.dbf:
             self.load()
         else:
             raise ShapefileException("Shapefile Reader requires a shapefile or file-like object.")
@@ -373,7 +375,7 @@ class Reader:
             record.m = unpack("<d", f.read(8))
         # Seek to the end of this record as defined by the record header because
         # the shapefile spec doesn't require the actual content to meet the header
-        # definition.  Probably allowed for lazy feature deletion. 
+        # definition.  Probably allowed for lazy feature deletion.
         f.seek(next)
         return record
 
@@ -434,7 +436,7 @@ class Reader:
         self.shpLength = shp.tell()
         shp.seek(100)
         while shp.tell() < self.shpLength:
-            yield self.__shape()    
+            yield self.__shape()
 
     def __dbfHeaderLength(self):
         """Retrieves the header length of a dbf file header."""
@@ -828,7 +830,7 @@ class Writer:
                     if hasattr(s,"z"):
                         f.write(pack("<%sd" % len(s.z), *s.z))
                     else:
-                        [f.write(pack("<d", p[2])) for p in s.points]  
+                        [f.write(pack("<d", p[2])) for p in s.points]
                 except error:
                     raise ShapefileException("Failed to write elevation values for record %s. Expected floats." % recNum)
             # Write m extremes and values
@@ -855,7 +857,7 @@ class Writer:
                 if hasattr(s, "z"):
                     try:
                         if not s.z:
-                            s.z = (0,)    
+                            s.z = (0,)
                         f.write(pack("<d", s.z[0]))
                     except error:
                         raise ShapefileException("Failed to write elevation value for record %s. Expected floats." % recNum)
@@ -871,11 +873,11 @@ class Writer:
                 if hasattr(s, "m"):
                     try:
                         if not s.m:
-                            s.m = (0,) 
+                            s.m = (0,)
                         f.write(pack("<1d", s.m[0]))
                     except error:
-                        raise ShapefileException("Failed to write measure value for record %s. Expected floats." % recNum)    
-                else:                                
+                        raise ShapefileException("Failed to write measure value for record %s. Expected floats." % recNum)
+                else:
                     try:
                         if len(s.points[0])<4:
                             s.points[0].append(0)
@@ -912,6 +914,18 @@ class Writer:
                     value = str(value).rjust(size)
                 elif fieldType == 'L':
                     value = str(value)[0].upper()
+                elif fieldType == 'D':
+                    if isinstance(value, datetime.datetime):
+                        ymd = [str(v).zfill(2) for v in [value.year, value.month, value.day]]
+                        value = '{0}{1}{2}'.format(*ymd)[:size].ljust(size)
+                    elif isinstance(value, basestring):
+                        if DATE_EXP.match(value):
+                            try:
+                                value = DATE_EXP.findall(value)[0].replace('/','').replace('-','')[:size].ljust(size)
+                            except IndexError:
+                                value = str(value)[:size].ljust(size)
+                    else:
+                        value = str(value)[:size].ljust(size)
                 else:
                     value = str(value)[:size].ljust(size)
                 if len(value) != size:
@@ -1038,8 +1052,8 @@ class Writer:
         be written exclusively using saveShp, saveShx, and saveDbf respectively.
         If target is specified but not shp,shx, or dbf then the target path and
         file name are used.  If no options or specified, a unique base file name
-        is generated to save the files and the base file name is returned as a 
-        string. 
+        is generated to save the files and the base file name is returned as a
+        string.
         """
         # Create a unique file name if one is not defined
         if shp:
@@ -1053,7 +1067,7 @@ class Writer:
             if not target:
                 temp = tempfile.NamedTemporaryFile(prefix="shapefile_",dir=os.getcwd())
                 target = temp.name
-                generated = True         
+                generated = True
             self.saveShp(target)
             self.shp.close()
             self.saveShx(target)
@@ -1193,3 +1207,4 @@ if __name__ == "__main__":
     2.3.
     """
     test()
+
