@@ -665,7 +665,7 @@ class Writer:
         size //= 2
         return size
 
-    def __bbox(self, shapes, shapeTypes=[]):
+    def __bbox(self, shapes):
         x = []
         y = []
         for s in shapes:
@@ -674,7 +674,7 @@ class Writer:
             y.extend(py)
         return [min(x), min(y), max(x), max(y)]
 
-    def __zbox(self, shapes, shapeTypes=[]):
+    def __zbox(self, shapes):
         z = []
         for s in shapes:
             try:
@@ -685,7 +685,7 @@ class Writer:
         if not z: z.append(0)
         return [min(z), max(z)]
 
-    def __mbox(self, shapes, shapeTypes=[]):
+    def __mbox(self, shapes):
         m = [0]
         for s in shapes:
             try:
