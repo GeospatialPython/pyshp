@@ -669,9 +669,6 @@ class Writer:
         x = []
         y = []
         for s in shapes:
-            shapeType = self.shapeType
-            if shapeTypes:
-                shapeType = shapeTypes[shapes.index(s)]
             px, py = list(zip(*s.points))[:2]
             x.extend(px)
             y.extend(py)
