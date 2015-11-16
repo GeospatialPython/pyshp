@@ -13,8 +13,7 @@ dfs/shapefile.pdf](http://www.esri.com/library/whitepapers/pdfs/shapefile.pdf)
 . The Esri document describes the shp and shx file formats. However a third
 file format called dbf is also required. This format is documented on the web
 as the "XBase File Format Description" and is a simple file-based database
-format created in the 1960's. For more on this specification see: [http://www.clicketyclick.dk/databases/xbase/format/index.html](http://www.clicketyclick.d
-k/databases/xbase/format/index.html)
+format created in the 1960's. For more on this specification see: [http://www.clicketyclick.dk/databases/xbase/format/index.html](http://www.clicketyclick.dk/databases/xbase/format/index.html)
 
 Both the Esri and XBase file-formats are very simple in design and memory
 efficient which is part of the reason the shapefile format remains popular
@@ -569,10 +568,9 @@ Remove the last shape in the polygon shapefile.
 
 The Python __geo_interface__ convention provides a data interchange interface
 among geospatial Python libraries. The interface returns data as GeoJSON. More
-information on the __geo_interface__ protocol can be found at: [https://gist.g
-ithub.com/sgillies/2217756](https://gist.github.com/sgillies/2217756). More
-information on GeoJSON is available at
-[http://geojson.org](http://geojson.org)
+information on the __geo_interface__ protocol can be found at:
+[https://gist.github.com/sgillies/2217756](https://gist.github.com/sgillies/2217756).
+More information on GeoJSON is available at
 [http://geojson.org](http://geojson.org).
 
 
