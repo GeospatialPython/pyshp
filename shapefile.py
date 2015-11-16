@@ -94,15 +94,21 @@ class _Array(array.array):
     def __repr__(self):
         return str(self.tolist())
 
+
 def signed_area(coords):
     """Return the signed area enclosed by a ring using the linear time
-    algorithm at http://www.cgafaq.info/wiki/Polygon_Area. A value >= 0
-    indicates a counter-clockwise oriented ring.
-    """
+    algorithm at https://en.wikipedia.org/wiki/Shoelace_formula.
+    A value >= 0 indicates a counter-clockwise oriented ring."""
     xs, ys = map(list, zip(*coords))
+    xs.insert(0, xs[-1])
+    ys.insert(0, ys[-1])
     xs.append(xs[1])
     ys.append(ys[1])
-    return sum(xs[i]*(ys[i+1]-ys[i-1]) for i in range(1, len(coords)))/2.0
+    return sum(
+        xs[i] * (ys[i + 1] - ys[i - 1])
+        for i in range(1, len(xs) - 1)
+    ) / 2.0
+
 
 class _Shape:
     def __init__(self, shapeType=None):
