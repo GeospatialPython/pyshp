@@ -1183,7 +1183,8 @@ class Editor(Writer):
 def test():
     import doctest
     doctest.NORMALIZE_WHITESPACE = 1
-    doctest.testfile("README.txt", verbose=1)
+    failure_count, test_count = doctest.testfile("README.txt", verbose=1)
+    return failure_count
 
 if __name__ == "__main__":
     """
@@ -1192,4 +1193,4 @@ if __name__ == "__main__":
     testing libraries but for now unit testing is done using what's available in
     2.3.
     """
-    test()
+    return test()
