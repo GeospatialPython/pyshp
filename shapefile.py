@@ -1193,4 +1193,6 @@ if __name__ == "__main__":
     testing libraries but for now unit testing is done using what's available in
     2.3.
     """
-    return test()
+    failure_count = test()
+    sys.exit(failure_count)
+    
