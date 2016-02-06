@@ -96,9 +96,7 @@ class _Array(array.array):
 
 def signed_area(coords):
     """Return the signed area enclosed by a ring using the linear time
-    algorithm at:
-    https://web.archive.org/web/20080209143651/http://cgafaq.info/wiki/Polygon_Area
-    indicates a counter-clockwise oriented ring.
+    algorithm. A value >= 0 indicates a counter-clockwise oriented ring.
     """
     xs, ys = map(list, zip(*coords))
     xs.append(xs[1])
