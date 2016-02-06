@@ -264,7 +264,8 @@ list of field values as demonstrated in the "Reading Records" section.
 Let's read the blockgroup key and the population for the 4th blockgroup:
 
 
-    >>> shapeRecs3.record[1:3] ['060750601001', 4715]
+    >>> shapeRecs3.record[1:3]
+    ['060750601001', 4715]
 
 Now let's read the first two points for that same record:
 
