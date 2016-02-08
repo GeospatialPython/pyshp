@@ -500,9 +500,17 @@ class Reader:
                 if value == b(''):
                     value = None
                 elif deci:
-                    value = float(value)
+                    try:
+                        value = float(value)
+                    except ValueError:
+                        #not parseable as float, set to None
+                        value = None
                 else:
-                    value = int(value)
+                    try:
+                        value = int(value)
+                    except ValueError:
+                        #not parseable as int, set to None
+                        value = None
             elif typ == b('D'):
                 if value.count(b('0')) == len(value):  # QGIS NULL is all '0' chars
                     value = None
