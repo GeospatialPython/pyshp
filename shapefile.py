@@ -43,11 +43,11 @@ if PYTHON3:
 else:
     from itertools import izip
 
-def b(v):
+def b(v,encoding='utf-8'):
     if PYTHON3:
         if isinstance(v, str):
             # For python 3 encode str to bytes.
-            return v.encode('utf-8')
+            return v.encode(encoding)
         elif isinstance(v, bytes):
             # Already bytes.
             return v
@@ -58,7 +58,7 @@ def b(v):
         # For python 2 assume str passed in and return str.
         return v
 
-def u(v):
+def u(v,encoding='utf-8'):
     if PYTHON3:
         # try/catch added 2014/05/07
         # returned error on dbf of shapefile
@@ -70,7 +70,7 @@ def u(v):
         try:
           if isinstance(v, bytes):
               # For python 3 decode bytes to str.
-              return v.decode('utf-8')
+              return v.decode(encoding)
           elif isinstance(v, str):
               # Already str.
               return v
@@ -227,6 +227,11 @@ class Reader:
         self.numRecords = None
         self.fields = []
         self.__dbfHdrLength = 0
+        self.encoding = 'utf-8'
+        
+        if "encoding" in kwargs.keys():
+            self.encoding = kwargs["encoding"]
+            
         # See if a shapefile name was passed as an argument
         if len(args) > 0:
             if is_string(args[0]):
@@ -461,9 +466,9 @@ class Reader:
             else:
                 idx = len(fieldDesc[name]) - 1
             fieldDesc[name] = fieldDesc[name][:idx]
-            fieldDesc[name] = u(fieldDesc[name])
+            fieldDesc[name] = u(fieldDesc[name], self.encoding) # WARN, fields name only in ascii
             fieldDesc[name] = fieldDesc[name].lstrip()
-            fieldDesc[1] = u(fieldDesc[1])
+            fieldDesc[1] = u(fieldDesc[1], self.encoding)
             self.fields.append(fieldDesc)
         terminator = dbf.read(1)
         if terminator != b("\r"):
@@ -492,7 +497,7 @@ class Reader:
             if name == 'DeletionFlag':
                 continue
             elif not value.strip():
-                record.append(value)
+                record.append(u(value, self.encoding))
                 continue
             elif typ == "N":
                 value = value.replace(b('\0'), b('')).strip()
@@ -524,7 +529,7 @@ class Reader:
                 value = (value in b('YyTt') and b('T')) or \
                                         (value in b('NnFf') and b('F')) or b('?')
             else:
-                value = u(value)
+                value = u(value, self.encoding)
                 value = value.strip()
             record.append(value)
         return record
@@ -587,7 +592,7 @@ class Reader:
 
 class Writer:
     """Provides write support for ESRI Shapefiles."""
-    def __init__(self, shapeType=None):
+    def __init__(self, shapeType=None, encoding='utf-8'):
         self._shapes = []
         self.fields = []
         self.records = []
@@ -600,6 +605,7 @@ class Writer:
         self._lengths = []
         # Use deletion flags in dbf? Default is false (0).
         self.deletionFlag = 0
+        self.encoding = encoding
 
     def __getFileObj(self, f):
         """Safety handler to verify file-like objects"""
@@ -772,10 +778,10 @@ class Writer:
         # Field descriptors
         for field in self.fields:
             name, fieldType, size, decimal = field
-            name = b(name)
+            name = b(name,self.encoding) # WARN, fields name only in ascii
             name = name.replace(b(' '), b('_'))
             name = name.ljust(11).replace(b(' '), b('\x00'))
-            fieldType = b(fieldType)
+            fieldType = b(fieldType,self.encoding)
             size = int(size)
             fld = pack('<11sc4xBB14x', name, fieldType, size, decimal)
             f.write(fld)
@@ -897,7 +903,7 @@ class Writer:
             f.seek(start-4)
             f.write(pack(">i", length))
             f.seek(finish)
-
+ 
     def __shxRecords(self):
         """Writes the shx records."""
         f = self.__getFileObj(self.shx)
@@ -925,7 +931,7 @@ class Writer:
                     raise ShapefileException(
                         "Shapefile Writer unable to pack incorrect sized value"
                         " (size %d) into field '%s' (size %d)." % (len(value), fieldName, size))
-                value = b(value)
+                value = b(value,self.encoding)
                 f.write(value)
 
     def null(self):
@@ -1070,15 +1076,15 @@ class Writer:
             if generated:
                 return target
 class Editor(Writer):
-    def __init__(self, shapefile=None, shapeType=POINT, autoBalance=1):
+    def __init__(self, shapefile=None, shapeType=POINT, autoBalance=1, encoding='utf-8'):
         self.autoBalance = autoBalance
         if not shapefile:
-            Writer.__init__(self, shapeType)
+            Writer.__init__(self, shapeType, encoding=encoding)
         elif is_string(shapefile):
             base = os.path.splitext(shapefile)[0]
             if os.path.isfile("%s.shp" % base):
                 r = Reader(base)
-                Writer.__init__(self, r.shapeType)
+                Writer.__init__(self, r.shapeType, encoding=encoding)
                 self._shapes = r.shapes()
                 self.fields = r.fields
                 self.records = r.records()
