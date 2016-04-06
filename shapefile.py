@@ -977,7 +977,7 @@ class Writer:
 
     def field(self, name, fieldType="C", size="50", decimal=0):
         """Adds a dbf field descriptor to the shapefile."""
-        self.fields.append((name, fieldType, size, decimal))
+        self.fields.append((name.encode('ascii'), fieldType, size, decimal))
 
     def record(self, *recordList, **recordDict):
         """Creates a dbf attribute record. You can submit either a sequence of
