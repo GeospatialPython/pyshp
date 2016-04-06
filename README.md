@@ -356,33 +356,13 @@ OR you can set it after the Writer is created:
 ### Geometry and Record Balancing
 
 Because every shape must have a corresponding record it is critical that the
-number of records equals the number of shapes to create a valid shapefile. To
-help prevent accidental misalignment the PSL has an "auto balance" feature to
-make sure when you add either a shape or a record the two sides of the
-equation line up. This feature is NOT turned on by default. To activate it set
-the attribute autoBalance to 1 (True):
+number of records equals the number of shapes to create a valid shapefile. You
+must take care to add records and shapes in the same order so that the record
+data lines up with the geometry data. For example:
 
-
-    >>> w.autoBalance = 1
-
-You also have the option of manually calling the balance() method each time
-you add a shape or a record to ensure the other side is up to date. When
-balancing is used null shapes are created on the geometry side or a record
-with a value of "NULL" for each field is created on the attribute side.
-
-The balancing option gives you flexibility in how you build the shapefile.
-
-Without auto balancing you can add geometry or records at anytime. You can
-create all of the shapes and then create all of the records or vice versa. You
-can use the balance method after creating a shape or record each time and make
-updates later. If you do not use the balance method and forget to manually
-balance the geometry and attributes the shapefile will be viewed as corrupt by
-most shapefile software.
-
-With auto balanacing you can add either shapes or geometry and update blank
-entries on either side as needed. Even if you forget to update an entry the
-shapefile will still be valid and handled correctly by most shapefile
-software.
+    >>> for feature in some_thing:
+    >>>     w.record(**feature['properties'])
+    >>>     w.poly(parts=feature['parts']
 
 ### Adding Geometry
 
@@ -565,6 +545,37 @@ Remove the last shape in the polygon shapefile.
     >>> e = shapefile.Editor(shapefile="shapefiles/test/polygon.shp")
     >>> e.delete(-1)
     >>> e.save('shapefiles/test/polygon')
+
+### Geometry and Record Balancing
+
+Because every shape must have a corresponding record it is critical that the
+number of records equals the number of shapes to create a valid shapefile. To
+help prevent accidental misalignment the PSL has an "auto balance" feature to
+make sure when you add either a shape or a record the two sides of the
+equation line up. This feature is NOT turned on by default. To activate it set
+the attribute autoBalance to 1 (True):
+
+
+    >>> e.autoBalance = 1
+
+You also have the option of manually calling the balance() method each time
+you add a shape or a record to ensure the other side is up to date. When
+balancing is used null shapes are created on the geometry side or a record
+with a value of "NULL" for each field is created on the attribute side.
+
+The balancing option gives you flexibility in how you build the shapefile.
+
+Without auto balancing you can add geometry or records at anytime. You can
+create all of the shapes and then create all of the records or vice versa. You
+can use the balance method after creating a shape or record each time and make
+updates later. If you do not use the balance method and forget to manually
+balance the geometry and attributes the shapefile will be viewed as corrupt by
+most shapefile software.
+
+With auto balanacing you can add either shapes or geometry and update blank
+entries on either side as needed. Even if you forget to update an entry the
+shapefile will still be valid and handled correctly by most shapefile
+software.
 
 ## Python __geo_interface__
 
