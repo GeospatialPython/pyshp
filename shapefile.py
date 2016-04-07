@@ -390,7 +390,11 @@ class Reader:
             # Jump to the first record.
             shx.seek(100)
             # Offsets are 16-bit words just like the file length
-            self._offsets = [unpack('>i4x', shx.read(8))[0] * 2 for r in range(numRecords)]
+            self._offsets = [2*el for el in 
+                             array.array('i', unpack(">%si" % (numRecords*2), 
+                                                     shx.read(4 * numRecords*2))
+                                         )[::2]
+                             ]
         if not i == None:
             return self._offsets[i]
 
