@@ -392,7 +392,7 @@ class Reader:
             for r in range(numRecords):
                 # Offsets are 16-bit words just like the file length
                 self._offsets.append(unpack(">i", shx.read(4))[0] * 2)
-                shx.seek(shx.tell() + 4)
+                shx.seek(4, 1)
         if not i == None:
             return self._offsets[i]
 
