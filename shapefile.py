@@ -18,6 +18,11 @@ import array
 import tempfile
 import itertools
 
+try:
+    memoryview(b'')
+except NameError:
+    memoryview = lambda x: x
+
 #
 # Constants for shape types
 NULL = 0
@@ -389,10 +394,12 @@ class Reader:
             numRecords = shxRecordLength // 8
             # Jump to the first record.
             shx.seek(100)
-            shxRecords = array.array('i', unpack(">" + "i4x" * numRecords, 
-                                                 shx.read((4+4) * numRecords)))
+            shxRecords = array.array('i')
+            shxRecords.fromfile(shx, 2 * numRecords)
+            if sys.byteorder != 'big':
+                shxRecords.byteswap()
             # Offsets are 16-bit words just like the file length
-            self._offsets = [2*el for el in shxRecords]
+            self._offsets = [2 * el for el in memoryview(shxRecords)[::2]]
         if not i == None:
             return self._offsets[i]
 
