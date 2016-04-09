@@ -295,9 +295,10 @@ The blockgroup key and population count:
 
 There is also an iterShapeRecords() method to iterate through large files:
 
->> shapeRecs = sf.iterShapeRecords()
->> for shape, rec in shapeRecs:
-..     # do something here
+>>> shapeRecs = sf.iterShapeRecords()
+>>> for shapeRec in shapeRecs:
+...     # do something here
+...     pass
 
 Writing Shapefiles
 ++++++++++++++++++
