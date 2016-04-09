@@ -19,6 +19,12 @@ import tempfile
 import itertools
 
 try:
+    import numpy
+    has_numpy = True
+except ImportError:
+    has_numpy = False
+
+try:
     memoryview(b'')
 except NameError:
     memoryview = lambda x: x
@@ -227,7 +233,7 @@ class Reader:
         self.shx = None
         self.dbf = None
         self.shapeName = "Not specified"
-        self._offsets = []
+        self._offsets = None
         self.shpLength = None
         self.numRecords = None
         self.fields = []
@@ -387,19 +393,22 @@ class Reader:
         shx = self.shx
         if not shx:
             return None
-        if not self._offsets:
+        if self._offsets is None:
             # File length (16-bit word * 2 = bytes) - header length
             shx.seek(24)
             shxRecordLength = (unpack(">i", shx.read(4))[0] * 2) - 100
             numRecords = shxRecordLength // 8
             # Jump to the first record.
             shx.seek(100)
-            shxRecords = array.array('i')
-            shxRecords.fromfile(shx, 2 * numRecords)
-            if sys.byteorder != 'big':
-                shxRecords.byteswap()
             # Offsets are 16-bit words just like the file length
-            self._offsets = [2 * el for el in memoryview(shxRecords)[::2]]
+            if has_numpy:
+                self._offsets = numpy.fromfile(shx, '>i4', 2 * numRecords)[::2] * 2
+            else:
+                shxRecords = array.array('i')
+                shxRecords.fromfile(shx, 2 * numRecords)
+                if sys.byteorder != 'big':
+                    shxRecords.byteswap()
+                self._offsets = [2 * el for el in memoryview(shxRecords)[::2]]
         if not i == None:
             return self._offsets[i]
 
