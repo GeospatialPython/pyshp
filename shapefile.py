@@ -1187,10 +1187,14 @@ class Editor(Writer):
         fieldName.replace(' ', '_')
 
 # Begin Testing
-def test():
+def test(verbosity):
     import doctest
     doctest.NORMALIZE_WHITESPACE = 1
-    failure_count, test_count = doctest.testfile("README.txt", verbose=1)
+    if verbosity == 0:
+        print('Running doctests...')
+    failure_count, test_count = doctest.testfile("README.txt", verbose=verbosity)
+    if verbosity == 0 and failure_count == 0:
+        print('All test passed successfully')
     return failure_count
 
 if __name__ == "__main__":
@@ -1200,6 +1204,6 @@ if __name__ == "__main__":
     testing libraries but for now unit testing is done using what's available in
     2.3.
     """
-    failure_count = test()
+    failure_count = test(0)
     sys.exit(failure_count)
     
