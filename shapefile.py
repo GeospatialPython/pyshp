@@ -1190,9 +1190,14 @@ class Editor(Writer):
 def test(verbosity):
     import doctest
     doctest.NORMALIZE_WHITESPACE = 1
+    existing_files = set(os.listdir('.'))
     if verbosity == 0:
         print('Running doctests...')
     failure_count, test_count = doctest.testfile("README.txt", verbose=verbosity)
+    temp_files = set(os.listdir('.')) - existing_files
+    for filename in temp_files:
+        if not os.path.isdir(filename):
+            os.unlink(filename)
     if verbosity == 0 and failure_count == 0:
         print('All test passed successfully')
     return failure_count
