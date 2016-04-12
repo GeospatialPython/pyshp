@@ -1,0 +1,23 @@
+sudo: false
+
+addons:
+  apt:
+    packages:
+      - dos2unix
+
+language: python
+
+python:
+  - "2.6"
+  - "2.7"
+  - "3.2"
+  - "3.3"
+  - "3.4"
+  - "3.5"
+  
+  
+install: 
+  - dos2unix README.txt
+  - pip install .
+  
+script: python shapefile.py
