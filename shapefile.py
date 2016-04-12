@@ -1187,10 +1187,20 @@ class Editor(Writer):
         fieldName.replace(' ', '_')
 
 # Begin Testing
-def test():
+def test(verbosity):
     import doctest
     doctest.NORMALIZE_WHITESPACE = 1
-    doctest.testfile("README.txt", verbose=1)
+    existing_files = set(os.listdir('.'))
+    if verbosity == 0:
+        print('Running doctests...')
+    failure_count, test_count = doctest.testfile("README.txt", verbose=verbosity)
+    temp_files = set(os.listdir('.')) - existing_files
+    for filename in temp_files:
+        if not os.path.isdir(filename):
+            os.unlink(filename)
+    if verbosity == 0 and failure_count == 0:
+        print('All test passed successfully')
+    return failure_count
 
 if __name__ == "__main__":
     """
@@ -1199,4 +1209,6 @@ if __name__ == "__main__":
     testing libraries but for now unit testing is done using what's available in
     2.3.
     """
-    test()
+    failure_count = test(0)
+    sys.exit(failure_count)
+    
