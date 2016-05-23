@@ -96,7 +96,8 @@ class _Array(array.array):
 
 def signed_area(coords):
     """Return the signed area enclosed by a ring using the linear time
-    algorithm. A value >= 0 indicates a counter-clockwise oriented ring.
+    algorithm at http://www.cgafaq.info/wiki/Polygon_Area. A value >= 0
+    indicates a counter-clockwise oriented ring.
     """
     xs, ys = map(list, zip(*coords))
     xs.append(xs[1])
@@ -523,6 +524,20 @@ class Reader:
             elif typ == b('L'):
                 value = (value in b('YyTt') and b('T')) or \
                                         (value in b('NnFf') and b('F')) or b('?')
+            elif typ in ("F","O"):
+                value = value.replace(b('\0'), b('')).strip()
+                value = value.replace(b('*'), b(''))  # QGIS NULL is all '*' chars
+                if value == b(''):
+                    value = None
+                else:
+                    value = float(value)
+            elif typ == "I":
+                value = value.replace(b('\0'), b('')).strip()
+                value = value.replace(b('*'), b(''))  # QGIS NULL is all '*' chars
+                if value == b(''):
+                    value = None
+                else:
+                    value = int(value)
             else:
                 value = u(value)
                 value = value.strip()
@@ -915,8 +930,12 @@ class Writer:
             for (fieldName, fieldType, size, dec), value in zip(self.fields, record):
                 fieldType = fieldType.upper()
                 size = int(size)
-                if fieldType.upper() == "N":
-                    value = str(value).rjust(size)
+                if fieldType.upper() in ("N","F","O","I"):
+                    if value is None or value is "":
+                        value = str("*"*size) # QGIS NULL
+                    else:
+                        value = str(value).rjust(size)
+                # TODO: Do date field values need special packing or just normal str()?
                 elif fieldType == 'L':
                     value = str(value)[0].upper()
                 else:
