@@ -346,7 +346,8 @@ class Reader:
             record.partTypes = _Array('i', unpack("<%si" % nParts, f.read(nParts * 4)))
         # Read points - produces a list of [x,y] values
         if nPoints:
-            record.points = [_Array('d', unpack("<2d", f.read(16))) for p in range(nPoints)]
+            flat = unpack("<%sd" % (2 * nPoints), f.read(16*nPoints))
+            record.points = list(izip(*(iter(flat),) * 2))
         # Read z extremes and values
         if shapeType in (13,15,18,31):
             (zmin, zmax) = unpack("<2d", f.read(16))
