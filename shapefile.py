@@ -10,7 +10,7 @@ version changelog: Reader.iterShapeRecords() bugfix for Python 3
 
 __version__ = "1.2.3"
 
-from struct import pack, unpack, calcsize, error
+from struct import pack, unpack, calcsize, error, Struct
 import os
 import sys
 import time
@@ -472,6 +472,8 @@ class Reader:
         if terminator != b("\r"):
             raise ShapefileException("Shapefile dbf header lacks expected terminator. (likely corrupt?)")
         self.fields.insert(0, ('DeletionFlag', 'C', 1, 0))
+        fmt,fmtSize = self.__recordFmt()
+        self.__recStruct = Struct(fmt)
 
     def __recordFmt(self):
         """Calculates the size of a .shp geometry record."""
@@ -484,8 +486,7 @@ class Reader:
     def __record(self):
         """Reads and returns a dbf record row as a list of values."""
         f = self.__getFileObj(self.dbf)
-        recFmt = self.__recordFmt()
-        recordContents = unpack(recFmt[0], f.read(recFmt[1]))
+        recordContents = self.__recStruct.unpack(f.read(self.__recStruct.size))
         if recordContents[0] != b(' '):
             # deleted record
             return None
@@ -538,7 +539,7 @@ class Reader:
         if not self.numRecords:
             self.__dbfHeader()
         i = self.__restrictIndex(i)
-        recSize = self.__recordFmt()[1]
+        recSize = self.__recStruct.size
         f.seek(0)
         f.seek(self.__dbfHeaderLength() + (i * recSize))
         return self.__record()
@@ -547,13 +548,11 @@ class Reader:
         """Returns all records in a dbf file."""
         if not self.numRecords:
             self.__dbfHeader()
-        records = []
         f = self.__getFileObj(self.dbf)
         f.seek(self.__dbfHeaderLength())
-        for i in range(self.numRecords):
-            r = self.__record()
-            if r:
-                records.append(r)
+        flat = unpack(self.__recStruct.format * self.numRecords, f.read(self.__recStruct.size * self.numRecords))
+        rowlen = len(self.fields) - 1
+        records = list(izip(*(iter(flat),) * rowlen))
         return records
 
     def iterRecords(self):
