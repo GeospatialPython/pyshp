@@ -539,9 +539,9 @@ write them.
 
 The Editor class attempts to make changing existing shapefiles easier by
 handling the reading and writing details behind the scenes.  This class is
-experimental and should be avoided for production use.  You can do the same
+experimental, has lots of issues, and should be avoided for production use.  *You can do the same
 thing by reading a shapefile into memory, making changes to the python objects,
-and write out a new shapefile with the same or different name.
+and write out a new shapefile with the same or different name.*
 
 Let's add shapes to existing shapefiles:
 
