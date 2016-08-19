@@ -336,7 +336,7 @@ class Reader:
         if shapeType in (3,5,13,15,23,25,31):
             nParts = unpack("<i", f.read(4))[0]
         # Shape types with points
-        if shapeType in (3,5,8,13,15,23,25,31):
+        if shapeType in (3,5,8,13,15,18,23,25,28,31):
             nPoints = unpack("<i", f.read(4))[0]
         # Read parts
         if nParts:
