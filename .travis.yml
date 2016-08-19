@@ -1,15 +1,14 @@
 language: python
-
 python:
-  - "2.7"
-
+- '2.7'
 script:
-  - touch foo
-
+- touch foo
 deploy:
   provider: pypi
   user: jlawhead
   password:
-    secure: VW/ECQYL1tjn7DOywdzFkHgGctqmSc2+CnJBjp041selJt1LTtuJYTRM2RvA3Y3RgAsnMYDoguxnGHOjcixodXhqaA1ZbNXA9CUparJtKJWA5uuIEVrbRUmd5YNdzks/Ngm3lhhBi8g7f4GB1u5QaP4lX8WLTimqaWEkNsDfQvGnRYvvcaIGlyC5/oR+VWKE/irMAnVU2YmHqHi2rq4WzmDtC+BRXSiF1AT3HDnVpWaNlbHaH/gIReGEZJRrLCS+qE0UyktXIQBujlqKfYhmQKeJ3pzaLxXBqCRPp4N9UGs0vtuDH0dZVk/akymA1DFXIRR8U9iuuyOyPp9y2cRECX8dCXm9IcL3iOH7Bvk3em60XmwGFoPOclERXZH2wVY+FBtyAA/l/h028+8uncde/yMnIeevs2MwpvSgnN7rYTknl4I8+4VX0zFET0wYcG/G+zhv5dkOqBJr7U8sQsQy9vX19B9QFARgH9wWYjkEBFUoHdUZ+6d1MvSoYQodC3vnYThef4+Iu1adrRbPWfk9cgrxgJdbib+fsRJyd1kajlkt9gMmUZrM/1KY7nXqxE42hutCDXfjBYCCSaITpKXFIlJP9q+Nq8ZjsCarMzKRbG18sYHtBaXWL6p0JbbgkYOILnErQi5DZj+YOPJOyaGtJhfqWnY4kFSmoiSMQDMp+jY=
+    secure: vtXfogyXwxd8k8CG5S+Mt9dEQa2tkV1oHuYzGh5KgBTs10uTOzslnhGvDsH8MFK7jTyGSDuLWi+ZykdORKNHnLqSYPs4KTaKYnOTvnqMmEbtowtzWkt1CakLYSjO3tbgreB5x9M9/Pgl6XrMuCjf0otpylgCBVzn6VyWVqt/v1b+ojoU4wR0rhQoRLiLY77h7DYCcViL4cqrnXqM7wbd0XvD0I3h/ybDkpfB4+8eqIypIWRJluGA3n9XptvD4R7Ih+VDgP5v76eJ407jWuNsPrBDlYc2Rz2R/ykt0HYYrCVP7Rfnkv+u3bxyyskB/id7GkIy104vsc3jCWA9MjUsz1P3x8lRUDw2BZlE1hYDa+Gkx85v6eufTNf0UHM4Czjed0ULSOvklBM8UXgJnqZPBjRRnktN+u5aIHg23TJ0hNUDhmtgYNko2BtfOGeyFvDthF62wK1iQs3dUL2fP8BzGDVn76bVgilWSH3Ye11Y9sCKeqJztg/3/CBWA3+0m/2KlgcFa44bRxpiT9H65NGl9irgXfP5DVFqemUCu6tbhJDF9gcxTBaEehBIc/hd5Dg7+221vrDKBlMViJgt1t7LuYX7XvHTw1arhdXRVPPBf2VSriVIJrbUJmkBmGGU4UPAjOU8TOZ5CPnuM3jnZTTnCEHfFKLrN9bzdOCiy0OU1Ec=
   on:
-    all_branches: true
+    tags: true
+    distributions: sdist bdist_wheel
+    repo: GeospatialPython/pyshp
