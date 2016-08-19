@@ -22,17 +22,17 @@ despite the numerous ways to store and exchange GIS data available today.
 
 Pyshp is compatible with Python 2.4-3.x.
 
-This document provides examples for using pyshp to read and write shapefiles.
+This document provides examples for using pyshp to read and write shapefiles. However 
+many more examples are continually added to the pyshp wiki on GitHub, the blog [http://GeospatialPython.com](http://GeospatialPython.com),
+and by searching for pyshp on [http://gis.stackexchange.com](http://gis.stackexchange.com). 
 
 Currently the sample census blockgroup shapefile referenced in the examples is available on the GitHub project site at
 [https://github.com/GeospatialPython/pyshp](https://github.com/GeospatialPython/pyshp). These
 examples are straight-forward and you can also easily run them against your
-own shapefiles manually with minimal modification. Other examples for specific
-topics are continually added to the pyshp wiki on GitHub and the blog
-[http://GeospatialPython.com](http://GeospatialPython.com).
+own shapefiles with minimal modification. 
 
-Important: For information about map projections, shapefiles, and Python
-please visit: [https://github.com/GeospatialPython/pyshp/wiki/Map-Projections](https://github.com/GeospatialPython/pyshp/wiki/Map-Projections)
+Important: If you are new to GIS you should read about map projections.
+Please visit: [https://github.com/GeospatialPython/pyshp/wiki/Map-Projections](https://github.com/GeospatialPython/pyshp/wiki/Map-Projections)
 
 I sincerely hope this library eliminates the mundane distraction of simply
 reading and writing data, and allows you to focus on the challenging and FUN
@@ -42,11 +42,10 @@ part of your geospatial project.
 
 Before doing anything you must import the library.
 
-
     >>> import shapefile
 
 The examples below will use a shapefile created from the U.S. Census Bureau
-Blockgroups data set near San Francisco, CA and available in the git
+Blockgroups data set near San Francisco, CA and available in the github
 repository of the pyshp GitHub site.
 
 ## Reading Shapefiles
@@ -587,12 +586,12 @@ Remove the last shape in the polygon shapefile.
 ## Python \_\_geo_interface\_\_
 
 The Python \_\_geo_interface\_\_ convention provides a data interchange interface
-among geospatial Python libraries. The interface returns data as GeoJSON. More
-information on the \_\_geo_interface\_\_ protocol can be found at: [https://gist.g
+among geospatial Python libraries. The interface returns data as GeoJSON which gives you
+nice compatability with other libraries and tools including Shapely, Fiona, and PostGIS. 
+More information on the \_\_geo_interface\_\_ protocol can be found at: [https://gist.g
 ithub.com/sgillies/2217756](https://gist.github.com/sgillies/2217756). More
 information on GeoJSON is available at
 [http://geojson.org](http://geojson.org).
-
 
     >>> s = sf.shape(0)
     >>> s.__geo_interface__["type"]
