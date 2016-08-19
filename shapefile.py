@@ -3,12 +3,10 @@ shapefile.py
 Provides read and write support for ESRI Shapefiles.
 author: jlawhead<at>geospatialpython.com
 date: 2015/06/22
-version: 1.2.5
+version: 1.2.6
 Compatible with Python versions 2.4-3.x
 version changelog: 
-- Reader speed up through batch unpacking bytes
-- Merge README text into markdown file.  Remove text version.
-- Fixed parsing of number of points for some shapes (MULTIPOINTM, MULTIPOINTZ)
+- Set up Travis-CI
 """
 
 __version__ = "1.2.3"
