@@ -1,14 +1,16 @@
 language: python
+
 python:
-- '2.7'
-- '3.4'
+  - "2.7"
+
 script:
-- touch foo
+  - touch foo
+
 deploy:
   provider: pypi
-  user: jlawhead
+  user: romgar
   password:
-    secure: VW/ECQYL1tjn7DOywdzFkHgGctqmSc2+CnJBjp041selJt1LTtuJYTRM2RvA3Y3RgAsnMYDoguxnGHOjcixodXhqaA1ZbNXA9CUparJtKJWA5uuIEVrbRUmd5YNdzks/Ngm3lhhBi8g7f4GB1u5QaP4lX8WLTimqaWEkNsDfQvGnRYvvcaIGlyC5/oR+VWKE/irMAnVU2YmHqHi2rq4WzmDtC+BRXSiF1AT3HDnVpWaNlbHaH/gIReGEZJRrLCS+qE0UyktXIQBujlqKfYhmQKeJ3pzaLxXBqCRPp4N9UGs0vtuDH0dZVk/akymA1DFXIRR8U9iuuyOyPp9y2cRECX8dCXm9IcL3iOH7Bvk3em60XmwGFoPOclERXZH2wVY+FBtyAA/l/h028+8uncde/yMnIeevs2MwpvSgnN7rYTknl4I8+4VX0zFET0wYcG/G+zhv5dkOqBJr7U8sQsQy9vX19B9QFARgH9wWYjkEBFUoHdUZ+6d1MvSoYQodC3vnYThef4+Iu1adrRbPWfk9cgrxgJdbib+fsRJyd1kajlkt9gMmUZrM/1KY7nXqxE42hutCDXfjBYCCSaITpKXFIlJP9q+Nq8ZjsCarMzKRbG18sYHtBaXWL6p0JbbgkYOILnErQi5DZj+YOPJOyaGtJhfqWnY4kFSmoiSMQDMp+jY=
+    secure: my_secure_password
   on:
     tags: true
-    branch: 1.2.7    
+    branch: master
