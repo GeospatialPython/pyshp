@@ -6,7 +6,7 @@ date: 2015/06/22
 version: 1.2.8
 Compatible with Python versions 2.4-3.x
 version changelog: 
-- Pushing 1.2.5 changes to PyPi using Travis-CI
+- Pushing 1.2.5 changes to PyPi using Travis-CI.
 """
 
 __version__ = "1.2.8"
