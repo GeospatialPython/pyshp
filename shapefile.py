@@ -3,13 +3,13 @@ shapefile.py
 Provides read and write support for ESRI Shapefiles.
 author: jlawhead<at>geospatialpython.com
 date: 2015/06/22
-version: 1.2.8
+version: 1.2.9
 Compatible with Python versions 2.4-3.x
 version changelog: 
 - Pushing 1.2.5 changes to PyPi using Travis-CI.
 """
 
-__version__ = "1.2.8"
+__version__ = "1.2.9"
 
 from struct import pack, unpack, calcsize, error, Struct
 import os
