@@ -477,6 +477,7 @@ class Reader:
         self.__recStruct = Struct(fmt)
 
     def __recordFmt(self):
+        """Calculates the format and size of a .dbf record."""
         if not self.numRecords:
             self.__dbfHeader()
         fmt = ''.join(['%ds' % fieldinfo[2] for fieldinfo in self.fields])
