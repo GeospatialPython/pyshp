@@ -22,17 +22,17 @@ despite the numerous ways to store and exchange GIS data available today.
 
 Pyshp is compatible with Python 2.4-3.x.
 
-This document provides examples for using pyshp to read and write shapefiles.
+This document provides examples for using pyshp to read and write shapefiles. However 
+many more examples are continually added to the pyshp wiki on GitHub, the blog [http://GeospatialPython.com](http://GeospatialPython.com),
+and by searching for pyshp on [http://gis.stackexchange.com](http://gis.stackexchange.com). 
 
-Currently the sample census blockgroup shapefile referenced in the examples is available on the google code project site at
+Currently the sample census blockgroup shapefile referenced in the examples is available on the GitHub project site at
 [https://github.com/GeospatialPython/pyshp](https://github.com/GeospatialPython/pyshp). These
 examples are straight-forward and you can also easily run them against your
-own shapefiles manually with minimal modification. Other examples for specific
-topics are continually added to the pyshp wiki on GitHub and the blog
-[http://GeospatialPython.com](http://GeospatialPython.com).
+own shapefiles with minimal modification. 
 
-Important: For information about map projections, shapefiles, and Python
-please visit: [https://github.com/GeospatialPython/pyshp/wiki/Map-Projections](https://github.com/GeospatialPython/pyshp/wiki/Map-Projections)
+Important: If you are new to GIS you should read about map projections.
+Please visit: [https://github.com/GeospatialPython/pyshp/wiki/Map-Projections](https://github.com/GeospatialPython/pyshp/wiki/Map-Projections)
 
 I sincerely hope this library eliminates the mundane distraction of simply
 reading and writing data, and allows you to focus on the challenging and FUN
@@ -42,12 +42,11 @@ part of your geospatial project.
 
 Before doing anything you must import the library.
 
-
     >>> import shapefile
 
 The examples below will use a shapefile created from the U.S. Census Bureau
-Blockgroups data set near San Francisco, CA and available in the subversion
-repository of the pyshp google code site.
+Blockgroups data set near San Francisco, CA and available in the github
+repository of the pyshp GitHub site.
 
 ## Reading Shapefiles
 
@@ -128,13 +127,17 @@ Each shape record contains the following attributes:
     'points'
     'shapeType'
 
-  * shapeType: an integer representing the type of shape as defined by the shapefile specification.
+  * shapeType: an integer representing the type of shape as defined by the
+      shapefile specification.
 
 
         >>> shapes[3].shapeType
         5
 
-  * bbox: If the shape type contains multiple points this tuple describes the lower left (x,y) coordinate and upper right corner coordinate creating a complete box around the points. If the shapeType is a Null (shapeType == 0) then an AttributeError is raised.
+  * bbox: If the shape type contains multiple points this tuple describes the
+      lower left (x,y) coordinate and upper right corner coordinate creating a
+      complete box around the points. If the shapeType is a
+      Null (shapeType == 0) then an AttributeError is raised.
 
 
         >>> # Get the bounding box of the 4th shape.
@@ -143,12 +146,16 @@ Each shape record contains the following attributes:
         >>> ['%.3f' % coord for coord in bbox]
         ['-122.486', '37.787', '-122.446', '37.811']
 
-  * parts: Parts simply group collections of points into shapes. If the shape record has multiple parts this attribute contains the index of the first point of each part. If there is only one part then a list containing 0 is returned.
+  * parts: Parts simply group collections of points into shapes. If the shape
+      record has multiple parts this attribute contains the index of the first
+      point of each part. If there is only one part then a list containing 0 is
+      returned.
 
         >>> shapes[3].parts
         [0]
 
-  * points: The points attribute contains a list of tuples containing an (x,y) coordinate for each point in the shape.
+  * points: The points attribute contains a list of tuples containing an
+      (x,y) coordinate for each point in the shape.
 
         >>> len(shapes[3].points)
         173
@@ -183,8 +190,12 @@ You can call the "fields" attribute of the shapefile as a Python list. Each
 field is a Python list with the following information:
 
   * Field name: the name describing the data at this column index.
-  * Field type: the type of data at this column index. Types can be: Character, Numbers, Longs, Dates, or Memo. The "Memo" type has no meaning within a GIS and is part of the xbase spec instead.
-  * Field length: the length of the data found at this column index. Older GIS software may truncate this length to 8 or 11 characters for "Character" fields.
+  * Field type: the type of data at this column index. Types can be: Character,
+       Numbers, Longs, Dates, or Memo. The "Memo" type has no meaning within a
+       GIS and is part of the xbase spec instead.
+  * Field length: the length of the data found at this column index. Older GIS
+       software may truncate this length to 8 or 11 characters for "Character"
+       fields.
   * Decimal length: the number of decimal places found in "Number" fields.
 
 To see the fields for the Reader object above (sf) call the "fields"
@@ -264,7 +275,7 @@ list of field values as demonstrated in the "Reading Records" section.
 Let's read the blockgroup key and the population for the 4th blockgroup:
 
 
-    >>> shapeRecs3.record[1:3]
+    >>> shapeRecs[3].record[1:3]
     ['060750601001', 4715]
 
 Now let's read the first two points for that same record:
@@ -295,17 +306,18 @@ The blockgroup key and population count:
 There is also an iterShapeRecords() method to iterate through large files:
 
     >>> shapeRecs = sf.iterShapeRecords()
-    >>> for shape, rec in shapeRecs:
+    >>> for shapeRec in shapeRecs:
     ...     # do something here
+    ...     pass
     
 
 ## Writing Shapefiles
 
-The PSL tries to be as flexible as possible when writing shapefiles while
+PyShp tries to be as flexible as possible when writing shapefiles while
 maintaining some degree of automatic validation to make sure you don't
 accidentally write an invalid file.
 
-The PSL can write just one of the component files such as the shp or dbf file
+PyShp can write just one of the component files such as the shp or dbf file
 without writing the others. So in addition to being a complete shapefile
 library, it can also be used as a basic dbf (xbase) library. Dbf files are a
 common database format which are often useful as a standalone simple database
@@ -333,9 +345,10 @@ shapefile specification. It is important to note that numbering system has
 several reserved numbers which have not been used yet therefore the numbers of
 the existing shape types are not sequential.
 
-There are three ways to set the shape type: - Set it when creating the class
-instance. - Set it by assigning a value to an existing class instance. - Set
-it automatically to the type of the first shape by saving the shapefile.
+There are three ways to set the shape type: 
+  * Set it when creating the class instance. 
+  * Set it by assigning a value to an existing class instance. 
+  * Set it automatically to the type of the first shape by saving the shapefile.
 
 To manually set the shape type for a Writer object when creating the Writer:
 
@@ -443,7 +456,8 @@ Creating attributes involves two steps. Step 1 is to create fields to contain
 attribute values and step 2 is to populate the fields with values for each
 shape record.
 
-The following attempts to create a complete shapefile.  The attribute and field names are not very creative:
+The following attempts to create a complete shapefile.  The attribute and
+field names are not very creative:
 
 
     >>> w = shapefile.Writer(shapefile.POINT)
@@ -523,7 +537,10 @@ write them.
 ## Editing Shapefiles
 
 The Editor class attempts to make changing existing shapefiles easier by
-handling the reading and writing details behind the scenes.  This class is experimental and should be avoided for production use.  You can do the same thing by reading a shapefile into memory, making changes to the python objects, and write out a new shapefile with the same or different name.
+handling the reading and writing details behind the scenes.  This class is
+experimental, has lots of issues, and should be avoided for production use.  *You can do the same
+thing by reading a shapefile into memory, making changes to the python objects,
+and write out a new shapefile with the same or different name.*
 
 Let's add shapes to existing shapefiles:
 
@@ -566,17 +583,27 @@ Remove the last shape in the polygon shapefile.
     >>> e.delete(-1)
     >>> e.save('shapefiles/test/polygon')
 
-## Python __geo_interface__
+## Python \_\_geo_interface\_\_
 
-The Python __geo_interface__ convention provides a data interchange interface
-among geospatial Python libraries. The interface returns data as GeoJSON. More
-information on the __geo_interface__ protocol can be found at: [https://gist.g
+The Python \_\_geo_interface\_\_ convention provides a data interchange interface
+among geospatial Python libraries. The interface returns data as GeoJSON which gives you
+nice compatability with other libraries and tools including Shapely, Fiona, and PostGIS. 
+More information on the \_\_geo_interface\_\_ protocol can be found at: [https://gist.g
 ithub.com/sgillies/2217756](https://gist.github.com/sgillies/2217756). More
 information on GeoJSON is available at
-[http://geojson.org](http://geojson.org)
 [http://geojson.org](http://geojson.org).
-
 
     >>> s = sf.shape(0)
     >>> s.__geo_interface__["type"]
     'MultiPolygon'
+
+# Testing
+
+The testing framework is doctest, which are located in this file README.md.
+In the same folder as README.md and shapefile.py, from the command line run 
+```
+$ python shapefile.py
+``` 
+
+Linux/Mac and similar platforms will need to run `$ dos2unix README.md` in order
+correct line endings in README.md.

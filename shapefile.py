@@ -3,12 +3,13 @@ shapefile.py
 Provides read and write support for ESRI Shapefiles.
 author: jlawhead<at>geospatialpython.com
 date: 2015/06/22
-version: 1.2.3
+version: 1.2.9
 Compatible with Python versions 2.4-3.x
-version changelog: Reader.iterShapeRecords() bugfix for Python 3
+version changelog: 
+- Pushing 1.2.5 changes to PyPi using Travis-CI.
 """
 
-__version__ = "1.2.3"
+__version__ = "1.2.9"
 
 from struct import pack, unpack, calcsize, error, Struct
 import os
@@ -336,7 +337,7 @@ class Reader:
         if shapeType in (3,5,13,15,23,25,31):
             nParts = unpack("<i", f.read(4))[0]
         # Shape types with points
-        if shapeType in (3,5,8,13,15,23,25,31):
+        if shapeType in (3,5,8,13,15,18,23,25,28,31):
             nPoints = unpack("<i", f.read(4))[0]
         # Read parts
         if nParts:
@@ -1192,11 +1193,11 @@ class Editor(Writer):
 def test():
     import doctest
     doctest.NORMALIZE_WHITESPACE = 1
-    doctest.testfile("README.txt", verbose=1)
+    doctest.testfile("README.md", verbose=1)
 
 if __name__ == "__main__":
     """
-    Doctests are contained in the file 'README.txt'. This library was originally developed
+    Doctests are contained in the file 'README.md'. This library was originally developed
     using Python 2.3. Python 2.4 and above have some excellent improvements in the built-in
     testing libraries but for now unit testing is done using what's available in
     2.3.
