@@ -477,7 +477,6 @@ class Reader:
         self.__recStruct = Struct(fmt)
 
     def __recordFmt(self):
-        """Calculates the size of a .shp geometry record."""
         if not self.numRecords:
             self.__dbfHeader()
         fmt = ''.join(['%ds' % fieldinfo[2] for fieldinfo in self.fields])
