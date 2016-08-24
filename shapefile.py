@@ -488,6 +488,9 @@ class Reader:
         """Reads and returns a dbf record row as a list of values."""
         f = self.__getFileObj(self.dbf)
         recordContents = self.__recStruct.unpack(f.read(self.__recStruct.size))
+        return self.__recordTypes(recordContents)
+
+    def __recordTypes(self, recordContents):
         if recordContents[0] != b(' '):
             # deleted record
             return None
@@ -552,8 +555,9 @@ class Reader:
         f = self.__getFileObj(self.dbf)
         f.seek(self.__dbfHeaderLength())
         flat = unpack(self.__recStruct.format * self.numRecords, f.read(self.__recStruct.size * self.numRecords))
-        rowlen = len(self.fields) - 1
-        records = list(izip(*(iter(flat),) * rowlen))
+        rowlen = len(self.fields)
+        records = (self.__recordTypes(row) for row in izip(*(iter(flat),) * rowlen))
+        records = [rec for rec in records if rec]
         return records
 
     def iterRecords(self):
