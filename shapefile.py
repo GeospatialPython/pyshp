@@ -549,11 +549,13 @@ class Reader:
         """Returns all records in a dbf file."""
         if not self.numRecords:
             self.__dbfHeader()
+        records = []
         f = self.__getFileObj(self.dbf)
         f.seek(self.__dbfHeaderLength())
-        flat = unpack(self.__recStruct.format * self.numRecords, f.read(self.__recStruct.size * self.numRecords))
-        rowlen = len(self.fields) - 1
-        records = list(izip(*(iter(flat),) * rowlen))
+        for i in range(self.numRecords):
+            r = self.__record()
+            if r:
+                records.append(r)
         return records
 
     def iterRecords(self):
