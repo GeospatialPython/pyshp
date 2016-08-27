@@ -1190,11 +1190,13 @@ class Editor(Writer):
         fieldName.replace(' ', '_')
 
 # Begin Testing
-def test():
+def test(**kwargs):
     import doctest
     doctest.NORMALIZE_WHITESPACE = 1
-    doctest.testfile("README.md", verbose=1)
-
+    verbosity = kwargs.get('verbose', 1)
+    failure_count, test_count = doctest.testfile("README.md", verbose=verbosity)
+    return failure_count
+    
 if __name__ == "__main__":
     """
     Doctests are contained in the file 'README.md'. This library was originally developed
@@ -1202,4 +1204,5 @@ if __name__ == "__main__":
     testing libraries but for now unit testing is done using what's available in
     2.3.
     """
-    test()
+    failure_count = test()
+    sys.exit(failure_count)
