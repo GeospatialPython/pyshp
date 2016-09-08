@@ -1,0 +1,14 @@
+language: python
+python:
+- '2.7'
+script:
+- touch foo
+deploy:
+  provider: pypi
+  user: jlawhead
+  password:
+    secure: w1ErvS4wRNUVlWOtisWIC9BZiV6qecAKUN8/KUHxpEPRe54DKYgd9VMPlEktHIEFqHiUw0QH3ObJZCghDDjbu9CliGU1plIOlBbxaX2EL6sAlmmZuwm2Xw2NplVclKI2QHyFLlABlKkH5eoFVFoMxdXMTGHAMcubk+EJoKEVHsGDhhHGaT1T8I8gV1kIzpYBe2/3b5Nol1/lKpFqHet017IJ8TZWziHsx91zqqDj9+T0cX3QllkZNn4PtY4KojcszTQyRQGwcEV9mzL/npmHtIqEIhQCqRc5vv+/wMU7aFfpA8NZEIcxb79nwiuSfmA6/iONBzHFJYPIws7cWJpBfTHYHX8uxUq9Nh4FTIPutIO92cx8xp5+ftTZRXxi4Wi6ESycMp/erQHgGPlvjkgzwWFwNCkMCCGAGZfH2aaSOBSAxf/s8DBGWQ9OzqtWxirHy/hzjdleWduFii1aw0I5nxjgvKzgM/jeBn9nd8Y3+HfsY0wPlowjHwLONew/kjSy8kVDva65Jf25ATb589NExBMLrU0rN1hlNMqJZHCfnzTiqFJQ+ybOPFrs9jpa1m3ezWTnCJg+8Gs6Qj6O8mwpbWPg6I4O9nP2Ivye0WgR1tvRFmbxoo5BAMWCzbzQYngInSY/EGn8hWXORG2hqKU4UH9LlAbFWbbHskFxTiUrotc=
+  on:
+    tags: true
+    distributions: sdist bdist_wheel
+    repo: GeospatialPython/pyshp

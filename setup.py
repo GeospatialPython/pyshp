@@ -1,13 +1,13 @@
 from setuptools import setup
 
 setup(name='pyshp',
-      version='1.2.3',
+      version='1.2.9',
       description='Pure Python read/write support for ESRI Shapefile format',
-      long_description=open('README.txt').read(),
+      long_description=open('README.md').read(),
       author='Joel Lawhead',
       author_email='jlawhead@geospatialpython.com',
       url='https://github.com/GeospatialPython/pyshp',
-      download_url='https://github.com/GeospatialPython/pyshp/archive/1.2.2.tar.gz',
+      download_url='https://github.com/GeospatialPython/pyshp/archive/1.2.9.tar.gz',
       py_modules=['shapefile'],
       license='MIT',
       zip_safe=False,

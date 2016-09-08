@@ -1,3 +1,20 @@
+VERSION 1.2.8
+
+2016-08-17 Joel Lawhead <jlawhead@geospatialpython.com>
+	* Configured Travis-CI 
+
+VERSION 1.2.5
+
+2016-08-16 Joel Lawhead <jlawhead@geospatialpython.com>
+	* Reader speed up through batch unpacking bytes
+	* Merge README text into markdown file. Remove text version.
+	* Fixed parsing of number of points for some shapes (MULTIPOINTM, MULTIPOINTZ)
+
+VERSON 1.2.3
+
+2015-06-21 Joel Lawhead <jlawhead@geospatialpython.com>
+	*shapefile.py (u) Bugfix for Python3 with Reader.iterShapeRecords()
+
 VERSION 1.2.2
 
 ### upcoming (2015/01/09 05:27 +00:00)

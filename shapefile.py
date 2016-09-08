@@ -3,14 +3,15 @@ shapefile.py
 Provides read and write support for ESRI Shapefiles.
 author: jlawhead<at>geospatialpython.com
 date: 2015/06/22
-version: 1.2.3
+version: 1.2.9
 Compatible with Python versions 2.4-3.x
-version changelog: Reader.iterShapeRecords() bugfix for Python 3
+version changelog: 
+- Pushing 1.2.5 changes to PyPi using Travis-CI.
 """
 
-__version__ = "1.2.3"
+__version__ = "1.2.9"
 
-from struct import pack, unpack, calcsize, error
+from struct import pack, unpack, calcsize, error, Struct
 import os
 import sys
 import time
@@ -336,7 +337,7 @@ class Reader:
         if shapeType in (3,5,13,15,23,25,31):
             nParts = unpack("<i", f.read(4))[0]
         # Shape types with points
-        if shapeType in (3,5,8,13,15,23,25,31):
+        if shapeType in (3,5,8,13,15,18,23,25,28,31):
             nPoints = unpack("<i", f.read(4))[0]
         # Read parts
         if nParts:
@@ -346,7 +347,8 @@ class Reader:
             record.partTypes = _Array('i', unpack("<%si" % nParts, f.read(nParts * 4)))
         # Read points - produces a list of [x,y] values
         if nPoints:
-            record.points = [_Array('d', unpack("<2d", f.read(16))) for p in range(nPoints)]
+            flat = unpack("<%sd" % (2 * nPoints), f.read(16*nPoints))
+            record.points = list(izip(*(iter(flat),) * 2))
         # Read z extremes and values
         if shapeType in (13,15,18,31):
             (zmin, zmax) = unpack("<2d", f.read(16))
@@ -389,10 +391,12 @@ class Reader:
             numRecords = shxRecordLength // 8
             # Jump to the first record.
             shx.seek(100)
-            for r in range(numRecords):
-                # Offsets are 16-bit words just like the file length
-                self._offsets.append(unpack(">i", shx.read(4))[0] * 2)
-                shx.seek(shx.tell() + 4)
+            shxRecords = _Array('i')
+            # Each offset consists of two nrs, only the first one matters
+            shxRecords.fromfile(shx, 2 * numRecords)
+            if sys.byteorder != 'big':
+                 shxRecords.byteswap()
+            self._offsets = [2 * el for el in shxRecords[::2]]
         if not i == None:
             return self._offsets[i]
 
@@ -469,6 +473,8 @@ class Reader:
         if terminator != b("\r"):
             raise ShapefileException("Shapefile dbf header lacks expected terminator. (likely corrupt?)")
         self.fields.insert(0, ('DeletionFlag', 'C', 1, 0))
+        fmt,fmtSize = self.__recordFmt()
+        self.__recStruct = Struct(fmt)
 
     def __recordFmt(self):
         """Calculates the size of a .shp geometry record."""
@@ -481,8 +487,7 @@ class Reader:
     def __record(self):
         """Reads and returns a dbf record row as a list of values."""
         f = self.__getFileObj(self.dbf)
-        recFmt = self.__recordFmt()
-        recordContents = unpack(recFmt[0], f.read(recFmt[1]))
+        recordContents = self.__recStruct.unpack(f.read(self.__recStruct.size))
         if recordContents[0] != b(' '):
             # deleted record
             return None
@@ -535,7 +540,7 @@ class Reader:
         if not self.numRecords:
             self.__dbfHeader()
         i = self.__restrictIndex(i)
-        recSize = self.__recordFmt()[1]
+        recSize = self.__recStruct.size
         f.seek(0)
         f.seek(self.__dbfHeaderLength() + (i * recSize))
         return self.__record()
@@ -544,13 +549,11 @@ class Reader:
         """Returns all records in a dbf file."""
         if not self.numRecords:
             self.__dbfHeader()
-        records = []
         f = self.__getFileObj(self.dbf)
         f.seek(self.__dbfHeaderLength())
-        for i in range(self.numRecords):
-            r = self.__record()
-            if r:
-                records.append(r)
+        flat = unpack(self.__recStruct.format * self.numRecords, f.read(self.__recStruct.size * self.numRecords))
+        rowlen = len(self.fields) - 1
+        records = list(izip(*(iter(flat),) * rowlen))
         return records
 
     def iterRecords(self):
@@ -1190,11 +1193,11 @@ class Editor(Writer):
 def test():
     import doctest
     doctest.NORMALIZE_WHITESPACE = 1
-    doctest.testfile("README.txt", verbose=1)
+    doctest.testfile("README.md", verbose=1)
 
 if __name__ == "__main__":
     """
-    Doctests are contained in the file 'README.txt'. This library was originally developed
+    Doctests are contained in the file 'README.md'. This library was originally developed
     using Python 2.3. Python 2.4 and above have some excellent improvements in the built-in
     testing libraries but for now unit testing is done using what's available in
     2.3.
