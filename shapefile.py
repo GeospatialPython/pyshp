@@ -937,9 +937,9 @@ class Writer:
                 elif fieldType == "D":
                     # date: 8 bytes - date stored as a string in the format YYYYMMDD.
                     if isinstance(value, date):
-                        value = b"%s%s%s"%(value.year,value.month,value.day)
+                        value = value.strftime("%Y%m%d")
                     elif isinstance(value, list) and len(value) == 3:
-                        value = b"%s%s%s"%value
+                        value = date(*value).strftime("%Y%m%d")
                     elif value in MISSING:
                         value = b('0') * 8 # QGIS NULL for date type
                     else:
