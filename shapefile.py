@@ -498,10 +498,6 @@ class Reader:
         for (name, typ, size, deci), value in zip(self.fields, recordContents):
             if name == 'DeletionFlag':
                 continue
-            elif not value.strip():
-                # why this? better to delete this and leave it up to the field type? 
-                record.append(value)
-                continue
             elif typ in ("N","F"):
                 # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field. 
                 value = value.replace(b('\0'), b('')).strip()
@@ -535,8 +531,12 @@ class Reader:
                 if value == " ":
                     value = None # space means missing or not yet set
                 else:
-                    value = (value in b('YyTt') and b('T')) or \
-                                            (value in b('NnFf') and b('F')) or b('?')
+                    if value in b('YyTt1'):
+                        value = True
+                    elif value in b('NnFf0'):
+                        value = False
+                    else:
+                        value = b('?')
             else:
                 # anything else is forced to string/unicode
                 value = u(value)
@@ -1009,6 +1009,12 @@ class Writer:
 
     def field(self, name, fieldType="C", size="50", decimal=0):
         """Adds a dbf field descriptor to the shapefile."""
+        if fieldType == "D":
+            size = "8"
+            decimal = 0
+        elif fieldType == "L":
+            size = "1"
+            decimal = 0
         self.fields.append((name, fieldType, size, decimal))
 
     def record(self, *recordList, **recordDict):
