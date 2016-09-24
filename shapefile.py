@@ -1032,7 +1032,7 @@ class Writer:
         # Compensate for deletion flag
         if self.fields[0][0].startswith("Deletion"): fieldCount -= 1
         if recordList:
-            [record.append(recordList[i]) for i in range(fieldCount)]
+            record = [recordList[i] for i in range(fieldCount)]
         elif recordDict:
             for field in self.fields:
                 if field[0] in recordDict:
@@ -1044,8 +1044,7 @@ class Writer:
         else:
             # Blank fields for empty record
             record = ["" for i in range(fieldCount)]
-        if record:
-            self.records.append(record)
+        self.records.append(record)
 
     def shape(self, i):
         return self._shapes[i]
