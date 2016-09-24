@@ -18,6 +18,7 @@ import time
 import array
 import tempfile
 import itertools
+from datetime import date
 
 #
 # Constants for shape types
@@ -35,6 +36,8 @@ POLYLINEM = 23
 POLYGONM = 25
 MULTIPOINTM = 28
 MULTIPATCH = 31
+
+MISSING = [None,'']
 
 PYTHON3 = sys.version_info[0] == 3
 
@@ -492,14 +495,11 @@ class Reader:
             # deleted record
             return None
         record = []
-        for (name, typ, size, deci), value in zip(self.fields,
-                                                                                                recordContents):
+        for (name, typ, size, deci), value in zip(self.fields, recordContents):
             if name == 'DeletionFlag':
                 continue
-            elif not value.strip():
-                record.append(value)
-                continue
-            elif typ == "N":
+            elif typ in ("N","F"):
+                # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field. 
                 value = value.replace(b('\0'), b('')).strip()
                 value = value.replace(b('*'), b(''))  # QGIS NULL is all '*' chars
                 if value == b(''):
@@ -517,18 +517,28 @@ class Reader:
                         #not parseable as int, set to None
                         value = None
             elif typ == b('D'):
+                # date: 8 bytes - date stored as a string in the format YYYYMMDD.
                 if value.count(b('0')) == len(value):  # QGIS NULL is all '0' chars
                     value = None
                 else:
                     try:
                         y, m, d = int(value[:4]), int(value[4:6]), int(value[6:8])
-                        value = [y, m, d]
+                        value = date(y, m, d)
                     except:
                         value = value.strip()
             elif typ == b('L'):
-                value = (value in b('YyTt') and b('T')) or \
-                                        (value in b('NnFf') and b('F')) or b('?')
+                # logical: 1 byte - initialized to 0x20 (space) otherwise T or F.
+                if value == " ":
+                    value = None # space means missing or not yet set
+                else:
+                    if value in b('YyTt1'):
+                        value = True
+                    elif value in b('NnFf0'):
+                        value = False
+                    else:
+                        value = b('?')
             else:
+                # anything else is forced to string/unicode
                 value = u(value)
                 value = value.strip()
             record.append(value)
@@ -920,11 +930,30 @@ class Writer:
             for (fieldName, fieldType, size, dec), value in zip(self.fields, record):
                 fieldType = fieldType.upper()
                 size = int(size)
-                if fieldType.upper() == "N":
-                    value = str(value).rjust(size)
+                if fieldType in ("N","F"):
+                    # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
+                    if value in MISSING:
+                        value = str("*"*size) # QGIS NULL
+                    else:
+                        value = str(value).rjust(size)
+                elif fieldType == "D":
+                    # date: 8 bytes - date stored as a string in the format YYYYMMDD.
+                    if isinstance(value, date):
+                        value = value.strftime("%Y%m%d")
+                    elif isinstance(value, list) and len(value) == 3:
+                        value = date(*value).strftime("%Y%m%d")
+                    elif value in MISSING:
+                        value = b('0') * 8 # QGIS NULL for date type
+                    else:
+                        raise ShapefileException("Date values must be either a datetime.date object, a list, or a missing value of None or ''.")
                 elif fieldType == 'L':
-                    value = str(value)[0].upper()
+                    # logical: 1 byte - initialized to 0x20 (space) otherwise T or F.
+                    if value in MISSING:
+                        value = str(' ') # missing is set to space
+                    else:
+                        value = str(value)[0].upper()
                 else:
+                    # anything else is forced to string
                     value = str(value)[:size].ljust(size)
                 if len(value) != size:
                     raise ShapefileException(
@@ -982,6 +1011,12 @@ class Writer:
 
     def field(self, name, fieldType="C", size="50", decimal=0):
         """Adds a dbf field descriptor to the shapefile."""
+        if fieldType == "D":
+            size = "8"
+            decimal = 0
+        elif fieldType == "L":
+            size = "1"
+            decimal = 0
         self.fields.append((name, fieldType, size, decimal))
 
     def record(self, *recordList, **recordDict):
