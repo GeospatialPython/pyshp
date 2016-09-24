@@ -1041,6 +1041,9 @@ class Writer:
                         record.append("")
                     else:
                         record.append(val)
+        else:
+            # Blank fields for empty record
+            record = ["" for i in range(fieldCount)]
         if record:
             self.records.append(record)
 
