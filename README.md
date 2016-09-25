@@ -266,7 +266,7 @@ that.
 Calling the shapeRecords() method will return the geometry and attributes for
 all shapes as a list of ShapeRecord objects. Each ShapeRecord instance has a
 "shape" and "record" attribute. The shape attribute is a ShapeRecord object as
-dicussed in the first section "Reading Geometry". The record attribute is a
+discussed in the first section "Reading Geometry". The record attribute is a
 list of field values as demonstrated in the "Reading Records" section.
 
 
@@ -484,7 +484,7 @@ names.
 
 File extensions are optional when reading or writing shapfiles. If you specify
 them PyShp ignores them anyway. When you save files you can specify a base
-file name that is used for all three file types. Or you can specify a nmae for
+file name that is used for all three file types. Or you can specify a name for
 one or more file types. In that case, any file types not assigned will not
 save and only file types with file names will be saved. If you do not specify
 any file names (i.e. save()), then a unique file name is generated with the
