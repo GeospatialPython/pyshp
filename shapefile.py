@@ -57,6 +57,9 @@ def b(v, encoding=u"utf8", encodingErrors=u"strict"):
     elif isinstance(v, bytes):
         # Already bytes.
         return v
+    elif isinstance(v, (int,float)):
+        # Number as bytes for Py2 and Py3
+        return unicode(v).encode()
     else:
         # Force object repr to bytes
         return bytes(v).encode(encoding, encodingErrors)
@@ -79,7 +82,7 @@ class _Array(array.array):
     """Converts python tuples to lits of the appropritate type.
     Used to unpack different shapefile header parts."""
     def __repr__(self):
-        return str(self.tolist())
+        return unicode(self.tolist())
 
 def signed_area(coords):
     """Return the signed area enclosed by a ring using the linear time
@@ -303,11 +306,11 @@ class Reader:
         shp.seek(32)
         self.shapeType= unpack(u"<i", shp.read(4))[0]
         # The shapefile's bounding box (lower left, upper right)
-        self.bbox = _Array(u'd', unpack(u"<4d", shp.read(32)))
+        self.bbox = _Array('d', unpack(u"<4d", shp.read(32)))
         # Elevation
-        self.elevation = _Array(u'd', unpack(u"<2d", shp.read(16)))
+        self.elevation = _Array('d', unpack(u"<2d", shp.read(16)))
         # Measure
-        self.measure = _Array(u'd', unpack(u"<2d", shp.read(16)))
+        self.measure = _Array('d', unpack(u"<2d", shp.read(16)))
 
     def __shape(self):
         """Returns the header info and geometry for a single shape."""
@@ -324,7 +327,7 @@ class Reader:
             record.points = []
         # All shape types capable of having a bounding box
         elif shapeType in (3,5,8,13,15,18,23,25,28,31):
-            record.bbox = _Array(u'd', unpack(u"<4d", f.read(32)))
+            record.bbox = _Array('d', unpack(u"<4d", f.read(32)))
         # Shape types with parts
         if shapeType in (3,5,13,15,23,25,31):
             nParts = unpack(u"<i", f.read(4))[0]
@@ -333,10 +336,10 @@ class Reader:
             nPoints = unpack(u"<i", f.read(4))[0]
         # Read parts
         if nParts:
-            record.parts = _Array(u'i', unpack(u"<%si" % nParts, f.read(nParts * 4)))
+            record.parts = _Array('i', unpack(u"<%si" % nParts, f.read(nParts * 4)))
         # Read part types for Multipatch - 31
         if shapeType == 31:
-            record.partTypes = _Array(u'i', unpack(u"<%si" % nParts, f.read(nParts * 4)))
+            record.partTypes = _Array('i', unpack(u"<%si" % nParts, f.read(nParts * 4)))
         # Read points - produces a list of [x,y] values
         if nPoints:
             flat = unpack(u"<%sd" % (2 * nPoints), f.read(16*nPoints))
@@ -344,20 +347,20 @@ class Reader:
         # Read z extremes and values
         if shapeType in (13,15,18,31):
             (zmin, zmax) = unpack(u"<2d", f.read(16))
-            record.z = _Array(u'd', unpack(u"<%sd" % nPoints, f.read(nPoints * 8)))
+            record.z = _Array('d', unpack(u"<%sd" % nPoints, f.read(nPoints * 8)))
         # Read m extremes and values if header m values do not equal 0.0
         if shapeType in (13,15,18,23,25,28,31) and not 0.0 in self.measure:
             (mmin, mmax) = unpack(u"<2d", f.read(16))
             # Measure values less than -10e38 are nodata values according to the spec
             record.m = []
-            for m in _Array(u'd', unpack(u"<%sd" % nPoints, f.read(nPoints * 8))):
+            for m in _Array('d', unpack(u"<%sd" % nPoints, f.read(nPoints * 8))):
                 if m > -10e38:
                     record.m.append(m)
                 else:
                     record.m.append(None)
         # Read a single point
         if shapeType in (1,11,21):
-            record.points = [_Array(u'd', unpack(u"<2d", f.read(16)))]
+            record.points = [_Array('d', unpack(u"<2d", f.read(16)))]
         # Read a single Z value
         if shapeType == 11:
             record.z = unpack(u"<d", f.read(8))
@@ -383,7 +386,7 @@ class Reader:
             numRecords = shxRecordLength // 8
             # Jump to the first record.
             shx.seek(100)
-            shxRecords = _Array(u'i')
+            shxRecords = _Array('i')
             # Each offset consists of two nrs, only the first one matters
             shxRecords.fromfile(shx, 2 * numRecords)
             if sys.byteorder != u'big':
@@ -928,7 +931,7 @@ class Writer:
                     if value in MISSING:
                         value = b"*"*size # QGIS NULL
                     else:
-                        value = bytes(value).rjust(size)
+                        value = b(value).rjust(size)
                 elif fieldType == u"D":
                     # date: 8 bytes - date stored as a string in the format YYYYMMDD.
                     if isinstance(value, date):
@@ -1246,20 +1249,22 @@ if __name__ == "__main__":
     2.3.
     """
 
-##    r = Reader("ne_10m_admin_1_states_provinces", encoding="utf8")
-##    for i,row in enumerate(r.iterRecords()):
-##        pass
-##        if i < 100:
-##            print(unicode(", ").join([v for v in row if isinstance(v,unicode)]))
-##        
-##    e = Editor("ne_10m_admin_1_states_provinces", encoding="utf8")
-##    e.save("copy_utf8.shp", encoding="utf8")
-##
-##    r = Reader("copy_utf8", encoding="utf8")
-##    for i,row in enumerate(r.iterRecords()):
-##        pass
-##        if i < 100:
-##            print(unicode(", ").join([v for v in row if isinstance(v,unicode)]))
+    r = Reader("ne_10m_admin_1_states_provinces", encoding="utf8")
+    for i,row in enumerate(r.iterRecords()):
+        pass
+        if i < 100:
+            print(unicode(", ").join([v for v in row if isinstance(v,unicode)]))
+
+    print(r.fields)
+        
+    e = Editor("ne_10m_admin_1_states_provinces", encoding="utf8")
+    e.save("copy_utf8.shp", encoding="utf8")
+
+    r = Reader("copy_utf8", encoding="utf8")
+    for i,row in enumerate(r.iterRecords()):
+        pass
+        if i < 100:
+            print(unicode(", ").join([v for v in row if isinstance(v,unicode)]))
     
     #### 
 
