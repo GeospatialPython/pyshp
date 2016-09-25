@@ -41,56 +41,39 @@ MISSING = [None,'']
 
 PYTHON3 = sys.version_info[0] == 3
 
+# change builtins to allow following python 2 conventions
 if PYTHON3:
     xrange = range
     izip = zip
+    unicode = str
+    str = bytes
 else:
     from itertools import izip
 
-def b(v):
-    if PYTHON3:
-        if isinstance(v, str):
-            # For python 3 encode str to bytes.
-            return v.encode('utf-8')
-        elif isinstance(v, bytes):
-            # Already bytes.
-            return v
-        else:
-            # Error.
-            raise Exception('Unknown input type')
-    else:
-        # For python 2 assume str passed in and return str.
+def b(v, encoding="utf8", encodingErrors="strict"):
+    if isinstance(v, unicode):
+        # Encode unicode to bytes
+        return v.encode(encoding, encodingErrors)
+    elif isinstance(v, bytes):
+        # Already bytes.
         return v
-
-def u(v):
-    if PYTHON3:
-        # try/catch added 2014/05/07
-        # returned error on dbf of shapefile
-        # from www.naturalearthdata.com named
-        # "ne_110m_admin_0_countries".
-        # Just returning v as is seemed to fix
-        # the problem.  This function could
-        # be condensed further.
-        try:
-          if isinstance(v, bytes):
-              # For python 3 decode bytes to str.
-              return v.decode('utf-8')
-          elif isinstance(v, str):
-              # Already str.
-              return v
-          else:
-              # Error.
-              raise Exception('Unknown input type')
-        except: return v
     else:
-        # For python 2 assume str passed in and return str.
+        # Force object repr to bytes
+        return bytes(v).encode(encoding, encodingErrors)
+        
+def u(v, encoding="utf8", encodingErrors="strict"):
+    if isinstance(v, bytes):
+        # Decode bytes to unicode.
+        return v.decode(encoding, encodingErrors)
+    elif isinstance(v, unicode):
+        # Already unicode.
         return v
+    else:
+        # Force object repr to unicode
+        return bytes(v).decode(encoding, encodingErrors)
 
 def is_string(v):
-    if PYTHON3:
-        return isinstance(v, str)
-    else:
-        return isinstance(v, basestring)
+    return isinstance(v, (bytes,unicode))
 
 class _Array(array.array):
     """Converts python tuples to lits of the appropritate type.
@@ -231,6 +214,9 @@ class Reader:
         self.numRecords = None
         self.fields = []
         self.__dbfHdrLength = 0
+        self.encoding = kwargs.get("encoding", "utf8")
+        self.encodingErrors = kwargs.get("encodingErrors", "strict")
+        
         # See if a shapefile name was passed as an argument
         if len(args) > 0:
             if is_string(args[0]):
@@ -398,7 +384,7 @@ class Reader:
             shxRecords = _Array('i')
             # Each offset consists of two nrs, only the first one matters
             shxRecords.fromfile(shx, 2 * numRecords)
-            if sys.byteorder != 'big':
+            if sys.byteorder != b('big'):
                  shxRecords.byteswap()
             self._offsets = [2 * el for el in shxRecords[::2]]
         if not i == None:
@@ -468,10 +454,12 @@ class Reader:
                 idx = fieldDesc[name].index(b("\x00"))
             else:
                 idx = len(fieldDesc[name]) - 1
+            # field name (always ascii)
             fieldDesc[name] = fieldDesc[name][:idx]
-            fieldDesc[name] = u(fieldDesc[name])
+            fieldDesc[name] = u(fieldDesc[name], encoding="ascii", encodingErrors="ignore")
             fieldDesc[name] = fieldDesc[name].lstrip()
-            fieldDesc[1] = u(fieldDesc[1])
+            # field type
+            fieldDesc[1] = u(fieldDesc[1]) 
             self.fields.append(fieldDesc)
         terminator = dbf.read(1)
         if terminator != b("\r"):
@@ -497,9 +485,9 @@ class Reader:
             return None
         record = []
         for (name, typ, size, deci), value in zip(self.fields, recordContents):
-            if name == 'DeletionFlag':
+            if name == b('DeletionFlag'):
                 continue
-            elif typ in ("N","F"):
+            elif typ in b("NF"):
                 # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field. 
                 value = value.replace(b('\0'), b('')).strip()
                 value = value.replace(b('*'), b(''))  # QGIS NULL is all '*' chars
@@ -529,7 +517,7 @@ class Reader:
                         value = value.strip()
             elif typ == b('L'):
                 # logical: 1 byte - initialized to 0x20 (space) otherwise T or F.
-                if value == " ":
+                if value == b(" "):
                     value = None # space means missing or not yet set
                 else:
                     if value in b('YyTt1'):
@@ -539,8 +527,8 @@ class Reader:
                     else:
                         value = b('?')
             else:
-                # anything else is forced to string/unicode
-                value = u(value)
+                # anything else is forced to unicode
+                value = u(value, encoding=self.encoding, encodingErrors=self.encodingErrors)
                 value = value.strip()
             record.append(value)
         return record
@@ -788,7 +776,7 @@ class Writer:
         # Field descriptors
         for field in self.fields:
             name, fieldType, size, decimal = field
-            name = b(name)
+            name = b(name, encoding="ascii", encodingErrors="ignore")
             name = name.replace(b(' '), b('_'))
             name = name.ljust(11).replace(b(' '), b('\x00'))
             fieldType = b(fieldType)
@@ -931,13 +919,13 @@ class Writer:
             for (fieldName, fieldType, size, dec), value in zip(self.fields, record):
                 fieldType = fieldType.upper()
                 size = int(size)
-                if fieldType in ("N","F"):
+                if fieldType in b("NF"):
                     # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
                     if value in MISSING:
-                        value = str("*"*size) # QGIS NULL
+                        value = bytes("*"*size) # QGIS NULL
                     else:
-                        value = str(value).rjust(size)
-                elif fieldType == "D":
+                        value = bytes(value).rjust(size)
+                elif fieldType == b("D"):
                     # date: 8 bytes - date stored as a string in the format YYYYMMDD.
                     if isinstance(value, date):
                         value = value.strftime("%Y%m%d")
@@ -947,20 +935,19 @@ class Writer:
                         value = b('0') * 8 # QGIS NULL for date type
                     else:
                         raise ShapefileException("Date values must be either a datetime.date object, a list, or a missing value of None or ''.")
-                elif fieldType == 'L':
+                elif fieldType == b('L'):
                     # logical: 1 byte - initialized to 0x20 (space) otherwise T or F.
                     if value in MISSING:
-                        value = str(' ') # missing is set to space
+                        value = b(' ') # missing is set to space
                     else:
-                        value = str(value)[0].upper()
+                        value = b(value, encoding=self.encoding, encodingErrors=self.encodingErrors)[0].upper()
                 else:
                     # anything else is forced to string
-                    value = str(value)[:size].ljust(size)
+                    value = b(value, encoding=self.encoding, encodingErrors=self.encodingErrors)[:size].ljust(size)
                 if len(value) != size:
                     raise ShapefileException(
                         "Shapefile Writer unable to pack incorrect sized value"
                         " (size %d) into field '%s' (size %d)." % (len(value), fieldName, size))
-                value = b(value)
                 f.write(value)
 
     def null(self):
@@ -1074,15 +1061,17 @@ class Writer:
         self.__shapefileHeader(self.shx, headerType='shx')
         self.__shxRecords()
 
-    def saveDbf(self, target):
+    def saveDbf(self, target, encoding="utf8", encodingErrors="strict"):
         """Save a dbf file."""
+        self.encoding = encoding
+        self.encodingErrors = encodingErrors
         if not hasattr(target, "write"):
             target = os.path.splitext(target)[0] + '.dbf'
         self.dbf = self.__getFileObj(target)
         self.__dbfHeader()
         self.__dbfRecords()
 
-    def save(self, target=None, shp=None, shx=None, dbf=None):
+    def save(self, target=None, shp=None, shx=None, dbf=None, encoding="utf8", encodingErrors="strict"):
         """Save the shapefile data to three files or
         three file-like objects. SHP and DBF files can also
         be written exclusively using saveShp, saveShx, and saveDbf respectively.
@@ -1097,7 +1086,7 @@ class Writer:
         if shx:
             self.saveShx(shx)
         if dbf:
-            self.saveDbf(dbf)
+            self.saveDbf(dbf, encoding=encoding, encodingErrors=encodingErrors)
         elif not shp and not shx and not dbf:
             generated = False
             if not target:
@@ -1108,19 +1097,20 @@ class Writer:
             self.shp.close()
             self.saveShx(target)
             self.shx.close()
-            self.saveDbf(target)
+            self.saveDbf(target, encoding=encoding, encodingErrors=encodingErrors)
             self.dbf.close()
             if generated:
                 return target
+            
 class Editor(Writer):
-    def __init__(self, shapefile=None, shapeType=POINT, autoBalance=1):
+    def __init__(self, shapefile=None, shapeType=POINT, autoBalance=1, encoding="utf8", encodingErrors="strict"):
         self.autoBalance = autoBalance
         if not shapefile:
             Writer.__init__(self, shapeType)
         elif is_string(shapefile):
             base = os.path.splitext(shapefile)[0]
             if os.path.isfile("%s.shp" % base):
-                r = Reader(base)
+                r = Reader(base, encoding=encoding, encodingErrors=encodingErrors)
                 Writer.__init__(self, r.shapeType)
                 self._shapes = r.shapes()
                 self.fields = r.fields
@@ -1228,6 +1218,7 @@ class Editor(Writer):
     def __fieldNorm(self, fieldName):
         """Normalizes a dbf field name to fit within the spec and the
         expectations of certain ESRI software."""
+        # TODO: not used, consider removing or use everywhere, also doesn't return anything
         if len(fieldName) > 11: fieldName = fieldName[:11]
         fieldName = fieldName.upper()
         fieldName.replace(' ', '_')
@@ -1245,4 +1236,52 @@ if __name__ == "__main__":
     testing libraries but for now unit testing is done using what's available in
     2.3.
     """
+
+    r = Reader("ne_10m_admin_1_states_provinces", encoding="utf8")
+    for i,row in enumerate(r.iterRecords()):
+        pass
+        if i < 100:
+            print(unicode(", ").join([v for v in row if isinstance(v,unicode)]))
+        
+    e = Editor("ne_10m_admin_1_states_provinces", encoding="utf8")
+    e.save("copy_utf8.shp", encoding="utf8")
+
+    r = Reader("copy_utf8", encoding="utf8")
+    for i,row in enumerate(r.iterRecords()):
+        pass
+        if i < 100:
+            print(unicode(", ").join([v for v in row if isinstance(v,unicode)]))
+    
+    #### 
+
+    encoding = "latin"
+    print(encoding)
+    w = Writer()
+    w.field(u"normal")
+    w.field("enc\xe5dings".decode(encoding))
+    w.record(u"hello", 'w\xe5\xe5\xe5\xe5\xf8\xf8\xf8\xf8rlld'.decode(encoding))
+    w.null()
+    w.save("latin.shp", encoding=encoding)
+
+    r = Reader("latin.shp", encoding=encoding)
+    print(r.fields)
+    for row in r.records():
+        print(row)
+        print(unicode(", ").join([v for v in row]))
+
+    encoding = "cp932"
+    print(encoding)
+    w = Writer()
+    w.field(u"normal")
+    w.field(u"jap")
+    w.record(u"hello", '\x96k\x8aC\x93\xb9 (Hokkaido)'.decode(encoding))
+    w.null()
+    w.save("cp932.shp", encoding=encoding)
+
+    r = Reader("cp932.shp", encoding=encoding)
+    print(r.fields)
+    for row in r.records():
+        print(row)
+        print(unicode(", ").join([v for v in row]))
+        
     test()
