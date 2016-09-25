@@ -266,7 +266,7 @@ that.
 Calling the shapeRecords() method will return the geometry and attributes for
 all shapes as a list of ShapeRecord objects. Each ShapeRecord instance has a
 "shape" and "record" attribute. The shape attribute is a ShapeRecord object as
-dicussed in the first section "Reading Geometry". The record attribute is a
+discussed in the first section "Reading Geometry". The record attribute is a
 list of field values as demonstrated in the "Reading Records" section.
 
 
@@ -304,6 +304,7 @@ The blockgroup key and population count:
     2
     
 There is also an iterShapeRecords() method to iterate through large files:
+
 
     >>> shapeRecs = sf.iterShapeRecords()
     >>> for shapeRec in shapeRecs:
@@ -369,33 +370,17 @@ OR you can set it after the Writer is created:
 ### Geometry and Record Balancing
 
 Because every shape must have a corresponding record it is critical that the
-number of records equals the number of shapes to create a valid shapefile. To
-help prevent accidental misalignment the PSL has an "auto balance" feature to
-make sure when you add either a shape or a record the two sides of the
-equation line up. This feature is NOT turned on by default. To activate it set
-the attribute autoBalance to 1 (True):
+number of records equals the number of shapes to create a valid shapefile. You
+must take care to add records and shapes in the same order so that the record
+data lines up with the geometry data. For example:
 
 
-    >>> w.autoBalance = 1
-
-You also have the option of manually calling the balance() method each time
-you add a shape or a record to ensure the other side is up to date. When
-balancing is used null shapes are created on the geometry side or a record
-with a value of "NULL" for each field is created on the attribute side.
-
-The balancing option gives you flexibility in how you build the shapefile.
-
-Without auto balancing you can add geometry or records at anytime. You can
-create all of the shapes and then create all of the records or vice versa. You
-can use the balance method after creating a shape or record each time and make
-updates later. If you do not use the balance method and forget to manually
-balance the geometry and attributes the shapefile will be viewed as corrupt by
-most shapefile software.
-
-With auto balanacing you can add either shapes or geometry and update blank
-entries on either side as needed. Even if you forget to update an entry the
-shapefile will still be valid and handled correctly by most shapefile
-software.
+	>>> w.field("field1", "C")
+	>>> w.field("field2", "C")
+    >>> w.record("row", "one")
+    >>> w.record("row", "two")
+    >>> w.point(1, 1)
+    >>> w.point(2, 2)
 
 ### Adding Geometry
 
@@ -504,7 +489,7 @@ names.
 
 File extensions are optional when reading or writing shapfiles. If you specify
 them PyShp ignores them anyway. When you save files you can specify a base
-file name that is used for all three file types. Or you can specify a nmae for
+file name that is used for all three file types. Or you can specify a name for
 one or more file types. In that case, any file types not assigned will not
 save and only file types with file names will be saved. If you do not specify
 any file names (i.e. save()), then a unique file name is generated with the
@@ -582,6 +567,37 @@ Remove the last shape in the polygon shapefile.
     >>> e = shapefile.Editor(shapefile="shapefiles/test/polygon.shp")
     >>> e.delete(-1)
     >>> e.save('shapefiles/test/polygon')
+    
+### Geometry and Record Balancing
+
+Because every shape must have a corresponding record it is critical that the
+number of records equals the number of shapes to create a valid shapefile. To
+help prevent accidental misalignment the PSL has an "auto balance" feature to
+make sure when you add either a shape or a record the two sides of the
+equation line up. This feature is NOT turned on by default. To activate it set
+the attribute autoBalance to 1 (True):
+
+
+    >>> e.autoBalance = 1
+
+You also have the option of manually calling the balance() method each time
+you add a shape or a record to ensure the other side is up to date. When
+balancing is used null shapes are created on the geometry side or a record
+with a value of "NULL" for each field is created on the attribute side.
+
+The balancing option gives you flexibility in how you build the shapefile.
+
+Without auto balancing you can add geometry or records at anytime. You can
+create all of the shapes and then create all of the records or vice versa. You
+can use the balance method after creating a shape or record each time and make
+updates later. If you do not use the balance method and forget to manually
+balance the geometry and attributes the shapefile will be viewed as corrupt by
+most shapefile software.
+
+With auto balanacing you can add either shapes or geometry and update blank
+entries on either side as needed. Even if you forget to update an entry the
+shapefile will still be valid and handled correctly by most shapefile
+software.
 
 ## Python \_\_geo_interface\_\_
 
@@ -592,6 +608,7 @@ More information on the \_\_geo_interface\_\_ protocol can be found at: [https:/
 ithub.com/sgillies/2217756](https://gist.github.com/sgillies/2217756). More
 information on GeoJSON is available at
 [http://geojson.org](http://geojson.org).
+
 
     >>> s = sf.shape(0)
     >>> s.__geo_interface__["type"]
