@@ -305,6 +305,7 @@ The blockgroup key and population count:
     
 There is also an iterShapeRecords() method to iterate through large files:
 
+
     >>> shapeRecs = sf.iterShapeRecords()
     >>> for shapeRec in shapeRecs:
     ...     # do something here
@@ -373,9 +374,13 @@ number of records equals the number of shapes to create a valid shapefile. You
 must take care to add records and shapes in the same order so that the record
 data lines up with the geometry data. For example:
 
-    >>> for feature in some_thing:
-    >>>     w.record(**feature['properties'])
-    >>>     w.poly(parts=feature['parts']
+
+	>>> w.field("field1", "C")
+	>>> w.field("field2", "C")
+    >>> w.record("row", "one")
+    >>> w.record("row", "two")
+    >>> w.point(1, 1)
+    >>> w.point(2, 2)
 
 ### Adding Geometry
 
@@ -603,6 +608,7 @@ More information on the \_\_geo_interface\_\_ protocol can be found at: [https:/
 ithub.com/sgillies/2217756](https://gist.github.com/sgillies/2217756). More
 information on GeoJSON is available at
 [http://geojson.org](http://geojson.org).
+
 
     >>> s = sf.shape(0)
     >>> s.__geo_interface__["type"]
