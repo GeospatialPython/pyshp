@@ -259,23 +259,24 @@ class Reader:
     def load(self, shapefile=None):
         """Opens a shapefile from a filename or file-like
         object. Normally this method would be called by the
-        constructor with the file object or file name as an
-        argument."""
+        constructor with the file name as an argument."""
         if shapefile:
             (shapeName, ext) = os.path.splitext(shapefile)
             self.shapeName = shapeName
             try:
                 self.shp = open("%s.shp" % shapeName, "rb")
             except IOError:
-                raise ShapefileException("Unable to open %s.shp" % shapeName)
+                pass
             try:
                 self.shx = open("%s.shx" % shapeName, "rb")
             except IOError:
-                raise ShapefileException("Unable to open %s.shx" % shapeName)
+                pass
             try:
                 self.dbf = open("%s.dbf" % shapeName, "rb")
             except IOError:
-                raise ShapefileException("Unable to open %s.dbf" % shapeName)
+                pass
+            if not (self.shp or self.dbf):
+                raise ShapefileException("Unable to open %s.dbf or %s.shp." % (shapeName, shapeName) )
         if self.shp:
             self.__shpHeader()
         if self.dbf:
