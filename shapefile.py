@@ -482,7 +482,7 @@ class Reader:
 
     def __recordFmt(self):
         """Calculates the format and size of a .dbf record."""
-        if not self.numRecords:
+        if self.numRecords is None:
             self.__dbfHeader()
         fmt = ''.join(['%ds' % fieldinfo[2] for fieldinfo in self.fields])
         fmtSize = calcsize(fmt)
@@ -548,7 +548,7 @@ class Reader:
     def record(self, i=0):
         """Returns a specific dbf record based on the supplied index."""
         f = self.__getFileObj(self.dbf)
-        if not self.numRecords:
+        if self.numRecords is None:
             self.__dbfHeader()
         i = self.__restrictIndex(i)
         recSize = self.__recStruct.size
@@ -558,7 +558,7 @@ class Reader:
 
     def records(self):
         """Returns all records in a dbf file."""
-        if not self.numRecords:
+        if self.numRecords is None:
             self.__dbfHeader()
         records = []
         f = self.__getFileObj(self.dbf)
@@ -572,7 +572,7 @@ class Reader:
     def iterRecords(self):
         """Serves up records in a dbf file as an iterator.
         Useful for large shapefiles or dbf files."""
-        if not self.numRecords:
+        if self.numRecords is None:
             self.__dbfHeader()
         f = self.__getFileObj(self.dbf)
         f.seek(self.__dbfHeaderLength())
