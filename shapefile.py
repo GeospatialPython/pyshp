@@ -249,7 +249,7 @@ class Reader:
                     self.shx = kwargs["shx"]
                     if hasattr(self.shx, "seek"):
                         try:
-                            self.shp.seek(0)
+                            self.shx.seek(0)
                         except UnsupportedOperationException:
                             pass
         if "dbf" in kwargs.keys():
@@ -257,7 +257,7 @@ class Reader:
                 self.dbf = kwargs["dbf"]
                 if hasattr(self.dbf, "seek"):
                     try:
-                        self.shp.seek(0)
+                        self.dbf.seek(0)
                     except UnsupportedOperationException:
                         pass
         if self.shp or self.dbf:        
