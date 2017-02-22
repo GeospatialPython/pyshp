@@ -221,6 +221,12 @@ class Reader:
     within each file is only accessed when required and as
     efficiently as possible. Shapefiles are usually not large
     but they can be.
+
+    If initializing the reader with a file-like object which
+    does not support seek(), you must set allow_copy=True
+    to allow the Reader to copy the entire file in memory.
+    This is set to False by default in order to avoid
+    large files being copyied into memory without user intention.
     """
     def __init__(self, *args, **kwargs):
         self.shp = None
