@@ -776,7 +776,7 @@ class Writer:
         year -= 1900
         # Remove deletion flag placeholder from fields
         for field in self.fields:
-            if field[0].startswith("Deletion"):
+            if str(field[0]).startswith("Deletion"):
                 self.fields.remove(field)
         numRecs = len(self.records)
         numFields = len(self.fields)
@@ -864,7 +864,7 @@ class Writer:
                 except error:
                     raise ShapefileException("Failed to write measure extremes for record %s. Expected floats" % recNum)
                 try:
-                    [f.write(pack("<d", p[3])) for p in s.points]
+                    [f.write(pack("<d", len(p) > 3 and p[3] or 0)) for p in s.points]
                 except error:
                     raise ShapefileException("Failed to write measure values for record %s. Expected floats" % recNum)
             # Write a single point
