@@ -945,6 +945,8 @@ class Writer:
                         value = date(*value).strftime("%Y%m%d")
                     elif value in MISSING:
                         value = b('0') * 8 # QGIS NULL for date type
+                    elif isinstance(value, str) and len(value) == 8:
+                        pass # value is already a date string
                     else:
                         raise ShapefileException("Date values must be either a datetime.date object, a list, or a missing value of None or ''.")
                 elif fieldType == 'L':
