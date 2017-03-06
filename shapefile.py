@@ -120,6 +120,7 @@ class _Shape:
         list of shapes."""
         self.shapeType = shapeType
         self.points = []
+        self.parts = []
 
     @property
     def __geo_interface__(self):
@@ -695,9 +696,12 @@ class Writer:
             shapeType = self.shapeType
             if shapeTypes:
                 shapeType = shapeTypes[shapes.index(s)]
-            px, py = list(zip(*s.points))[:2]
-            x.extend(px)
-            y.extend(py)
+            if len(s.points) > 0:
+                px, py = list(zip(*s.points))[:2]
+                x.extend(px)
+                y.extend(py)
+        if len(x) == 0:
+            return [0] * 4
         return [min(x), min(y), max(x), max(y)]
 
     def __zbox(self, shapes, shapeTypes=[]):
@@ -857,7 +861,7 @@ class Writer:
             # Write m extremes and values
             if s.shapeType in (13,15,18,23,25,28,31):
                 try:
-                    if hasattr(s,"m"):
+                    if hasattr(s,"m") and None not in s.m:
                         f.write(pack("<%sd" % len(s.m), *s.m))
                     else:
                         f.write(pack("<2d", *self.__mbox([s])))
