@@ -24,7 +24,7 @@ Pyshp is compatible with Python 2.4-3.x.
 
 This document provides examples for using pyshp to read and write shapefiles. However 
 many more examples are continually added to the pyshp wiki on GitHub, the blog [http://GeospatialPython.com](http://GeospatialPython.com),
-and by searching for pyshp on [http://gis.stackexchange.com](http://gis.stackexchange.com). 
+and by searching for pyshp on [https://gis.stackexchange.com](https://gis.stackexchange.com). 
 
 Currently the sample census blockgroup shapefile referenced in the examples is available on the GitHub project site at
 [https://github.com/GeospatialPython/pyshp](https://github.com/GeospatialPython/pyshp). These
@@ -45,13 +45,13 @@ Before doing anything you must import the library.
     >>> import shapefile
 
 The examples below will use a shapefile created from the U.S. Census Bureau
-Blockgroups data set near San Francisco, CA and available in the github
+Blockgroups data set near San Francisco, CA and available in the git
 repository of the pyshp GitHub site.
 
 ## Reading Shapefiles
 
 To read a shapefile create a new "Reader" object and pass it the name of an
-existing shapefile. The shapefile format is acutally a collection of three
+existing shapefile. The shapefile format is actually a collection of three
 files. You specify the base filename of the shapefile or the complete filename
 of any of the shapefile component files.
 
@@ -92,7 +92,7 @@ it.
 ### Reading Geometry
 
 A shapefile's geometry is the collection of points or shapes made from
-verticies and implied arcs representing physical locations. All types of
+vertices and implied arcs representing physical locations. All types of
 shapefiles just store points. The metadata about the points determine how they
 are handled by software.
 
@@ -259,7 +259,7 @@ To read a single record call the record() method with the record's index:
 
 ### Reading Geometry and Records Simultaneously
 
-You way want to examine both the geometry and the attributes for a record at
+You may want to examine both the geometry and the attributes for a record at
 the same time. The shapeRecord() and shapeRecords() method let you do just
 that.
 
@@ -287,7 +287,7 @@ Now let's read the first two points for that same record:
     2
 
 The shapeRecord() method reads a single shape/record pair at the specified index.
-To get the 4th shape record from the blockgroups shapfile use the third index:
+To get the 4th shape record from the blockgroups shapefile use the third index:
 
 
     >>> shapeRec = sf.shapeRecord(3)
@@ -322,7 +322,7 @@ PyShp can write just one of the component files such as the shp or dbf file
 without writing the others. So in addition to being a complete shapefile
 library, it can also be used as a basic dbf (xbase) library. Dbf files are a
 common database format which are often useful as a standalone simple database
-format. And even shp files occasionaly have uses as a standalone format. Some
+format. And even shp files occasionally have uses as a standalone format. Some
 web-based GIS systems use an user-uploaded shp file to specify an area of
 interest. Many precision agriculture chemical field sprayers also use the shp
 format as a control file for the sprayer system (usually in combination with
@@ -375,8 +375,8 @@ must take care to add records and shapes in the same order so that the record
 data lines up with the geometry data. For example:
 
 
-	>>> w.field("field1", "C")
-	>>> w.field("field2", "C")
+    >>> w.field("field1", "C")
+    >>> w.field("field2", "C")
     >>> w.record("row", "one")
     >>> w.record("row", "two")
     >>> w.point(1, 1)
@@ -487,7 +487,7 @@ names.
 
 ### File Names
 
-File extensions are optional when reading or writing shapfiles. If you specify
+File extensions are optional when reading or writing shapefiles. If you specify
 them PyShp ignores them anyway. When you save files you can specify a base
 file name that is used for all three file types. Or you can specify a name for
 one or more file types. In that case, any file types not assigned will not
@@ -529,7 +529,7 @@ and write out a new shapefile with the same or different name.*
 
 Let's add shapes to existing shapefiles:
 
-Add a point to a point shapefile
+Add a point to a point shapefile:
 
 
     >>> e = shapefile.Editor(shapefile="shapefiles/test/point.shp")
@@ -554,14 +554,14 @@ Add a new polygon to a polygon shapefile:
     >>> e.save('shapefiles/test/polygon')
 
 Remove the first point in each shapefile - for a point shapefile that is the
-first shape and record"
+first shape and record":
 
 
     >>> e = shapefile.Editor(shapefile="shapefiles/test/point.shp")
     >>> e.delete(0)
     >>> e.save('shapefiles/test/point')
 
-Remove the last shape in the polygon shapefile.
+Remove the last shape in the polygon shapefile:
 
 
     >>> e = shapefile.Editor(shapefile="shapefiles/test/polygon.shp")
@@ -572,7 +572,7 @@ Remove the last shape in the polygon shapefile.
 
 Because every shape must have a corresponding record it is critical that the
 number of records equals the number of shapes to create a valid shapefile. To
-help prevent accidental misalignment the PSL has an "auto balance" feature to
+help prevent accidental misalignment pyshp has an "auto balance" feature to
 make sure when you add either a shape or a record the two sides of the
 equation line up. This feature is NOT turned on by default. To activate it set
 the attribute autoBalance to 1 (True):
@@ -594,7 +594,7 @@ updates later. If you do not use the balance method and forget to manually
 balance the geometry and attributes the shapefile will be viewed as corrupt by
 most shapefile software.
 
-With auto balanacing you can add either shapes or geometry and update blank
+With auto balancing you can add either shapes or geometry and update blank
 entries on either side as needed. Even if you forget to update an entry the
 shapefile will still be valid and handled correctly by most shapefile
 software.
@@ -603,11 +603,10 @@ software.
 
 The Python \_\_geo_interface\_\_ convention provides a data interchange interface
 among geospatial Python libraries. The interface returns data as GeoJSON which gives you
-nice compatability with other libraries and tools including Shapely, Fiona, and PostGIS. 
-More information on the \_\_geo_interface\_\_ protocol can be found at: [https://gist.g
-ithub.com/sgillies/2217756](https://gist.github.com/sgillies/2217756). More
-information on GeoJSON is available at
-[http://geojson.org](http://geojson.org).
+nice compatibility with other libraries and tools including Shapely, Fiona, and PostGIS. 
+More information on the \_\_geo_interface\_\_ protocol can be found at:
+[https://gist.github.com/sgillies/2217756](https://gist.github.com/sgillies/2217756).
+More information on GeoJSON is available at [http://geojson.org](http://geojson.org).
 
 
     >>> s = sf.shape(0)
