@@ -120,6 +120,7 @@ class _Shape:
         list of shapes."""
         self.shapeType = shapeType
         self.points = []
+        self.parts = []
 
     @property
     def __geo_interface__(self):
@@ -695,9 +696,12 @@ class Writer:
             shapeType = self.shapeType
             if shapeTypes:
                 shapeType = shapeTypes[shapes.index(s)]
-            px, py = list(zip(*s.points))[:2]
-            x.extend(px)
-            y.extend(py)
+            if len(s.points) > 0:
+                px, py = list(zip(*s.points))[:2]
+                x.extend(px)
+                y.extend(py)
+        if len(x) == 0:
+            return [0] * 4
         return [min(x), min(y), max(x), max(y)]
 
     def __zbox(self, shapes, shapeTypes=[]):
@@ -776,7 +780,7 @@ class Writer:
         year -= 1900
         # Remove deletion flag placeholder from fields
         for field in self.fields:
-            if field[0].startswith("Deletion"):
+            if str(field[0]).startswith("Deletion"):
                 self.fields.remove(field)
         numRecs = len(self.records)
         numFields = len(self.fields)
@@ -857,14 +861,14 @@ class Writer:
             # Write m extremes and values
             if s.shapeType in (13,15,18,23,25,28,31):
                 try:
-                    if hasattr(s,"m"):
+                    if hasattr(s,"m") and None not in s.m:
                         f.write(pack("<%sd" % len(s.m), *s.m))
                     else:
                         f.write(pack("<2d", *self.__mbox([s])))
                 except error:
                     raise ShapefileException("Failed to write measure extremes for record %s. Expected floats" % recNum)
                 try:
-                    [f.write(pack("<d", p[3])) for p in s.points]
+                    [f.write(pack("<d", len(p) > 3 and p[3] or 0)) for p in s.points]
                 except error:
                     raise ShapefileException("Failed to write measure values for record %s. Expected floats" % recNum)
             # Write a single point
@@ -945,6 +949,8 @@ class Writer:
                         value = date(*value).strftime("%Y%m%d")
                     elif value in MISSING:
                         value = b('0') * 8 # QGIS NULL for date type
+                    elif isinstance(value, str) and len(value) == 8:
+                        pass # value is already a date string
                     else:
                         raise ShapefileException("Date values must be either a datetime.date object, a list, or a missing value of None or ''.")
                 elif fieldType == 'L':
