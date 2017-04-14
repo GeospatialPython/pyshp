@@ -276,7 +276,7 @@ class Reader:
                 self.dbf = open("%s.dbf" % shapeName, "rb")
             except IOError:
                 pass
-            if not (self.shp or self.dbf):
+            if not (self.shp and self.dbf):
                 raise ShapefileException("Unable to open %s.dbf or %s.shp." % (shapeName, shapeName) )
         if self.shp:
             self.__shpHeader()
