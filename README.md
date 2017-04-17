@@ -349,7 +349,7 @@ the existing shape types are not sequential.
 There are three ways to set the shape type: 
   * Set it when creating the class instance. 
   * Set it by assigning a value to an existing class instance. 
-  * Set it automatically to the type of the first shape by saving the shapefile.
+  * Set it automatically to the type of the first non-null shape by saving the shapefile.
 
 To manually set the shape type for a Writer object when creating the Writer:
 
