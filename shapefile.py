@@ -713,13 +713,14 @@ class Writer:
         return [min(z), max(z)]
 
     def __mbox(self, shapes):
-        m = [0]
+        m = []
         for s in shapes:
             try:
                 for p in s.points:
                     m.append(p[3])
             except IndexError:
                 pass
+        if not m: m.append(0)
         return [min(m), max(m)]
 
     def bbox(self):
