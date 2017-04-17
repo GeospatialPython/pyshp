@@ -671,7 +671,7 @@ class Writer:
                 # z array
                 size += 8 * nPoints
             # Calc m extremes and values
-            if self.shapeType in (23,25,31):
+            if self.shapeType in (15,23,25,31):
                 # m extremes
                 size += 16
                 # m array
@@ -701,7 +701,7 @@ class Writer:
             return [0] * 4
         return [min(x), min(y), max(x), max(y)]
 
-    def __zbox(self, shapes, shapeTypes=[]):
+    def __zbox(self, shapes):
         z = []
         for s in shapes:
             try:
@@ -712,7 +712,7 @@ class Writer:
         if not z: z.append(0)
         return [min(z), max(z)]
 
-    def __mbox(self, shapes, shapeTypes=[]):
+    def __mbox(self, shapes):
         m = [0]
         for s in shapes:
             try:
