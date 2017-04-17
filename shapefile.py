@@ -108,7 +108,7 @@ def signed_area(coords):
     return sum(xs[i]*(ys[i+1]-ys[i-1]) for i in range(1, len(coords)))/2.0
 
 class _Shape:
-    def __init__(self, shapeType=None):
+    def __init__(self, shapeType=NULL):
         """Stores the geometry of the different shape types
         specified in the Shapefile spec. Shape types are
         usually point, polyline, or polygons. Every shape type
@@ -604,7 +604,7 @@ class Reader:
 
 class Writer:
     """Provides write support for ESRI Shapefiles."""
-    def __init__(self, shapeType=None):
+    def __init__(self, shapeType=NULL):
         self._shapes = []
         self.fields = []
         self.records = []
@@ -689,13 +689,10 @@ class Writer:
         size //= 2
         return size
 
-    def __bbox(self, shapes, shapeTypes=[]):
+    def __bbox(self, shapes):
         x = []
         y = []
         for s in shapes:
-            shapeType = self.shapeType
-            if shapeTypes:
-                shapeType = shapeTypes[shapes.index(s)]
             if len(s.points) > 0:
                 px, py = list(zip(*s.points))[:2]
                 x.extend(px)
@@ -814,8 +811,6 @@ class Writer:
             recNum += 1
             start = f.tell()
             # Shape Type
-            if self.shapeType != 31:
-                s.shapeType = self.shapeType
             f.write(pack("<i", s.shapeType))
             # All shape types capable of having a bounding box
             if s.shapeType in (3,5,8,13,15,18,23,25,28,31):
@@ -1065,7 +1060,8 @@ class Writer:
         if not hasattr(target, "write"):
             target = os.path.splitext(target)[0] + '.shp'
         if not self.shapeType:
-            self.shapeType = self._shapes[0].shapeType
+            # autoset file type to first non-null geometry
+            self.shapeType = next((s.shapeType for s in self._shapes if s.shapeType != NULL), NULL)
         self.shp = self.__getFileObj(target)
         self.__shapefileHeader(self.shp, headerType='shp')
         self.__shpRecords()
@@ -1075,7 +1071,8 @@ class Writer:
         if not hasattr(target, "write"):
             target = os.path.splitext(target)[0] + '.shx'
         if not self.shapeType:
-            self.shapeType = self._shapes[0].shapeType
+            # autoset file type to first non-null geometry
+            self.shapeType = next((s.shapeType for s in self._shapes if s.shapeType != NULL), NULL)
         self.shx = self.__getFileObj(target)
         self.__shapefileHeader(self.shx, headerType='shx')
         self.__shxRecords()
