@@ -692,6 +692,8 @@ class Writer:
     def __bbox(self, shapes):
         x = []
         y = []
+        if not shapes:
+            return [0, 0, 0, 0]
         for s in shapes:
             if len(s.points) > 0:
                 px, py = list(zip(*s.points))[:2]
@@ -703,6 +705,8 @@ class Writer:
 
     def __zbox(self, shapes):
         z = []
+        if not shapes:
+            return [0, 0]
         for s in shapes:
             try:
                 for p in s.points:
@@ -714,6 +718,8 @@ class Writer:
 
     def __mbox(self, shapes):
         m = [0]
+        if not shapes:
+            return [0, 0]
         for s in shapes:
             try:
                 for p in s.points:
