@@ -604,7 +604,7 @@ class Reader:
 
 class Writer:
     """Provides write support for ESRI Shapefiles."""
-    def __init__(self, shapeType=NULL):
+    def __init__(self, shapeType=None):
         self._shapes = []
         self.fields = []
         self.records = []
@@ -1059,7 +1059,7 @@ class Writer:
         """Save an shp file."""
         if not hasattr(target, "write"):
             target = os.path.splitext(target)[0] + '.shp'
-        if not self.shapeType:
+        if self.shapeType is None:
             # autoset file type to first non-null geometry
             self.shapeType = next((s.shapeType for s in self._shapes if s.shapeType != NULL), NULL)
         self.shp = self.__getFileObj(target)
@@ -1070,7 +1070,7 @@ class Writer:
         """Save an shx file."""
         if not hasattr(target, "write"):
             target = os.path.splitext(target)[0] + '.shx'
-        if not self.shapeType:
+        if self.shapeType is None:
             # autoset file type to first non-null geometry
             self.shapeType = next((s.shapeType for s in self._shapes if s.shapeType != NULL), NULL)
         self.shx = self.__getFileObj(target)
