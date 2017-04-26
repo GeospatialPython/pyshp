@@ -450,8 +450,8 @@ class Reader:
             if not self.dbf:
                 raise ShapefileException("Shapefile Reader requires a shapefile or file-like object. (no dbf file found)")
             dbf = self.dbf
-            (self.numRecords, self.__dbfHdrLength) = \
-                    unpack("<xxxxLH22x", dbf.read(32))
+            self.numRecords, self.__dbfHdrLength, self.__recordLength = \
+                    unpack("<xxxxLHH20x", dbf.read(32))
         return self.__dbfHdrLength
 
     def __dbfHeader(self):
@@ -487,6 +487,11 @@ class Reader:
             self.__dbfHeader()
         fmt = ''.join(['%ds' % fieldinfo[2] for fieldinfo in self.fields])
         fmtSize = calcsize(fmt)
+        # total size of fields should add up to recordlength from the header
+        while fmtSize < self.__recordLength:
+            # if not, pad byte until reaches recordlength
+            fmt += "x" 
+            fmtSize += 1
         return (fmt, fmtSize)
 
     def __record(self):
