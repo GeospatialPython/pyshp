@@ -444,23 +444,16 @@ class Reader:
         while shp.tell() < self.shpLength:
             yield self.__shape()    
 
-    def __dbfHeaderLength(self):
-        """Retrieves the header length of a dbf file header."""
-        if not self.__dbfHdrLength:
-            if not self.dbf:
-                raise ShapefileException("Shapefile Reader requires a shapefile or file-like object. (no dbf file found)")
-            dbf = self.dbf
-            self.numRecords, self.__dbfHdrLength, self.__recordLength = \
-                    unpack("<xxxxLHH20x", dbf.read(32))
-        return self.__dbfHdrLength
-
     def __dbfHeader(self):
         """Reads a dbf header. Xbase-related code borrows heavily from ActiveState Python Cookbook Recipe 362715 by Raymond Hettinger"""
         if not self.dbf:
             raise ShapefileException("Shapefile Reader requires a shapefile or file-like object. (no dbf file found)")
         dbf = self.dbf
-        headerLength = self.__dbfHeaderLength()
-        numFields = (headerLength - 33) // 32
+        # read relevant header parts
+        self.numRecords, self.__dbfHdrLength, self.__recordLength = \
+                unpack("<xxxxLHH20x", dbf.read(32))
+        # read fields
+        numFields = (self.__dbfHdrLength - 33) // 32
         for field in range(numFields):
             fieldDesc = list(unpack("<11sc4xBB14x", dbf.read(32)))
             name = 0
@@ -559,7 +552,7 @@ class Reader:
         i = self.__restrictIndex(i)
         recSize = self.__recStruct.size
         f.seek(0)
-        f.seek(self.__dbfHeaderLength() + (i * recSize))
+        f.seek(self.__dbfHdrLength + (i * recSize))
         return self.__record()
 
     def records(self):
@@ -568,7 +561,7 @@ class Reader:
             self.__dbfHeader()
         records = []
         f = self.__getFileObj(self.dbf)
-        f.seek(self.__dbfHeaderLength())
+        f.seek(self.__dbfHdrLength)
         for i in range(self.numRecords):
             r = self.__record()
             if r:
@@ -581,7 +574,7 @@ class Reader:
         if self.numRecords is None:
             self.__dbfHeader()
         f = self.__getFileObj(self.dbf)
-        f.seek(self.__dbfHeaderLength())
+        f.seek(self.__dbfHdrLength)
         for i in xrange(self.numRecords):
             r = self.__record()
             if r:
