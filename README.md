@@ -404,7 +404,7 @@ data lines up with the geometry data. For example:
 
 Geometry is added using one of three methods: "null", "point", or "poly". The
 "null" method is used for null shapes, "point" is used for point shapes, "line" for lines, and
-"poly" is used for everything else.
+"poly" is used for polygons and everything else.
 
 **Adding a Point shape**
 
@@ -486,7 +486,7 @@ shape record.
 There are several different field types, all of which support storing None values as NULL. 
 
 Text fields are created using the 'C' type, and the third 'size' argument can be customized to the expected
-length of text values:
+length of text values to save space:
 
 
     >>> w = shapefile.Writer()
@@ -500,7 +500,9 @@ length of text values:
 	>>> r = shapefile.Reader('shapefiles/test/dtype')
 	>>> assert r.record(0) == ['Hello', 'World', 'World'*50]
 
-Date fields are created using the 'D' type. Field length or decimal have no impact on this type:
+Date fields are created using the 'D' type, and can be created using either 
+date objects, lists, or a YYYYMMDD formatted string. 
+Field length or decimal have no impact on this type:
 
 
 	>>> from datetime import date
@@ -509,15 +511,18 @@ Date fields are created using the 'D' type. Field length or decimal have no impa
 	>>> w.null()
 	>>> w.null()
 	>>> w.null()
+	>>> w.null()
     >>> w.record(date(1998,1,30))
 	>>> w.record([1998,1,30])
+	>>> w.record('19980130')
 	>>> w.record(None)
     >>> w.save('shapefiles/test/dtype')
 	
 	>>> r = shapefile.Reader('shapefiles/test/dtype')
 	>>> assert r.record(0) == [date(1998,1,30)]
 	>>> assert r.record(1) == [date(1998,1,30)]
-	>>> assert r.record(2) == [None]
+	>>> assert r.record(2) == [date(1998,1,30)]
+	>>> assert r.record(3) == [None]
 
 Numeric fields are created using the 'N' type (or the 'F' type, which is exactly the same). 
 By default the fourth decimal argument is set to zero, essentially creating an integer field. 
@@ -528,19 +533,23 @@ To store very large numbers you must increase the field length size to the total
 
     >>> w = shapefile.Writer()
 	>>> w.field('INT', 'N')
-    >>> w.field('DECIMAL', 'N', decimal=10)
+    >>> w.field('LOWPREC', 'N', decimal=2)
+	>>> w.field('MEDPREC', 'N', decimal=10)
+	>>> w.field('HIGHPREC', 'N', decimal=30)
 	>>> w.field('FTYPE', 'F', decimal=10)
 	>>> w.field('LARGENR', 'N', 101)
 	>>> nr = 1.3217328
 	>>> w.null()
 	>>> w.null()
-    >>> w.record(INT=int(nr), DECIMAL=nr, FTYPE=nr, LARGENR=int(nr)*10**100)
-	>>> w.record(None, None, None, None)
+    >>> w.record(INT=int(nr), LOWPREC=nr, MEDPREC=nr, HIGHPREC=-3.2302e-25, FTYPE=nr, LARGENR=int(nr)*10**100)
+	>>> w.record(None, None, None, None, None, None)
     >>> w.save('shapefiles/test/dtype')
 	
 	>>> r = shapefile.Reader('shapefiles/test/dtype')
-	>>> assert r.record(0) == [int(nr), nr, nr, 10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000L]
-	>>> assert r.record(1) == [None, None, None, None]
+	>>> r.record(0)
+	[1, 1.32, 1.3217328, -3.2302e-25, 1.3217328, 10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000L]
+	>>> r.record(1)
+	[None, None, None, None, None, None]
 
 	
 Finally, we can create boolean fields by setting the type to 'L'. 
