@@ -1,6 +1,24 @@
 ## Contents
 
-[TOC]
+[Overview](#overview)
+
+[Examples](#examples)
+- [Reading Shapefiles](#reading-shapefiles)
+  - [Reading Shapefiles from File-Like Objects](#reading-shapefiles-from-file-like-objects)
+  - [Reading Geometry](#reading-geometry)
+  - [Reading Records](#reading-records)
+  - [Reading Geometry and Records Simultaneously](#reading-geometry-and-records-simultaneously)
+- [Writing Shapefiles](#writing-shapefiles)
+  - [Setting the Shape Type](#setting-the-shape-type)
+  - [Geometry and Record Balancing](#geometry-and-record-balancing)
+  - [Adding Geometry](#adding-geometry)
+  - [Creating Attributes](#creating-attributes)
+  - [File Names](#file-names)
+  - [Saving to File-Like Objects](#saving-to-file-like-objects)
+- [Editing Shapefiles](#editing-shapefiles)
+  - [Geometry and Record Balancing](#geometry-and-record-balancing)
+- [Python \_\_geo_interface\_\_](#python-\_\_geo\_interface\_\_)
+- [Testing](#testing)
 
 # Overview
 
