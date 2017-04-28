@@ -967,9 +967,9 @@ class Writer:
         """Creates a null shape."""
         self._shapes.append(_Shape(NULL))
 
-    def point(self, x, y, z=0, m=0):
+    def point(self, x, y, z=0, m=0, shapeType=POINT):
         """Creates a point shape."""
-        pointShape = _Shape(self.shapeType)
+        pointShape = _Shape(shapeType)
         pointShape.points.append([x, y, z, m])
         self._shapes.append(pointShape)
 
@@ -1060,7 +1060,7 @@ class Writer:
             target = os.path.splitext(target)[0] + '.shp'
         if self.shapeType is None:
             # autoset file type to first non-null geometry
-            self.shapeType = next((s.shapeType for s in self._shapes if s.shapeType != NULL), NULL)
+            self.shapeType = next((s.shapeType for s in self._shapes if s.shapeType), NULL)
         self.shp = self.__getFileObj(target)
         self.__shapefileHeader(self.shp, headerType='shp')
         self.__shpRecords()
