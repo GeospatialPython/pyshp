@@ -385,7 +385,7 @@ data lines up with the geometry data. For example:
 ### Adding Geometry
 
 Geometry is added using one of three methods: "null", "point", or "poly". The
-"null" method is used for null shapes, "point" is used for point shapes, and
+"null" method is used for null shapes, "point" is used for point shapes, "line" for lines, and
 "poly" is used for everything else.
 
 **Adding a Point shape**
@@ -394,8 +394,8 @@ Point shapes are added using the "point" method. A point is specified by an x,
 y, and optional z (elevation) and m (measure) value.
 
 
-    >>> w = shapefile.Writer()
-
+    >>> w = shapefile.Writer(shapefile.POINTM)
+	
     >>> w.point(122, 37) # No elevation or measure values
 
     >>> w.shapes()[0].points
@@ -405,21 +405,45 @@ y, and optional z (elevation) and m (measure) value.
 
     >>> w.shapes()[1].points
     [[118, 36, 4, 8]]
+	
+	>>> w.field('FIRST_FLD', 'C')
+	>>> w.field('SECOND_FLD', 'C')
+	
+	>>> w.save('shapefiles/test/point')
 
-**Adding a Poly shape**
+**Adding a Polygon shape**
 
-"Poly" shapes can be either polygons or lines. Shapefile polygons must have at
+Shapefile polygons must have at
 least 4 points and the last point must be the same as the first. PyShp
-automatically enforces closed polygons. A line must have at least two points.
-Because of the similarities between these two shape types they are created
-using a single method called "poly".
+automatically enforces closed polygons. 
 
 
     >>> w = shapefile.Writer()
 
-    >>> w.poly(shapeType=3, parts=[[[122,37,4,9], [117,36,3,4]], [[115,32,8,8],
+    >>> w.poly(parts=[[[122,37,4,9], [117,36,3,4]], [[115,32,8,8],
     ... [118,20,6,4], [113,24]]])
 
+	>>> w.field('FIRST_FLD', 'C')
+	>>> w.field('SECOND_FLD', 'C')
+	
+	>>> w.save('shapefiles/test/polygon')
+
+**Adding a Line shape**
+
+A line must have at least two points.
+Because of the similarities between polygon and line types it is possible to create
+a line shape using either the "line" or "poly" method.
+	
+	>>> w = shapefile.Writer()
+	
+    >>> w.line(parts=[[[1,5],[5,5],[5,1],[3,3],[1,1]]])
+    >>> w.poly(parts=[[[1,3],[5,3]]], shapeType=shapefile.POLYLINE)
+	
+	>>> w.field('FIRST_FLD', 'C')
+	>>> w.field('SECOND_FLD', 'C')
+	
+	>>> w.save('shapefiles/test/polygon')
+	
 **Adding a Null shape**
 
 Because Null shape types (shape type 0) have no geometry the "null" method is
@@ -439,51 +463,105 @@ The writer object's shapes list will now have one null shape:
 
 Creating attributes involves two steps. Step 1 is to create fields to contain
 attribute values and step 2 is to populate the fields with values for each
-shape record.
+shape record. 
 
-The following attempts to create a complete shapefile.  The attribute and
-field names are not very creative:
+There are several different field types, all of which support storing None values as NULL. 
 
-
-    >>> w = shapefile.Writer(shapefile.POINT)
-    >>> w.point(1,1)
-    >>> w.point(3,1)
-    >>> w.point(4,3)
-    >>> w.point(2,2)
-    >>> w.field('FIRST_FLD')
-    >>> w.field('SECOND_FLD','C','40')
-    >>> w.record('First','Point')
-    >>> w.record('Second','Point')
-    >>> w.record('Third','Point')
-    >>> w.record('Fourth','Point')
-    >>> w.save('shapefiles/test/point')
-
-    >>> w = shapefile.Writer(shapefile.POLYGON)
-    >>> w.poly(parts=[[[1,5],[5,5],[5,1],[3,3],[1,1]]])
-    >>> w.field('FIRST_FLD','C','40')
-    >>> w.field('SECOND_FLD','C','40')
-    >>> w.record('First','Polygon')
-    >>> w.save('shapefiles/test/polygon')
-
-    >>> w = shapefile.Writer(shapefile.POLYLINE)
-    >>> w.line(parts=[[[1,5],[5,5],[5,1],[3,3],[1,1]]])
-    >>> w.poly(parts=[[[1,3],[5,3]]], shapeType=shapefile.POLYLINE)
-    >>> w.field('FIRST_FLD','C','40')
-    >>> w.field('SECOND_FLD','C','40')
-    >>> w.record('First','Line')
-    >>> w.record('Second','Line')
-    >>> w.save('shapefiles/test/line')
-
-You can also add attributes using keyword arguments where the keys are field
-names.
+Text fields are created using the 'C' type, and the third 'size' argument can be customized to the expected
+length of text values:
 
 
-    >>> w = shapefile.Writer(shapefile.POLYLINE)
-    >>> w.line(parts=[[[1,5],[5,5],[5,1],[3,3],[1,1]]])
-    >>> w.field('FIRST_FLD','C','40')
-    >>> w.field('SECOND_FLD','C','40')
-    >>> w.record(FIRST_FLD='First', SECOND_FLD='Line')
-    >>> w.save('shapefiles/test/line')
+    >>> w = shapefile.Writer()
+    >>> w.field('TEXT', 'C')
+	>>> w.field('SHORT_TEXT', 'C', size=5)
+	>>> w.field('LONG_TEXT', 'C', size=250)
+	>>> w.null()
+    >>> w.record('Hello', 'World', 'World'*50)
+    >>> w.save('shapefiles/test/dtype')
+	
+	>>> r = shapefile.Reader('shapefiles/test/dtype')
+	>>> assert r.record(0) == ['Hello', 'World', 'World'*50]
+
+Date fields are created using the 'D' type. Field length or decimal have no impact on this type:
+
+
+	>>> from datetime import date
+    >>> w = shapefile.Writer()
+    >>> w.field('DATE', 'D')
+	>>> w.null()
+	>>> w.null()
+	>>> w.null()
+    >>> w.record(date(1998,1,30))
+	>>> w.record([1998,1,30])
+	>>> w.record(None)
+    >>> w.save('shapefiles/test/dtype')
+	
+	>>> r = shapefile.Reader('shapefiles/test/dtype')
+	>>> assert r.record(0) == [date(1998,1,30)]
+	>>> assert r.record(1) == [date(1998,1,30)]
+	>>> assert r.record(2) == [None]
+
+Numeric fields are created using the 'N' type (or the 'F' type, which is exactly the same). 
+By default the fourth decimal argument is set to zero, essentially creating an integer field. 
+To store floats you must set the decimal argument to the precision of your choice. 
+To store very large numbers you must increase the field length size to the total number of digits 
+(including comma and minus). 
+
+
+    >>> w = shapefile.Writer()
+	>>> w.field('INT', 'N')
+    >>> w.field('DECIMAL', 'N', decimal=10)
+	>>> w.field('FTYPE', 'F', decimal=10)
+	>>> w.field('LARGENR', 'N', 101)
+	>>> nr = 1.3217328
+	>>> w.null()
+	>>> w.null()
+    >>> w.record(INT=int(nr), DECIMAL=nr, FTYPE=nr, LARGENR=int(nr)*10**100)
+	>>> w.record(None, None, None, None)
+    >>> w.save('shapefiles/test/dtype')
+	
+	>>> r = shapefile.Reader('shapefiles/test/dtype')
+	>>> assert r.record(0) == [int(nr), nr, nr, 10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000L]
+	>>> assert r.record(1) == [None, None, None, None]
+
+	
+Finally, we can create boolean fields by setting the type to 'L'. 
+This field can take True or False values, or any string whose first character is one of YyTt (True) or NnFf (False). 
+None is interpreted as missing. 
+
+
+    >>> w = shapefile.Writer()
+	>>> w.field('BOOLEAN', 'L')
+	>>> w.null()
+	>>> w.null()
+	>>> w.null()
+	>>> w.null()
+	>>> w.null()
+    >>> w.record(True)
+	>>> w.record("Yes")
+	>>> w.record(False)
+	>>> w.record("No")
+	>>> w.record(None)
+    >>> w.save('shapefiles/test/dtype')
+	
+	>>> r = shapefile.Reader('shapefiles/test/dtype')
+	>>> assert r.record(0) == [True]
+	>>> assert r.record(1) == [True]
+	>>> assert r.record(2) == [False]
+	>>> assert r.record(3) == [False]
+	>>> assert r.record(4) == [None]
+	
+	
+You can also add attributes using keyword arguments where the keys are field names.
+
+	>>> w = shapefile.Writer()
+	>>> w.field('FIRST_FLD','C','40')
+	>>> w.field('SECOND_FLD','C','40')
+	>>> w.record('First', 'Line')
+	>>> w.record(FIRST_FLD='First', SECOND_FLD='Line')
+	>>> assert w.records[0] == w.records[1]
+	
+	
 
 ### File Names
 
