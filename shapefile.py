@@ -926,15 +926,17 @@ class Writer:
         for record in self.records:
             if not self.fields[0][0].startswith("Deletion"):
                 f.write(b(' ')) # deletion flag
-            for (fieldName, fieldType, size, dec), value in zip(self.fields, record):
+            for (fieldName, fieldType, size, deci), value in zip(self.fields, record):
                 fieldType = fieldType.upper()
                 size = int(size)
                 if fieldType in ("N","F"):
                     # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
                     if value in MISSING:
                         value = str("*"*size) # QGIS NULL
+                    elif not deci:
+                        value = format(value, "d")[:size].rjust(size) # caps the size if exceeds the field size
                     else:
-                        value = str(value).rjust(size)
+                        value = format(value, ".%sf"%deci)[:size].rjust(size) # caps the size if exceeds the field size
                 elif fieldType == "D":
                     # date: 8 bytes - date stored as a string in the format YYYYMMDD.
                     if isinstance(value, date):
@@ -946,7 +948,7 @@ class Writer:
                     elif isinstance(value, str) and len(value) == 8:
                         pass # value is already a date string
                     else:
-                        raise ShapefileException("Date values must be either a datetime.date object, a list, or a missing value of None or ''.")
+                        raise ShapefileException("Date values must be either a datetime.date object, a list, a YYYYMMDD string, or a missing value.")
                 elif fieldType == 'L':
                     # logical: 1 byte - initialized to 0x20 (space) otherwise T or F.
                     if value in MISSING:
