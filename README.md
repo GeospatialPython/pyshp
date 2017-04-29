@@ -1,3 +1,9 @@
+# PyShp
+
+This library reads and writes ESRI Shapefiles in pure Python.
+
+[![Build Status](https://travis-ci.org/GeospatialPython/pyshp.svg?branch=master)](https://travis-ci.org/GeospatialPython/pyshp)
+
 ## Contents
 
 [Overview](#overview)

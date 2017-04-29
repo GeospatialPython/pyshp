@@ -1245,8 +1245,12 @@ class Editor(Writer):
 def test(**kwargs):
     import doctest
     doctest.NORMALIZE_WHITESPACE = 1
-    verbosity = kwargs.get('verbose', 1)
+    verbosity = kwargs.get('verbose', 0)
+    if verbosity == 0:
+        print('Running doctests...')
     failure_count, test_count = doctest.testfile("README.md", verbose=verbosity)
+    if verbosity == 0 and failure_count == 0:
+        print('All test passed successfully')
     return failure_count
     
 if __name__ == "__main__":
