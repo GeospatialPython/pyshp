@@ -16,6 +16,7 @@ import time
 import array
 import tempfile
 import itertools
+import io
 from datetime import date
 
 #
@@ -219,6 +220,12 @@ class Reader:
     within each file is only accessed when required and as
     efficiently as possible. Shapefiles are usually not large
     but they can be.
+
+    If initializing the reader with a file-like object which
+    does not support seek(), you must set allow_copy=True
+    to allow the Reader to copy the entire file in memory.
+    This is set to False by default in order to avoid
+    large files being copyied into memory without user intention.
     """
     def __init__(self, *args, **kwargs):
         self.shp = None
@@ -230,6 +237,12 @@ class Reader:
         self.numRecords = None
         self.fields = []
         self.__dbfHdrLength = 0
+        # Allow in-memory copy (only if required)
+        # Even if allowed, this will only happen
+        #  for files that do not support seek.
+        # False by default to avoid consuming huge amounts
+        # of memory
+        allow_copy = "allow_copy" in kwargs and kwargs["allow_copy"]
         # See if a shapefile name was passed as an argument
         if len(args) > 0:
             if is_string(args[0]):
@@ -238,22 +251,46 @@ class Reader:
         if "shp" in kwargs.keys():
             if hasattr(kwargs["shp"], "read"):
                 self.shp = kwargs["shp"]
-                if hasattr(self.shp, "seek"):
+                # Copy if required
+                try:
                     self.shp.seek(0)
+                except (NameError, io.UnsupportedOperation):
+                    if allow_copy:
+                        self.shp = io.BytesIO(self.shp.read())
+                    else:
+                        raise ValueError("shp argument does not "\
+                            "support seek, consider allow_copy=True")
             if "shx" in kwargs.keys():
                 if hasattr(kwargs["shx"], "read"):
                     self.shx = kwargs["shx"]
-                    if hasattr(self.shx, "seek"):
+                    # Copy if required
+                    try:
                         self.shx.seek(0)
+                    except (NameError, io.UnsupportedOperation):
+                        if allow_copy:
+                            self.shx = io.BytesIO(self.shx.read())
+                        else:
+                            raise ValueError("shx argument does not "\
+                                "support seek, consider allow_copy=True")
         if "dbf" in kwargs.keys():
             if hasattr(kwargs["dbf"], "read"):
                 self.dbf = kwargs["dbf"]
-                if hasattr(self.dbf, "seek"):
+                # Copy if required
+                try:
                     self.dbf.seek(0)
+                except (NameError, io.UnsupportedOperation):
+                    if allow_copy:
+                        self.dbf = io.BytesIO(self.dbf.read())
+                    else:
+                        raise ValueError("dbf argument does not "\
+                            "support seek, consider allow_copy=True")
         if self.shp or self.dbf:        
             self.load()
         else:
             raise ShapefileException("Shapefile Reader requires a shapefile or file-like object.")
+
+
+
 
     def load(self, shapefile=None):
         """Opens a shapefile from a filename or file-like
