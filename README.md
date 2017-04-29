@@ -452,6 +452,7 @@ A line must have at least two points.
 Because of the similarities between polygon and line types it is possible to create
 a line shape using either the "line" or "poly" method.
 	
+	
 	>>> w = shapefile.Writer()
 	
     >>> w.line(parts=[[[1,5],[5,5],[5,1],[3,3],[1,1]]])
@@ -546,14 +547,12 @@ To store very large numbers you must increase the field length size to the total
     >>> w.save('shapefiles/test/dtype')
 	
 	>>> r = shapefile.Reader('shapefiles/test/dtype')
-	>>> r.record(0)
-	[1, 1.32, 1.3217328, -3.2302e-25, 1.3217328, 10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000L]
-	>>> r.record(1)
-	[None, None, None, None, None, None]
+	>>> assert r.record(0) == [1, 1.32, 1.3217328, -3.2302e-25, 1.3217328, 10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000]
+	>>> assert r.record(1) == [None, None, None, None, None, None]
 
 	
 Finally, we can create boolean fields by setting the type to 'L'. 
-This field can take True or False values, or any string whose first character is one of YyTt (True) or NnFf (False). 
+This field can take True or False values, or 1 (True) or 0 (False). 
 None is interpreted as missing. 
 
 
@@ -565,21 +564,29 @@ None is interpreted as missing.
 	>>> w.null()
 	>>> w.null()
     >>> w.record(True)
-	>>> w.record("Yes")
+	>>> w.record(1)
 	>>> w.record(False)
-	>>> w.record("No")
+	>>> w.record(0)
 	>>> w.record(None)
+	>>> w.record("Nonesense")
     >>> w.save('shapefiles/test/dtype')
 	
 	>>> r = shapefile.Reader('shapefiles/test/dtype')
-	>>> assert r.record(0) == [True]
-	>>> assert r.record(1) == [True]
-	>>> assert r.record(2) == [False]
-	>>> assert r.record(3) == [False]
-	>>> assert r.record(4) == [None]
-	
+	>>> r.record(0)
+	[True]
+	>>> r.record(1)
+	[True]
+	>>> r.record(2)
+	[False]
+	>>> r.record(3)
+	[False]
+	>>> r.record(4)
+	[None]
+	>>> r.record(5)
+	[None]
 	
 You can also add attributes using keyword arguments where the keys are field names.
+
 
 	>>> w = shapefile.Writer()
 	>>> w.field('FIRST_FLD','C','40')
