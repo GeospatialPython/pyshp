@@ -1,3 +1,15 @@
+VERSION 1.2.11
+
+2017-04-29 Karim Bahgat <karim.bahgat.norway@gmail.com>
+	* Fixed bugs when reading and writing empty shapefiles. 
+	* Fixed bug when writing null geometry.
+	* Fixed misc data type errors.
+	* Fixed error when reading files with wrong record length.
+	* Use max field precision when saving decimal numbers. 
+	* Improved shapetype detection. 
+	* Expanded docs on data types. 
+	* General doc additions and travis icon. 
+
 VERSION 1.2.10
 
 2016-09-24 Karim Bahgat <karim.bahgat.norway@gmail.com>
