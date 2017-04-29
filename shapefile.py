@@ -516,7 +516,7 @@ class Reader:
                     except ValueError:
                         #not parseable as int, set to None
                         value = None
-            elif typ == b('D'):
+            elif typ == 'D':
                 # date: 8 bytes - date stored as a string in the format YYYYMMDD.
                 if value.count(b('0')) == len(value):  # QGIS NULL is all '0' chars
                     value = None
@@ -526,9 +526,9 @@ class Reader:
                         value = date(y, m, d)
                     except:
                         value = value.strip()
-            elif typ == b('L'):
+            elif typ == 'L':
                 # logical: 1 byte - initialized to 0x20 (space) otherwise T or F.
-                if value == " ":
+                if value == b(" "):
                     value = None # space means missing or not yet set
                 else:
                     if value in b('YyTt1'):
@@ -536,7 +536,7 @@ class Reader:
                     elif value in b('NnFf0'):
                         value = False
                     else:
-                        value = b('?')
+                        value = None # unknown value is set to missing
             else:
                 # anything else is forced to string/unicode
                 value = u(value)
@@ -952,9 +952,13 @@ class Writer:
                 elif fieldType == 'L':
                     # logical: 1 byte - initialized to 0x20 (space) otherwise T or F.
                     if value in MISSING:
-                        value = str(' ') # missing is set to space
+                        value = b(' ') # missing is set to space
+                    elif value in [True,1]:
+                        value = b("T")
+                    elif value in [False,0]:
+                        value = b("F")
                     else:
-                        value = str(value)[0].upper()
+                        value = b(' ') # unknown is set to space
                 else:
                     # anything else is forced to string
                     value = str(value)[:size].ljust(size)
@@ -1116,6 +1120,7 @@ class Writer:
             self.dbf.close()
             if generated:
                 return target
+            
 class Editor(Writer):
     def __init__(self, shapefile=None, shapeType=POINT, autoBalance=1):
         self.autoBalance = autoBalance
