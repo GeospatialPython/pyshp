@@ -105,8 +105,8 @@ def signed_area(coords):
     ys.append(ys[1])
     return sum(xs[i]*(ys[i+1]-ys[i-1]) for i in range(1, len(coords)))/2.0
 
-class _Shape:
-    def __init__(self, shapeType=NULL):
+class Shape:
+    def __init__(self, shapeType=NULL, points=None, parts=None, partTypes=None):
         """Stores the geometry of the different shape types
         specified in the Shapefile spec. Shape types are
         usually point, polyline, or polygons. Every shape type
@@ -115,10 +115,14 @@ class _Shape:
         multiple shapes containing points within a single
         geometry record then those shapes are called parts. Parts
         are designated by their starting index in geometry record's
-        list of shapes."""
+        list of shapes. For MultiPatch geometry, partTypes designates
+        the patch type of each of the parts. 
+        """
         self.shapeType = shapeType
-        self.points = []
-        self.parts = []
+        self.points = points or []
+        self.parts = parts or []
+        if partTypes:
+            self.partTypes = partTypes
 
     @property
     def __geo_interface__(self):
@@ -192,7 +196,7 @@ class _Shape:
                     'coordinates': polys
                     }
 
-class _ShapeRecord:
+class ShapeRecord:
     """A shape object of any type."""
     def __init__(self, shape=None, record=None):
         self.shape = shape
@@ -323,7 +327,7 @@ class Reader:
     def __shape(self):
         """Returns the header info and geometry for a single shape."""
         f = self.__getFileObj(self.shp)
-        record = _Shape()
+        record = Shape()
         nParts = nPoints = zmin = zmax = mmin = mmax = None
         (recNum, recLength) = unpack(">2i", f.read(8))
         # Determine the start of the next record
@@ -582,20 +586,20 @@ class Reader:
         """Returns a combination geometry and attribute record for the
         supplied record index."""
         i = self.__restrictIndex(i)
-        return _ShapeRecord(shape=self.shape(i), record=self.record(i))
+        return ShapeRecord(shape=self.shape(i), record=self.record(i))
 
     def shapeRecords(self):
         """Returns a list of combination geometry/attribute records for
         all records in a shapefile."""
         shapeRecords = []
-        return [_ShapeRecord(shape=rec[0], record=rec[1]) \
+        return [ShapeRecord(shape=rec[0], record=rec[1]) \
                                 for rec in zip(self.shapes(), self.records())]
 
     def iterShapeRecords(self):
         """Returns a generator of combination geometry/attribute records for
         all records in a shapefile."""
         for shape, record in izip(self.iterShapes(), self.iterRecords()):
-            yield _ShapeRecord(shape=shape, record=record)
+            yield ShapeRecord(shape=shape, record=record)
 
 
 class Writer:
@@ -962,11 +966,11 @@ class Writer:
 
     def null(self):
         """Creates a null shape."""
-        self.shape(_Shape(NULL))
+        self.shape(Shape(NULL))
 
     def point(self, x, y, z=0, m=0, shapeType=POINT):
         """Creates a point shape."""
-        pointShape = _Shape(shapeType)
+        pointShape = Shape(shapeType)
         if shapeType == POINT:
             pointShape.points.append([x, y])
         elif shapeType == POINTZ:
@@ -987,7 +991,7 @@ class Writer:
         is specified it defaults to 'polygon'. If no part types are specified
         (which they normally won't be) then all parts default to the shape type.
         """
-        polyShape = _Shape(shapeType)
+        polyShape = Shape(shapeType)
         polyShape.parts = []
         polyShape.points = []
         # Make sure polygons are closed

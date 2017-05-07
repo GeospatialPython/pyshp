@@ -408,8 +408,8 @@ data lines up with the geometry data. For example:
 
 ### Adding Geometry
 
-Geometry is added using one of three methods: "null", "point", or "poly". The
-"null" method is used for null shapes, "point" is used for point shapes, "line" for lines, and
+Geometry is added using one of several convenience methods. The "null" method is used
+for null shapes, "point" is used for point shapes, "line" for lines, and
 "poly" is used for polygons and everything else.
 
 **Adding a Point shape**
@@ -442,6 +442,7 @@ automatically enforces closed polygons.
 
 	>>> w.field('FIRST_FLD', 'C')
 	>>> w.field('SECOND_FLD', 'C')
+	>>> w.record('first', 'second')
 	
 	>>> w.save('shapefiles/test/polygon')
 
@@ -460,7 +461,7 @@ a line shape using either the "line" or "poly" method.
 	>>> w.field('FIRST_FLD', 'C')
 	>>> w.field('SECOND_FLD', 'C')
 	
-	>>> w.save('shapefiles/test/polygon')
+	>>> w.save('shapefiles/test/line')
 	
 **Adding a Null shape**
 
@@ -471,6 +472,25 @@ called without any arguments.  This type of shapefile is rarely used but it is v
 	>>> w = shapefile.Writer()
 
 	>>> w.null()
+
+	>>> w.save('shapefiles/test/null')
+
+**Adding from an existing Shape object**
+
+Finally, geometry can be added by passing an existing "Shape" object to the "shape" method.
+This can be particularly useful for copying from one file to another:
+
+
+	>>> r = shapefile.Reader('shapefiles/test/polygon')
+
+	>>> w = shapefile.Writer()
+	>>> w.fields = r.fields[1:] # skip first deletion field
+
+	>>> for shaperec in r.iterShapeRecords():
+	...     w.record(*shaperec.record)
+	...     w.shape(shaperec.shape)
+
+	>>> w.save('shapefiles/test/copy')
 
 
 ### Creating Attributes
