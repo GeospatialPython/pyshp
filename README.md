@@ -420,11 +420,10 @@ is PointZ or PointM.
 
 
 	>>> w = shapefile.Writer()
+	>>> w.field('name', 'C')
 	
 	>>> w.point(122, 37) 
-	
-	>>> w.field('FIRST_FLD', 'C')
-	>>> w.field('SECOND_FLD', 'C')
+	>>> w.record('point1')
 	
 	>>> w.save('shapefiles/test/point')
 
@@ -436,13 +435,11 @@ automatically enforces closed polygons.
 
 
 	>>> w = shapefile.Writer()
+	>>> w.field('name', 'C')
 
 	>>> w.poly(parts=[[[122,37,4,9], [117,36,3,4]], [[115,32,8,8],
 	... [118,20,6,4], [113,24]]])
-
-	>>> w.field('FIRST_FLD', 'C')
-	>>> w.field('SECOND_FLD', 'C')
-	>>> w.record('first', 'second')
+	>>> w.record('polygon1')
 	
 	>>> w.save('shapefiles/test/polygon')
 
@@ -454,12 +451,13 @@ a line shape using either the "line" or "poly" method.
 	
 	
 	>>> w = shapefile.Writer()
+	>>> w.field('name', 'C')
 	
 	>>> w.line(parts=[[[1,5],[5,5],[5,1],[3,3],[1,1]]])
 	>>> w.poly(parts=[[[1,3],[5,3]]], shapeType=shapefile.POLYLINE)
 	
-	>>> w.field('FIRST_FLD', 'C')
-	>>> w.field('SECOND_FLD', 'C')
+	>>> w.record('line1')
+	>>> w.record('line2')
 	
 	>>> w.save('shapefiles/test/line')
 	
@@ -470,8 +468,10 @@ called without any arguments.  This type of shapefile is rarely used but it is v
 
 
 	>>> w = shapefile.Writer()
+	>>> w.field('name', 'C')
 
 	>>> w.null()
+	>>> w.record('nullgeom')
 
 	>>> w.save('shapefiles/test/null')
 
