@@ -612,9 +612,9 @@ class Writer:
         self.dbf = None
         # Create temporary files for immediate writing, minus the header
         self.bufsize = bufsize or 1056*1000*100 # default is 100 mb
-        self._shp = tempfile.TemporaryFile(bufsize=self.bufsize)
-        self._shx = tempfile.TemporaryFile(bufsize=self.bufsize)
-        self._dbf = tempfile.TemporaryFile(bufsize=self.bufsize)
+        self._shp = tempfile.TemporaryFile()
+        self._shx = tempfile.TemporaryFile()
+        self._dbf = tempfile.TemporaryFile()
         # Geometry record offsets and lengths for writing shx file.
         self._recNum = 0
         self._bbox = [0,0,0,0]
