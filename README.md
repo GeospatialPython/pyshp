@@ -380,18 +380,18 @@ There are three ways to set the shape type:
 To manually set the shape type for a Writer object when creating the Writer:
 
 
-    >>> w = shapefile.Writer(shapeType=1)
+    >>> w = shapefile.Writer(shapeType=3)
 
     >>> w.shapeType
-    1
+    3
 
 OR you can set it after the Writer is created:
 
 
-    >>> w.shapeType = 3
+    >>> w.shapeType = 1
 
     >>> w.shapeType
-    3
+    1
 
 ### Geometry and Record Balancing
 
@@ -417,20 +417,13 @@ Geometry is added using one of three methods: "null", "point", or "poly". The
 **Adding a Point shape**
 
 Point shapes are added using the "point" method. A point is specified by an x,
-y, and optional z (elevation) and m (measure) value.
+y value. An optional z (elevation) and m (measure) value can be set if the shapeType 
+is PointZ or PointM. 
 
 
-    >>> w = shapefile.Writer(shapefile.POINTM)
+	>>> w = shapefile.Writer()
 	
-    >>> w.point(122, 37) # No elevation or measure values
-
-    >>> w.shapes()[0].points
-    [[122, 37, 0, 0]]
-
-    >>> w.point(118, 36, 4, 8)
-
-    >>> w.shapes()[1].points
-    [[118, 36, 4, 8]]
+	>>> w.point(122, 37) 
 	
 	>>> w.field('FIRST_FLD', 'C')
 	>>> w.field('SECOND_FLD', 'C')
@@ -564,20 +557,21 @@ This field can take True or False values, or 1 (True) or 0 (False).
 None is interpreted as missing. 
 
 
-    >>> w = shapefile.Writer()
+	>>> w = shapefile.Writer()
 	>>> w.field('BOOLEAN', 'L')
 	>>> w.null()
 	>>> w.null()
 	>>> w.null()
 	>>> w.null()
 	>>> w.null()
-    >>> w.record(True)
+	>>> w.null()
+	>>> w.record(True)
 	>>> w.record(1)
 	>>> w.record(False)
 	>>> w.record(0)
 	>>> w.record(None)
 	>>> w.record("Nonesense")
-    >>> w.save('shapefiles/test/dtype')
+	>>> w.save('shapefiles/test/dtype')
 	
 	>>> r = shapefile.Reader('shapefiles/test/dtype')
 	>>> r.record(0)
