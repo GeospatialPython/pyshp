@@ -474,10 +474,6 @@ called without any arguments.  This type of shapefile is rarely used but it is v
 
 	>>> w.null()
 
-The writer object's shapes list will now have one null shape:
-
-
-	>>> assert w.shapes()[0].shapeType == shapefile.NULL
 
 ### Creating Attributes
 
@@ -595,7 +591,6 @@ You can also add attributes using keyword arguments where the keys are field nam
 	>>> w.field('SECOND_FLD','C','40')
 	>>> w.record('First', 'Line')
 	>>> w.record(FIRST_FLD='First', SECOND_FLD='Line')
-	>>> assert w.records[0] == w.records[1]
 	
 	
 
