@@ -155,8 +155,8 @@ Each shape record contains the following attributes:
 	  shapefile specification.
 
 
-	>>> shapes[3].shapeType
-	5
+		>>> shapes[3].shapeType
+		5
 
   * bbox: If the shape type contains multiple points this tuple describes the
 	  lower left (x,y) coordinate and upper right corner coordinate creating a
@@ -175,19 +175,21 @@ Each shape record contains the following attributes:
 	  point of each part. If there is only one part then a list containing 0 is
 	  returned.
 
-	>>> shapes[3].parts
-	[0]
+
+		>>> shapes[3].parts
+		[0]
 
   * points: The points attribute contains a list of tuples containing an
 	  (x,y) coordinate for each point in the shape.
 
-	>>> len(shapes[3].points)
-	173
-	>>> # Get the 8th point of the fourth shape
-	>>> # Truncate coordinates to 3 decimal places
-	>>> shape = shapes[3].points[7]
-	>>> ['%.3f' % coord for coord in shape]
-	['-122.471', '37.787']
+
+		>>> len(shapes[3].points)
+		173
+		>>> # Get the 8th point of the fourth shape
+		>>> # Truncate coordinates to 3 decimal places
+		>>> shape = shapes[3].points[7]
+		>>> ['%.3f' % coord for coord in shape]
+		['-122.471', '37.787']
 
 To read a single shape by calling its index use the shape() method. The index
 is the shape's count from 0. So to read the 8th shape record you would use its
