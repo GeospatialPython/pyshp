@@ -16,6 +16,7 @@ import time
 import array
 import tempfile
 import itertools
+import io
 from datetime import date
 
 #
@@ -238,22 +239,34 @@ class Reader:
         if "shp" in kwargs.keys():
             if hasattr(kwargs["shp"], "read"):
                 self.shp = kwargs["shp"]
-                if hasattr(self.shp, "seek"):
+                # Copy if required
+                try:
                     self.shp.seek(0)
+                except (NameError, io.UnsupportedOperation):
+                    self.shp = io.BytesIO(self.shp.read())
             if "shx" in kwargs.keys():
                 if hasattr(kwargs["shx"], "read"):
                     self.shx = kwargs["shx"]
-                    if hasattr(self.shx, "seek"):
+                    # Copy if required
+                    try:
                         self.shx.seek(0)
+                    except (NameError, io.UnsupportedOperation):
+                        self.shx = io.BytesIO(self.shx.read())
         if "dbf" in kwargs.keys():
             if hasattr(kwargs["dbf"], "read"):
                 self.dbf = kwargs["dbf"]
-                if hasattr(self.dbf, "seek"):
+                # Copy if required
+                try:
                     self.dbf.seek(0)
+                except (NameError, io.UnsupportedOperation):
+                    self.dbf = io.BytesIO(self.dbf.read())
         if self.shp or self.dbf:        
             self.load()
         else:
             raise ShapefileException("Shapefile Reader requires a shapefile or file-like object.")
+
+
+
 
     def load(self, shapefile=None):
         """Opens a shapefile from a filename or file-like
