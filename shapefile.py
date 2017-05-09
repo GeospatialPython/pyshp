@@ -239,17 +239,26 @@ class Reader:
             if hasattr(kwargs["shp"], "read"):
                 self.shp = kwargs["shp"]
                 if hasattr(self.shp, "seek"):
-                    self.shp.seek(0)
+                    try:
+                        self.shp.seek(0)
+                    except UnsupportedOperationException:
+                        pass
             if "shx" in kwargs.keys():
                 if hasattr(kwargs["shx"], "read"):
                     self.shx = kwargs["shx"]
                     if hasattr(self.shx, "seek"):
-                        self.shx.seek(0)
+                        try:
+                            self.shx.seek(0)
+                        except UnsupportedOperationException:
+                            pass
         if "dbf" in kwargs.keys():
             if hasattr(kwargs["dbf"], "read"):
                 self.dbf = kwargs["dbf"]
                 if hasattr(self.dbf, "seek"):
-                    self.dbf.seek(0)
+                    try:
+                        self.dbf.seek(0)
+                    except UnsupportedOperationException:
+                        pass
         if self.shp or self.dbf:        
             self.load()
         else:
