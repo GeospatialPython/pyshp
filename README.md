@@ -66,6 +66,7 @@ part of your geospatial project.
 
 Before doing anything you must import the library.
 
+
 	>>> import shapefile
 
 The examples below will use a shapefile created from the U.S. Census Bureau
