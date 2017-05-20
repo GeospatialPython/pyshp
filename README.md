@@ -13,6 +13,7 @@ The Python Shapefile Library (pyshp) reads and writes ESRI Shapefiles in pure Py
 [Examples](#examples)
 - [Reading Shapefiles](#reading-shapefiles)
   - [Reading Shapefiles from File-Like Objects](#reading-shapefiles-from-file-like-objects)
+  - [Reading Shapefile Meta-Data](#reading-shapefile-meta-data)
   - [Reading Geometry](#reading-geometry)
   - [Reading Records](#reading-records)
   - [Reading Geometry and Records Simultaneously](#reading-geometry-and-records-simultaneously)
@@ -113,6 +114,53 @@ very simple fixed-record index for the variable length records in the shp
 file. This file is optional for reading. If it's available pyshp will use the
 shx file to access shape records a little faster but will do just fine without
 it.
+
+### Reading Shapefile Meta-Data
+
+Shapefiles have a number of attributes for inspecting the file contents.
+A shapefile is a container for a specific type of geometry, and this can be checked using the 
+shapeType attribute. 
+
+
+	>>> sf.shapeType
+	5
+
+Shape types are represented by numbers between 0 and 31 as defined by the
+shapefile specification and listed below. It is important to note that numbering system has
+several reserved numbers which have not been used yet therefore the numbers of
+the existing shape types are not sequential:
+
+- NULL = 0
+- POINT = 1
+- POLYLINE = 3
+- POLYGON = 5
+- MULTIPOINT = 8
+- POINTZ = 11
+- POLYLINEZ = 13
+- POLYGONZ = 15
+- MULTIPOINTZ = 18
+- POINTM = 21
+- POLYLINEM = 23
+- POLYGONM = 25
+- MULTIPOINTM = 28
+- MULTIPATCH = 31
+	
+Based on this we can see that our blockgroups shapefile contains
+Polygon type shapes. The shape types are also defined as constants in
+the shapefile module, so that we can compare types more intuitively:
+
+
+	>>> sf.shapeType == shapefile.POLYGON
+	True
+	
+Other pieces of meta-data that we can check includes the number of features, 
+or the bounding box area the shapefile covers:
+
+
+	>>> len(sf)
+	663
+	>>> sf.bbox
+	[-122.515048, 37.652916, -122.327622, 37.863433]
 
 ### Reading Geometry
 
@@ -367,11 +415,6 @@ Create an instance of the Writer class to begin creating a shapefile:
 
 The shape type defines the type of geometry contained in the shapefile. All of
 the shapes must match the shape type setting.
-
-Shape types are represented by numbers between 0 and 31 as defined by the
-shapefile specification. It is important to note that numbering system has
-several reserved numbers which have not been used yet therefore the numbers of
-the existing shape types are not sequential.
 
 There are three ways to set the shape type: 
   * Set it when creating the class instance. 

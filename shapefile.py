@@ -269,8 +269,9 @@ class Reader:
         else:
             raise ShapefileException("Shapefile Reader requires a shapefile or file-like object.")
 
-
-
+    def __len__(self):
+        """Returns the number of shapes/records in the shapefile."""
+        return self.numRecords
 
     def load(self, shapefile=None):
         """Opens a shapefile from a filename or file-like
@@ -637,6 +638,12 @@ class Writer:
         self._mbox = [0,0]
         # Use deletion flags in dbf? Default is false (0).
         self.deletionFlag = 0
+
+    def __len__(self):
+        """Returns the current number of features written to the shapefile. 
+        If shapes and records are unbalanced, the length is considered the highest
+        of the two."""
+        return max(self.recNum, self.shpNum) 
 
     def __getFileObj(self, f):
         """Safety handler to verify file-like objects"""
