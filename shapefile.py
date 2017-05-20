@@ -19,7 +19,7 @@ import itertools
 import io
 from datetime import date
 
-#
+
 # Constants for shape types
 NULL = 0
 POINT = 1
@@ -36,7 +36,8 @@ POLYGONM = 25
 MULTIPOINTM = 28
 MULTIPATCH = 31
 
-MISSING = [None,'']
+
+# Python 2-3 handling
 
 PYTHON3 = sys.version_info[0] == 3
 
@@ -46,8 +47,13 @@ if PYTHON3:
 else:
     from itertools import izip
 
-def b(v):
-    if PYTHON3:
+
+# Helpers
+
+MISSING = [None,'']
+
+if PYTHON3:
+    def b(v):
         if isinstance(v, str):
             # For python 3 encode str to bytes.
             return v.encode('utf-8')
@@ -57,12 +63,8 @@ def b(v):
         else:
             # Error.
             raise Exception('Unknown input type')
-    else:
-        # For python 2 assume str passed in and return str.
-        return v
 
-def u(v):
-    if PYTHON3:
+    def u(v):
         # try/catch added 2014/05/07
         # returned error on dbf of shapefile
         # from www.naturalearthdata.com named
@@ -81,15 +83,24 @@ def u(v):
               # Error.
               raise Exception('Unknown input type')
         except: return v
-    else:
+
+    def is_string(v):
+        return isinstance(v, str)
+
+else:
+    def b(v):
         # For python 2 assume str passed in and return str.
         return v
 
-def is_string(v):
-    if PYTHON3:
-        return isinstance(v, str)
-    else:
+    def u(v):
+        # For python 2 assume str passed in and return str.
+        return v
+
+    def is_string(v):
         return isinstance(v, basestring)
+
+
+# Begin
 
 class _Array(array.array):
     """Converts python tuples to lits of the appropritate type.
@@ -261,7 +272,7 @@ class Shape:
                     }
 
 class ShapeRecord:
-    """A shape object of any type."""
+    """A ShapeRecord object containing a shape along with its attributes."""
     def __init__(self, shape=None, record=None):
         self.shape = shape
         self.record = record
