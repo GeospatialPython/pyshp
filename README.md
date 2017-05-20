@@ -21,7 +21,7 @@ The Python Shapefile Library (pyshp) reads and writes ESRI Shapefiles in pure Py
   - [Setting the Shape Type](#setting-the-shape-type)
   - [Geometry and Record Balancing](#geometry-and-record-balancing)
   - [Adding Geometry](#adding-geometry)
-  - [Creating Attributes](#creating-attributes)
+  - [Adding Records](#adding-records)
   - [File Names](#file-names)
   - [Saving to File-Like Objects](#saving-to-file-like-objects)
 - [Python \_\_geo_interface\_\_](#python-\_\_geo\_interface\_\_)
@@ -45,7 +45,7 @@ Both the Esri and XBase file-formats are very simple in design and memory
 efficient which is part of the reason the shapefile format remains popular
 despite the numerous ways to store and exchange GIS data available today.
 
-Pyshp is compatible with Python 2.4-3.x.
+Pyshp is compatible with Python 2.7-3.x.
 
 This document provides examples for using pyshp to read and write shapefiles. However 
 many more examples are continually added to the pyshp wiki on GitHub, the blog [http://GeospatialPython.com](http://GeospatialPython.com),
@@ -182,13 +182,6 @@ each shape record.
 	>>> len(shapes)
 	663
 
-You can iterate through the shapefile's geometry using the iterShapes()
-method.
-
-
-	>>> len(list(sf.iterShapes()))
-	663
-
 Each shape record contains the following attributes:
 
 
@@ -306,13 +299,6 @@ You can get a list of the shapefile's records by calling the records() method:
 	>>> len(records)
 	663
 
-Similar to the geometry methods, you can iterate through dbf records using the
-iterRecords() method.
-
-
-	>>> len(list(sf.iterRecords()))
-	663
-
 Each record is a list containing an attribute corresponding to each field in
 the field list.
 
@@ -378,14 +364,6 @@ The blockgroup key and population count:
 	>>> len(points)
 	2
 	
-There is also an iterShapeRecords() method to iterate through large files:
-
-
-	>>> shapeRecs = sf.iterShapeRecords()
-	>>> for shapeRec in shapeRecs:
-	...     # do something here
-	...     pass
-	
 
 ## Writing Shapefiles
 
@@ -404,7 +382,7 @@ format as a control file for the sprayer system (usually in combination with
 custom database file formats).
 
 To create a shapefile you add geometry and/or attributes using methods in the
-Writer class until you are ready to save the file.
+Writer class until you are ready to save the file. 
 
 Create an instance of the Writer class to begin creating a shapefile:
 
@@ -490,7 +468,7 @@ You can create all of the shapes and then create all of the records or vice vers
 	>>> w.recNum == w.shpNum
 	True
 
-If you do not use the balance method and forget to manually
+If you do not use the autobalance or balance method and forget to manually
 balance the geometry and attributes the shapefile will be viewed as corrupt by
 most shapefile software.
 
@@ -582,9 +560,9 @@ This can be particularly useful for copying from one file to another:
 	>>> w.save('shapefiles/test/copy')
 
 
-### Creating Attributes
+### Adding Records
 
-Creating attributes involves two steps. Step 1 is to create fields to contain
+Adding record attributes involves two steps. Step 1 is to create fields to contain
 attribute values and step 2 is to populate the fields with values for each
 shape record. 
 
@@ -734,6 +712,48 @@ write them.
 	>>> w.saveDbf(dbf)
 	>>> # Normally you would call the "StringIO.getvalue()" method on these objects.
 	>>> shp = shx = dbf = None
+	
+## Working with Large Shapefiles
+
+Despite being a lightweight library, PyShp is designed to be able to read and write 
+shapefiles of any size, allowing you to work with hundreds of thousands or even millions 
+of records and complex geometries. 
+
+When first creating the Reader class, the library only reads the header information
+and leaves the rest of the file contents alone. Once you call the records() and shapes() 
+methods however, it will attempt to read the entire file into memory at once. 
+For very large files this can result in MemoryError. So when working with large files
+it is recommended to use instead the iterShapes(), iterRecords(), or iterShapeRecords()
+methods instead. These iterate through the file contents one at a time, enabling you to loop 
+through them while keeping memory usage at a minimum. 
+
+
+	>>> for shape in sf.iterShapes():
+	...     # do something here
+	...     pass
+	
+	>>> for rec in sf.iterRecords():
+	...     # do something here
+	...     pass
+	
+	>>> for shapeRec in sf.iterShapeRecords():
+	...     # do something here
+	...     pass
+
+The shapefile Writer class uses a similar streaming approach to keep memory 
+usage at a minimum, except you don't have change any of your code. 
+The library takes care of this under-the-hood by creating a set of temporary files
+and immediately writing each geometry and record to disk the moment they 
+are added using shape() or record(). You still have to call save() as usual
+in order to specify the final location of the output file and in order
+for the header information to be calculated and written to the beginning of the
+file. 
+
+This means that as long as you are able to iterate through a source file without having
+to load everything into memory, such as a large CSV table or a large shapefile, you can 
+process and write any number of items, and even merging many different source files into a single 
+large shapefile. If you need to edit or undo any of your writing you would have to read the 
+file back in, one record at a time, make your changes, and write it back out. 
 
 ## Python \_\_geo_interface\_\_
 
