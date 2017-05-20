@@ -106,6 +106,69 @@ def signed_area(coords):
     ys.append(ys[1])
     return sum(xs[i]*(ys[i+1]-ys[i-1]) for i in range(1, len(coords)))/2.0
 
+def geojson_to_shape(geoj):
+    # create empty shape
+    shape = Shape()
+    # set shapeType
+    geojType = geoj["type"] if geoj else "Null"
+    if geojType == "Null":
+        shapeType = NULL
+    elif geojType == "Point":
+        shapeType = POINT
+    elif geojType == "LineString":
+        shapeType = POLYLINE
+    elif geojType == "Polygon":
+        shapeType = POLYGON
+    elif geojType == "MultiPoint":
+        shapeType = MULTIPOINT
+    elif geojType == "MultiLineString":
+        shapeType = POLYLINE
+    elif geojType == "MultiPolygon":
+        shapeType = POLYGON
+    else:
+        raise Exception("Cannot create Shape from GeoJSON type '%s'" % geojType)
+    shape.shapeType = shapeType
+    
+    # set points and parts
+    if geojType == "Point":
+        shape.points = [ geoj["coordinates"] ]
+        shape.parts = [0]
+    elif geojType in ("MultiPoint","LineString"):
+        shape.points = geoj["coordinates"]
+        shape.parts = [0]
+    elif geojType in ("Polygon"):
+        points = []
+        parts = []
+        index = 0
+        for ext_or_hole in geoj["coordinates"]:
+            points.extend(ext_or_hole)
+            parts.append(index)
+            index += len(ext_or_hole)
+        shape.points = points
+        shape.parts = parts
+    elif geojType in ("MultiLineString"):
+        points = []
+        parts = []
+        index = 0
+        for linestring in geoj["coordinates"]:
+            points.extend(linestring)
+            parts.append(index)
+            index += len(linestring)
+        shape.points = points
+        shape.parts = parts
+    elif geojType in ("MultiPolygon"):
+        points = []
+        parts = []
+        index = 0
+        for polygon in geoj["coordinates"]:
+            for ext_or_hole in polygon:
+                points.extend(ext_or_hole)
+                parts.append(index)
+                index += len(ext_or_hole)
+        shape.points = points
+        shape.parts = parts
+    return shape
+
 class Shape:
     def __init__(self, shapeType=NULL, points=None, parts=None, partTypes=None):
         """Stores the geometry of the different shape types
@@ -791,6 +854,17 @@ class Writer:
         # Balance if already not balanced
         if self.autoBalance and self.recNum < self.shpNum:
             self.balance()
+        # Check is shape or import from geojson
+        if not isinstance(s, Shape):
+            if hasattr(s, "__geo_interface__"):
+                s = s.__geo_interface__
+            if isinstance(s, dict):
+                s = geojson_to_shape(s)
+            else:
+                raise Exception("Can only write Shape objects, GeoJSON dictionaries, "
+                                "or objects with the __geo_interface__, "
+                                "not: %r" % s)
+        # Write to file
         offset,length = self.__shpRecord(s)
         self.__shxRecord(offset, length)
 

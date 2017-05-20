@@ -24,7 +24,8 @@ The Python Shapefile Library (pyshp) reads and writes ESRI Shapefiles in pure Py
   - [Adding Records](#adding-records)
   - [File Names](#file-names)
   - [Saving to File-Like Objects](#saving-to-file-like-objects)
-- [Python \_\_geo_interface\_\_](#python-\_\_geo\_interface\_\_)
+- [Working with Large Shapefiles](#working-with-large-shapefiles)
+- [Python Geo Interface](#python-geo-interface)
 - [Testing](#testing)
 
 # Overview
@@ -755,7 +756,7 @@ process and write any number of items, and even merging many different source fi
 large shapefile. If you need to edit or undo any of your writing you would have to read the 
 file back in, one record at a time, make your changes, and write it back out. 
 
-## Python \_\_geo_interface\_\_
+## Python Geo Interface
 
 The Python \_\_geo_interface\_\_ convention provides a data interchange interface
 among geospatial Python libraries. The interface returns data as GeoJSON which gives you
@@ -768,6 +769,30 @@ More information on GeoJSON is available at [http://geojson.org](http://geojson.
 	>>> s = sf.shape(0)
 	>>> s.__geo_interface__["type"]
 	'MultiPolygon'
+	
+Just as the library can expose its objects to other applications through the geo interface, 
+it also supports receiving objects with the geo interface from other applications. 
+To write shapes based on GeoJSON objects, simply send an object with the geo interface or a 
+GeoJSON dictionary to the shape() method instead of a Shape object. Alternatively, you can
+construct a Shape object from GeoJSON using the "geojson_as_shape()" function. 
+
+
+	>>> w = shapefile.Writer()
+	>>> w.field('name', 'C')
+
+	>>> w.shape( {"type":"Point", "coordinates":[1,1]} )
+	>>> w.record('one')
+	
+	>>> shape = shapefile.geojson_to_shape( {"type":"Point", "coordinates":[2,2]} )
+	>>> shape.shapeType
+	1
+	>>> shape.points
+	[[2, 2]]
+	
+	>>> w.shape(shape)
+	>>> w.record('two')
+
+	>>> w.save('shapefiles/test/geojson')
 
 # Testing
 
