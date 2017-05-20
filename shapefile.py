@@ -617,7 +617,8 @@ class Reader:
 
 class Writer:
     """Provides write support for ESRI Shapefiles."""
-    def __init__(self, shapeType=None, bufsize=None):
+    def __init__(self, shapeType=None, autoBalance=False, bufsize=None):
+        self.autoBalance = autoBalance
         self.fields = []
         self.shapeType = shapeType
         self.shp = None
@@ -629,7 +630,8 @@ class Writer:
         self._shx = tempfile.TemporaryFile()
         self._dbf = tempfile.TemporaryFile()
         # Geometry record offsets and lengths for writing shx file.
-        self._recNum = 0
+        self.recNum = 0
+        self.shpNum = 0
         self._bbox = [0,0,0,0]
         self._zbox = [0,0]
         self._mbox = [0,0]
@@ -725,7 +727,7 @@ class Writer:
         if headerType == 'shp':
             f.write(pack(">i", self.__shpFileLength()))
         elif headerType == 'shx':
-            f.write(pack('>i', ((100 + (self._recNum * 8)) // 2)))
+            f.write(pack('>i', ((100 + (self.shpNum * 8)) // 2)))
         # Version, Shape type
         if self.shapeType is None:
             self.shapeType = NULL
@@ -758,7 +760,7 @@ class Writer:
         for field in self.fields:
             if str(field[0]).startswith("Deletion"):
                 self.fields.remove(field)
-        numRecs = self._recNum
+        numRecs = self.recNum
         numFields = len(self.fields)
         headerLength = numFields * 32 + 33
         recordLength = sum([int(field[2]) for field in self.fields]) + 1
@@ -779,6 +781,9 @@ class Writer:
         f.write(b('\r'))
 
     def shape(self, s):
+        # Balance if already not balanced
+        if self.autoBalance and self.recNum < self.shpNum:
+            self.balance()
         offset,length = self.__shpRecord(s)
         self.__shxRecord(offset, length)
 
@@ -786,8 +791,8 @@ class Writer:
         f = self.__getFileObj(self._shp)
         offset = 100 + f.tell()
         # Record number, Content length place holder
-        f.write(pack(">2i", self._recNum, 0))
-        self._recNum += 1
+        f.write(pack(">2i", self.shpNum, 0))
+        self.shpNum += 1
         start = f.tell()
         # Shape Type
         if self.shapeType is None and s.shapeType != NULL:
@@ -910,6 +915,10 @@ class Writer:
         extra ones won't be added. In the case of using keyword arguments to specify
         field/value pairs only fields matching the already registered fields
         will be added."""
+        # Balance if already not balanced
+        if self.autoBalance and self.recNum > self.shpNum:
+            self.balance()
+            
         record = []
         fieldCount = len(self.fields)
         # Compensate for deletion flag
@@ -932,6 +941,7 @@ class Writer:
     def __dbfRecord(self, record):
         """Writes the dbf records."""
         f = self.__getFileObj(self._dbf)
+        self.recNum += 1
         if not self.fields[0][0].startswith("Deletion"):
             f.write(b(' ')) # deletion flag
         for (fieldName, fieldType, size, deci), value in zip(self.fields, record):
@@ -976,6 +986,15 @@ class Writer:
                     " (size %d) into field '%s' (size %d)." % (len(value), fieldName, size))
             value = b(value)
             f.write(value)
+
+    def balance(self):
+        """Adds corresponding empty attributes or null geometry records depending
+        on which type of record was created to make sure all three files
+        are in synch."""
+        while self.recNum > self.shpNum:
+            self.null()
+        while self.recNum < self.shpNum:
+            self.record()
 
     def null(self):
         """Creates a null shape."""
@@ -1081,19 +1100,28 @@ class Writer:
         """Save the shapefile data to three files or
         three file-like objects. SHP and DBF files can also
         be written exclusively using saveShp, saveShx, and saveDbf respectively.
-        If target is specified but not shp,shx, or dbf then the target path and
+        If target is specified but not shp, shx, or dbf then the target path and
         file name are used.  If no options or specified, a unique base file name
         is generated to save the files and the base file name is returned as a 
         string. 
         """
-        # Create a unique file name if one is not defined
+        # Balance if already not balanced
+        if shp and dbf:
+            if self.autoBalance:
+                self.balance()
+            if self.recNum != self.shpNum:
+                raise ShapefileException("When saving both the dbf and shp file, "
+                                         "the number of records (%s) must correspond "
+                                         "with the number of shapes (%s)" % (self.recNum, self.shpNum))
+        # Save
         if shp:
             self.saveShp(shp)
         if shx:
             self.saveShx(shx)
         if dbf:
             self.saveDbf(dbf)
-        elif not shp and not shx and not dbf:
+        # Create a unique file name if one is not defined
+        if not shp and not shx and not dbf:
             generated = False
             if not target:
                 temp = tempfile.NamedTemporaryFile(prefix="shapefile_",dir=os.getcwd())

@@ -401,13 +401,56 @@ number of records equals the number of shapes to create a valid shapefile. You
 must take care to add records and shapes in the same order so that the record
 data lines up with the geometry data. For example:
 
-
+	
+	>>> w = shapefile.Writer(shapeType=shapefile.POINT)
 	>>> w.field("field1", "C")
 	>>> w.field("field2", "C")
+	
 	>>> w.record("row", "one")
-	>>> w.record("row", "two")
 	>>> w.point(1, 1)
+	
+	>>> w.record("row", "two")
 	>>> w.point(2, 2)
+	
+To help prevent accidental misalignment pyshp has an "auto balance" feature to
+make sure when you add either a shape or a record the two sides of the
+equation line up. This way if you forget to update an entry the
+shapefile will still be valid and handled correctly by most shapefile
+software. Autobalancing is NOT turned on by default. To activate it set
+the attribute autoBalance to 1 or True:
+
+
+    >>> w.autoBalance = 1
+	>>> w.record("row", "three")
+	>>> w.record("row", "four")
+	>>> w.point(4, 4)
+	
+	>>> w.recNum == w.shpNum
+	True
+
+You also have the option of manually calling the balance() method at any time
+to ensure the other side is up to date. When balancing is used
+null shapes are created on the geometry side or records
+with a value of "NULL" for each field is created on the attribute side.
+This gives you flexibility in how you build the shapefile.
+You can create all of the shapes and then create all of the records or vice versa. 
+
+
+    >>> w.autoBalance = 0
+	>>> w.record("row", "five")
+	>>> w.record("row", "six")
+	>>> w.record("row", "seven")
+	>>> w.point(5, 5)
+	>>> w.point(6, 6)
+	>>> w.balance()
+	
+	>>> w.recNum == w.shpNum
+	True
+
+If you do not use the balance method and forget to manually
+balance the geometry and attributes the shapefile will be viewed as corrupt by
+most shapefile software.
+
 
 ### Adding Geometry
 
