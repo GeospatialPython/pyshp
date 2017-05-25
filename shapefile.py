@@ -1297,21 +1297,39 @@ class GeoInterfaceContainer(list):
         elif self.geojson['type'] == 'FeatureCollection':
             bbox_coordinates = [feature['geometry']['coordinates']
                                 for feature
-                                in self.geojson['features'] if
-                                feature['type'] != 'Point']
+                                in self.geojson['features']]
             lats = []
             longs = []
             if self.geojson['features'][0]['geometry'][
                 'type'] != 'Point':
-                for x in bbox_coordinates:
-                    for y in x:
-                        for z in y:
-                            longs.append(z[0])
-                            lats.append(z[1])
+                for feature in bbox_coordinates:
+                    for x, y in feature:
+                        longs.append(x)
+                        lats.append(y)
             else:
                 for long, lat in bbox_coordinates:
                     longs.append(long)
                     lats.append(lat)
+
+            lats.sort()
+            longs.sort()
+            self.bbox = [longs[0], lats[1], longs[-1], lats[-1]]
+        elif self.geojson['type'] == 'GeometryCollection':
+            bbox_coordinates = [geometry['coordinates']
+                                for geometry
+                                in self.geojson['geometries']]
+            lats = []
+            longs = []
+            if self.geojson['geometries'][0]['type'] != 'Point':
+                for feature in bbox_coordinates:
+                    for x, y in feature:
+                        longs.append(x)
+                        lats.append(y)
+            else:
+                for long, lat in bbox_coordinates:
+                    longs.append(long)
+                    lats.append(lat)
+
             lats.sort()
             longs.sort()
             self.bbox = [longs[0], lats[1], longs[-1], lats[-1]]
