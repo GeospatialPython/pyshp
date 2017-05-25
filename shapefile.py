@@ -199,8 +199,7 @@ class Shape:
         if partTypes:
             self.partTypes = partTypes
 
-    @property
-    def __geo_interface__(self):
+    def __get_geo_interface_geodata__(self):
         if self.shapeType in [POINT, POINTM, POINTZ]:
             return {
             'type': 'Point',
@@ -271,11 +270,32 @@ class Shape:
                     'coordinates': polys
                     }
 
+    @property
+    def __geo_interface__(self):
+        self.geojson = {}
+        self.geojson.update(self.__get_geo_interface_geodata__())
+        if self.geojson['type'] is not 'Point':
+            self.geojson.update({'bbox': tuple(self.bbox)})
+        return self.geojson
+
 class ShapeRecord:
     """A ShapeRecord object containing a shape along with its attributes."""
-    def __init__(self, shape=None, record=None):
+    def __init__(self, shape=None, record=None, fields=None):
         self.shape = shape
         self.record = record
+        self.fields = fields
+
+    def __get_geo_interface_properties__(self):
+        return {'properties': dict((field[0], record) for (field, record) in zip(self.fields[1:], self.record))}
+
+    @property
+    def __geo_interface__(self):
+        return {'type': 'Feature',
+                'geometry': {'type': self.shape.__geo_interface__['type'],
+                             'coordinates': self.shape.__geo_interface__['coordinates'],
+                             'bbox': self.shape.__geo_interface__.get('bbox', 'null')},
+                             'properties': self.__get_geo_interface_properties__()
+                }
 
 class ShapefileException(Exception):
     """An exception to handle shapefile specific problems."""
@@ -519,7 +539,7 @@ class Reader:
         shp.seek(0,2)
         self.shpLength = shp.tell()
         shp.seek(100)
-        shapes = []
+        shapes = GeoInterfaceContainer('GeometryCollection')
         while shp.tell() < self.shpLength:
             shapes.append(self.__shape())
         return shapes
@@ -679,16 +699,33 @@ class Reader:
     def shapeRecords(self):
         """Returns a list of combination geometry/attribute records for
         all records in a shapefile."""
-        shapeRecords = []
-        return [ShapeRecord(shape=rec[0], record=rec[1]) \
-                                for rec in zip(self.shapes(), self.records())]
+        result =  GeoInterfaceContainer('FeatureCollection')
+        shapeRecords = [ShapeRecord(shape=rec[0], record=rec[1], fields=self.fields)
+                        for rec in zip(self.shapes(), self.records())]
+        result.extend(shapeRecords)
+        return result
 
     def iterShapeRecords(self):
         """Returns a generator of combination geometry/attribute records for
         all records in a shapefile."""
         for shape, record in izip(self.iterShapes(), self.iterRecords()):
-            yield ShapeRecord(shape=shape, record=record)
+            yield ShapeRecord(shape=shape, record=record, fields=self.fields)
 
+    def __get_geo_interface_geodata__(self):
+        """returns type and coordinates for __geo_interface__
+
+        """
+        return {
+        'type': 'FeatureCollection',
+        'features': [feature.__geo_interface__ for feature in self.shapeRecords()],
+        }
+
+    @property
+    def __geo_interface__(self):
+        self.geojson = {}
+        self.geojson.update(self.__get_geo_interface_geodata__())
+        self.geojson.update({'bbox': tuple(self.bbox)})
+        return self.geojson
 
 class Writer:
     """Provides write support for ESRI Shapefiles."""
@@ -1227,6 +1264,65 @@ class Writer:
             self.dbf.close()
             if generated:
                 return target
+
+class GeoInterfaceContainer(list):
+    """Implementation of __geo_interface__
+
+    https://gist.github.com/sgillies/2217756
+
+    """
+    def __init__(self, collectionType):
+        self.collectionType = collectionType
+
+    def __get_geo_interface_geodata__(self):
+        """returns type and coordinates for __geo_interface__
+
+        """
+        if self.collectionType == 'FeatureCollection':
+            return {
+                'type': 'FeatureCollection',
+                'features': [feature.__geo_interface__ for feature in
+                             self],
+            }
+        elif self.collectionType == 'GeometryCollection':
+            return {
+                'type': 'GeometryCollection',
+                'geometries': [geometry.__geo_interface__ for geometry in
+                               self],
+            }
+
+    def __get_geo_interface_bbox__(self):
+        if hasattr(self, 'shape'):
+            self.bbox = self.shape.bbox
+        elif self.geojson['type'] == 'FeatureCollection':
+            bbox_coordinates = [feature['geometry']['coordinates']
+                                for feature
+                                in self.geojson['features'] if
+                                feature['type'] != 'Point']
+            lats = []
+            longs = []
+            if self.geojson['features'][0]['geometry'][
+                'type'] != 'Point':
+                for x in bbox_coordinates:
+                    for y in x:
+                        for z in y:
+                            longs.append(z[0])
+                            lats.append(z[1])
+            else:
+                for long, lat in bbox_coordinates:
+                    longs.append(long)
+                    lats.append(lat)
+            lats.sort()
+            longs.sort()
+            self.bbox = [longs[0], lats[1], longs[-1], lats[-1]]
+        return {'bbox': tuple(self.bbox)}
+
+    @property
+    def __geo_interface__(self):
+        self.geojson = {}
+        self.geojson.update(self.__get_geo_interface_geodata__())
+        self.geojson.update(self.__get_geo_interface_bbox__())
+        return self.geojson
 
 # Begin Testing
 def test(**kwargs):
