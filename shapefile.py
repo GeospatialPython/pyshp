@@ -201,6 +201,11 @@ class Shape:
 
     @property
     def __geo_interface__(self):
+
+        """  Case parts or points is empty """
+        if not self.parts or not self.points:
+            return False
+        
         if self.shapeType in [POINT, POINTM, POINTZ]:
             return {
             'type': 'Point',
