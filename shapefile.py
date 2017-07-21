@@ -1013,7 +1013,7 @@ class Writer:
 
         record = []
         fieldCount = len(self.fields)
-        if len(recordList) == 2:
+        if recordList[0] is tuple:
             recordList = recordList[0]
         # Compensate for deletion flag
         if self.fields[0][0].startswith("Deletion"): fieldCount -= 1
