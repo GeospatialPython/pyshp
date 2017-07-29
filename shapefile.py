@@ -64,25 +64,16 @@ if PYTHON3:
             # Error.
             raise Exception('Unknown input type')
 
-    def u(v):
-        # try/catch added 2014/05/07
-        # returned error on dbf of shapefile
-        # from www.naturalearthdata.com named
-        # "ne_110m_admin_0_countries".
-        # Just returning v as is seemed to fix
-        # the problem.  This function could
-        # be condensed further.
-        try:
-          if isinstance(v, bytes):
-              # For python 3 decode bytes to str.
-              return v.decode('utf-8')
-          elif isinstance(v, str):
-              # Already str.
-              return v
-          else:
-              # Error.
-              raise Exception('Unknown input type')
-        except: return v
+    def u(v, encoding='utf-8'):
+        if isinstance(v, bytes):
+            # For python 3 decode bytes to str.
+            return v.decode(encoding)
+        elif isinstance(v, str):
+            # Already str.
+            return v
+        else:
+            # Error.
+            raise Exception('Unknown input type')
 
     def is_string(v):
         return isinstance(v, str)
@@ -309,6 +300,7 @@ class Reader:
         self.numRecords = None
         self.fields = []
         self.__dbfHdrLength = 0
+        self.encoding = kwargs.pop('encoding', 'utf-8')
         # See if a shapefile name was passed as an argument
         if len(args) > 0:
             if is_string(args[0]):
@@ -553,9 +545,9 @@ class Reader:
             else:
                 idx = len(fieldDesc[name]) - 1
             fieldDesc[name] = fieldDesc[name][:idx]
-            fieldDesc[name] = u(fieldDesc[name])
+            fieldDesc[name] = u(fieldDesc[name], self.encoding)
             fieldDesc[name] = fieldDesc[name].lstrip()
-            fieldDesc[1] = u(fieldDesc[1])
+            fieldDesc[1] = u(fieldDesc[1], self.encoding)
             self.fields.append(fieldDesc)
         terminator = dbf.read(1)
         if terminator != b("\r"):
@@ -629,7 +621,7 @@ class Reader:
                         value = None # unknown value is set to missing
             else:
                 # anything else is forced to string/unicode
-                value = u(value)
+                value = u(value, self.encoding)
                 value = value.strip()
             record.append(value)
         return record
