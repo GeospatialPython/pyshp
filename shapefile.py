@@ -83,7 +83,7 @@ else:
         # For python 2 assume str passed in and return str.
         return v
 
-    def u(v):
+    def u(v, encoding='utf-8'):
         # For python 2 assume str passed in and return str.
         return v
 
