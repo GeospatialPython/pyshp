@@ -373,6 +373,20 @@ class Reader:
         if self.dbf:
             self.__dbfHeader()
 
+    def __del__(self):
+        self.close()
+
+    def close(self):
+        try:
+            if hasattr(self.shp, 'close'):
+                self.shp.close()
+            if hasattr(self.shx, 'close'):
+                self.shx.close()
+            if hasattr(self.dbf, 'close'):
+                self.dbf.close()
+        except IOError:
+            pass
+
     def __getFileObj(self, f):
         """Checks to see if the requested shapefile file object is
         available. If not a ShapefileException is raised."""
