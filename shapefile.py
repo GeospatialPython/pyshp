@@ -130,7 +130,7 @@ def geojson_to_shape(geoj):
     else:
         raise Exception("Cannot create Shape from GeoJSON type '%s'" % geojType)
     shape.shapeType = shapeType
-    
+
     # set points and parts
     if geojType == "Point":
         shape.points = [ geoj["coordinates"] ]
@@ -182,7 +182,7 @@ class Shape:
         geometry record then those shapes are called parts. Parts
         are designated by their starting index in geometry record's
         list of shapes. For MultiPatch geometry, partTypes designates
-        the patch type of each of the parts. 
+        the patch type of each of the parts.
         """
         self.shapeType = shapeType
         self.points = points or []
@@ -330,7 +330,7 @@ class Reader:
                     self.dbf.seek(0)
                 except (NameError, io.UnsupportedOperation):
                     self.dbf = io.BytesIO(self.dbf.read())
-        if self.shp or self.dbf:        
+        if self.shp or self.dbf:
             self.load()
         else:
             raise ShapefileException("Shapefile Reader requires a shapefile or file-like object.")
@@ -475,7 +475,7 @@ class Reader:
             record.m = unpack("<d", f.read(8))
         # Seek to the end of this record as defined by the record header because
         # the shapefile spec doesn't require the actual content to meet the header
-        # definition.  Probably allowed for lazy feature deletion. 
+        # definition.  Probably allowed for lazy feature deletion.
         f.seek(next)
         return record
 
@@ -538,7 +538,7 @@ class Reader:
         self.shpLength = shp.tell()
         shp.seek(100)
         while shp.tell() < self.shpLength:
-            yield self.__shape()    
+            yield self.__shape()
 
     def __dbfHeader(self):
         """Reads a dbf header. Xbase-related code borrows heavily from ActiveState Python Cookbook Recipe 362715 by Raymond Hettinger"""
@@ -579,7 +579,7 @@ class Reader:
         # total size of fields should add up to recordlength from the header
         while fmtSize < self.__recordLength:
             # if not, pad byte until reaches recordlength
-            fmt += "x" 
+            fmt += "x"
             fmtSize += 1
         return (fmt, fmtSize)
 
@@ -595,7 +595,7 @@ class Reader:
             if name == 'DeletionFlag':
                 continue
             elif typ in ("N","F"):
-                # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field. 
+                # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
                 value = value.replace(b('\0'), b('')).strip()
                 value = value.replace(b('*'), b(''))  # QGIS NULL is all '*' chars
                 if value == b(''):
@@ -720,10 +720,10 @@ class Writer:
         self.deletionFlag = 0
 
     def __len__(self):
-        """Returns the current number of features written to the shapefile. 
+        """Returns the current number of features written to the shapefile.
         If shapes and records are unbalanced, the length is considered the highest
         of the two."""
-        return max(self.recNum, self.shpNum) 
+        return max(self.recNum, self.shpNum)
 
     def __getFileObj(self, f):
         """Safety handler to verify file-like objects"""
@@ -936,7 +936,7 @@ class Writer:
                 if hasattr(s,"z"):
                     f.write(pack("<%sd" % len(s.z), *s.z))
                 else:
-                    [f.write(pack("<d", p[2])) for p in s.points]  
+                    [f.write(pack("<d", p[2])) for p in s.points]
             except error:
                 raise ShapefileException("Failed to write elevation values for record %s. Expected floats." % recNum)
         # Write m extremes and values
@@ -963,7 +963,7 @@ class Writer:
             if hasattr(s, "z"):
                 try:
                     if not s.z:
-                        s.z = (0,)    
+                        s.z = (0,)
                     f.write(pack("<d", s.z[0]))
                 except error:
                     raise ShapefileException("Failed to write elevation value for record %s. Expected floats." % recNum)
@@ -979,7 +979,7 @@ class Writer:
             if hasattr(s, "m"):
                 try:
                     if not s.m:
-                        s.m = (0,) 
+                        s.m = (0,)
                     f.write(pack("<1d", s.m[0]))
                 except error:
                     raise ShapefileException("Failed to write measure value for record %s. Expected floats." % recNum)
@@ -1016,12 +1016,14 @@ class Writer:
         # Balance if already not balanced
         if self.autoBalance and self.recNum > self.shpNum:
             self.balance()
-            
+
         record = []
         fieldCount = len(self.fields)
         # Compensate for deletion flag
         if self.fields[0][0].startswith("Deletion"): fieldCount -= 1
         if recordList:
+            if recordList[0] is tuple:
+                recordList = recordList[0]
             record = [recordList[i] for i in range(fieldCount)]
         elif recordDict:
             for field in self.fields:
@@ -1200,8 +1202,8 @@ class Writer:
         be written exclusively using saveShp, saveShx, and saveDbf respectively.
         If target is specified but not shp, shx, or dbf then the target path and
         file name are used.  If no options or specified, a unique base file name
-        is generated to save the files and the base file name is returned as a 
-        string. 
+        is generated to save the files and the base file name is returned as a
+        string.
         """
         # Balance if already not balanced
         if shp and dbf:
@@ -1224,7 +1226,7 @@ class Writer:
             if not target:
                 temp = tempfile.NamedTemporaryFile(prefix="shapefile_",dir=os.getcwd())
                 target = temp.name
-                generated = True         
+                generated = True
             self.saveShp(target)
             self.shp.close()
             self.saveShx(target)
@@ -1245,7 +1247,7 @@ def test(**kwargs):
     if verbosity == 0 and failure_count == 0:
         print('All test passed successfully')
     return failure_count
-    
+
 if __name__ == "__main__":
     """
     Doctests are contained in the file 'README.md'. This library was originally developed
