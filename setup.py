@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='pyshp',
-      version='1.2.11',
+      version='2.0.0-dev',
       description='Pure Python read/write support for ESRI Shapefile format',
       long_description=open('README.md').read(),
       author='Joel Lawhead',
