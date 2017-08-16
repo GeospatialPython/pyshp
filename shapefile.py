@@ -559,9 +559,9 @@ class Reader:
             else:
                 idx = len(fieldDesc[name]) - 1
             fieldDesc[name] = fieldDesc[name][:idx]
-            fieldDesc[name] = u(fieldDesc[name], self.encoding)
+            fieldDesc[name] = u(fieldDesc[name], "ascii")
             fieldDesc[name] = fieldDesc[name].lstrip()
-            fieldDesc[1] = u(fieldDesc[1], self.encoding)
+            fieldDesc[1] = u(fieldDesc[1], "ascii")
             self.fields.append(fieldDesc)
         terminator = dbf.read(1)
         if terminator != b("\r"):
