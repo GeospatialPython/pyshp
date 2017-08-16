@@ -64,10 +64,10 @@ if PYTHON3:
             # Error.
             raise Exception('Unknown input type')
 
-    def u(v, encoding='utf-8'):
+    def u(v, encoding='utf-8', encodingErrors='strict'):
         if isinstance(v, bytes):
             # For python 3 decode bytes to str.
-            return v.decode(encoding)
+            return v.decode(encoding, encodingErrors)
         elif isinstance(v, str):
             # Already str.
             return v
@@ -301,6 +301,7 @@ class Reader:
         self.fields = []
         self.__dbfHdrLength = 0
         self.encoding = kwargs.pop('encoding', 'utf-8')
+        self.encodingErrors = kwargs.pop('encodingErrors', 'strict')
         # See if a shapefile name was passed as an argument
         if len(args) > 0:
             if is_string(args[0]):
@@ -635,7 +636,7 @@ class Reader:
                         value = None # unknown value is set to missing
             else:
                 # anything else is forced to string/unicode
-                value = u(value, self.encoding)
+                value = u(value, self.encoding, self.encodingErrors)
                 value = value.strip()
             record.append(value)
         return record
