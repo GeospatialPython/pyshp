@@ -1098,7 +1098,7 @@ class Writer:
                 value = b(value, self.encoding, self.encodingErrors)[:size].ljust(size)
             if not isinstance(value, bytes):
                 # just in case some of the numeric format() and date strftime() results are still in unicode (Python 3 only)
-                value = bytes(value) # should be default bytes ascii encoding
+                value = b(value, 'ascii', self.encodingErrors) # should be default ascii encoding
             if len(value) != size:
                 raise ShapefileException(
                     "Shapefile Writer unable to pack incorrect sized value"
