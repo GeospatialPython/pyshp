@@ -79,13 +79,27 @@ if PYTHON3:
         return isinstance(v, str)
 
 else:
-    def b(v):
-        # For python 2 assume str passed in and return str.
-        return v
+    def b(v, encoding='utf-8', encodingErrors='strict'):
+        if isinstance(v, unicode):
+            # For python 2 encode unicode to bytes.
+            return v.encode(encoding, encodingErrors)
+        elif isinstance(v, bytes):
+            # Already bytes.
+            return v
+        else:
+            # Error.
+            raise Exception('Unknown input type')
 
-    def u(v, encoding='utf-8'):
-        # For python 2 assume str passed in and return str.
-        return v
+    def u(v, encoding='utf-8', encodingErrors='strict'):
+        if isinstance(v, bytes):
+            # For python 2 decode bytes to unicode.
+            return v.decode(encoding, encodingErrors)
+        elif isinstance(v, unicode):
+            # Already unicode.
+            return v
+        else:
+            # Error.
+            raise Exception('Unknown input type')
 
     def is_string(v):
         return isinstance(v, basestring)
