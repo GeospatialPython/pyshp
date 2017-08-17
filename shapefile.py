@@ -1261,17 +1261,39 @@ def test(**kwargs):
     verbosity = kwargs.get('verbose', 0)
     if verbosity == 0:
         print('Running doctests...')
-    failure_count, test_count = doctest.testfile("README.md", verbose=verbosity)
-    if verbosity == 0 and failure_count == 0:
-        print('All test passed successfully')
+
+    # ignore py2-3 unicode differences
+    import re
+    class Py23DocChecker(doctest.OutputChecker):
+        def check_output(self, want, got, optionflags):
+            if sys.version_info[0] == 2:
+                got = re.sub("u'(.*?)'", "'\\1'", got)
+                got = re.sub('u"(.*?)"', '"\\1"', got)
+            return doctest.OutputChecker.check_output(self, want, got, optionflags)
+        def summarize(self):
+            doctest.OutputChecker.summarize(True)
+
+    # run tests
+    runner = doctest.DocTestRunner(checker=Py23DocChecker(), verbose=verbosity)
+    with open("README.md","r") as fobj:
+        test = doctest.DocTestParser().get_doctest(string=fobj.read(), globs={}, name="README", filename="README.md", lineno=0)
+    failure_count, test_count = runner.run(test)
+
+    # print results
+    if verbosity:
+        runner.summarize(True)
+    else:
+        if failure_count == 0:
+            print('All test passed successfully')
+        elif failure_count > 0:
+            runner.summarize(verbosity)
+
     return failure_count
     
 if __name__ == "__main__":
     """
-    Doctests are contained in the file 'README.md'. This library was originally developed
-    using Python 2.3. Python 2.4 and above have some excellent improvements in the built-in
-    testing libraries but for now unit testing is done using what's available in
-    2.3.
+    Doctests are contained in the file 'README.md', and are tested using the built-in
+    testing libraries. 
     """
     failure_count = test()
     sys.exit(failure_count)
