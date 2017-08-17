@@ -53,10 +53,10 @@ else:
 MISSING = [None,'']
 
 if PYTHON3:
-    def b(v):
+    def b(v, encoding='utf-8', encodingErrors='strict'):
         if isinstance(v, str):
             # For python 3 encode str to bytes.
-            return v.encode('utf-8')
+            return v.encode(encoding, encodingErrors)
         elif isinstance(v, bytes):
             # Already bytes.
             return v
@@ -64,10 +64,10 @@ if PYTHON3:
             # Error.
             raise Exception('Unknown input type')
 
-    def u(v, encoding='utf-8'):
+    def u(v, encoding='utf-8', encodingErrors='strict'):
         if isinstance(v, bytes):
             # For python 3 decode bytes to str.
-            return v.decode(encoding)
+            return v.decode(encoding, encodingErrors)
         elif isinstance(v, str):
             # Already str.
             return v
@@ -79,13 +79,27 @@ if PYTHON3:
         return isinstance(v, str)
 
 else:
-    def b(v):
-        # For python 2 assume str passed in and return str.
-        return v
+    def b(v, encoding='utf-8', encodingErrors='strict'):
+        if isinstance(v, unicode):
+            # For python 2 encode unicode to bytes.
+            return v.encode(encoding, encodingErrors)
+        elif isinstance(v, bytes):
+            # Already bytes.
+            return v
+        else:
+            # Error.
+            raise Exception('Unknown input type')
 
-    def u(v, encoding='utf-8'):
-        # For python 2 assume str passed in and return str.
-        return v
+    def u(v, encoding='utf-8', encodingErrors='strict'):
+        if isinstance(v, bytes):
+            # For python 2 decode bytes to unicode.
+            return v.decode(encoding, encodingErrors)
+        elif isinstance(v, unicode):
+            # Already unicode.
+            return v
+        else:
+            # Error.
+            raise Exception('Unknown input type')
 
     def is_string(v):
         return isinstance(v, basestring)
@@ -301,6 +315,7 @@ class Reader:
         self.fields = []
         self.__dbfHdrLength = 0
         self.encoding = kwargs.pop('encoding', 'utf-8')
+        self.encodingErrors = kwargs.pop('encodingErrors', 'strict')
         # See if a shapefile name was passed as an argument
         if len(args) > 0:
             if is_string(args[0]):
@@ -554,17 +569,17 @@ class Reader:
             fieldDesc = list(unpack("<11sc4xBB14x", dbf.read(32)))
             name = 0
             idx = 0
-            if b("\x00") in fieldDesc[name]:
-                idx = fieldDesc[name].index(b("\x00"))
+            if b"\x00" in fieldDesc[name]:
+                idx = fieldDesc[name].index(b"\x00")
             else:
                 idx = len(fieldDesc[name]) - 1
             fieldDesc[name] = fieldDesc[name][:idx]
-            fieldDesc[name] = u(fieldDesc[name], self.encoding)
+            fieldDesc[name] = u(fieldDesc[name], "ascii")
             fieldDesc[name] = fieldDesc[name].lstrip()
-            fieldDesc[1] = u(fieldDesc[1], self.encoding)
+            fieldDesc[1] = u(fieldDesc[1], "ascii")
             self.fields.append(fieldDesc)
         terminator = dbf.read(1)
-        if terminator != b("\r"):
+        if terminator != b"\r":
             raise ShapefileException("Shapefile dbf header lacks expected terminator. (likely corrupt?)")
         self.fields.insert(0, ('DeletionFlag', 'C', 1, 0))
         fmt,fmtSize = self.__recordFmt()
@@ -587,7 +602,7 @@ class Reader:
         """Reads and returns a dbf record row as a list of values."""
         f = self.__getFileObj(self.dbf)
         recordContents = self.__recStruct.unpack(f.read(self.__recStruct.size))
-        if recordContents[0] != b(' '):
+        if recordContents[0] != b' ':
             # deleted record
             return None
         record = []
@@ -596,9 +611,9 @@ class Reader:
                 continue
             elif typ in ("N","F"):
                 # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field. 
-                value = value.replace(b('\0'), b('')).strip()
-                value = value.replace(b('*'), b(''))  # QGIS NULL is all '*' chars
-                if value == b(''):
+                value = value.replace(b'\0', b'').strip()
+                value = value.replace(b'*', b'')  # QGIS NULL is all '*' chars
+                if value == b'':
                     value = None
                 elif deci:
                     try:
@@ -614,7 +629,7 @@ class Reader:
                         value = None
             elif typ == 'D':
                 # date: 8 bytes - date stored as a string in the format YYYYMMDD.
-                if value.count(b('0')) == len(value):  # QGIS NULL is all '0' chars
+                if value.count(b'0') == len(value):  # QGIS NULL is all '0' chars
                     value = None
                 else:
                     try:
@@ -624,18 +639,18 @@ class Reader:
                         value = value.strip()
             elif typ == 'L':
                 # logical: 1 byte - initialized to 0x20 (space) otherwise T or F.
-                if value == b(" "):
+                if value == b" ":
                     value = None # space means missing or not yet set
                 else:
-                    if value in b('YyTt1'):
+                    if value in b'YyTt1':
                         value = True
-                    elif value in b('NnFf0'):
+                    elif value in b'NnFf0':
                         value = False
                     else:
                         value = None # unknown value is set to missing
             else:
                 # anything else is forced to string/unicode
-                value = u(value, self.encoding)
+                value = u(value, self.encoding, self.encodingErrors)
                 value = value.strip()
             record.append(value)
         return record
@@ -698,7 +713,7 @@ class Reader:
 
 class Writer:
     """Provides write support for ESRI Shapefiles."""
-    def __init__(self, shapeType=None, autoBalance=False, bufsize=None):
+    def __init__(self, shapeType=None, autoBalance=False, bufsize=None, **kwargs):
         self.autoBalance = autoBalance
         self.fields = []
         self.shapeType = shapeType
@@ -718,6 +733,9 @@ class Writer:
         self._mbox = [0,0]
         # Use deletion flags in dbf? Default is false (0).
         self.deletionFlag = 0
+        # Encoding
+        self.encoding = kwargs.pop('encoding', 'utf-8')
+        self.encodingErrors = kwargs.pop('encodingErrors', 'strict')
 
     def __len__(self):
         """Returns the current number of features written to the shapefile. 
@@ -857,15 +875,15 @@ class Writer:
         # Field descriptors
         for field in self.fields:
             name, fieldType, size, decimal = field
-            name = b(name)
-            name = name.replace(b(' '), b('_'))
-            name = name.ljust(11).replace(b(' '), b('\x00'))
-            fieldType = b(fieldType)
+            name = b(name, 'ascii', self.encodingErrors)
+            name = name.replace(b' ', b'_')
+            name = name.ljust(11).replace(b' ', b'\x00')
+            fieldType = b(fieldType, 'ascii', self.encodingErrors)
             size = int(size)
             fld = pack('<11sc4xBB14x', name, fieldType, size, decimal)
             f.write(fld)
         # Terminator
-        f.write(b('\r'))
+        f.write(b'\r')
 
     def shape(self, s):
         # Balance if already not balanced
@@ -1041,14 +1059,14 @@ class Writer:
         f = self.__getFileObj(self._dbf)
         self.recNum += 1
         if not self.fields[0][0].startswith("Deletion"):
-            f.write(b(' ')) # deletion flag
+            f.write(b' ') # deletion flag
         for (fieldName, fieldType, size, deci), value in zip(self.fields, record):
             fieldType = fieldType.upper()
             size = int(size)
             if fieldType in ("N","F"):
                 # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
                 if value in MISSING:
-                    value = str("*"*size) # QGIS NULL
+                    value = b"*"*size # QGIS NULL
                 elif not deci:
                     value = format(value, "d")[:size].rjust(size) # caps the size if exceeds the field size
                 else:
@@ -1060,29 +1078,31 @@ class Writer:
                 elif isinstance(value, list) and len(value) == 3:
                     value = date(*value).strftime("%Y%m%d")
                 elif value in MISSING:
-                    value = b('0') * 8 # QGIS NULL for date type
-                elif isinstance(value, str) and len(value) == 8:
+                    value = b'0' * 8 # QGIS NULL for date type
+                elif is_string(value) and len(value) == 8:
                     pass # value is already a date string
                 else:
                     raise ShapefileException("Date values must be either a datetime.date object, a list, a YYYYMMDD string, or a missing value.")
             elif fieldType == 'L':
                 # logical: 1 byte - initialized to 0x20 (space) otherwise T or F.
                 if value in MISSING:
-                    value = b(' ') # missing is set to space
+                    value = b' ' # missing is set to space
                 elif value in [True,1]:
-                    value = b("T")
+                    value = b'T'
                 elif value in [False,0]:
-                    value = b("F")
+                    value = b'F'
                 else:
-                    value = b(' ') # unknown is set to space
+                    value = b' ' # unknown is set to space
             else:
-                # anything else is forced to string
-                value = str(value)[:size].ljust(size)
+                # anything else is forced to string, truncated to the length of the field
+                value = b(value, self.encoding, self.encodingErrors)[:size].ljust(size)
+            if not isinstance(value, bytes):
+                # just in case some of the numeric format() and date strftime() results are still in unicode (Python 3 only)
+                value = b(value, 'ascii', self.encodingErrors) # should be default ascii encoding
             if len(value) != size:
                 raise ShapefileException(
                     "Shapefile Writer unable to pack incorrect sized value"
                     " (size %d) into field '%s' (size %d)." % (len(value), fieldName, size))
-            value = b(value)
             f.write(value)
 
     def balance(self):
@@ -1241,17 +1261,39 @@ def test(**kwargs):
     verbosity = kwargs.get('verbose', 0)
     if verbosity == 0:
         print('Running doctests...')
-    failure_count, test_count = doctest.testfile("README.md", verbose=verbosity)
-    if verbosity == 0 and failure_count == 0:
-        print('All test passed successfully')
+
+    # ignore py2-3 unicode differences
+    import re
+    class Py23DocChecker(doctest.OutputChecker):
+        def check_output(self, want, got, optionflags):
+            if sys.version_info[0] == 2:
+                got = re.sub("u'(.*?)'", "'\\1'", got)
+                got = re.sub('u"(.*?)"', '"\\1"', got)
+            return doctest.OutputChecker.check_output(self, want, got, optionflags)
+        def summarize(self):
+            doctest.OutputChecker.summarize(True)
+
+    # run tests
+    runner = doctest.DocTestRunner(checker=Py23DocChecker(), verbose=verbosity)
+    with open("README.md","r") as fobj:
+        test = doctest.DocTestParser().get_doctest(string=fobj.read(), globs={}, name="README", filename="README.md", lineno=0)
+    failure_count, test_count = runner.run(test)
+
+    # print results
+    if verbosity:
+        runner.summarize(True)
+    else:
+        if failure_count == 0:
+            print('All test passed successfully')
+        elif failure_count > 0:
+            runner.summarize(verbosity)
+
     return failure_count
     
 if __name__ == "__main__":
     """
-    Doctests are contained in the file 'README.md'. This library was originally developed
-    using Python 2.3. Python 2.4 and above have some excellent improvements in the built-in
-    testing libraries but for now unit testing is done using what's available in
-    2.3.
+    Doctests are contained in the file 'README.md', and are tested using the built-in
+    testing libraries. 
     """
     failure_count = test()
     sys.exit(failure_count)
