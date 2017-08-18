@@ -627,7 +627,7 @@ To store very large numbers you must increase the field length size to the total
 	>>> nr = 1.3217328
 	>>> w.null()
 	>>> w.null()
-	>>> w.record(INT=int(nr), LOWPREC=nr, MEDPREC=nr, HIGHPREC=-3.2302e-25, FTYPE=nr, LARGENR=int(nr)*10**100)
+	>>> w.record(INT=nr, LOWPREC=nr, MEDPREC=nr, HIGHPREC=-3.2302e-25, FTYPE=nr, LARGENR=int(nr)*10**100)
 	>>> w.record(None, None, None, None, None, None)
 	>>> w.save('shapefiles/test/dtype')
 	
