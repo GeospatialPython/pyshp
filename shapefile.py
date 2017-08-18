@@ -1269,14 +1269,15 @@ def test(**kwargs):
             if sys.version_info[0] == 2:
                 got = re.sub("u'(.*?)'", "'\\1'", got)
                 got = re.sub('u"(.*?)"', '"\\1"', got)
-            return doctest.OutputChecker.check_output(self, want, got, optionflags)
+            res = doctest.OutputChecker.check_output(self, want, got, optionflags)
+            return res
         def summarize(self):
             doctest.OutputChecker.summarize(True)
 
     # run tests
     runner = doctest.DocTestRunner(checker=Py23DocChecker(), verbose=verbosity)
-    with open("README.md","r") as fobj:
-        test = doctest.DocTestParser().get_doctest(string=fobj.read(), globs={}, name="README", filename="README.md", lineno=0)
+    with open("README.md","rb") as fobj:
+        test = doctest.DocTestParser().get_doctest(string=fobj.read().decode("utf8"), globs={}, name="README", filename="README.md", lineno=0)
     failure_count, test_count = runner.run(test)
 
     # print results

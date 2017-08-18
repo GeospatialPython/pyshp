@@ -24,9 +24,11 @@ The Python Shapefile Library (pyshp) reads and writes ESRI Shapefiles in pure Py
   - [Adding Records](#adding-records)
   - [File Names](#file-names)
   - [Saving to File-Like Objects](#saving-to-file-like-objects)
-- [Working with Large Shapefiles](#working-with-large-shapefiles)
 - [Python Geo Interface](#python-geo-interface)
-- [Testing](#testing)
+- [Working with Large Shapefiles](#working-with-large-shapefiles)
+- [Unicode and Shapefile Encodings](#unicode-and-shapefile-encodings)
+
+[Testing](#testing)
 
 # Overview
 
@@ -714,6 +716,35 @@ write them.
 	>>> # Normally you would call the "StringIO.getvalue()" method on these objects.
 	>>> shp = shx = dbf = None
 	
+## Python Geo Interface
+
+The Python \_\_geo_interface\_\_ convention provides a data interchange interface
+among geospatial Python libraries. The interface returns data as GeoJSON which gives you
+nice compatibility with other libraries and tools including Shapely, Fiona, and PostGIS. 
+More information on the \_\_geo_interface\_\_ protocol can be found at:
+[https://gist.github.com/sgillies/2217756](https://gist.github.com/sgillies/2217756).
+More information on GeoJSON is available at [http://geojson.org](http://geojson.org).
+
+
+	>>> s = sf.shape(0)
+	>>> s.__geo_interface__["type"]
+	'MultiPolygon'
+	
+Just as the library can expose its objects to other applications through the geo interface, 
+it also supports receiving objects with the geo interface from other applications. 
+To write shapes based on GeoJSON objects, simply send an object with the geo interface or a 
+GeoJSON dictionary to the shape() method instead of a Shape object. Alternatively, you can
+construct a Shape object from GeoJSON using the "geojson_as_shape()" function. 
+
+
+	>>> w = shapefile.Writer()
+	>>> w.field('name', 'C')
+	
+	>>> w.shape( {"type":"Point", "coordinates":[1,1]} )
+	>>> w.record('two')
+
+	>>> w.save('shapefiles/test/geojson')
+	
 ## Working with Large Shapefiles
 
 Despite being a lightweight library, PyShp is designed to be able to read and write 
@@ -756,43 +787,43 @@ process and write any number of items, and even merging many different source fi
 large shapefile. If you need to edit or undo any of your writing you would have to read the 
 file back in, one record at a time, make your changes, and write it back out. 
 
-## Python Geo Interface
+## Unicode and Shapefile Encodings
 
-The Python \_\_geo_interface\_\_ convention provides a data interchange interface
-among geospatial Python libraries. The interface returns data as GeoJSON which gives you
-nice compatibility with other libraries and tools including Shapely, Fiona, and PostGIS. 
-More information on the \_\_geo_interface\_\_ protocol can be found at:
-[https://gist.github.com/sgillies/2217756](https://gist.github.com/sgillies/2217756).
-More information on GeoJSON is available at [http://geojson.org](http://geojson.org).
+PyShp has full support for unicode and shapefile encodings, so you can always expect to be working
+with unicode strings in shapefiles that have text fields. 
+Most shapefiles are written in UTF-8 encoding, PyShp's default encoding, so in most cases you don't 
+have to specify the encoding. For reading shapefiles in any other encoding, such as Latin-1, just 
+supply the encoding option when creating the Reader class. 
 
 
-	>>> s = sf.shape(0)
-	>>> s.__geo_interface__["type"]
-	'MultiPolygon'
+	>>> r = shapefile.Reader("shapefiles/test/latin1.shp", encoding="latin1")
+	>>> r.record(0) == [2, u'Ñandú']
+	True
 	
-Just as the library can expose its objects to other applications through the geo interface, 
-it also supports receiving objects with the geo interface from other applications. 
-To write shapes based on GeoJSON objects, simply send an object with the geo interface or a 
-GeoJSON dictionary to the shape() method instead of a Shape object. Alternatively, you can
-construct a Shape object from GeoJSON using the "geojson_as_shape()" function. 
+Once you have loaded the shapefile, you may choose to save it using another more supportive encoding such 
+as UTF-8. Provided the new encoding supports the characters you are trying to write, reading it back in 
+should give you the same unicode string you started with. 
 
 
-	>>> w = shapefile.Writer()
-	>>> w.field('name', 'C')
-
-	>>> w.shape( {"type":"Point", "coordinates":[1,1]} )
-	>>> w.record('one')
+	>>> w = shapefile.Writer(encoding="utf8")
+	>>> w.fields = r.fields[1:]
+	>>> w.record(*r.record(0))
+	>>> w.null()
+	>>> w.save("shapefiles/test/latin_as_utf8.shp")
 	
-	>>> shape = shapefile.geojson_to_shape( {"type":"Point", "coordinates":[2,2]} )
-	>>> shape.shapeType
-	1
-	>>> shape.points
-	[[2, 2]]
+	>>> r = shapefile.Reader("shapefiles/test/latin_as_utf8.shp", encoding="utf8")
+	>>> r.record(0) == [2, u'Ñandú']
+	True
 	
-	>>> w.shape(shape)
-	>>> w.record('two')
+If you supply the wrong encoding and the string is unable to be decoded, PyShp will by default raise an
+exception. If however, on rare occasion, you are unable to find the correct encoding and want to ignore
+or replace encoding errors, you can specify the "encodingErrors" to be used by the decode method. This
+applies to both reading and writing. 
 
-	>>> w.save('shapefiles/test/geojson')
+
+	>>> r = shapefile.Reader("shapefiles/test/latin1.shp", encoding="ascii", encodingErrors="replace")
+	>>> r.record(0) == [2, u'�and�']
+	True
 
 # Testing
 
