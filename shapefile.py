@@ -3,11 +3,11 @@ shapefile.py
 Provides read and write support for ESRI Shapefiles.
 author: jlawhead<at>geospatialpython.com
 date: 2017/04/29
-version: 1.2.11
+version: 1.2.12-dev
 Compatible with Python versions 2.7-3.x
 """
 
-__version__ = "1.2.11"
+__version__ = "1.2.12-dev"
 
 from struct import pack, unpack, calcsize, error, Struct
 import os
@@ -522,11 +522,19 @@ class Reader:
                         #not parseable as float, set to None
                         value = None
                 else:
+                    # force to int
                     try:
-                        value = int(value)
+                        # first try to force directly to int.
+                        # forcing a large int to float and back to int
+                        # will lose information and result in wrong nr.
+                        value = int(value) 
                     except ValueError:
-                        #not parseable as int, set to None
-                        value = None
+                        # forcing directly to int failed, so was probably a float.
+                        try:
+                            value = int(float(value))
+                        except ValueError:
+                            #not parseable as int, set to None
+                            value = None
             elif typ == 'D':
                 # date: 8 bytes - date stored as a string in the format YYYYMMDD.
                 if value.count(b('0')) == len(value):  # QGIS NULL is all '0' chars
@@ -945,8 +953,18 @@ class Writer:
                     if value in MISSING:
                         value = str("*"*size) # QGIS NULL
                     elif not deci:
+                        # force to int
+                        try:
+                            # first try to force directly to int.
+                            # forcing a large int to float and back to int
+                            # will lose information and result in wrong nr.
+                            value = int(value) 
+                        except ValueError:
+                            # forcing directly to int failed, so was probably a float.
+                            value = int(float(value))
                         value = format(value, "d")[:size].rjust(size) # caps the size if exceeds the field size
                     else:
+                        value = float(value)
                         value = format(value, ".%sf"%deci)[:size].rjust(size) # caps the size if exceeds the field size
                 elif fieldType == "D":
                     # date: 8 bytes - date stored as a string in the format YYYYMMDD.
