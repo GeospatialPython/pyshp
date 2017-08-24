@@ -1,3 +1,9 @@
+VERSION 1.2.12
+
+2017-08-24 Karim Bahgat <karim.bahgat.norway@gmail.com> 
+	* Fixed errors caused by strict value type checking, as introduced in v1.2.11. Now more lenient by attempting force conversion of values to match the field type. 
+	* Allow reading file-like objects without seek method (such as ZipFile or urllib.urlopen). 
+
 VERSION 1.2.11
 
 2017-04-29 Karim Bahgat <karim.bahgat.norway@gmail.com>
