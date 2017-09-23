@@ -377,10 +377,10 @@ class Reader:
         """
         shp_ext = 'shp'
         try:
-            self.shp = self.shp = open("%s.%s" % (shapefile_name, shp_ext), "rb")
+            self.shp = open("%s.%s" % (shapefile_name, shp_ext), "rb")
         except IOError:
             try:
-                self.shp = self.shp = open("%s.%s" % (shapefile_name, shp_ext.upper()), "rb")
+                self.shp = open("%s.%s" % (shapefile_name, shp_ext.upper()), "rb")
             except IOError:
                 pass
 
@@ -390,10 +390,10 @@ class Reader:
         """
         shx_ext = 'shx'
         try:
-            self.shp = self.shp = open("%s.%s" % (shapefile_name, shx_ext), "rb")
+            self.shx = open("%s.%s" % (shapefile_name, shx_ext), "rb")
         except IOError:
             try:
-                self.shp = self.shp = open("%s.%s" % (shapefile_name, shx_ext.upper()), "rb")
+                self.shx = open("%s.%s" % (shapefile_name, shx_ext.upper()), "rb")
             except IOError:
                 pass
 
@@ -403,10 +403,10 @@ class Reader:
         """
         dbf_ext = 'dbf'
         try:
-            self.shp = self.shp = open("%s.%s" % (shapefile_name, dbf_ext), "rb")
+            self.dbf = open("%s.%s" % (shapefile_name, dbf_ext), "rb")
         except IOError:
             try:
-                self.shp = self.shp = open("%s.%s" % (shapefile_name, dbf_ext.upper()), "rb")
+                self.dbf = open("%s.%s" % (shapefile_name, dbf_ext.upper()), "rb")
             except IOError:
                 pass
 
