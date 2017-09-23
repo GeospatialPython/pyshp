@@ -361,24 +361,54 @@ class Reader:
         if shapefile:
             (shapeName, ext) = os.path.splitext(shapefile)
             self.shapeName = shapeName
-            try:
-                self.shp = open("%s.shp" % shapeName, "rb")
-            except IOError:
-                pass
-            try:
-                self.shx = open("%s.shx" % shapeName, "rb")
-            except IOError:
-                pass
-            try:
-                self.dbf = open("%s.dbf" % shapeName, "rb")
-            except IOError:
-                pass
+            self.load_shp(shapeName)
+            self.load_shx(shapeName)
+            self.load_dbf(shapeName)
             if not (self.shp and self.dbf):
-                raise ShapefileException("Unable to open %s.dbf or %s.shp." % (shapeName, shapeName) )
+                raise ShapefileException("Unable to open %s.dbf or %s.shp." % (shapeName, shapeName))
         if self.shp:
             self.__shpHeader()
         if self.dbf:
             self.__dbfHeader()
+
+    def load_shp(self, shapefile_name):
+        """
+        Attempts to load file with .shp extension as both lower and upper case
+        """
+        shp_ext = 'shp'
+        try:
+            self.shp = self.shp = open("%s.%s" % (shapefile_name, shp_ext), "rb")
+        except IOError:
+            try:
+                self.shp = self.shp = open("%s.%s" % (shapefile_name, shp_ext.upper()), "rb")
+            except IOError:
+                pass
+
+    def load_shx(self, shapefile_name):
+        """
+        Attempts to load file with .shx extension as both lower and upper case
+        """
+        shx_ext = 'shx'
+        try:
+            self.shp = self.shp = open("%s.%s" % (shapefile_name, shx_ext), "rb")
+        except IOError:
+            try:
+                self.shp = self.shp = open("%s.%s" % (shapefile_name, shx_ext.upper()), "rb")
+            except IOError:
+                pass
+
+    def load_dbf(self, shapefile_name):
+        """
+        Attempts to load file with .dbf extension as both lower and upper case
+        """
+        dbf_ext = 'dbf'
+        try:
+            self.shp = self.shp = open("%s.%s" % (shapefile_name, dbf_ext), "rb")
+        except IOError:
+            try:
+                self.shp = self.shp = open("%s.%s" % (shapefile_name, dbf_ext.upper()), "rb")
+            except IOError:
+                pass
 
     def __del__(self):
         self.close()
