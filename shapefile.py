@@ -486,7 +486,7 @@ class Reader:
         if shapeType == 11:
             record.z = unpack("<d", f.read(8))
         # Read a single M value
-        if shapeType in (11,21):
+        if shapeType == 21 or (shapeType == 11 and f.tell() < next):
             record.m = unpack("<d", f.read(8))
         # Seek to the end of this record as defined by the record header because
         # the shapefile spec doesn't require the actual content to meet the header
