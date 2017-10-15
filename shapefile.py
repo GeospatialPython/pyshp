@@ -38,7 +38,7 @@ SHAPE_TYPES = {
     31: 'MULTIPATCH'}
 # add inverse mapping and insert all into globals
 _thismodule = sys.modules[__name__]
-for num, name in SHAPE_TYPES.items():
+for num, name in list(SHAPE_TYPES.items()):
     setattr(_thismodule, name, num)
     if name in SHAPE_TYPES:
         # this is a conflict in shapetype names and should not happen
