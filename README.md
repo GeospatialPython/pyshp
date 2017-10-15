@@ -126,6 +126,9 @@ objects are properly closed when done reading the data:
 
     >>> with shapefile.Reader("shapefiles/blockgroups.shp") as shp:
     ...     print(shp)
+    shapefile Reader
+        663 shapes (type 'POLYGON')
+        663 records (44 fields)
 
 ### Reading Shapefile Meta-Data
 

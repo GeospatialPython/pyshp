@@ -359,6 +359,19 @@ class Reader(object):
         else:
             raise ShapefileException("Shapefile Reader requires a shapefile or file-like object.")
 
+    def __str__(self):
+        """
+        Use some general info on the shapefile as __str__
+        """
+        info = ['shapefile Reader']
+        if self.shp:
+            info.append("    {} shapes (type '{}')".format(
+                len(self.shapes()), SHAPE_TYPES[self.shapeType]))
+        if self.dbf:
+            info.append('    {} records ({} fields)'.format(
+                self.numRecords, len(self.fields)))
+        return '\n'.join(info)
+
     def __enter__(self):
         """
         Enter phase of context manager.
