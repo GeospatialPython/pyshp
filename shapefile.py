@@ -185,7 +185,7 @@ def geojson_to_shape(geoj):
         shape.parts = parts
     return shape
 
-class Shape:
+class Shape(object):
     def __init__(self, shapeType=NULL, points=None, parts=None, partTypes=None):
         """Stores the geometry of the different shape types
         specified in the Shapefile spec. Shape types are
@@ -276,7 +276,7 @@ class Shape:
                     'coordinates': polys
                     }
 
-class ShapeRecord:
+class ShapeRecord(object):
     """A ShapeRecord object containing a shape along with its attributes."""
     def __init__(self, shape=None, record=None):
         self.shape = shape
@@ -286,7 +286,7 @@ class ShapefileException(Exception):
     """An exception to handle shapefile specific problems."""
     pass
 
-class Reader:
+class Reader(object):
     """Reads the three files of a shapefile as a unit or
     separately.  If one of the three files (.shp, .shx,
     .dbf) is missing no exception is thrown until you try
@@ -749,7 +749,7 @@ class Reader:
             yield ShapeRecord(shape=shape, record=record)
 
 
-class Writer:
+class Writer(object):
     """Provides write support for ESRI Shapefiles."""
     def __init__(self, shapeType=None, autoBalance=False, bufsize=None, **kwargs):
         self.autoBalance = autoBalance
