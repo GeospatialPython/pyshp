@@ -384,15 +384,12 @@ class Reader(object):
         self.close()
 
     def close(self):
-        try:
-            if hasattr(self.shp, 'close'):
-                self.shp.close()
-            if hasattr(self.shx, 'close'):
-                self.shx.close()
-            if hasattr(self.dbf, 'close'):
-                self.dbf.close()
-        except IOError:
-            pass
+        for attribute in (self.shp, self.shx, self.dbf):
+            if hasattr(attribute, 'close'):
+                try:
+                    attribute.close()
+                except IOError:
+                    pass
 
     def __getFileObj(self, f):
         """Checks to see if the requested shapefile file object is
