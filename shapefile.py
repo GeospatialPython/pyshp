@@ -21,20 +21,29 @@ from datetime import date
 
 
 # Constants for shape types
-NULL = 0
-POINT = 1
-POLYLINE = 3
-POLYGON = 5
-MULTIPOINT = 8
-POINTZ = 11
-POLYLINEZ = 13
-POLYGONZ = 15
-MULTIPOINTZ = 18
-POINTM = 21
-POLYLINEM = 23
-POLYGONM = 25
-MULTIPOINTM = 28
-MULTIPATCH = 31
+SHAPE_TYPES = {
+    0: 'NULL',
+    1: 'POINT',
+    3: 'POLYLINE',
+    5: 'POLYGON',
+    8: 'MULTIPOINT',
+    11: 'POINTZ',
+    13: 'POLYLINEZ',
+    15: 'POLYGONZ',
+    18: 'MULTIPOINTZ',
+    21: 'POINTM',
+    23: 'POLYLINEM',
+    25: 'POLYGONM',
+    28: 'MULTIPOINTM',
+    31: 'MULTIPATCH'}
+# add inverse mapping and insert all into globals
+_thismodule = sys.modules[__name__]
+for num, name in SHAPE_TYPES.items():
+    setattr(_thismodule, name, num)
+    if name in SHAPE_TYPES:
+        # this is a conflict in shapetype names and should not happen
+        raise Exception()
+    SHAPE_TYPES[name] = num
 
 
 # Python 2-3 handling
@@ -349,6 +358,18 @@ class Reader(object):
             self.load()
         else:
             raise ShapefileException("Shapefile Reader requires a shapefile or file-like object.")
+
+    def __enter__(self):
+        """
+        Enter phase of context manager.
+        """
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Exit phase of context manager, close opened files.
+        """
+        self.close()
 
     def __len__(self):
         """Returns the number of shapes/records in the shapefile."""
