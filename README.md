@@ -33,7 +33,7 @@ Python Shapefile库（pyshp）在纯Python中读取和写入ESRI Shapefile。
 
 # 概观
 
-Python Shapefile库（pyshp）为Esri Shapefile格式提供读写支持。Shapefile格式是Esri创建的受欢迎的地理信息系统向量数据格式。有关此格式的更多信息，请阅读位于[http://www.esri.com/library/whitepapers/p dfs / shapefile.pdf](http://www.esri.com/library/whitepapers/pdfs/shapefile.pdf)的精心编写的“ESRI Shapefile技术描述 - 1998年7月” 。Esri文档描述了shp和shx文件格式。但是也需要第三种称为dbf的文件格式。这种格式在Web上记录为“XBase文件格式描述”，是一种在20世纪60年代创建的一种简单的基于文件的数据库格式。有关本规范的更多信息，请参阅：[ [http://www.clicketyclick.dk/databases/xbase/format/index.html\]（](http://www.clicketyclick.dk/databases/xbase/format/index.html]()[http：//www.clicketyclick.d](http://www.clicketyclick.d/) K /数据库/ XBASE /格式/ index.html中）
+Python Shapefile库（pyshp）为Esri Shapefile格式提供读写支持。Shapefile格式是Esri创建的受欢迎的地理信息系统向量数据格式。有关此格式的更多信息，请阅读位于[http://www.esri.com/library/whitepapers/pdfs/shapefile.pdf](http://www.esri.com/library/whitepapers/pdfs/shapefile.pdf)的精心编写的“ESRI Shapefile技术描述 - 1998年7月” 。Esri文档描述了shp和shx文件格式。但是也需要第三种称为dbf的文件格式。这种格式在Web上记录为“XBase文件格式描述”，是一种在20世纪60年代创建的一种简单的基于文件的数据库格式。有关本规范的更多信息，请参阅：[http://www.clicketyclick.dk/databases/xbase/format/index.html\](http://www.clicketyclick.dk/databases/xbase/format/index.html)[http：//www.clicketyclick.d](http://www.clicketyclick.d/) K /数据库/XBASE/格式/index.html中）
 
 Esri和XBase文件格式在设计和内存有效性方面都非常简单，这是造型文件格式仍然流行的原因之一，尽管目前存在和交换GIS数据的方法很多。
 
