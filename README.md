@@ -1,16 +1,16 @@
 # PyShp
 
-The Python Shapefile Library (pyshp) reads and writes ESRI Shapefiles in pure Python.
+Python Shapefile库（pyshp）在纯Python中读取和写入ESRI Shapefile。
 
 ![pyshp logo](http://4.bp.blogspot.com/_SBi37QEsCvg/TPQuOhlHQxI/AAAAAAAAAE0/QjFlWfMx0tQ/S350/GSP_Logo.png "PyShp")
 
 [![Build Status](https://travis-ci.org/GeospatialPython/pyshp.svg?branch=master)](https://travis-ci.org/GeospatialPython/pyshp)
 
-## Contents
+## 内容
 
-[Overview](#overview)
+[概述](#overview)
 
-[Examples](#examples)
+[例子](#examples)
 - [Reading Shapefiles](#reading-shapefiles)
   - [Reading Shapefiles from File-Like Objects](#reading-shapefiles-from-file-like-objects)
   - [Reading Geometry](#reading-geometry)
