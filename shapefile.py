@@ -1009,10 +1009,11 @@ class Writer:
                         value = b(' ')  # unknown is set to space
                 else:
                     # anything else is forced to string
-                    #value = b(str(value))
+                    # value = b(str(value))
+                    # Intercepts a string of the specified byte length
                     value = self.__cuttingStr(str(value),size)
                     value = value[:size].ljust(size)
-                    # 截取指定字节长度的字符串
+
 
 
                 if len(value) != size:
@@ -1023,6 +1024,8 @@ class Writer:
                 f.write(value)
 
     def __cuttingStr(self, value, lens):
+        if isinstance(value, bytes):
+            value = unicode(value, 'utf-8')
         b_str = value.encode("utf-8")
         return_str = ""
 
