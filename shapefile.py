@@ -791,17 +791,23 @@ class Writer:
     def __zbox(self, s):
         z = []
         try:
+            #print(s.points)
             for p in s.points:
                 z.append(p[2])
         except IndexError:
             pass
         if not z: z.append(0)
+#        print(z)
+#        print(self._zbox)
         zbox = [min(z), max(z)]
         # update global
-        self._zbox = [min(zbox[0],self._zbox[0]), min(zbox[1],self._zbox[1]), max(zbox[2],self._zbox[2]), max(zbox[3],self._zbox[3])]
+        try:
+            self._zbox = [min(zbox[0],self._zbox[0]), min(zbox[1],self._zbox[1]), max(zbox[2],self._zbox[2]), max(zbox[3],self._zbox[3])]
+        except IndexError:
+            pass
         return zbox
 
-    def __mbox(self, shapes):
+    def __mbox(self, s):
         m = []
         try:
             for p in s.points:
@@ -811,7 +817,10 @@ class Writer:
         if not m: m.append(0)
         mbox = [min(m), max(m)]
         # update global
-        self._mbox = [min(mbox[0],self._mbox[0]), min(mbox[1],self._mbox[1]), max(mbox[2],self._mbox[2]), max(mbox[3],self._mbox[3])]
+        try:
+            self._mbox = [min(mbox[0],self._mbox[0]), min(mbox[1],self._mbox[1]), max(mbox[2],self._mbox[2]), max(mbox[3],self._mbox[3])]
+        except IndexError:
+            pass
         return mbox
 
     def bbox(self):
