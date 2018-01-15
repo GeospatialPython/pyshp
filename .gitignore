@@ -1,0 +1,15 @@
+shapefile_[a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9].dbf
+shapefile_[a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9].shp
+shapefile_[a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9].shx
+shapefiles/test/copy.dbf
+shapefiles/test/copy.shp
+shapefiles/test/copy.shx
+shapefiles/test/geojson.dbf
+shapefiles/test/geojson.shp
+shapefiles/test/geojson.shx
+shapefiles/test/latin_as_utf8.dbf
+shapefiles/test/latin_as_utf8.shp
+shapefiles/test/latin_as_utf8.shx
+shapefiles/test/null.dbf
+shapefiles/test/null.shp
+shapefiles/test/null.shx

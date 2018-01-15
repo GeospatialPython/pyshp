@@ -13,6 +13,7 @@ The Python Shapefile Library (pyshp) reads and writes ESRI Shapefiles in pure Py
 [Examples](#examples)
 - [Reading Shapefiles](#reading-shapefiles)
   - [Reading Shapefiles from File-Like Objects](#reading-shapefiles-from-file-like-objects)
+  - [Reading Shapefile Using the Context Manager](#reading-shapefile-context-manager)
   - [Reading Shapefile Meta-Data](#reading-shapefile-meta-data)
   - [Reading Geometry](#reading-geometry)
   - [Reading Records](#reading-records)
@@ -117,6 +118,17 @@ very simple fixed-record index for the variable length records in the shp
 file. This file is optional for reading. If it's available pyshp will use the
 shx file to access shape records a little faster but will do just fine without
 it.
+
+### Reading Shapefile Using the Context Manager
+
+The "Reader" class can be used as a context manager, to ensure open file
+objects are properly closed when done reading the data:
+
+    >>> with shapefile.Reader("shapefiles/blockgroups.shp") as shp:
+    ...     print(shp)
+    shapefile Reader
+        663 shapes (type 'POLYGON')
+        663 records (44 fields)
 
 ### Reading Shapefile Meta-Data
 

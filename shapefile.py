@@ -7,7 +7,7 @@ version: 2.0.0-dev
 Compatible with Python versions 2.7-3.x
 """
 
-__version__ = "2.0.0-dev-pk"
+__version__ = "2.0.0-dev"
 
 from struct import pack, unpack, calcsize, error, Struct
 import os
@@ -15,25 +15,35 @@ import sys
 import time
 import array
 import tempfile
+import itertools
 import io
 from datetime import date
 
 
 # Constants for shape types
-NULL = 0
-POINT = 1
-POLYLINE = 3
-POLYGON = 5
-MULTIPOINT = 8
-POINTZ = 11
-POLYLINEZ = 13
-POLYGONZ = 15
-MULTIPOINTZ = 18
-POINTM = 21
-POLYLINEM = 23
-POLYGONM = 25
-MULTIPOINTM = 28
-MULTIPATCH = 31
+SHAPE_TYPES = {
+    0: 'NULL',
+    1: 'POINT',
+    3: 'POLYLINE',
+    5: 'POLYGON',
+    8: 'MULTIPOINT',
+    11: 'POINTZ',
+    13: 'POLYLINEZ',
+    15: 'POLYGONZ',
+    18: 'MULTIPOINTZ',
+    21: 'POINTM',
+    23: 'POLYLINEM',
+    25: 'POLYGONM',
+    28: 'MULTIPOINTM',
+    31: 'MULTIPATCH'}
+# add inverse mapping and insert all into globals
+_thismodule = sys.modules[__name__]
+for num, name in list(SHAPE_TYPES.items()):
+    setattr(_thismodule, name, num)
+    if name in SHAPE_TYPES:
+        # this is a conflict in shapetype names and should not happen
+        raise Exception()
+    SHAPE_TYPES[name] = num
 
 
 # Python 2-3 handling
@@ -184,7 +194,7 @@ def geojson_to_shape(geoj):
         shape.parts = parts
     return shape
 
-class Shape:
+class Shape(object):
     def __init__(self, shapeType=NULL, points=None, parts=None, partTypes=None):
         """Stores the geometry of the different shape types
         specified in the Shapefile spec. Shape types are
@@ -373,7 +383,7 @@ class Record(list):
         return 'record #{} of {}'.format(self.__oid, self.__factory)
 
 
-class ShapeRecord:
+class ShapeRecord(object):
     """A ShapeRecord object containing a shape along with its attributes."""
     def __init__(self, shape=None, record=None):
         self.shape = shape
@@ -383,7 +393,7 @@ class ShapefileException(Exception):
     """An exception to handle shapefile specific problems."""
     pass
 
-class Reader:
+class Reader(object):
     """Reads the three files of a shapefile as a unit or
     separately.  If one of the three files (.shp, .shx,
     .dbf) is missing no exception is thrown until you try
@@ -448,6 +458,31 @@ class Reader:
         else:
             raise ShapefileException("Shapefile Reader requires a shapefile or file-like object.")
 
+    def __str__(self):
+        """
+        Use some general info on the shapefile as __str__
+        """
+        info = ['shapefile Reader']
+        if self.shp:
+            info.append("    {} shapes (type '{}')".format(
+                len(self.shapes()), SHAPE_TYPES[self.shapeType]))
+        if self.dbf:
+            info.append('    {} records ({} fields)'.format(
+                self.numRecords, len(self.fields)))
+        return '\n'.join(info)
+
+    def __enter__(self):
+        """
+        Enter phase of context manager.
+        """
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Exit phase of context manager, close opened files.
+        """
+        self.close()
+
     def __len__(self):
         """Returns the number of shapes/records in the shapefile."""
         return self.numRecords
@@ -482,15 +517,12 @@ class Reader:
         self.close()
 
     def close(self):
-        try:
-            if hasattr(self.shp, 'close'):
-                self.shp.close()
-            if hasattr(self.shx, 'close'):
-                self.shx.close()
-            if hasattr(self.dbf, 'close'):
-                self.dbf.close()
-        except IOError:
-            pass
+        for attribute in (self.shp, self.shx, self.dbf):
+            if hasattr(attribute, 'close'):
+                try:
+                    attribute.close()
+                except IOError:
+                    pass
 
     def __getFileObj(self, f):
         """Checks to see if the requested shapefile file object is
@@ -776,7 +808,7 @@ class Reader:
         recSize = self.__recStruct.size
         f.seek(0)
         f.seek(self.__dbfHdrLength + (i * recSize))
-        return self.__record()
+        return self.__record(oid=i)
 
     def records(self):
         """Returns all records in a dbf file."""
@@ -786,7 +818,7 @@ class Reader:
         f = self.__getFileObj(self.dbf)
         f.seek(self.__dbfHdrLength)
         for i in range(self.numRecords):
-            r = self.__record()
+            r = self.__record(oid=i)
             if r:
                 records.append(r)
         return records
@@ -823,7 +855,7 @@ class Reader:
             yield ShapeRecord(shape=shape, record=record)
 
 
-class Writer:
+class Writer(object):
     """Provides write support for ESRI Shapefiles."""
     def __init__(self, shapeType=None, autoBalance=False, bufsize=None, **kwargs):
         self.autoBalance = autoBalance
@@ -1420,4 +1452,3 @@ if __name__ == "__main__":
     """
     failure_count = test()
     sys.exit(failure_count)
-
