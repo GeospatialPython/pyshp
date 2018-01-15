@@ -18,6 +18,7 @@ import tempfile
 import itertools
 import io
 from datetime import date
+from collections import namedtuple
 
 
 # Constants for shape types
@@ -276,6 +277,84 @@ class Shape:
                     'coordinates': polys
                     }
 
+
+class RecordFactory:
+    """
+    a record factory creates records using the field names of a record
+    """
+    def __init__(self, fields, name='shapefile'):
+        self.fields = dict((f[0], i) for i, f in enumerate(fields))
+        self.name = name
+
+    def __call__(self, values):
+        return Record(self, values)
+
+    def __str__(self):
+        return self.name
+
+class Record(list):
+    """
+    A class to hold a record. Subclasses list to ensure compatibility with
+    former work. In addition to the list interface, the values of the record
+    can also be retrieved using the fields name. Eg. the dbf contains
+    a field ID at position 1, the ID can be retrieved with the position, the field name
+    as a key or the field name as an attribute
+    >>> # Create a Record with one field, normally the record is created with the RecordFactory
+    >>> r = Record({'ID': 1}, [0])
+    >>> print(r[1])
+    >>> print(r['ID'])
+    >>> print(r.ID)
+    """
+
+    def __init__(self, factory, values):
+        """
+        A Record should be created by the record factory
+
+        :param factory: A RecordFactory
+        :param values: A sequence of values
+        """
+        self.__factory = factory
+        super(Record, self).__init__(values)
+
+    def __getattr__(self, item):
+        try:
+            index = self.__factory.fields[item]
+            return super(Record, self).__getitem__(index)
+        except KeyError:
+            raise AttributeError('{} is not a field of {}'.format(item, self.__factory))
+        except IndexError:
+            raise ValueError('{} found as a field but not enough values available.')
+
+    def __setattr__(self, key, value):
+        if key.startswith('_'): # Prevent infinite loop when setting mangled attribute
+            return super(Record, self).__setattr__(key, value)
+        try:
+            index = self.__factory.fields[key]
+            return super(Record, self).__setitem__(index, value)
+        except KeyError:
+            raise AttributeError('{} is not a field of {}'.format(key, self.__factory))
+
+    def __getitem__(self, item):
+        try:
+            return super(Record, self).__getitem__(item)
+        except TypeError:
+            index = self.__factory.fields.get(item)
+        if index is not None:
+            return super(Record, self).__getitem__(index)
+        else:
+            raise IndexError('"{}" is not a field of {} and not an int'.format(item, self.__factory))
+
+    def __setitem__(self, key, value):
+        try:
+            return super(Record, self).__setitem__(key, value)
+        except TypeError:
+            index = self.__factory.fields.get(key)
+            if index is not None:
+                return super(Record, self).__setitem__(index, value)
+            else:
+                raise IndexError('{} is not a field of {} and not an int'.format(key, self.__factory))
+
+
 class ShapeRecord:
     """A ShapeRecord object containing a shape along with its attributes."""
     def __init__(self, shape=None, record=None):
@@ -314,6 +393,7 @@ class Reader:
         self.numRecords = None
         self.fields = []
         self.__dbfHdrLength = 0
+        self.__recFactory = None
         self.encoding = kwargs.pop('encoding', 'utf-8')
         self.encodingErrors = kwargs.pop('encodingErrors', 'strict')
         # See if a shapefile name was passed as an argument
@@ -585,6 +665,9 @@ class Reader:
         fmt,fmtSize = self.__recordFmt()
         self.__recStruct = Struct(fmt)
 
+        # Populate a namedtuple with the fields
+        self.__recFactory = RecordFactory(self.fields[1:], self.shapeName)
+
     def __recordFmt(self):
         """Calculates the format and size of a .dbf record."""
         if self.numRecords is None:
@@ -661,7 +744,10 @@ class Reader:
                 value = u(value, self.encoding, self.encodingErrors)
                 value = value.strip()
             record.append(value)
-        return record
+        if self.__recFactory and len(self.__recFactory.fields) == len(record):
+            return self.__recFactory(record)
+        else:
+            return record
 
     def record(self, i=0):
         """Returns a specific dbf record based on the supplied index."""
@@ -1314,5 +1400,9 @@ if __name__ == "__main__":
     Doctests are contained in the file 'README.md', and are tested using the built-in
     testing libraries. 
     """
-    failure_count = test()
-    sys.exit(failure_count)
+    # failure_count = test()
+    # sys.exit(failure_count)
+    from shapefile import RecordFactory, Reader
+    shp = Reader('shapefiles/blockgroups.shp')
+    r = shp.record(0)
+
