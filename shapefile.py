@@ -15,10 +15,8 @@ import sys
 import time
 import array
 import tempfile
-import itertools
 import io
 from datetime import date
-from collections import namedtuple
 
 
 # Constants for shape types
@@ -286,8 +284,8 @@ class RecordFactory:
         self.fields = dict((f[0], i) for i, f in enumerate(fields))
         self.name = name
 
-    def __call__(self, values):
-        return Record(self, values)
+    def __call__(self, values, oid=None):
+        return Record(self, values, oid)
 
     def __str__(self):
         return self.name
@@ -306,14 +304,19 @@ class Record(list):
     >>> print(r.ID)
     """
 
-    def __init__(self, factory, values):
+    def __init__(self, factory, values, oid=None):
         """
         A Record should be created by the record factory
 
         :param factory: A RecordFactory
         :param values: A sequence of values
+        :param oid: The object id, an int (optional)
         """
         self.__factory = factory
+        if oid is not None:
+            self.__oid = oid
+        else:
+            self.__oid = '?'
         super(Record, self).__init__(values)
 
     def __getattr__(self, item):
@@ -353,6 +356,21 @@ class Record(list):
                 return super(Record, self).__setitem__(index, value)
             else:
                 raise IndexError('{} is not a field of {} and not an int'.format(key, self.__factory))
+
+    def __get_fields(self):
+        return list(self.__factory.fields.keys())
+
+    fields = property(__get_fields)
+
+    def as_dict(self):
+        """
+        Returns this Record as a dictionary using the field names as keys
+        :return: dict
+        """
+        return dict((f, self[i]) for f, i in self.__factory.fields.items())
+
+    def __str__(self):
+        return 'record #{} of {}'.format(self.__oid, self.__factory)
 
 
 class ShapeRecord:
@@ -744,10 +762,7 @@ class Reader:
                 value = u(value, self.encoding, self.encodingErrors)
                 value = value.strip()
             record.append(value)
-        if self.__recFactory and len(self.__recFactory.fields) == len(record):
-            return self.__recFactory(record)
-        else:
-            return record
+        return record
 
     def record(self, i=0):
         """Returns a specific dbf record based on the supplied index."""
@@ -758,7 +773,11 @@ class Reader:
         recSize = self.__recStruct.size
         f.seek(0)
         f.seek(self.__dbfHdrLength + (i * recSize))
-        return self.__record()
+        rec = self.__record()
+        if self.__recFactory and len(self.__recFactory.fields) == len(rec):
+            return self.__recFactory(rec, oid=i)
+        else:
+            return rec
 
     def records(self):
         """Returns all records in a dbf file."""
@@ -1405,4 +1424,5 @@ if __name__ == "__main__":
     from shapefile import RecordFactory, Reader
     shp = Reader('shapefiles/blockgroups.shp')
     r = shp.record(0)
+    print(r.as_dict())
 
