@@ -7,7 +7,7 @@ version: 2.0.0-dev
 Compatible with Python versions 2.7-3.x
 """
 
-__version__ = "2.0.0-dev"
+__version__ = "2.0.0-dev-pk"
 
 from struct import pack, unpack, calcsize, error, Struct
 import os
@@ -699,7 +699,7 @@ class Reader:
             fmtSize += 1
         return (fmt, fmtSize)
 
-    def __record(self):
+    def __record(self, oid=None):
         """Reads and returns a dbf record row as a list of values."""
         f = self.__getFileObj(self.dbf)
         recordContents = self.__recStruct.unpack(f.read(self.__recStruct.size))
@@ -762,7 +762,10 @@ class Reader:
                 value = u(value, self.encoding, self.encodingErrors)
                 value = value.strip()
             record.append(value)
-        return record
+        if self.__recFactory and len(self.__recFactory.fields) == len(record):
+            return self.__recFactory(record, oid=oid)
+        else:
+            return record
 
     def record(self, i=0):
         """Returns a specific dbf record based on the supplied index."""
@@ -773,11 +776,7 @@ class Reader:
         recSize = self.__recStruct.size
         f.seek(0)
         f.seek(self.__dbfHdrLength + (i * recSize))
-        rec = self.__record()
-        if self.__recFactory and len(self.__recFactory.fields) == len(rec):
-            return self.__recFactory(rec, oid=i)
-        else:
-            return rec
+        return self.__record()
 
     def records(self):
         """Returns all records in a dbf file."""
@@ -1419,10 +1418,6 @@ if __name__ == "__main__":
     Doctests are contained in the file 'README.md', and are tested using the built-in
     testing libraries. 
     """
-    # failure_count = test()
-    # sys.exit(failure_count)
-    from shapefile import RecordFactory, Reader
-    shp = Reader('shapefiles/blockgroups.shp')
-    r = shp.record(0)
-    print(r.as_dict())
+    failure_count = test()
+    sys.exit(failure_count)
 

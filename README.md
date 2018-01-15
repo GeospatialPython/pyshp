@@ -302,7 +302,7 @@ You can get a list of the shapefile's records by calling the records() method:
 	>>> len(records)
 	663
 
-Each record is a list containing an attribute corresponding to each field in
+Each record is a kind of list containing an attribute corresponding to each field in
 the field list.
 
 For example in the 4th record of the blockgroups shapefile the 2nd and 3rd
@@ -313,6 +313,17 @@ Francisco blockgroup:
 	>>> records[3][1:3]
 	['060750601001', 4715]
 
+For simpler access, the fields of an record can also accessed via the name of the field,
+either as a key or as an attribute name. The blockgroup id (BKG_KEY) of the 4th record can also be retrieved
+as:
+
+
+	>>> records[3]['BKG_KEY']
+	'060750601001'
+
+	>>> records[3].BKG_KEY
+	'060750601001'
+
 To read a single record call the record() method with the record's index:
 
 
@@ -321,6 +332,9 @@ To read a single record call the record() method with the record's index:
 	>>> rec[1:3]
 	['060750601001', 4715]
 
+	>>> rec.BKG_KEY
+	'060750601001'
+    
 ### Reading Geometry and Records Simultaneously
 
 You may want to examine both the geometry and the attributes for a record at
