@@ -462,14 +462,16 @@ class Reader(object):
         """
         Use some general info on the shapefile as __str__
         """
-        info = ['shapefile Reader']
+
+        info = []
+        ext = 'shp' if self.shp else 'dbf'
         if self.shp:
-            info.append("    {} shapes (type '{}')".format(
+            info.append("{} shapes (type '{}')".format(
                 len(self.shapes()), SHAPE_TYPES[self.shapeType]))
         if self.dbf:
-            info.append('    {} records ({} fields)'.format(
+            info.append('{} records ({} fields)'.format(
                 self.numRecords, len(self.fields)))
-        return '\n'.join(info)
+        return '{}.{} [{}]'.format(self.shapeName, ext, ', '.join(info))
 
     def __enter__(self):
         """
