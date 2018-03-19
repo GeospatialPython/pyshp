@@ -532,17 +532,37 @@ class Reader:
 
     def shapes(self):
         """Returns all shapes in a shapefile."""
-        shp = self.__getFileObj(self.shp)
-        # Found shapefiles which report incorrect
-        # shp file length in the header. Can't trust
-        # that so we seek to the end of the file
-        # and figure it out.
-        shp.seek(0,2)
-        self.shpLength = shp.tell()
-        shp.seek(100)
         shapes = []
-        while shp.tell() < self.shpLength:
-            shapes.append(self.__shape())
+        try:
+            shp = self.__getFileObj(self.shp)
+            # Found shapefiles which report incorrect
+            # shp file length in the header. Can't trust
+            # that so we seek to the end of the file
+            # and figure it out.
+            shp.seek(0,2)
+            self.shpLength = shp.tell()
+            shp.seek(100)
+            i=0
+            while True:
+                try:
+                    i+=1
+                    print(i)
+                    tell = shp.tell()
+                    print('tell ',tell)
+                    if not  tell < self.shpLength:
+                        break;         
+                    print(i,self.__shape())
+                    shapes.append(self.__shape())
+                except Exception as e:
+                    print('Exception (%s,%s) ' % (type(e),str(e)))
+                    print('Exception i',i,'tell ',tell)
+                    #print('Exception __shape',self.__shape())
+            print('shapes() return normally')
+            print('len: ',len(shapes))
+        except Exception as e:
+            print('Exception2')
+            print('Exception2 %s,%s' % (type(e),str(e)))
+        print('orig length ',self.shpLength)
         return shapes
 
     def iterShapes(self):
