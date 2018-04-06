@@ -924,6 +924,10 @@ class Writer:
         if self.shapeType != 31 and s.shapeType != NULL and s.shapeType != self.shapeType:
             raise Exception("The shape's type (%s) must match the type of the shapefile (%s)." % (s.shapeType, self.shapeType))
         f.write(pack("<i", s.shapeType))
+
+        # For point just update bbox of the whole shapefile
+        if s.shapeType == 1:
+            self.__bbox(s)
         # All shape types capable of having a bounding box
         if s.shapeType in (3,5,8,13,15,18,23,25,28,31):
             try:
