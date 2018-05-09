@@ -15,7 +15,6 @@ import sys
 import time
 import array
 import tempfile
-import itertools
 import io
 from datetime import date
 
@@ -937,6 +936,9 @@ class Writer(object):
         numRecs = self.recNum
         numFields = len(self.fields)
         headerLength = numFields * 32 + 33
+        if headerLength >= 65535:
+            raise ShapefileException(
+                    "Shapefile dbf header length exceeds maximum length.")
         recordLength = sum([int(field[2]) for field in self.fields]) + 1
         header = pack('<BBBBLHH20x', version, year, month, day, numRecs,
                 headerLength, recordLength)
@@ -1257,6 +1259,9 @@ class Writer(object):
         elif fieldType == "L":
             size = "1"
             decimal = 0
+        if len(self.fields) >= 2046:
+            raise ShapefileException(
+                "Shapefile Writer reached maximum number of fields: 2046.")
         self.fields.append((name, fieldType, size, decimal))
 
     def saveShp(self, target):
