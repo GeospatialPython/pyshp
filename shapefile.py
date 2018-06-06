@@ -214,6 +214,9 @@ class Shape(object):
 
     @property
     def __geo_interface__(self):
+        if not self.parts or not self.points:
+            Exception('Invalid shape, cannot create GeoJSON representation. Shape type is "%s" but does not contain any parts and/or points.' % self.shapeType)
+
         if self.shapeType in [POINT, POINTM, POINTZ]:
             return {
             'type': 'Point',
@@ -283,6 +286,8 @@ class Shape(object):
                     'type': 'MultiPolygon',
                     'coordinates': polys
                     }
+        else:
+            raise Exception('Shape type "%s" cannot be represented as GeoJSON.' % self.shapeType)
 
 class ShapeRecord(object):
     """A ShapeRecord object containing a shape along with its attributes."""
