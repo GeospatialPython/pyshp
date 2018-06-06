@@ -597,17 +597,37 @@ class Reader(object):
 
     def shapes(self):
         """Returns all shapes in a shapefile."""
-        shp = self.__getFileObj(self.shp)
-        # Found shapefiles which report incorrect
-        # shp file length in the header. Can't trust
-        # that so we seek to the end of the file
-        # and figure it out.
-        shp.seek(0,2)
-        self.shpLength = shp.tell()
-        shp.seek(100)
         shapes = []
-        while shp.tell() < self.shpLength:
-            shapes.append(self.__shape())
+        try:
+            shp = self.__getFileObj(self.shp)
+            # Found shapefiles which report incorrect
+            # shp file length in the header. Can't trust
+            # that so we seek to the end of the file
+            # and figure it out.
+            shp.seek(0,2)
+            self.shpLength = shp.tell()
+            shp.seek(100)
+            i=0
+            while True:
+                try:
+                    i+=1
+                    print(i)
+                    tell = shp.tell()
+                    print('tell ',tell)
+                    if not  tell < self.shpLength:
+                        break;         
+                    print(i,self.__shape())
+                    shapes.append(self.__shape())
+                except Exception as e:
+                    print('Exception (%s,%s) ' % (type(e),str(e)))
+                    print('Exception i',i,'tell ',tell)
+                    #print('Exception __shape',self.__shape())
+            print('shapes() return normally')
+            print('len: ',len(shapes))
+        except Exception as e:
+            print('Exception2')
+            print('Exception2 %s,%s' % (type(e),str(e)))
+        print('orig length ',self.shpLength)
         return shapes
 
     def iterShapes(self):
@@ -856,17 +876,23 @@ class Writer(object):
     def __zbox(self, s):
         z = []
         try:
+            #print(s.points)
             for p in s.points:
                 z.append(p[2])
         except IndexError:
             pass
         if not z: z.append(0)
+#        print(z)
+#        print(self._zbox)
         zbox = [min(z), max(z)]
         # update global
-        self._zbox = [min(zbox[0],self._zbox[0]), min(zbox[1],self._zbox[1]), max(zbox[2],self._zbox[2]), max(zbox[3],self._zbox[3])]
+        try:
+            self._zbox = [min(zbox[0],self._zbox[0]), min(zbox[1],self._zbox[1]), max(zbox[2],self._zbox[2]), max(zbox[3],self._zbox[3])]
+        except IndexError:
+            pass
         return zbox
 
-    def __mbox(self, shapes):
+    def __mbox(self, s):
         m = []
         try:
             for p in s.points:
@@ -876,7 +902,10 @@ class Writer(object):
         if not m: m.append(0)
         mbox = [min(m), max(m)]
         # update global
-        self._mbox = [min(mbox[0],self._mbox[0]), min(mbox[1],self._mbox[1]), max(mbox[2],self._mbox[2]), max(mbox[3],self._mbox[3])]
+        try:
+            self._mbox = [min(mbox[0],self._mbox[0]), min(mbox[1],self._mbox[1]), max(mbox[2],self._mbox[2]), max(mbox[3],self._mbox[3])]
+        except IndexError:
+            pass
         return mbox
 
     def bbox(self):
