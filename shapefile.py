@@ -393,6 +393,11 @@ class Reader(object):
         """Returns the number of shapes/records in the shapefile."""
         return self.numRecords
 
+    def __iter__(self):
+        """Iterates through the shapes/records in the shapefile."""
+        for shaperec in self.iterShapeRecords():
+            yield shaperec
+
     def load(self, shapefile=None):
         """Opens a shapefile from a filename or file-like
         object. Normally this method would be called by the
