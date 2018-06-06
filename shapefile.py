@@ -398,6 +398,21 @@ class Reader(object):
         for shaperec in self.iterShapeRecords():
             yield shaperec
 
+    @property
+    def __geo_interface__(self):
+        fieldnames = [f[0] for f in self.fields]
+        features = []
+        for feat in self.iterShapeRecords():
+            fdict = {'type': 'Feature',
+                     'properties': dict(*zip(fieldnames,
+                                             list(feat.record)
+                                             )),
+                     'geometry': feat.shape.__geo_interface__}
+            features.append(fdict)
+        return {'type': 'FeatureCollection',
+                'bbox': self.bbox,
+                'features': features}        
+
     def load(self, shapefile=None):
         """Opens a shapefile from a filename or file-like
         object. Normally this method would be called by the
