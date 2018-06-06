@@ -1,3 +1,8 @@
+VERSION 2.0.0-dev
+
+... Tobias Megies <megies@geophysik.uni-muenchen.de>
+	* Fixed bug writing shapefiles with datefield and date values earlier than 1900
+
 VERSION 1.2.11
 
 2017-04-29 Karim Bahgat <karim.bahgat.norway@gmail.com>
