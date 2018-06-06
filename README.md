@@ -598,14 +598,14 @@ Field length or decimal have no impact on this type:
 	>>> w.null()
 	>>> w.null()
 	>>> w.null()
-	>>> w.record(date(1998,1,30))
+	>>> w.record(date(1898,1,30))
 	>>> w.record([1998,1,30])
 	>>> w.record('19980130')
 	>>> w.record(None)
 	>>> w.save('shapefiles/test/dtype')
 	
 	>>> r = shapefile.Reader('shapefiles/test/dtype')
-	>>> assert r.record(0) == [date(1998,1,30)]
+	>>> assert r.record(0) == [date(1898,1,30)]
 	>>> assert r.record(1) == [date(1998,1,30)]
 	>>> assert r.record(2) == [date(1998,1,30)]
 	>>> assert r.record(3) == [None]
