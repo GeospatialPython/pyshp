@@ -15,6 +15,7 @@ import sys
 import time
 import array
 import tempfile
+import warnings
 import io
 from datetime import date
 
@@ -855,28 +856,28 @@ class Writer(object):
 
     def __zbox(self, s):
         z = []
-        try:
-            for p in s.points:
+        for p in s.points:
+            try:
                 z.append(p[2])
-        except IndexError:
-            pass
+            except IndexError:
+                warnings.warn('One or more of the shapes had a missing z-value and were skipped when calculating the Z bounding box.')
         if not z: z.append(0)
         zbox = [min(z), max(z)]
         # update global
-        self._zbox = [min(zbox[0],self._zbox[0]), min(zbox[1],self._zbox[1]), max(zbox[2],self._zbox[2]), max(zbox[3],self._zbox[3])]
+        self._zbox = [min(zbox[0],self._zbox[0]), min(zbox[1],self._zbox[1])]
         return zbox
 
-    def __mbox(self, shapes):
+    def __mbox(self, s):
         m = []
-        try:
-            for p in s.points:
+        for p in s.points:
+            try:
                 m.append(p[3])
-        except IndexError:
-            pass
+            except IndexError:
+                warnings.warn('One or more of the shapes had a missing m-value and were skipped when calculating the M bounding box.')
         if not m: m.append(0)
         mbox = [min(m), max(m)]
         # update global
-        self._mbox = [min(mbox[0],self._mbox[0]), min(mbox[1],self._mbox[1]), max(mbox[2],self._mbox[2]), max(mbox[3],self._mbox[3])]
+        self._mbox = [min(mbox[0],self._mbox[0]), min(mbox[1],self._mbox[1])]
         return mbox
 
     def bbox(self):
