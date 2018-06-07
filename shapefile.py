@@ -60,7 +60,7 @@ else:
 # Helpers
 
 MISSING = [None,'']
-NO_DATA = -10e38 # as per the ESRI shapefile spec, only used for m-values. 
+NODATA = -10e38 # as per the ESRI shapefile spec, only used for m-values. 
 
 if PYTHON3:
     def b(v, encoding='utf-8', encodingErrors='strict'):
@@ -556,13 +556,13 @@ class Reader(object):
         if shapeType in (13,15,18,31):
             (zmin, zmax) = unpack("<2d", f.read(16))
             record.z = _Array('d', unpack("<%sd" % nPoints, f.read(nPoints * 8)))
-        # Read m extremes and values if header m values do not equal 0.0
-        if shapeType in (13,15,18,23,25,28,31) and not 0.0 in self.measure:
+        # Read m extremes and values
+        if shapeType in (13,15,18,23,25,28,31):
             (mmin, mmax) = unpack("<2d", f.read(16))
             # Measure values less than -10e38 are nodata values according to the spec
             record.m = []
             for m in _Array('d', unpack("<%sd" % nPoints, f.read(nPoints * 8))):
-                if m > -10e38:
+                if m > NODATA:
                     record.m.append(m)
                 else:
                     record.m.append(None)
@@ -912,7 +912,7 @@ class Writer(object):
         if not m:
             # none of the shapes had m values
             # be flexible on this and set them to m nodata values, as per the ESRI spec
-            m.append(NO_DATA)
+            m.append(NODATA)
         mbox = [min(m), max(m)]
         # update global
         if self._mbox:
