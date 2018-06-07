@@ -983,7 +983,7 @@ class Writer(object):
             mbox = [0,0]
         # Try writing
         try:
-            f.write(pack("<4d", z[0], z[1], m[0], m[1]))
+            f.write(pack("<4d", zbox[0], zbox[1], mbox[0], mbox[1]))
         except error:
             raise ShapefileException("Failed to write shapefile elevation and measure values. Floats required.")
 
