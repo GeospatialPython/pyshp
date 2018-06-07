@@ -15,7 +15,7 @@ import sys
 import time
 import array
 import tempfile
-import itertools
+import warnings
 import io
 from datetime import date
 
@@ -215,6 +215,9 @@ class Shape(object):
 
     @property
     def __geo_interface__(self):
+        if not self.parts or not self.points:
+            Exception('Invalid shape, cannot create GeoJSON representation. Shape type is "%s" but does not contain any parts and/or points.' % self.shapeType)
+
         if self.shapeType in [POINT, POINTM, POINTZ]:
             return {
             'type': 'Point',
@@ -284,6 +287,8 @@ class Shape(object):
                     'type': 'MultiPolygon',
                     'coordinates': polys
                     }
+        else:
+            raise Exception('Shape type "%s" cannot be represented as GeoJSON.' % self.shapeType)
 
 
 class RecordFactory:
@@ -462,16 +467,14 @@ class Reader(object):
         """
         Use some general info on the shapefile as __str__
         """
-
-        info = []
-        ext = 'shp' if self.shp else 'dbf'
+        info = ['shapefile Reader']
         if self.shp:
-            info.append("{} shapes (type '{}')".format(
+            info.append("    {} shapes (type '{}')".format(
                 len(self.shapes()), SHAPE_TYPES[self.shapeType]))
         if self.dbf:
-            info.append('{} records ({} fields)'.format(
+            info.append('    {} records ({} fields)'.format(
                 self.numRecords, len(self.fields)))
-        return '{}.{} [{}]'.format(self.shapeName, ext, ', '.join(info))
+        return '\n'.join(info)
 
     def __enter__(self):
         """
@@ -496,24 +499,54 @@ class Reader(object):
         if shapefile:
             (shapeName, ext) = os.path.splitext(shapefile)
             self.shapeName = shapeName
-            try:
-                self.shp = open("%s.shp" % shapeName, "rb")
-            except IOError:
-                pass
-            try:
-                self.shx = open("%s.shx" % shapeName, "rb")
-            except IOError:
-                pass
-            try:
-                self.dbf = open("%s.dbf" % shapeName, "rb")
-            except IOError:
-                pass
+            self.load_shp(shapeName)
+            self.load_shx(shapeName)
+            self.load_dbf(shapeName)
             if not (self.shp and self.dbf):
-                raise ShapefileException("Unable to open %s.dbf or %s.shp." % (shapeName, shapeName) )
+                raise ShapefileException("Unable to open %s.dbf or %s.shp." % (shapeName, shapeName))
         if self.shp:
             self.__shpHeader()
         if self.dbf:
             self.__dbfHeader()
+
+    def load_shp(self, shapefile_name):
+        """
+        Attempts to load file with .shp extension as both lower and upper case
+        """
+        shp_ext = 'shp'
+        try:
+            self.shp = open("%s.%s" % (shapefile_name, shp_ext), "rb")
+        except IOError:
+            try:
+                self.shp = open("%s.%s" % (shapefile_name, shp_ext.upper()), "rb")
+            except IOError:
+                pass
+
+    def load_shx(self, shapefile_name):
+        """
+        Attempts to load file with .shx extension as both lower and upper case
+        """
+        shx_ext = 'shx'
+        try:
+            self.shx = open("%s.%s" % (shapefile_name, shx_ext), "rb")
+        except IOError:
+            try:
+                self.shx = open("%s.%s" % (shapefile_name, shx_ext.upper()), "rb")
+            except IOError:
+                pass
+
+    def load_dbf(self, shapefile_name):
+        """
+        Attempts to load file with .dbf extension as both lower and upper case
+        """
+        dbf_ext = 'dbf'
+        try:
+            self.dbf = open("%s.%s" % (shapefile_name, dbf_ext), "rb")
+        except IOError:
+            try:
+                self.dbf = open("%s.%s" % (shapefile_name, dbf_ext.upper()), "rb")
+            except IOError:
+                pass
 
     def __del__(self):
         self.close()
@@ -618,7 +651,7 @@ class Reader(object):
         if shapeType == 11:
             record.z = unpack("<d", f.read(8))
         # Read a single M value
-        if shapeType in (11,21):
+        if shapeType == 21 or (shapeType == 11 and f.tell() < next):
             record.m = unpack("<d", f.read(8))
         # Seek to the end of this record as defined by the record header because
         # the shapefile spec doesn't require the actual content to meet the header
@@ -717,7 +750,7 @@ class Reader(object):
         fmt,fmtSize = self.__recordFmt()
         self.__recStruct = Struct(fmt)
 
-        # Populate a namedtuple with the fields
+        # Create the record factory
         self.__recFactory = RecordFactory(self.fields[1:], self.shapeName)
 
     def __recordFmt(self):
@@ -928,28 +961,28 @@ class Writer(object):
 
     def __zbox(self, s):
         z = []
-        try:
-            for p in s.points:
+        for p in s.points:
+            try:
                 z.append(p[2])
-        except IndexError:
-            pass
+            except IndexError:
+                warnings.warn('One or more of the shapes had a missing z-value and were skipped when calculating the Z bounding box.')
         if not z: z.append(0)
         zbox = [min(z), max(z)]
         # update global
-        self._zbox = [min(zbox[0],self._zbox[0]), min(zbox[1],self._zbox[1]), max(zbox[2],self._zbox[2]), max(zbox[3],self._zbox[3])]
+        self._zbox = [min(zbox[0],self._zbox[0]), min(zbox[1],self._zbox[1])]
         return zbox
 
-    def __mbox(self, shapes):
+    def __mbox(self, s):
         m = []
-        try:
-            for p in s.points:
+        for p in s.points:
+            try:
                 m.append(p[3])
-        except IndexError:
-            pass
+            except IndexError:
+                warnings.warn('One or more of the shapes had a missing m-value and were skipped when calculating the M bounding box.')
         if not m: m.append(0)
         mbox = [min(m), max(m)]
         # update global
-        self._mbox = [min(mbox[0],self._mbox[0]), min(mbox[1],self._mbox[1]), max(mbox[2],self._mbox[2]), max(mbox[3],self._mbox[3])]
+        self._mbox = [min(mbox[0],self._mbox[0]), min(mbox[1],self._mbox[1])]
         return mbox
 
     def bbox(self):
@@ -1014,6 +1047,9 @@ class Writer(object):
         numRecs = self.recNum
         numFields = len(self.fields)
         headerLength = numFields * 32 + 33
+        if headerLength >= 65535:
+            raise ShapefileException(
+                    "Shapefile dbf header length exceeds maximum length.")
         recordLength = sum([int(field[2]) for field in self.fields]) + 1
         header = pack('<BBBBLHH20x', version, year, month, day, numRecs,
                 headerLength, recordLength)
@@ -1062,6 +1098,10 @@ class Writer(object):
         if self.shapeType != 31 and s.shapeType != NULL and s.shapeType != self.shapeType:
             raise Exception("The shape's type (%s) must match the type of the shapefile (%s)." % (s.shapeType, self.shapeType))
         f.write(pack("<i", s.shapeType))
+
+        # For point just update bbox of the whole shapefile
+        if s.shapeType == 1:
+            self.__bbox(s)
         # All shape types capable of having a bounding box
         if s.shapeType in (3,5,8,13,15,18,23,25,28,31):
             try:
@@ -1230,9 +1270,9 @@ class Writer(object):
             elif fieldType == "D":
                 # date: 8 bytes - date stored as a string in the format YYYYMMDD.
                 if isinstance(value, date):
-                    value = value.strftime("%Y%m%d")
+                    value = '{:04d}{:02d}{:02d}'.format(value.year, value.month, value.day)
                 elif isinstance(value, list) and len(value) == 3:
-                    value = date(*value).strftime("%Y%m%d")
+                    value = '{:04d}{:02d}{:02d}'.format(*value)
                 elif value in MISSING:
                     value = b'0' * 8 # QGIS NULL for date type
                 elif is_string(value) and len(value) == 8:
@@ -1330,6 +1370,9 @@ class Writer(object):
         elif fieldType == "L":
             size = "1"
             decimal = 0
+        if len(self.fields) >= 2046:
+            raise ShapefileException(
+                "Shapefile Writer reached maximum number of fields: 2046.")
         self.fields.append((name, fieldType, size, decimal))
 
     def saveShp(self, target):
