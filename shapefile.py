@@ -896,7 +896,7 @@ class Writer(object):
         # update global
         if self._zbox:
             # compare with existing
-            self._zbox = [min(zbox[0],self._zbox[0]), min(zbox[1],self._zbox[1])]
+            self._zbox = [min(zbox[0],self._zbox[0]), max(zbox[1],self._zbox[1])]
         else:
             # first time zbox is being set
             self._zbox = zbox
@@ -917,7 +917,7 @@ class Writer(object):
         # update global
         if self._mbox:
             # compare with existing
-            self._mbox = [min(mbox[0],self._mbox[0]), min(mbox[1],self._mbox[1])]
+            self._mbox = [min(mbox[0],self._mbox[0]), max(mbox[1],self._mbox[1])]
         else:
             # first time mbox is being set
             self._mbox = mbox
