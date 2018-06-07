@@ -60,6 +60,7 @@ else:
 # Helpers
 
 MISSING = [None,'']
+NO_DATA = -10e38 # as per the ESRI shapefile spec, only used for m-values. 
 
 if PYTHON3:
     def b(v, encoding='utf-8', encodingErrors='strict'):
@@ -823,8 +824,8 @@ class Writer(object):
         self.recNum = 0
         self.shpNum = 0
         self._bbox = None
-        self._zbox = [0,0]
-        self._mbox = [0,0]
+        self._zbox = None
+        self._mbox = None
         # Use deletion flags in dbf? Default is false (0).
         self.deletionFlag = 0
         # Encoding
@@ -886,10 +887,19 @@ class Writer(object):
                 z.append(p[2])
             except IndexError:
                 warnings.warn('One or more of the shapes had a missing z-value and were skipped when calculating the Z bounding box.')
-        if not z: z.append(0)
+        if not z:
+            # none of the shapes had z values
+            # z dimension does not have the concept of nodata values
+            # but setting them to 0 is probably ok, since it means all are on the same elavation
+            z.append(0)
         zbox = [min(z), max(z)]
         # update global
-        self._zbox = [min(zbox[0],self._zbox[0]), min(zbox[1],self._zbox[1])]
+        if self._zbox:
+            # compare with existing
+            self._zbox = [min(zbox[0],self._zbox[0]), min(zbox[1],self._zbox[1])]
+        else:
+            # first time zbox is being set
+            self._zbox = zbox
         return zbox
 
     def __mbox(self, s):
@@ -899,10 +909,18 @@ class Writer(object):
                 m.append(p[3])
             except IndexError:
                 warnings.warn('One or more of the shapes had a missing m-value and were skipped when calculating the M bounding box.')
-        if not m: m.append(0)
+        if not m:
+            # none of the shapes had m values
+            # be flexible on this and set them to m nodata values, as per the ESRI spec
+            m.append(NO_DATA)
         mbox = [min(m), max(m)]
         # update global
-        self._mbox = [min(mbox[0],self._mbox[0]), min(mbox[1],self._mbox[1])]
+        if self._mbox:
+            # compare with existing
+            self._mbox = [min(mbox[0],self._mbox[0]), min(mbox[1],self._mbox[1])]
+        else:
+            # first time mbox is being set
+            self._mbox = mbox
         return mbox
 
     def bbox(self):
@@ -952,9 +970,18 @@ class Writer(object):
         else:
             f.write(pack("<4d", 0,0,0,0))
         # Elevation
-        z = self.zbox()
+        zbox = self.zbox()
+        if zbox is None:
+            # The zbox is initialized with None, so this would mean the shapefile contains no z values
+            # As per the ESRI shapefile spec, the zbox for non-Z type shapefiles are set to 0s
+            zbox = [0,0]
         # Measure
-        m = self.mbox()
+        mbox = self.mbox()
+        if mbox is None:
+            # The mbox is initialized with None, so this would mean the shapefile contains no m values
+            # As per the ESRI shapefile spec, the mbox for non-M type shapefiles are set to 0s
+            mbox = [0,0]
+        # Try writing
         try:
             f.write(pack("<4d", z[0], z[1], m[0], m[1]))
         except error:
