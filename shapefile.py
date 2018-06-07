@@ -907,10 +907,11 @@ class Writer(object):
         return zbox
 
     def __mbox(self, s):
+        mpos = 3 if s.shapeType in (13,15,18,31) else 2
         m = []
         for p in s.points:
             try:
-                m.append(p[3])
+                m.append(p[mpos])
             except IndexError:
                 warnings.warn('One or more of the shape points had a missing m-value and were skipped when calculating the M bounding box.')
         if not m:
@@ -1118,8 +1119,10 @@ class Writer(object):
                     # if m values are stored in attribute
                     f.write(pack("<%sd" % len(s.m), *[m if m is not None else NODATA for m in s.m]))
                 else:
-                    # if m values are stored as 4th dimension
-                    [f.write(pack("<d", p[3] if len(p) > 3 and p[3] is not None else NODATA)) for p in s.points]
+                    # if m values are stored as 3rd/4th dimension
+                    # 0-index position of m value is 3 if z type (x,y,z,m), or 2 if m type (x,y,m)
+                    mpos = 3 if s.shapeType in (13,15,18,31) else 2
+                    [f.write(pack("<d", p[mpos] if len(p) > mpos and p[mpos] is not None else NODATA)) for p in s.points]
             except error:
                 raise ShapefileException("Failed to write measure values for record %s. Expected floats" % recNum)
         # Write a single point
@@ -1159,11 +1162,13 @@ class Writer(object):
                 except error:
                     raise ShapefileException("Failed to write measure value for record %s. Expected floats." % recNum)
             else:
-                # if m values are stored as 3rd dimension
+                # if m values are stored as 3rd/4th dimension
+                # 0-index position of m value is 3 if z type (x,y,z,m), or 2 if m type (x,y,m)
                 try:
-                    if len(s.points[0])<4:
+                    mpos = 3 if s.shapeType == 11 else 2
+                    if len(s.points[0])<mpos+1:
                         s.points[0].append(NODATA)
-                    f.write(pack("<1d", s.points[0][3]))
+                    f.write(pack("<1d", s.points[0][mpos]))
                 except error:
                     raise ShapefileException("Failed to write measure value for record %s. Expected floats." % recNum)
         # Finalize record length as 16-bit words
@@ -1286,14 +1291,14 @@ class Writer(object):
         """Creates a null shape."""
         self.shape(Shape(NULL))
 
-    def point(self, x, y, z=0, m=0, shapeType=POINT):
+    def point(self, x, y, z=0, m=NODATA, shapeType=POINT):
         """Creates a point shape."""
         pointShape = Shape(shapeType)
         if shapeType == POINT:
             pointShape.points.append([x, y])
-        elif shapeType == POINTZ:
-            pointShape.points.append([x, y, z])
         elif shapeType == POINTM:
+            pointShape.points.append([x, y, m])
+        elif shapeType == POINTZ:
             pointShape.points.append([x, y, z, m])
         self.shape(pointShape)
 
