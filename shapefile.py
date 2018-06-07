@@ -868,8 +868,11 @@ class Writer(object):
             px, py = list(zip(*s.points))[:2]
             x.extend(px)
             y.extend(py)
-        if len(x) == 0:
-            return [0] * 4
+        else:
+            # this should not happen.
+            # any shape that is not null should have at least one point, and only those should be sent here. 
+            # could also mean that earlier code failed to add points to a non-null shape. 
+            raise Exception("Cannot create bbox. Expected a valid shape with at least one point. Got a shape of type '%s' and 0 points." % s.shapeType)
         bbox = [min(x), min(y), max(x), max(y)]
         # update global
         if self._bbox:
@@ -886,11 +889,12 @@ class Writer(object):
             try:
                 z.append(p[2])
             except IndexError:
-                warnings.warn('One or more of the shapes had a missing z-value and were skipped when calculating the Z bounding box.')
+                warnings.warn('One or more of the shape points had a missing z-value and were skipped when calculating the Z bounding box.')
         if not z:
             # none of the shapes had z values
             # z dimension does not have the concept of nodata values
             # but setting them to 0 is probably ok, since it means all are on the same elavation
+            warnings.warn('None of the shape points had any z-values, setting the Z bounding box to (0,0).')
             z.append(0)
         zbox = [min(z), max(z)]
         # update global
@@ -908,10 +912,11 @@ class Writer(object):
             try:
                 m.append(p[3])
             except IndexError:
-                warnings.warn('One or more of the shapes had a missing m-value and were skipped when calculating the M bounding box.')
+                warnings.warn('One or more of the shape points had a missing m-value and were skipped when calculating the M bounding box.')
         if not m:
             # none of the shapes had m values
             # be flexible on this and set them to m nodata values, as per the ESRI spec
+            warnings.warn('None of the shape points had any m-values, setting the M bounding box to (nodata,nodata).')
             m.append(NODATA)
         mbox = [min(m), max(m)]
         # update global
@@ -1061,7 +1066,7 @@ class Writer(object):
             try:
                 f.write(pack("<4d", *self.__bbox(s)))
             except error:
-                raise ShapefileException("Falied to write bounding box for record %s. Expected floats." % recNum)
+                raise ShapefileException("Failed to write bounding box for record %s. Expected floats." % recNum)
         # Shape types with parts
         if s.shapeType in (3,5,13,15,23,25,31):
             # Number of parts
