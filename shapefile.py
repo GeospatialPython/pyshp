@@ -822,7 +822,7 @@ class Writer(object):
         # Geometry record offsets and lengths for writing shx file.
         self.recNum = 0
         self.shpNum = 0
-        self._bbox = [0,0,0,0]
+        self._bbox = None
         self._zbox = [0,0]
         self._mbox = [0,0]
         # Use deletion flags in dbf? Default is false (0).
@@ -871,7 +871,12 @@ class Writer(object):
             return [0] * 4
         bbox = [min(x), min(y), max(x), max(y)]
         # update global
-        self._bbox = [min(bbox[0],self._bbox[0]), min(bbox[1],self._bbox[1]), max(bbox[2],self._bbox[2]), max(bbox[3],self._bbox[3])]
+        if self._bbox:
+            # compare with existing
+            self._bbox = [min(bbox[0],self._bbox[0]), min(bbox[1],self._bbox[1]), max(bbox[2],self._bbox[2]), max(bbox[3],self._bbox[3])]
+        else:
+            # first time bbox is being set
+            self._bbox = bbox
         return bbox
 
     def __zbox(self, s):
@@ -934,7 +939,14 @@ class Writer(object):
         # The shapefile's bounding box (lower left, upper right)
         if self.shapeType != 0:
             try:
-                f.write(pack("<4d", *self.bbox()))
+                bbox = self.bbox()
+                if bbox is None:
+                    # The bbox is initialized with None, so this would mean the shapefile contains no valid geometries.
+                    # In such cases of empty shapefiles, ESRI spec says the bbox values are 'unspecified'.
+                    # Not sure what that means, so for now just setting to 0s, which is the same behavior as in previous versions.
+                    # This would also make sense since the Z and M bounds are similarly set to 0 for non-Z/M type shapefiles.
+                    bbox = [0,0,0,0] 
+                f.write(pack("<4d", *bbox))
             except error:
                 raise ShapefileException("Failed to write shapefile bounding box. Floats required.")
         else:
