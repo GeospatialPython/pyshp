@@ -291,32 +291,37 @@ class Shape(object):
             raise Exception('Shape type "%s" cannot be represented as GeoJSON.' % self.shapeType)
 
 
-class RecordFactory:
+class _RecordFactory:
     """
-    a record factory creates records using the field names of a record
+    A record factory creates records using the field names of a record and
+    are referenced by the record as the source for the field names.
+    In that sense, the _RecordFactory acts both as the factory pattern
+    approach, as well as a header class of the attribute table
     """
     def __init__(self, fields, name='shapefile'):
         self.fields = dict((f[0], i) for i, f in enumerate(fields))
         self.name = name
 
     def __call__(self, values, oid=None):
-        return Record(self, values, oid)
+        return _Record(self, values, oid)
 
     def __str__(self):
         return self.name
 
-class Record(list):
+
+class _Record(list):
     """
     A class to hold a record. Subclasses list to ensure compatibility with
-    former work. In addition to the list interface, the values of the record
+    former work and allows to use all the optimazations of the builtin list.
+    In addition to the list interface, the values of the record
     can also be retrieved using the fields name. Eg. the dbf contains
     a field ID at position 1, the ID can be retrieved with the position, the field name
-    as a key or the field name as an attribute. The field names are owned by the RecordFactory
-    to conserve memory - no need to repeat all the field names in every record. Instead the record
-    holds only a pointer to one factory owning the field captions.
+    as a key or the field name as an attribute. The field names used for this, are owned by
+    the RecordFactory  to conserve memory - no need to repeat all the field names in every record.
+    Instead the record  holds only a pointer to one factory owning the field captions.
 
     >>> # Create a Record with one field, normally the record is created with the RecordFactory
-    >>> r = Record({'ID': 1}, [0])
+    >>> r = _Record({'ID': 1}, [0])
     >>> print(r[1])
     >>> print(r['ID'])
     >>> print(r.ID)
@@ -335,7 +340,7 @@ class Record(list):
             self.__oid = oid
         else:
             self.__oid = '?'
-        super(Record, self).__init__(values)
+        super(_Record, self).__init__(values)
 
     def __getattr__(self, item):
         """
@@ -349,7 +354,7 @@ class Record(list):
         """
         try:
             index = self.__factory.fields[item]
-            return super(Record, self).__getitem__(index)
+            return super(_Record, self).__getitem__(index)
         except KeyError:
             raise AttributeError('{} is not a field of {}'.format(item, self.__factory))
         except IndexError:
@@ -357,30 +362,30 @@ class Record(list):
 
     def __setattr__(self, key, value):
         if key.startswith('_'):  # Prevent infinite loop when setting mangled attribute
-            return super(Record, self).__setattr__(key, value)
+            return super(_Record, self).__setattr__(key, value)
         try:
             index = self.__factory.fields[key]
-            return super(Record, self).__setitem__(index, value)
+            return super(_Record, self).__setitem__(index, value)
         except KeyError:
             raise AttributeError('{} is not a field of {}'.format(key, self.__factory))
 
     def __getitem__(self, item):
         try:
-            return super(Record, self).__getitem__(item)
+            return super(_Record, self).__getitem__(item)
         except TypeError:
             index = self.__factory.fields.get(item)
         if index is not None:
-            return super(Record, self).__getitem__(index)
+            return super(_Record, self).__getitem__(index)
         else:
             raise IndexError('"{}" is not a field of {} and not an int'.format(item, self.__factory))
 
     def __setitem__(self, key, value):
         try:
-            return super(Record, self).__setitem__(key, value)
+            return super(_Record, self).__setitem__(key, value)
         except TypeError:
             index = self.__factory.fields.get(key)
             if index is not None:
-                return super(Record, self).__setitem__(index, value)
+                return super(_Record, self).__setitem__(index, value)
             else:
                 raise IndexError('{} is not a field of {} and not an int'.format(key, self.__factory))
 
@@ -763,7 +768,7 @@ class Reader(object):
         self.__recStruct = Struct(fmt)
 
         # Create the record factory
-        self.__recFactory = RecordFactory(self.fields[1:], self.shapeName)
+        self.__recFactory = _RecordFactory(self.fields[1:], self.shapeName)
 
     def __recordFmt(self):
         """Calculates the format and size of a .dbf record."""
