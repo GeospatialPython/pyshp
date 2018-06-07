@@ -311,7 +311,10 @@ class Record(list):
     former work. In addition to the list interface, the values of the record
     can also be retrieved using the fields name. Eg. the dbf contains
     a field ID at position 1, the ID can be retrieved with the position, the field name
-    as a key or the field name as an attribute
+    as a key or the field name as an attribute. The field names are owned by the RecordFactory
+    to conserve memory - no need to repeat all the field names in every record. Instead the record
+    holds only a pointer to one factory owning the field captions.
+
     >>> # Create a Record with one field, normally the record is created with the RecordFactory
     >>> r = Record({'ID': 1}, [0])
     >>> print(r[1])
@@ -335,6 +338,15 @@ class Record(list):
         super(Record, self).__init__(values)
 
     def __getattr__(self, item):
+        """
+        __getattr__ is called if an attribute is used that does
+        not exist in the normal sense. Eg. r=Record(...), r.ID
+        calls r.__getattr__('ID'), but r.index(5) calls list.index(r, 5)
+        :param item: The field name, used as attribute
+        :return: Value of the field
+        :raises: Attribute error, if field does not exist in RecordFactory
+                and IndexError, if field exists but not values in the Record
+        """
         try:
             index = self.__factory.fields[item]
             return super(Record, self).__getitem__(index)
@@ -344,7 +356,7 @@ class Record(list):
             raise ValueError('{} found as a field but not enough values available.')
 
     def __setattr__(self, key, value):
-        if key.startswith('_'): # Prevent infinite loop when setting mangled attribute
+        if key.startswith('_'):  # Prevent infinite loop when setting mangled attribute
             return super(Record, self).__setattr__(key, value)
         try:
             index = self.__factory.fields[key]
