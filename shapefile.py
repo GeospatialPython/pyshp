@@ -404,10 +404,6 @@ class _Record(list):
     def __str__(self):
         return 'record #{} of {}'.format(self.__oid, self.__factory)
 
-    def __repr__(self):
-
-        return '<pyshp._Record #{} of {}>'.format(self.__oid, self.__factory)
-
     def __dir__(self):
         """
         Helps to show the field names in an interactive environment like IPython.
