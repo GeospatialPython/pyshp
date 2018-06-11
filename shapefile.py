@@ -907,7 +907,7 @@ class Writer(object):
         return zbox
 
     def __mbox(self, s):
-        mpos = 3 if s.shapeType in (13,15,18,31) else 2
+        mpos = 3 if s.shapeType in (11,13,15,18,31) else 2
         m = []
         for p in s.points:
             try:
@@ -982,9 +982,10 @@ class Writer(object):
             # As per the ESRI shapefile spec, the zbox for non-Z type shapefiles are set to 0s
             zbox = [0,0]
         # Measure
-        mbox = self.mbox()
-        if mbox is None:
-            # The mbox is initialized with None, so this would mean the shapefile contains no m values
+        if self.shapeType in (11,13,15,18,23,25,28,31):
+            # M values are present in M or Z type
+            mbox = self.mbox()
+        else:
             # As per the ESRI shapefile spec, the mbox for non-M type shapefiles are set to 0s
             mbox = [0,0]
         # Try writing
@@ -1060,7 +1061,7 @@ class Writer(object):
         f.write(pack("<i", s.shapeType))
 
         # For point just update bbox of the whole shapefile
-        if s.shapeType == 1:
+        if s.shapeType in (1,11,21):
             self.__bbox(s)
         # All shape types capable of having a bounding box
         if s.shapeType in (3,5,8,13,15,18,23,25,28,31):
@@ -1134,6 +1135,9 @@ class Writer(object):
         # Write a single Z value
         # Note: missing z values are autoset to 0, but not sure if this is ideal.
         if s.shapeType == 11:
+            # update the global z box
+            self.__zbox(s)
+            # then write value
             if hasattr(s, "z"):
                 # if z values are stored in attribute
                 try:
@@ -1153,6 +1157,9 @@ class Writer(object):
         # Write a single M value
         # Note: missing m values are autoset to NODATA.
         if s.shapeType in (11,21):
+            # update the global m box
+            self.__mbox(s)
+            # then write value
             if hasattr(s, "m"):
                 # if m values are stored in attribute
                 try:
@@ -1329,8 +1336,9 @@ class Writer(object):
                 if not isinstance(point, list):
                     point = list(point)
                 # Make sure point has z and m values
-                while len(point) < 4:
-                    point.append(0)
+                # TODO: Positions and values of missing z/m depend on shapeType
+                #while len(point) < 4:
+                #    point.append(0)
                 polyShape.points.append(point)
         if polyShape.shapeType == 31:
             if not partTypes:
