@@ -976,13 +976,14 @@ class Writer(object):
         else:
             f.write(pack("<4d", 0,0,0,0))
         # Elevation
-        zbox = self.zbox()
-        if zbox is None:
-            # The zbox is initialized with None, so this would mean the shapefile contains no z values
+        if self.shapeType in (11,13,15,18):
+            # Z values are present in Z type
+            zbox = self.zbox()
+        else:
             # As per the ESRI shapefile spec, the zbox for non-Z type shapefiles are set to 0s
             zbox = [0,0]
         # Measure
-        if self.shapeType in (11,13,15,18,23,25,28,31):
+        if self.shapeType in (11,13,15,18,21,23,25,28,31):
             # M values are present in M or Z type
             mbox = self.mbox()
         else:
@@ -1074,7 +1075,7 @@ class Writer(object):
             # Number of parts
             f.write(pack("<i", len(s.parts)))
         # Shape types with multiple points per record
-        if s.shapeType in (3,5,8,13,15,23,25,31):
+        if s.shapeType in (3,5,8,13,15,18,23,25,28,31):
             # Number of points
             f.write(pack("<i", len(s.points)))
         # Write part indexes
@@ -1086,7 +1087,7 @@ class Writer(object):
             for pt in s.partTypes:
                 f.write(pack("<i", pt))
         # Write points for multiple-point records
-        if s.shapeType in (3,5,8,13,15,23,25,31):
+        if s.shapeType in (3,5,8,13,15,18,23,25,28,31):
             try:
                 [f.write(pack("<2d", *p[:2])) for p in s.points]
             except error:
