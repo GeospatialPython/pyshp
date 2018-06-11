@@ -518,7 +518,13 @@ class Reader(object):
         # Elevation
         self.elevation = _Array('d', unpack("<2d", shp.read(16)))
         # Measure
-        self.measure = _Array('d', unpack("<2d", shp.read(16)))
+        self.measure = []
+        for m in _Array('d', unpack("<2d", shp.read(16))):
+            # Measure values less than -10e38 are nodata values according to the spec
+            if m > NODATA:
+                self.measure.append(m)
+            else:
+                self.measure.append(None)
 
     def __shape(self):
         """Returns the header info and geometry for a single shape."""
@@ -571,10 +577,15 @@ class Reader(object):
             record.points = [_Array('d', unpack("<2d", f.read(16)))]
         # Read a single Z value
         if shapeType == 11:
-            record.z = unpack("<d", f.read(8))
+            record.z = list(unpack("<d", f.read(8)))
         # Read a single M value
         if shapeType == 21 or (shapeType == 11 and f.tell() < next):
-            record.m = unpack("<d", f.read(8))
+            (m,) = unpack("<d", f.read(8))
+            # Measure values less than -10e38 are nodata values according to the spec
+            if m > NODATA:
+                record.m = [m]
+            else:
+                record.m = [None]
         # Seek to the end of this record as defined by the record header because
         # the shapefile spec doesn't require the actual content to meet the header
         # definition.  Probably allowed for lazy feature deletion. 
