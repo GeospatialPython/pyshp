@@ -900,12 +900,13 @@ class Writer(object):
             try:
                 z.append(p[2])
             except IndexError:
-                warnings.warn('One or more of the shape points had a missing z-value and were skipped when calculating the Z bounding box.')
+                #warnings.warn('One or more of the shape points had a missing z-value and were skipped when calculating the Z bounding box.')
+                pass
         if not z:
             # none of the shapes had z values
             # z dimension does not have the concept of nodata values
             # but setting them to 0 is probably ok, since it means all are on the same elavation
-            warnings.warn('None of the shape points had any z-values, setting the Z bounding box to (0,0).')
+            #warnings.warn('None of the shape points had any z-values, setting the Z bounding box to (0,0).')
             z.append(0)
         zbox = [min(z), max(z)]
         # update global
@@ -924,11 +925,12 @@ class Writer(object):
             try:
                 m.append(p[mpos])
             except IndexError:
-                warnings.warn('One or more of the shape points had a missing m-value and were skipped when calculating the M bounding box.')
+                #warnings.warn('One or more of the shape points had a missing m-value and were skipped when calculating the M bounding box.')
+                pass
         if not m:
             # none of the shapes had m values
             # be flexible on this and set them to m nodata values, as per the ESRI spec
-            warnings.warn('None of the shape points had any m-values, setting the M bounding box to (nodata,nodata).')
+            #warnings.warn('None of the shape points had any m-values, setting the M bounding box to (nodata,nodata).')
             m.append(NODATA)
         mbox = [min(m), max(m)]
         # update global
