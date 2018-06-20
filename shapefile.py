@@ -60,7 +60,7 @@ else:
 # Helpers
 
 MISSING = [None,'']
-NODATA = -10e38 # as per the ESRI shapefile spec, only used for m-values. 
+NODATA = -10e38 # as per the ESRI shapefile spec, only used for m-values.
 
 if PYTHON3:
     def b(v, encoding='utf-8', encodingErrors='strict'):
@@ -291,6 +291,140 @@ class Shape(object):
         else:
             raise Exception('Shape type "%s" cannot be represented as GeoJSON.' % self.shapeType)
 
+
+
+
+class _Record(list):
+    """
+    A class to hold a record. Subclasses list to ensure compatibility with
+    former work and allows to use all the optimazations of the builtin list.
+    In addition to the list interface, the values of the record
+    can also be retrieved using the fields name. Eg. the dbf contains
+    a field ID at position 1, the ID can be retrieved with the position, the field name
+    as a key or the field name as an attribute.
+
+    >>> # Create a Record with one field, normally the record is created with the RecordFactory
+    >>> r = _Record({'ID': 1}, [0])
+    >>> print(r[1])
+    >>> print(r['ID'])
+    >>> print(r.ID)
+    """
+
+    def __init__(self, field_position, values, oid=None):
+        """
+        A Record should be created by the record factory
+
+        :param field_position: A dict mapping field names to field positions
+        :param values: A sequence of values
+        :param oid: The object id, an int (optional)
+        """
+        self.__field_position = field_position
+        if oid is not None:
+            self.__oid = oid
+        else:
+            self.__oid = -1
+        list.__init__(self, values)
+
+    def __getattr__(self, item):
+        """
+        __getattr__ is called if an attribute is used that does
+        not exist in the normal sense. Eg. r=Record(...), r.ID
+        calls r.__getattr__('ID'), but r.index(5) calls list.index(r, 5)
+        :param item: The field name, used as attribute
+        :return: Value of the field
+        :raises: Attribute error, if field does not exist in RecordFactory
+                and IndexError, if field exists but not values in the Record
+        """
+        try:
+            index = self.__field_position[item]
+            return list.__getitem__(self, index)
+        except KeyError:
+            raise AttributeError('{} is not a field name'.format(item))
+        except IndexError:
+            raise ValueError('{} found as a field but not enough values available.')
+
+    def __setattr__(self, key, value):
+        """
+        Sets a value of a field attribute
+        :param key: The field name
+        :param value: the value of that field
+        :return: None
+        :raises: KeyError, if key is not a field of the shapefile
+        """
+        if key.startswith('_'):  # Prevent infinite loop when setting mangled attribute
+            return list.__setattr__(self, key, value)
+        try:
+            index = self.__field_position[key]
+            return list.__setitem__(self, index, value)
+        except KeyError:
+            raise AttributeError('{} is not a field name'.format(key))
+
+    def __getitem__(self, item):
+        """
+        Extends the normal list item access with
+        access using a fieldname
+
+        Eg. r['ID'], r[0]
+        :param item: Either the position of the value or the name of a field
+        :return: the value of the field
+        """
+        try:
+            return list.__getitem__(self, item)
+        except TypeError:
+            try:
+                index = self.__field_position[item]
+            except KeyError:
+                index = None
+        if index is not None:
+            return list.__getitem__(self, index)
+        else:
+            raise IndexError('"{}" is not a field name and not an int'.format(item))
+
+    def __setitem__(self, key, value):
+        """
+        Extends the normal list item access with
+        access using a fieldname
+
+        Eg. r['ID']=2, r[0]=2
+        :param key: Either the position of the value or the name of a field
+        :param value: the new value of the field
+        """
+        try:
+            return list.__setitem__(self, key, value)
+        except TypeError:
+            index = self.__field_position.get(key)
+            if index is not None:
+                return list.__setitem__(self, index, value)
+            else:
+                raise IndexError('{} is not a field name and not an int'.format(key))
+
+    def __get_fields(self):
+        """Helper function for the fields property"""
+        return list(self.__field_position.keys())
+
+    fields = property(__get_fields, doc="The field names of the record")
+
+    def as_dict(self):
+        """
+        Returns this Record as a dictionary using the field names as keys
+        :return: dict
+        """
+        return dict((f, self[i]) for f, i in self.__field_position.items())
+
+    def __str__(self):
+        return 'record #{} '.format(self.__oid)
+
+    def __dir__(self):
+        """
+        Helps to show the field names in an interactive environment like IPython.
+        See: http://ipython.readthedocs.io/en/stable/config/integrating.html
+
+        :return: List of method names and fields
+        """
+        attrs = [attr for attr in vars(type(self)) if not attr.startswith('_')]
+        return attrs + self.fields
+
+
 class ShapeRecord(object):
     """A ShapeRecord object containing a shape along with its attributes."""
     def __init__(self, shape=None, record=None):
@@ -329,6 +463,7 @@ class Reader(object):
         self.numRecords = None
         self.fields = []
         self.__dbfHdrLength = 0
+        self.__fieldposition_lookup = {}
         self.encoding = kwargs.pop('encoding', 'utf-8')
         self.encodingErrors = kwargs.pop('encodingErrors', 'strict')
         # See if a shapefile name was passed as an argument
@@ -412,7 +547,7 @@ class Reader(object):
             features.append(fdict)
         return {'type': 'FeatureCollection',
                 'bbox': self.bbox,
-                'features': features}        
+                'features': features}
 
     def load(self, shapefile=None):
         """Opens a shapefile from a filename or file-like
@@ -683,6 +818,9 @@ class Reader(object):
         fmt,fmtSize = self.__recordFmt()
         self.__recStruct = Struct(fmt)
 
+        # Create the record factory
+        self.__fieldposition_lookup = dict((f[0], i) for i, f in enumerate(self.fields[1:]))
+
     def __recordFmt(self):
         """Calculates the format and size of a .dbf record."""
         if self.numRecords is None:
@@ -696,7 +834,7 @@ class Reader(object):
             fmtSize += 1
         return (fmt, fmtSize)
 
-    def __record(self):
+    def __record(self, oid=None):
         """Reads and returns a dbf record row as a list of values."""
         f = self.__getFileObj(self.dbf)
         recordContents = self.__recStruct.unpack(f.read(self.__recStruct.size))
@@ -753,13 +891,14 @@ class Reader(object):
                     elif value in b'NnFf0':
                         value = False
                     else:
-                        value = None # unknown value is set to missing
+                        value = None  # unknown value is set to missing
             else:
                 # anything else is forced to string/unicode
                 value = u(value, self.encoding, self.encodingErrors)
                 value = value.strip()
             record.append(value)
-        return record
+
+        return _Record(self.__fieldposition_lookup, record, oid)
 
     def record(self, i=0):
         """Returns a specific dbf record based on the supplied index."""
@@ -770,7 +909,7 @@ class Reader(object):
         recSize = self.__recStruct.size
         f.seek(0)
         f.seek(self.__dbfHdrLength + (i * recSize))
-        return self.__record()
+        return self.__record(oid=i)
 
     def records(self):
         """Returns all records in a dbf file."""
@@ -780,7 +919,7 @@ class Reader(object):
         f = self.__getFileObj(self.dbf)
         f.seek(self.__dbfHdrLength)
         for i in range(self.numRecords):
-            r = self.__record()
+            r = self.__record(oid=i)
             if r:
                 records.append(r)
         return records
@@ -815,7 +954,6 @@ class Reader(object):
         all records in a shapefile."""
         for shape, record in izip(self.iterShapes(), self.iterRecords()):
             yield ShapeRecord(shape=shape, record=record)
-
 
 class Writer(object):
     """Provides write support for ESRI Shapefiles."""
@@ -881,8 +1019,8 @@ class Writer(object):
             y.extend(py)
         else:
             # this should not happen.
-            # any shape that is not null should have at least one point, and only those should be sent here. 
-            # could also mean that earlier code failed to add points to a non-null shape. 
+            # any shape that is not null should have at least one point, and only those should be sent here.
+            # could also mean that earlier code failed to add points to a non-null shape.
             raise Exception("Cannot create bbox. Expected a valid shape with at least one point. Got a shape of type '%s' and 0 points." % s.shapeType)
         bbox = [min(x), min(y), max(x), max(y)]
         # update global
@@ -982,7 +1120,7 @@ class Writer(object):
                     # In such cases of empty shapefiles, ESRI spec says the bbox values are 'unspecified'.
                     # Not sure what that means, so for now just setting to 0s, which is the same behavior as in previous versions.
                     # This would also make sense since the Z and M bounds are similarly set to 0 for non-Z/M type shapefiles.
-                    bbox = [0,0,0,0] 
+                    bbox = [0,0,0,0]
                 f.write(pack("<4d", *bbox))
             except error:
                 raise ShapefileException("Failed to write shapefile bounding box. Floats required.")
@@ -1118,7 +1256,7 @@ class Writer(object):
                     f.write(pack("<%sd" % len(s.z), *s.z))
                 else:
                     # if z values are stored as 3rd dimension
-                    [f.write(pack("<d", p[2] if len(p) > 2 else 0)) for p in s.points]  
+                    [f.write(pack("<d", p[2] if len(p) > 2 else 0)) for p in s.points]
             except error:
                 raise ShapefileException("Failed to write elevation values for record %s. Expected floats." % recNum)
         # Write m extremes and values
@@ -1130,7 +1268,7 @@ class Writer(object):
             except error:
                 raise ShapefileException("Failed to write measure extremes for record %s. Expected floats" % recNum)
             try:
-                if hasattr(s,"m"): 
+                if hasattr(s,"m"):
                     # if m values are stored in attribute
                     f.write(pack("<%sd" % len(s.m), *[m if m is not None else NODATA for m in s.m]))
                 else:
@@ -1178,7 +1316,7 @@ class Writer(object):
                 # if m values are stored in attribute
                 try:
                     if not s.m:
-                        s.m = (NODATA,) 
+                        s.m = (NODATA,)
                     f.write(pack("<1d", s.m[0]))
                 except error:
                     raise ShapefileException("Failed to write measure value for record %s. Expected floats." % recNum)
