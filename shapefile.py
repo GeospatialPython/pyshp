@@ -60,6 +60,7 @@ else:
 # Helpers
 
 MISSING = [None,'']
+NODATA = -10e38 # as per the ESRI shapefile spec, only used for m-values.
 
 if PYTHON3:
     def b(v, encoding='utf-8', encodingErrors='strict'):
@@ -519,6 +520,26 @@ class Reader(object):
         """Returns the number of shapes/records in the shapefile."""
         return self.numRecords
 
+    def __iter__(self):
+        """Iterates through the shapes/records in the shapefile."""
+        for shaperec in self.iterShapeRecords():
+            yield shaperec
+
+    @property
+    def __geo_interface__(self):
+        fieldnames = [f[0] for f in self.fields]
+        features = []
+        for feat in self.iterShapeRecords():
+            fdict = {'type': 'Feature',
+                     'properties': dict(*zip(fieldnames,
+                                             list(feat.record)
+                                             )),
+                     'geometry': feat.shape.__geo_interface__}
+            features.append(fdict)
+        return {'type': 'FeatureCollection',
+                'bbox': self.bbox,
+                'features': features}
+
     def load(self, shapefile=None):
         """Opens a shapefile from a filename or file-like
         object. Normally this method would be called by the
@@ -623,7 +644,13 @@ class Reader(object):
         # Elevation
         self.elevation = _Array('d', unpack("<2d", shp.read(16)))
         # Measure
-        self.measure = _Array('d', unpack("<2d", shp.read(16)))
+        self.measure = []
+        for m in _Array('d', unpack("<2d", shp.read(16))):
+            # Measure values less than -10e38 are nodata values according to the spec
+            if m > NODATA:
+                self.measure.append(m)
+            else:
+                self.measure.append(None)
 
     def __shape(self):
         """Returns the header info and geometry for a single shape."""
@@ -661,13 +688,13 @@ class Reader(object):
         if shapeType in (13,15,18,31):
             (zmin, zmax) = unpack("<2d", f.read(16))
             record.z = _Array('d', unpack("<%sd" % nPoints, f.read(nPoints * 8)))
-        # Read m extremes and values if header m values do not equal 0.0
-        if shapeType in (13,15,18,23,25,28,31) and not 0.0 in self.measure:
+        # Read m extremes and values
+        if shapeType in (13,15,18,23,25,28,31):
             (mmin, mmax) = unpack("<2d", f.read(16))
             # Measure values less than -10e38 are nodata values according to the spec
             record.m = []
             for m in _Array('d', unpack("<%sd" % nPoints, f.read(nPoints * 8))):
-                if m > -10e38:
+                if m > NODATA:
                     record.m.append(m)
                 else:
                     record.m.append(None)
@@ -676,10 +703,15 @@ class Reader(object):
             record.points = [_Array('d', unpack("<2d", f.read(16)))]
         # Read a single Z value
         if shapeType == 11:
-            record.z = unpack("<d", f.read(8))
+            record.z = list(unpack("<d", f.read(8)))
         # Read a single M value
         if shapeType == 21 or (shapeType == 11 and f.tell() < next):
-            record.m = unpack("<d", f.read(8))
+            (m,) = unpack("<d", f.read(8))
+            # Measure values less than -10e38 are nodata values according to the spec
+            if m > NODATA:
+                record.m = [m]
+            else:
+                record.m = [None]
         # Seek to the end of this record as defined by the record header because
         # the shapefile spec doesn't require the actual content to meet the header
         # definition.  Probably allowed for lazy feature deletion. 
@@ -934,9 +966,9 @@ class Writer(object):
         # Geometry record offsets and lengths for writing shx file.
         self.recNum = 0
         self.shpNum = 0
-        self._bbox = [0,0,0,0]
-        self._zbox = [0,0]
-        self._mbox = [0,0]
+        self._bbox = None
+        self._zbox = None
+        self._mbox = None
         # Use deletion flags in dbf? Default is false (0).
         self.deletionFlag = 0
         # Encoding
@@ -979,11 +1011,19 @@ class Writer(object):
             px, py = list(zip(*s.points))[:2]
             x.extend(px)
             y.extend(py)
-        if len(x) == 0:
-            return [0] * 4
+        else:
+            # this should not happen.
+            # any shape that is not null should have at least one point, and only those should be sent here.
+            # could also mean that earlier code failed to add points to a non-null shape.
+            raise Exception("Cannot create bbox. Expected a valid shape with at least one point. Got a shape of type '%s' and 0 points." % s.shapeType)
         bbox = [min(x), min(y), max(x), max(y)]
         # update global
-        self._bbox = [min(bbox[0],self._bbox[0]), min(bbox[1],self._bbox[1]), max(bbox[2],self._bbox[2]), max(bbox[3],self._bbox[3])]
+        if self._bbox:
+            # compare with existing
+            self._bbox = [min(bbox[0],self._bbox[0]), min(bbox[1],self._bbox[1]), max(bbox[2],self._bbox[2]), max(bbox[3],self._bbox[3])]
+        else:
+            # first time bbox is being set
+            self._bbox = bbox
         return bbox
 
     def __zbox(self, s):
@@ -992,24 +1032,46 @@ class Writer(object):
             try:
                 z.append(p[2])
             except IndexError:
-                warnings.warn('One or more of the shapes had a missing z-value and were skipped when calculating the Z bounding box.')
-        if not z: z.append(0)
+                #warnings.warn('One or more of the shape points had a missing z-value and were skipped when calculating the Z bounding box.')
+                pass
+        if not z:
+            # none of the shapes had z values
+            # z dimension does not have the concept of nodata values
+            # but setting them to 0 is probably ok, since it means all are on the same elavation
+            #warnings.warn('None of the shape points had any z-values, setting the Z bounding box to (0,0).')
+            z.append(0)
         zbox = [min(z), max(z)]
         # update global
-        self._zbox = [min(zbox[0],self._zbox[0]), min(zbox[1],self._zbox[1])]
+        if self._zbox:
+            # compare with existing
+            self._zbox = [min(zbox[0],self._zbox[0]), max(zbox[1],self._zbox[1])]
+        else:
+            # first time zbox is being set
+            self._zbox = zbox
         return zbox
 
     def __mbox(self, s):
+        mpos = 3 if s.shapeType in (11,13,15,18,31) else 2
         m = []
         for p in s.points:
             try:
-                m.append(p[3])
+                m.append(p[mpos])
             except IndexError:
-                warnings.warn('One or more of the shapes had a missing m-value and were skipped when calculating the M bounding box.')
-        if not m: m.append(0)
+                #warnings.warn('One or more of the shape points had a missing m-value and were skipped when calculating the M bounding box.')
+                pass
+        if not m:
+            # none of the shapes had m values
+            # be flexible on this and set them to m nodata values, as per the ESRI spec
+            #warnings.warn('None of the shape points had any m-values, setting the M bounding box to (nodata,nodata).')
+            m.append(NODATA)
         mbox = [min(m), max(m)]
         # update global
-        self._mbox = [min(mbox[0],self._mbox[0]), min(mbox[1],self._mbox[1])]
+        if self._mbox:
+            # compare with existing
+            self._mbox = [min(mbox[0],self._mbox[0]), max(mbox[1],self._mbox[1])]
+        else:
+            # first time mbox is being set
+            self._mbox = mbox
         return mbox
 
     def bbox(self):
@@ -1046,17 +1108,35 @@ class Writer(object):
         # The shapefile's bounding box (lower left, upper right)
         if self.shapeType != 0:
             try:
-                f.write(pack("<4d", *self.bbox()))
+                bbox = self.bbox()
+                if bbox is None:
+                    # The bbox is initialized with None, so this would mean the shapefile contains no valid geometries.
+                    # In such cases of empty shapefiles, ESRI spec says the bbox values are 'unspecified'.
+                    # Not sure what that means, so for now just setting to 0s, which is the same behavior as in previous versions.
+                    # This would also make sense since the Z and M bounds are similarly set to 0 for non-Z/M type shapefiles.
+                    bbox = [0,0,0,0]
+                f.write(pack("<4d", *bbox))
             except error:
                 raise ShapefileException("Failed to write shapefile bounding box. Floats required.")
         else:
             f.write(pack("<4d", 0,0,0,0))
         # Elevation
-        z = self.zbox()
+        if self.shapeType in (11,13,15,18):
+            # Z values are present in Z type
+            zbox = self.zbox()
+        else:
+            # As per the ESRI shapefile spec, the zbox for non-Z type shapefiles are set to 0s
+            zbox = [0,0]
         # Measure
-        m = self.mbox()
+        if self.shapeType in (11,13,15,18,21,23,25,28,31):
+            # M values are present in M or Z type
+            mbox = self.mbox()
+        else:
+            # As per the ESRI shapefile spec, the mbox for non-M type shapefiles are set to 0s
+            mbox = [0,0]
+        # Try writing
         try:
-            f.write(pack("<4d", z[0], z[1], m[0], m[1]))
+            f.write(pack("<4d", zbox[0], zbox[1], mbox[0], mbox[1]))
         except error:
             raise ShapefileException("Failed to write shapefile elevation and measure values. Floats required.")
 
@@ -1127,20 +1207,20 @@ class Writer(object):
         f.write(pack("<i", s.shapeType))
 
         # For point just update bbox of the whole shapefile
-        if s.shapeType == 1:
+        if s.shapeType in (1,11,21):
             self.__bbox(s)
         # All shape types capable of having a bounding box
         if s.shapeType in (3,5,8,13,15,18,23,25,28,31):
             try:
                 f.write(pack("<4d", *self.__bbox(s)))
             except error:
-                raise ShapefileException("Falied to write bounding box for record %s. Expected floats." % recNum)
+                raise ShapefileException("Failed to write bounding box for record %s. Expected floats." % recNum)
         # Shape types with parts
         if s.shapeType in (3,5,13,15,23,25,31):
             # Number of parts
             f.write(pack("<i", len(s.parts)))
         # Shape types with multiple points per record
-        if s.shapeType in (3,5,8,13,15,23,25,31):
+        if s.shapeType in (3,5,8,13,15,18,23,25,28,31):
             # Number of points
             f.write(pack("<i", len(s.points)))
         # Write part indexes
@@ -1152,12 +1232,13 @@ class Writer(object):
             for pt in s.partTypes:
                 f.write(pack("<i", pt))
         # Write points for multiple-point records
-        if s.shapeType in (3,5,8,13,15,23,25,31):
+        if s.shapeType in (3,5,8,13,15,18,23,25,28,31):
             try:
                 [f.write(pack("<2d", *p[:2])) for p in s.points]
             except error:
                 raise ShapefileException("Failed to write points for record %s. Expected floats." % recNum)
         # Write z extremes and values
+        # Note: missing z values are autoset to 0, but not sure if this is ideal.
         if s.shapeType in (13,15,18,31):
             try:
                 f.write(pack("<2d", *self.__zbox(s)))
@@ -1165,22 +1246,30 @@ class Writer(object):
                 raise ShapefileException("Failed to write elevation extremes for record %s. Expected floats." % recNum)
             try:
                 if hasattr(s,"z"):
+                    # if z values are stored in attribute
                     f.write(pack("<%sd" % len(s.z), *s.z))
                 else:
-                    [f.write(pack("<d", p[2])) for p in s.points]  
+                    # if z values are stored as 3rd dimension
+                    [f.write(pack("<d", p[2] if len(p) > 2 else 0)) for p in s.points]
             except error:
                 raise ShapefileException("Failed to write elevation values for record %s. Expected floats." % recNum)
         # Write m extremes and values
+        # When reading a file, pyshp converts NODATA m values to None, so here we make sure to convert them back to NODATA
+        # Note: missing m values are autoset to NODATA.
         if s.shapeType in (13,15,18,23,25,28,31):
             try:
-                if hasattr(s,"m") and None not in s.m:
-                    f.write(pack("<%sd" % len(s.m), *s.m))
-                else:
-                    f.write(pack("<2d", *self.__mbox(s)))
+                f.write(pack("<2d", *self.__mbox(s)))
             except error:
                 raise ShapefileException("Failed to write measure extremes for record %s. Expected floats" % recNum)
             try:
-                [f.write(pack("<d", len(p) > 3 and p[3] or 0)) for p in s.points]
+                if hasattr(s,"m"):
+                    # if m values are stored in attribute
+                    f.write(pack("<%sd" % len(s.m), *[m if m is not None else NODATA for m in s.m]))
+                else:
+                    # if m values are stored as 3rd/4th dimension
+                    # 0-index position of m value is 3 if z type (x,y,z,m), or 2 if m type (x,y,m)
+                    mpos = 3 if s.shapeType in (13,15,18,31) else 2
+                    [f.write(pack("<d", p[mpos] if len(p) > mpos and p[mpos] is not None else NODATA)) for p in s.points]
             except error:
                 raise ShapefileException("Failed to write measure values for record %s. Expected floats" % recNum)
         # Write a single point
@@ -1190,8 +1279,13 @@ class Writer(object):
             except error:
                 raise ShapefileException("Failed to write point for record %s. Expected floats." % recNum)
         # Write a single Z value
+        # Note: missing z values are autoset to 0, but not sure if this is ideal.
         if s.shapeType == 11:
+            # update the global z box
+            self.__zbox(s)
+            # then write value
             if hasattr(s, "z"):
+                # if z values are stored in attribute
                 try:
                     if not s.z:
                         s.z = (0,)    
@@ -1199,6 +1293,7 @@ class Writer(object):
                 except error:
                     raise ShapefileException("Failed to write elevation value for record %s. Expected floats." % recNum)
             else:
+                # if z values are stored as 3rd dimension
                 try:
                     if len(s.points[0])<3:
                         s.points[0].append(0)
@@ -1206,19 +1301,27 @@ class Writer(object):
                 except error:
                     raise ShapefileException("Failed to write elevation value for record %s. Expected floats." % recNum)
         # Write a single M value
+        # Note: missing m values are autoset to NODATA.
         if s.shapeType in (11,21):
+            # update the global m box
+            self.__mbox(s)
+            # then write value
             if hasattr(s, "m"):
+                # if m values are stored in attribute
                 try:
                     if not s.m:
-                        s.m = (0,) 
+                        s.m = (NODATA,)
                     f.write(pack("<1d", s.m[0]))
                 except error:
                     raise ShapefileException("Failed to write measure value for record %s. Expected floats." % recNum)
             else:
+                # if m values are stored as 3rd/4th dimension
+                # 0-index position of m value is 3 if z type (x,y,z,m), or 2 if m type (x,y,m)
                 try:
-                    if len(s.points[0])<4:
-                        s.points[0].append(0)
-                    f.write(pack("<1d", s.points[0][3]))
+                    mpos = 3 if s.shapeType == 11 else 2
+                    if len(s.points[0])<mpos+1:
+                        s.points[0].append(NODATA)
+                    f.write(pack("<1d", s.points[0][mpos]))
                 except error:
                     raise ShapefileException("Failed to write measure value for record %s. Expected floats." % recNum)
         # Finalize record length as 16-bit words
@@ -1341,14 +1444,14 @@ class Writer(object):
         """Creates a null shape."""
         self.shape(Shape(NULL))
 
-    def point(self, x, y, z=0, m=0, shapeType=POINT):
+    def point(self, x, y, z=0, m=NODATA, shapeType=POINT):
         """Creates a point shape."""
         pointShape = Shape(shapeType)
         if shapeType == POINT:
             pointShape.points.append([x, y])
-        elif shapeType == POINTZ:
-            pointShape.points.append([x, y, z])
         elif shapeType == POINTM:
+            pointShape.points.append([x, y, m])
+        elif shapeType == POINTZ:
             pointShape.points.append([x, y, z, m])
         self.shape(pointShape)
 
@@ -1379,8 +1482,9 @@ class Writer(object):
                 if not isinstance(point, list):
                     point = list(point)
                 # Make sure point has z and m values
-                while len(point) < 4:
-                    point.append(0)
+                # TODO: Positions and values of missing z/m depend on shapeType
+                #while len(point) < 4:
+                #    point.append(0)
                 polyShape.points.append(point)
         if polyShape.shapeType == 31:
             if not partTypes:
