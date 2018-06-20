@@ -292,22 +292,6 @@ class Shape(object):
             raise Exception('Shape type "%s" cannot be represented as GeoJSON.' % self.shapeType)
 
 
-class _RecordFactory:
-    """
-    A record factory creates records using the field names of a record and
-    are referenced by the record as the source for the field names.
-    In that sense, the _RecordFactory acts both as the factory pattern
-    approach, as well as a header class of the attribute table
-    """
-    def __init__(self, fields, name='shapefile'):
-        self.fields = dict((f[0], i) for i, f in enumerate(fields))
-        self.name = name
-
-    def __call__(self, values, oid=None):
-        return _Record(self, values, oid)
-
-    def __str__(self):
-        return self.name
 
 
 class _Record(list):
@@ -317,9 +301,7 @@ class _Record(list):
     In addition to the list interface, the values of the record
     can also be retrieved using the fields name. Eg. the dbf contains
     a field ID at position 1, the ID can be retrieved with the position, the field name
-    as a key or the field name as an attribute. The field names used for this, are owned by
-    the RecordFactory  to conserve memory - no need to repeat all the field names in every record.
-    Instead the record  holds only a pointer to one factory owning the field captions.
+    as a key or the field name as an attribute.
 
     >>> # Create a Record with one field, normally the record is created with the RecordFactory
     >>> r = _Record({'ID': 1}, [0])
@@ -328,20 +310,20 @@ class _Record(list):
     >>> print(r.ID)
     """
 
-    def __init__(self, factory, values, oid=None):
+    def __init__(self, field_position, values, oid=None):
         """
         A Record should be created by the record factory
 
-        :param factory: A RecordFactory
+        :param field_position: A dict mapping field names to field positions
         :param values: A sequence of values
         :param oid: The object id, an int (optional)
         """
-        self.__factory = factory
+        self.__field_position = field_position
         if oid is not None:
             self.__oid = oid
         else:
-            self.__oid = '?'
-        super(_Record, self).__init__(values)
+            self.__oid = -1
+        list.__init__(self, values)
 
     def __getattr__(self, item):
         """
@@ -354,56 +336,83 @@ class _Record(list):
                 and IndexError, if field exists but not values in the Record
         """
         try:
-            index = self.__factory.fields[item]
-            return super(_Record, self).__getitem__(index)
+            index = self.__field_position[item]
+            return list.__getitem__(self, index)
         except KeyError:
-            raise AttributeError('{} is not a field of {}'.format(item, self.__factory))
+            raise AttributeError('{} is not a field name'.format(item))
         except IndexError:
             raise ValueError('{} found as a field but not enough values available.')
 
     def __setattr__(self, key, value):
+        """
+        Sets a value of a field attribute
+        :param key: The field name
+        :param value: the value of that field
+        :return: None
+        :raises: KeyError, if key is not a field of the shapefile
+        """
         if key.startswith('_'):  # Prevent infinite loop when setting mangled attribute
-            return super(_Record, self).__setattr__(key, value)
+            return list.__setattr__(self, key, value)
         try:
-            index = self.__factory.fields[key]
-            return super(_Record, self).__setitem__(index, value)
+            index = self.__field_position[key]
+            return list.__setitem__(self, index, value)
         except KeyError:
-            raise AttributeError('{} is not a field of {}'.format(key, self.__factory))
+            raise AttributeError('{} is not a field name'.format(key))
 
     def __getitem__(self, item):
+        """
+        Extends the normal list item access with
+        access using a fieldname
+
+        Eg. r['ID'], r[0]
+        :param item: Either the position of the value or the name of a field
+        :return: the value of the field
+        """
         try:
-            return super(_Record, self).__getitem__(item)
+            return list.__getitem__(self, item)
         except TypeError:
-            index = self.__factory.fields.get(item)
+            try:
+                index = self.__field_position[item]
+            except KeyError:
+                index = None
         if index is not None:
-            return super(_Record, self).__getitem__(index)
+            return list.__getitem__(self, index)
         else:
-            raise IndexError('"{}" is not a field of {} and not an int'.format(item, self.__factory))
+            raise IndexError('"{}" is not a field name and not an int'.format(item))
 
     def __setitem__(self, key, value):
+        """
+        Extends the normal list item access with
+        access using a fieldname
+
+        Eg. r['ID']=2, r[0]=2
+        :param key: Either the position of the value or the name of a field
+        :param value: the new value of the field
+        """
         try:
-            return super(_Record, self).__setitem__(key, value)
+            return list.__setitem__(self, key, value)
         except TypeError:
-            index = self.__factory.fields.get(key)
+            index = self.__field_position.get(key)
             if index is not None:
-                return super(_Record, self).__setitem__(index, value)
+                return list.__setitem__(self, index, value)
             else:
-                raise IndexError('{} is not a field of {} and not an int'.format(key, self.__factory))
+                raise IndexError('{} is not a field name and not an int'.format(key))
 
     def __get_fields(self):
-        return list(self.__factory.fields.keys())
+        """Helper function for the fields property"""
+        return list(self.__field_position.keys())
 
-    fields = property(__get_fields)
+    fields = property(__get_fields, doc="The field names of the record")
 
     def as_dict(self):
         """
         Returns this Record as a dictionary using the field names as keys
         :return: dict
         """
-        return dict((f, self[i]) for f, i in self.__factory.fields.items())
+        return dict((f, self[i]) for f, i in self.__field_position.items())
 
     def __str__(self):
-        return 'record #{} of {}'.format(self.__oid, self.__factory)
+        return 'record #{} '.format(self.__oid)
 
     def __dir__(self):
         """
@@ -454,7 +463,7 @@ class Reader(object):
         self.numRecords = None
         self.fields = []
         self.__dbfHdrLength = 0
-        self.__recFactory = None
+        self.__fieldposition_lookup = {}
         self.encoding = kwargs.pop('encoding', 'utf-8')
         self.encodingErrors = kwargs.pop('encodingErrors', 'strict')
         # See if a shapefile name was passed as an argument
@@ -810,7 +819,7 @@ class Reader(object):
         self.__recStruct = Struct(fmt)
 
         # Create the record factory
-        self.__recFactory = _RecordFactory(self.fields[1:], self.shapeName)
+        self.__fieldposition_lookup = dict((f[0], i) for i, f in enumerate(self.fields[1:]))
 
     def __recordFmt(self):
         """Calculates the format and size of a .dbf record."""
@@ -882,16 +891,14 @@ class Reader(object):
                     elif value in b'NnFf0':
                         value = False
                     else:
-                        value = None # unknown value is set to missing
+                        value = None  # unknown value is set to missing
             else:
                 # anything else is forced to string/unicode
                 value = u(value, self.encoding, self.encodingErrors)
                 value = value.strip()
             record.append(value)
-        if self.__recFactory and len(self.__recFactory.fields) == len(record):
-            return self.__recFactory(record, oid=oid)
-        else:
-            return record
+
+        return _Record(self.__fieldposition_lookup, record, oid)
 
     def record(self, i=0):
         """Returns a specific dbf record based on the supplied index."""
@@ -947,7 +954,6 @@ class Reader(object):
         all records in a shapefile."""
         for shape, record in izip(self.iterShapes(), self.iterRecords()):
             yield ShapeRecord(shape=shape, record=record)
-
 
 class Writer(object):
     """Provides write support for ESRI Shapefiles."""
