@@ -736,7 +736,7 @@ class Reader(object):
                 continue
             elif typ in ("N","F"):
                 # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field. 
-                value = value.replace(b'\0', b'').strip()
+                value = value.split(b'\0')[0]
                 value = value.replace(b'*', b'')  # QGIS NULL is all '*' chars
                 if value == b'':
                     value = None
