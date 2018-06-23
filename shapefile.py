@@ -1095,8 +1095,8 @@ class Writer(object):
         f = self.__getFileObj(self._shp)
         offset = 100 + f.tell()
         # Record number, Content length place holder
-        f.write(pack(">2i", self.shpNum, 0))
         self.shpNum += 1
+        f.write(pack(">2i", self.shpNum, 0))
         start = f.tell()
         # Shape Type
         if self.shapeType is None and s.shapeType != NULL:
