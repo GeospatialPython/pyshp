@@ -273,9 +273,13 @@ You can call the "fields" attribute of the shapefile as a Python list. Each
 field is a Python list with the following information:
 
   * Field name: the name describing the data at this column index.
-  * Field type: the type of data at this column index. Types can be: Character,
-	   Numbers, Longs, Dates, or Memo. The "Memo" type has no meaning within a
-	   GIS and is part of the xbase spec instead.
+  * Field type: the type of data at this column index. Types can be: 
+       * "C": Characters, text.
+	   * "N": Numbers, with or without decimals.
+	   * "F": Floats (same as "N").
+	   * "L": Logical, for boolean True/False values. 
+	   * "D": Dates. 
+	   * "M": Memo, has no meaning within a GIS and is part of the xbase spec instead.
   * Field length: the length of the data found at this column index. Older GIS
 	   software may truncate this length to 8 or 11 characters for "Character"
 	   fields.

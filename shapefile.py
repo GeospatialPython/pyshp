@@ -224,7 +224,7 @@ class Shape(object):
     @property
     def __geo_interface__(self):
         if not self.parts or not self.points:
-            Exception('Invalid shape, cannot create GeoJSON representation. Shape type is "%s" but does not contain any parts and/or points.' % self.shapeType)
+            Exception('Invalid shape, cannot create GeoJSON representation. Shape type is "%s" but does not contain any parts and/or points.' % SHAPETYPE_LOOKUP[self.shapeType])
 
         if self.shapeType in [POINT, POINTM, POINTZ]:
             return {
