@@ -298,6 +298,10 @@ class Shape(object):
         else:
             raise Exception('Shape type "%s" cannot be represented as GeoJSON.' % SHAPETYPE_LOOKUP[self.shapeType])
 
+    @property
+    def shapeTypeName(self):
+        return SHAPETYPE_LOOKUP[self.shapeType]
+        
 class ShapeRecord(object):
     """A ShapeRecord object containing a shape along with its attributes."""
     def __init__(self, shape=None, record=None):
@@ -419,7 +423,11 @@ class Reader(object):
             features.append(fdict)
         return {'type': 'FeatureCollection',
                 'bbox': self.bbox,
-                'features': features}        
+                'features': features}
+
+    @property
+    def shapeTypeName(self):
+        return SHAPETYPE_LOOKUP[self.shapeType]
 
     def load(self, shapefile=None):
         """Opens a shapefile from a filename or file-like
@@ -948,6 +956,10 @@ class Writer(object):
             # first time mbox is being set
             self._mbox = mbox
         return mbox
+
+    @property
+    def shapeTypeName(self):
+        return SHAPETYPE_LOOKUP[self.shapeType]
 
     def bbox(self):
         """Returns the current bounding box for the shapefile which is
