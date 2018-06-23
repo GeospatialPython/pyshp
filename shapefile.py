@@ -77,9 +77,12 @@ if PYTHON3:
         elif isinstance(v, bytes):
             # Already bytes.
             return v
+        elif v is None:
+            # Since we're dealing with text, interpret None as ""
+            return b""
         else:
-            # Error.
-            raise Exception('Unknown input type')
+            # Force string representation.
+            return str(v).encode(encoding, encodingErrors)
 
     def u(v, encoding='utf-8', encodingErrors='strict'):
         if isinstance(v, bytes):
@@ -88,9 +91,12 @@ if PYTHON3:
         elif isinstance(v, str):
             # Already str.
             return v
+        elif v is None:
+            # Since we're dealing with text, interpret None as ""
+            return ""
         else:
-            # Error.
-            raise Exception('Unknown input type')
+            # Force string representation.
+            return bytes(v).decode(encoding, encodingErrors)
 
     def is_string(v):
         return isinstance(v, str)
@@ -103,9 +109,12 @@ else:
         elif isinstance(v, bytes):
             # Already bytes.
             return v
+        elif v is None:
+            # Since we're dealing with text, interpret None as ""
+            return ""
         else:
-            # Error.
-            raise Exception('Unknown input type')
+            # Force string representation.
+            return unicode(v).encode(encoding, encodingErrors)
 
     def u(v, encoding='utf-8', encodingErrors='strict'):
         if isinstance(v, bytes):
@@ -114,9 +123,12 @@ else:
         elif isinstance(v, unicode):
             # Already unicode.
             return v
+        elif v is None:
+            # Since we're dealing with text, interpret None as ""
+            return u""
         else:
-            # Error.
-            raise Exception('Unknown input type')
+            # Force string representation.
+            return bytes(v).decode(encoding, encodingErrors)
 
     def is_string(v):
         return isinstance(v, basestring)
