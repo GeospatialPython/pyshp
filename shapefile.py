@@ -21,7 +21,22 @@ from datetime import date
 
 
 # Constants for shape types
-SHAPE_TYPES = {
+NULL = 0
+POINT = 1
+POLYLINE = 3
+POLYGON = 5
+MULTIPOINT = 8
+POINTZ = 11
+POLYLINEZ = 13
+POLYGONZ = 15
+MULTIPOINTZ = 18
+POINTM = 21
+POLYLINEM = 23
+POLYGONM = 25
+MULTIPOINTM = 28
+MULTIPATCH = 31
+
+SHAPETYPE_LOOKUP = {
     0: 'NULL',
     1: 'POINT',
     3: 'POLYLINE',
@@ -36,14 +51,6 @@ SHAPE_TYPES = {
     25: 'POLYGONM',
     28: 'MULTIPOINTM',
     31: 'MULTIPATCH'}
-# add inverse mapping and insert all into globals
-_thismodule = sys.modules[__name__]
-for num, name in list(SHAPE_TYPES.items()):
-    setattr(_thismodule, name, num)
-    if name in SHAPE_TYPES:
-        # this is a conflict in shapetype names and should not happen
-        raise Exception()
-    SHAPE_TYPES[name] = num
 
 
 # Python 2-3 handling
@@ -289,7 +296,7 @@ class Shape(object):
                     'coordinates': polys
                     }
         else:
-            raise Exception('Shape type "%s" cannot be represented as GeoJSON.' % self.shapeType)
+            raise Exception('Shape type "%s" cannot be represented as GeoJSON.' % SHAPETYPE_LOOKUP[self.shapeType])
 
 class ShapeRecord(object):
     """A ShapeRecord object containing a shape along with its attributes."""
@@ -372,7 +379,7 @@ class Reader(object):
         info = ['shapefile Reader']
         if self.shp:
             info.append("    {} shapes (type '{}')".format(
-                len(self.shapes()), SHAPE_TYPES[self.shapeType]))
+                len(self.shapes()), SHAPETYPE_LOOKUP[self.shapeType]))
         if self.dbf:
             info.append('    {} records ({} fields)'.format(
                 self.numRecords, len(self.fields)))
