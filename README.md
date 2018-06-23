@@ -167,6 +167,12 @@ the shapefile module, so that we can compare types more intuitively:
 
 	>>> sf.shapeType == shapefile.POLYGON
 	True
+
+For convenience, you can also get the name of the shape type as a string:
+
+
+	>>> sf.shapeTypeName == 'POLYGON'
+	True
 	
 Other pieces of meta-data that we can check includes the number of features, 
 or the bounding box area the shapefile covers:
@@ -207,6 +213,7 @@ Each shape record contains the following attributes:
 	'parts'
 	'points'
 	'shapeType'
+	'shapeTypeName'
 
   * shapeType: an integer representing the type of shape as defined by the
 	  shapefile specification.
@@ -215,6 +222,12 @@ Each shape record contains the following attributes:
 		>>> shapes[3].shapeType
 		5
 
+  * shapeTypeName: a string representation of the type of shape as defined by shapeType. Read-only. 
+
+
+		>>> shapes[3].shapeTypeName
+		'POLYGON'
+		
   * bbox: If the shape type contains multiple points this tuple describes the
 	  lower left (x,y) coordinate and upper right corner coordinate creating a
 	  complete box around the points. If the shapeType is a
