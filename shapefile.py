@@ -439,7 +439,7 @@ class Reader(object):
             self.load_shp(shapeName)
             self.load_shx(shapeName)
             self.load_dbf(shapeName)
-            if not (self.shp and self.dbf):
+            if not (self.shp or self.dbf):
                 raise ShapefileException("Unable to open %s.dbf or %s.shp." % (shapeName, shapeName))
         if self.shp:
             self.__shpHeader()
