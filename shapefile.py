@@ -52,6 +52,21 @@ SHAPETYPE_LOOKUP = {
     28: 'MULTIPOINTM',
     31: 'MULTIPATCH'}
 
+TRIANGLE_STRIP = 0
+TRIANGLE_FAN = 1
+OUTER_RING = 2
+INNER_RING = 3
+FIRST_RING = 4
+RING = 5
+
+PARTTYPE_LOOKUP = {
+    0: 'TRIANGLE_STRIP',
+    1: 'TRIANGLE_FAN',
+    2: 'OUTER_RING',
+    3: 'INNER_RING',
+    4: 'FIRST_RING',
+    5: 'RING'}
+
 
 # Python 2-3 handling
 
@@ -1339,57 +1354,155 @@ class Writer(object):
         while self.recNum < self.shpNum:
             self.record()
 
+
     def null(self):
         """Creates a null shape."""
         self.shape(Shape(NULL))
 
-    def point(self, x, y, z=0, m=NODATA, shapeType=POINT):
-        """Creates a point shape."""
+
+    def point(self, x, y):
+        """Creates a POINT shape."""
+        shapeType = POINT
         pointShape = Shape(shapeType)
-        if shapeType == POINT:
-            pointShape.points.append([x, y])
-        elif shapeType == POINTM:
-            pointShape.points.append([x, y, m])
-        elif shapeType == POINTZ:
-            pointShape.points.append([x, y, z, m])
+        pointShape.points.append([x, y])
         self.shape(pointShape)
 
-    def line(self, parts=[], shapeType=POLYLINE):
-        """Creates a line shape. This method is just a convienience method
-        which wraps 'poly()'.
-        """
-        self.poly(parts, shapeType, [])
+    def pointm(self, x, y, m=None):
+        """Creates a POINTM shape.
+        If the m (measure) value is not set, it defaults to NoData."""
+        shapeType = POINTM
+        pointShape = Shape(shapeType)
+        pointShape.points.append([x, y, m])
+        self.shape(pointShape)
 
-    def poly(self, parts=[], shapeType=POLYGON, partTypes=[]):
-        """Creates a shape that has multiple collections of points (parts)
-        including lines, polygons, and even multipoint shapes. If no shape type
-        is specified it defaults to 'polygon'. If no part types are specified
-        (which they normally won't be) then all parts default to the shape type.
-        """
+    def pointz(self, x, y, z=0, m=None):
+        """Creates a POINTZ shape.
+        If the z (elevation) value is not set, it defaults to 0.
+        If the m (measure) value is not set, it defaults to NoData."""
+        shapeType = POINTZ
+        pointShape = Shape(shapeType)
+        pointShape.points.append([x, y, z, m])
+        self.shape(pointShape)
+        
+
+    def multipoint(self, points):
+        """Creates a MULTIPOINT shape.
+        Points is a list of xy values."""
+        shapeType = MULTIPOINT
+        points = [points] # nest the points inside a list to be compatible with the generic shapeparts method
+        self._shapeparts(parts=points, shapeType=shapeType)
+
+    def multipointm(self, points):
+        """Creates a MULTIPOINTM shape.
+        Points is a list of xym values.
+        If the m (measure) value is not included, it defaults to None (NoData)."""
+        shapeType = MULTIPOINTM
+        points = [points] # nest the points inside a list to be compatible with the generic shapeparts method
+        self._shapeparts(parts=points, shapeType=shapeType)
+
+    def multipointz(self, points):
+        """Creates a MULTIPOINTZ shape.
+        Points is a list of xyzm values.
+        If the z (elevation) value is not included, it defaults to 0.
+        If the m (measure) value is not included, it defaults to None (NoData)."""
+        shapeType = MULTIPOINTZ
+        points = [points] # nest the points inside a list to be compatible with the generic shapeparts method
+        self._shapeparts(parts=points, shapeType=shapeType)
+
+
+    def line(self, lines):
+        """Creates a POLYLINE shape.
+        Lines is a collection of lines, each made up of a list of xy values."""
+        shapeType = POLYLINE
+        self._shapeparts(parts=lines, shapeType=shapeType)
+
+    def linem(self, lines):
+        """Creates a POLYLINEM shape.
+        Lines is a collection of lines, each made up of a list of xym values.
+        If the m (measure) value is not included, it defaults to None (NoData)."""
+        shapeType = POLYLINEM
+        self._shapeparts(parts=lines, shapeType=shapeType)
+
+    def linez(self, lines):
+        """Creates a POLYLINEZ shape.
+        Lines is a collection of lines, each made up of a list of xyzm values.
+        If the z (elevation) value is not included, it defaults to 0.
+        If the m (measure) value is not included, it defaults to None (NoData)."""
+        shapeType = POLYLINEZ
+        self._shapeparts(parts=lines, shapeType=shapeType)
+
+
+    def poly(self, polys):
+        """Creates a POLYGON shape.
+        Polys is a collection of polygons, each made up of a list of xy values.
+        Note that for ordinary polygons the coordinates must run in a clockwise direction.
+        If some of the polygons are holes, these must run in a counterclockwise direction."""
+        shapeType = POLYGON
+        self._shapeparts(parts=polys, shapeType=shapeType)
+
+    def polym(self, polys):
+        """Creates a POLYGONM shape.
+        Polys is a collection of polygons, each made up of a list of xym values.
+        Note that for ordinary polygons the coordinates must run in a clockwise direction.
+        If some of the polygons are holes, these must run in a counterclockwise direction.
+        If the m (measure) value is not included, it defaults to None (NoData)."""
+        shapeType = POLYGONM
+        self._shapeparts(parts=polys, shapeType=shapeType)
+
+    def polyz(self, polys):
+        """Creates a POLYGONZ shape.
+        Polys is a collection of polygons, each made up of a list of xyzm values.
+        Note that for ordinary polygons the coordinates must run in a clockwise direction.
+        If some of the polygons are holes, these must run in a counterclockwise direction.
+        If the z (elevation) value is not included, it defaults to 0.
+        If the m (measure) value is not included, it defaults to None (NoData)."""
+        shapeType = POLYGONZ
+        self._shapeparts(parts=polys, shapeType=shapeType)
+
+
+    def multipatch(self, parts, partTypes):
+        """Creates a MULTIPATCH shape.
+        Parts is a collection of 3D surface patches, each made up of a list of xyzm values.
+        PartTypes is a list of types that define each of the surface patches.
+        The types can be any of the following module constants: TRIANGLE_STRIP,
+        TRIANGLE_FAN, OUTER_RING, INNER_RING, FIRST_RING, or RING.
+        If the z (elavation) value is not included, it defaults to 0.
+        If the m (measure) value is not included, it defaults to None (NoData)."""
+        shapeType = MULTIPATCH
         polyShape = Shape(shapeType)
         polyShape.parts = []
         polyShape.points = []
-        # Make sure polygons are closed
-        if shapeType in (5,15,25,31):
-            for part in parts:
-                    if part[0] != part[-1]:
-                        part.append(part[0])
         for part in parts:
+            # set part index position
             polyShape.parts.append(len(polyShape.points))
+            # add points
             for point in part:
                 # Ensure point is list
                 if not isinstance(point, list):
                     point = list(point)
-                # Make sure point has z and m values
-                # TODO: Positions and values of missing z/m depend on shapeType
-                #while len(point) < 4:
-                #    point.append(0)
                 polyShape.points.append(point)
-        if polyShape.shapeType == 31:
-            if not partTypes:
-                for part in parts:
-                    partTypes.append(polyShape.shapeType)
-            polyShape.partTypes = partTypes
+        polyShape.partTypes = partTypes
+        # write the shape
+        self.shape(polyShape)
+
+
+    def _shapeparts(self, parts, shapeType):
+        """Internal method for adding a shape that has multiple collections of points (parts):
+        lines, polygons, and multipoint shapes.
+        """
+        polyShape = Shape(shapeType)
+        polyShape.parts = []
+        polyShape.points = []
+        for part in parts:
+            # set part index position
+            polyShape.parts.append(len(polyShape.points))
+            # add points
+            for point in part:
+                # Ensure point is list
+                if not isinstance(point, list):
+                    point = list(point)
+                polyShape.points.append(point)
+        # write the shape
         self.shape(polyShape)
 
     def field(self, name, fieldType="C", size="50", decimal=0):

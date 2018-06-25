@@ -508,14 +508,13 @@ most shapefile software.
 ### Adding Geometry
 
 Geometry is added using one of several convenience methods. The "null" method is used
-for null shapes, "point" is used for point shapes, "line" for lines, and
-"poly" is used for polygons and everything else.
+for null shapes, "point" is used for point shapes, "multipoint" is used for multipoint shapes, "line" for lines,
+"poly" for polygons, and "multipatch" for multipatches. 
 
 **Adding a Point shape**
 
-Point shapes are added using the "point" method. A point is specified by an x,
-y value. An optional z (elevation) and m (measure) value can be set if the shapeType 
-is PointZ or PointM. 
+Point shapes are added using the "point" method. A point is specified by an x and
+y value. 
 
 
 	>>> w = shapefile.Writer()
@@ -526,44 +525,65 @@ is PointZ or PointM.
 	
 	>>> w.save('shapefiles/test/point')
 
-**Adding a Polygon shape**
+**Adding a MultiPoint shape**
 
-Shapefile polygons must have at
-least 4 points and the last point must be the same as the first. PyShp
-automatically enforces closed polygons. 
+If your point data allows for the possibility of multiple points per feature, use "multipoint" instead. 
+These are specified as a list of xy point coordinates. 
 
 
 	>>> w = shapefile.Writer()
 	>>> w.field('name', 'C')
-
-	>>> w.poly(parts=[[[122,37,4,9], [117,36,3,4]], [[115,32,8,8],
-	... [118,20,6,4], [113,24]]])
-	>>> w.record('polygon1')
 	
-	>>> w.save('shapefiles/test/polygon')
+	>>> w.multipoint([[122,37], [124,32]]) 
+	>>> w.record('multipoint1')
+	
+	>>> w.save('shapefiles/test/multipoint')
+	
+**Adding a LineString shape**
 
-**Adding a Line shape**
-
-A line must have at least two points.
-Because of the similarities between polygon and line types it is possible to create
-a line shape using either the "line" or "poly" method.
+For LineString shapefiles, each line shape consists of multiple lines. Line shapes must be given as a list of lines, 
+even if there is just one line. Also, each line must have at least two points.
 	
 	
 	>>> w = shapefile.Writer()
 	>>> w.field('name', 'C')
 	
-	>>> w.line(parts=[[[1,5],[5,5],[5,1],[3,3],[1,1]]])
-	>>> w.poly(parts=[[[1,3],[5,3]]], shapeType=shapefile.POLYLINE)
+	>>> w.line([
+				[[1,5],[5,5],[5,1],[3,3],[1,1]], # line 1
+				[[3,2],[2,6]] # line 2
+				])
 	
-	>>> w.record('line1')
-	>>> w.record('line2')
+	>>> w.record('linestring1')
 	
 	>>> w.save('shapefiles/test/line')
 	
+**Adding a Polygon shape**
+
+Similarly to LineString, Polygon shapes consist of multiple polygons, and must be given as a list of polygons.
+The main difference being that polygons must have at least 4 points and the last point must be the same as the first. 
+It's also okay if you forget to do so, PyShp automatically checks and closes the polygons if you don't. 
+
+It's important to note that for Polygon shapefiles, your polygon coordinates must be ordered in a clockwise direction.
+If any of the polygons have holes, then the hole polygon coordinates must be ordered in a counterclockwise direction.
+The direction of your polygons determines how shapefile readers will distinguish between polygons outlines and holes. 
+
+
+	>>> w = shapefile.Writer()
+	>>> w.field('name', 'C')
+
+	>>> w.poly([
+    ...			[[122,37], [117,36], [115,32], [118,20], [113,24]], # poly 1
+	...			[[15,2], [17,6], [22,7]], # hole 1
+	...			[[122,37], [117,36], [115,32] # poly 2
+    ...			])
+	>>> w.record('polygon1')
+	
+	>>> w.save('shapefiles/test/polygon')
+	
 **Adding a Null shape**
 
-Because Null shape types (shape type 0) have no geometry the "null" method is
-called without any arguments.  This type of shapefile is rarely used but it is valid.
+A shapefile may contain some records for which geometry is not available, and may be set using the "null" method. 
+Because Null shape types (shape type 0) have no geometry the "null" method is called without any arguments. 
 
 
 	>>> w = shapefile.Writer()
@@ -573,7 +593,77 @@ called without any arguments.  This type of shapefile is rarely used but it is v
 	>>> w.record('nullgeom')
 
 	>>> w.save('shapefiles/test/null')
+	
+**Adding shapes with measurement (M) values**
 
+Measured shape types are shapes that include a measurement value at each vertice, for instance speed measurements from a GPS device. 
+Shapes with measurement (M) values are added with following methods: "pointm", "multipointm", "linem", and "polygonm". 
+The M-values are specified by adding a third M value to each XY coordinate. Missing or unobserved M-values are specified with a None value,
+or by simply omitting the third M-coordinate. 
+	
+	
+	>>> w = shapefile.Writer()
+	>>> w.field('name', 'C')
+	
+	>>> w.linem([
+    ...			[[1,5,0],[5,5],[5,1,3],[3,3,None],[1,1,0]], # line with one omitted and one missing M-value
+	...			[[3,2],[2,6]] # line without any M-values
+	...			])
+	
+	>>> w.record('lineM1')
+	
+	>>> w.save('shapefiles/test/linem')
+	
+**Adding shapes with elevation (Z) values**
+
+Elevation shape types are shapes that include an elevation value at each vertice, for instance elevation from a GPS device. 
+Shapes with an elevation (Z) values are added with following methods: "pointz", "multipointz", "linez", and "polygonz". 
+The Z-values are specified by adding a third Z value to each XY coordinate. Z-values do not support the concept of missing data,
+but if you omit the third Z-coordinate it will default to 0. Note that Z-type shapes also support measurement (M) values added
+as a fourth M-coordinate. This too is optional. 
+	
+	
+	>>> w = shapefile.Writer()
+	>>> w.field('name', 'C')
+	
+	>>> w.linez([
+    ...			[[1,5,18],[5,5,20],[5,1,22],[3,3],[1,1]], # line with some omitted Z-values
+	...			[[3,2],[2,6]], # line without any Z-values
+	...			[[3,2,15,0],[2,6,13,3],[1,9,14,2]] # line with both Z and M-values
+	...			])
+	
+	>>> w.record('lineZ1')
+	
+	>>> w.save('shapefiles/test/linez')
+
+**Adding a 3D MultiPatch shape**
+
+Multipatch shapes are useful for storing composite 3-Dimensional objects. 
+A MultiPatch shape represents a 3D object made up of one or more surface parts.
+Each surface in "parts" is defined by a list of XYZM values (Z and M values optional), and its corresponding type
+given in the "partTypes" argument. The part type decides how the coordinate sequence is to be interpreted, and can be one 
+of the following module constants: TRIANGLE_STRIP, TRIANGLE_FAN, OUTER_RING, INNER_RING, FIRST_RING, or RING.
+For instance, a TRIANGLE_STRIP may be used to represent the walls of a building, combined with a TRIANGLE_FAN to represent 
+its roof: 
+
+	>>> from shapefile import TRIANGLE_STRIP, TRIANGLE_FAN
+	
+	>>> w = shapefile.Writer()
+	>>> w.field('name', 'C')
+	
+	>>> w.multipatch([
+    ...				 [[0,0,0],[0,0,3],[5,0,0],[5,0,3],[5,5,0],[5,5,3],[0,5,0],[0,5,3],[0,0,0],[0,0,3]], # TRIANGLE_STRIP for house walls
+	...				 [[2.5,2.5,5],[0,0,3],[5,0,3],[5,5,3],[0,5,3],[0,0,3]], # TRIANGLE_FAN for pointed house roof
+	...				 ],
+	...				 partTypes=[TRIANGLE_STRIP, TRIANGLE_FAN]) # one type for each part
+	
+	>>> w.record('house1')
+	
+	>>> w.save('shapefiles/test/multipatch')
+	
+For an introduction to the various part types and examples of how to create 3D MultiPatch objects see [this
+ESRI White Paper](http://downloads.esri.com/support/whitepapers/ao_/J9749_MultiPatch_Geometry_Type.pdf). 
+	
 **Adding from an existing Shape object**
 
 Finally, geometry can be added by passing an existing "Shape" object to the "shape" method.
@@ -770,7 +860,7 @@ construct a Shape object from GeoJSON using the "geojson_as_shape()" function.
 	>>> w.field('name', 'C')
 	
 	>>> w.shape( {"type":"Point", "coordinates":[1,1]} )
-	>>> w.record('two')
+	>>> w.record('one')
 
 	>>> w.save('shapefiles/test/geojson')
 	
