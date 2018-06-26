@@ -10,22 +10,24 @@ The Python Shapefile Library (pyshp) reads and writes ESRI Shapefiles in pure Py
 
 [Overview](#overview)
 
-[Examples](#examples)
+[Basic Use](#basic-use)
 - [Reading Shapefiles](#reading-shapefiles)
-  - [Reading Shapefiles from File-Like Objects](#reading-shapefiles-from-file-like-objects)
   - [Reading Shapefile Using the Context Manager](#reading-shapefile-context-manager)
+  - [Reading Shapefiles from File-Like Objects](#reading-shapefiles-from-file-like-objects)
   - [Reading Shapefile Meta-Data](#reading-shapefile-meta-data)
   - [Reading Geometry](#reading-geometry)
   - [Reading Records](#reading-records)
   - [Reading Geometry and Records Simultaneously](#reading-geometry-and-records-simultaneously)
 - [Writing Shapefiles](#writing-shapefiles)
   - [Setting the Shape Type](#setting-the-shape-type)
-  - [Geometry and Record Balancing](#geometry-and-record-balancing)
-  - [Adding Geometry](#adding-geometry)
   - [Adding Records](#adding-records)
-  - [File Names](#file-names)
+  - [Adding Geometry](#adding-geometry)
+  - [Geometry and Record Balancing](#geometry-and-record-balancing)
+  - [Saving to File Names](#saving-to-file-names)
   - [Saving to File-Like Objects](#saving-to-file-like-objects)
-- [Python Geo Interface](#python-geo-interface)
+  
+[More](#more)
+- [3D and Other Geometry Types](#3d-and-other-geometry-types)
 - [Working with Large Shapefiles](#working-with-large-shapefiles)
 - [Unicode and Shapefile Encodings](#unicode-and-shapefile-encodings)
 
@@ -67,7 +69,9 @@ I sincerely hope this library eliminates the mundane distraction of simply
 reading and writing data, and allows you to focus on the challenging and FUN
 part of your geospatial project.
 
-# Examples
+
+
+# Basic Use
 
 Before doing anything you must import the library.
 
@@ -101,6 +105,17 @@ OR
 OR any of the other 5+ formats which are potentially part of a shapefile. The
 library does not care about file extensions.
 
+### Reading Shapefile Using the Context Manager
+
+The "Reader" class can be used as a context manager, to ensure open file
+objects are properly closed when done reading the data:
+
+    >>> with shapefile.Reader("shapefiles/blockgroups.shp") as shp:
+    ...     print(shp)
+    shapefile Reader
+        663 shapes (type 'POLYGON')
+        663 records (44 fields)
+
 ### Reading Shapefiles from File-Like Objects
 
 You can also load shapefiles from any Python file-like object using keyword
@@ -118,17 +133,6 @@ very simple fixed-record index for the variable length records in the shp
 file. This file is optional for reading. If it's available pyshp will use the
 shx file to access shape records a little faster but will do just fine without
 it.
-
-### Reading Shapefile Using the Context Manager
-
-The "Reader" class can be used as a context manager, to ensure open file
-objects are properly closed when done reading the data:
-
-    >>> with shapefile.Reader("shapefiles/blockgroups.shp") as shp:
-    ...     print(shp)
-    shapefile Reader
-        663 shapes (type 'POLYGON')
-        663 records (44 fields)
 
 ### Reading Shapefile Meta-Data
 
@@ -190,7 +194,7 @@ vertices and implied arcs representing physical locations. All types of
 shapefiles just store points. The metadata about the points determine how they
 are handled by software.
 
-You can get the a list of the shapefile's geometry by calling the shapes()
+You can get a list of the shapefile's geometry by calling the shapes()
 method.
 
 
@@ -202,6 +206,18 @@ each shape record.
 
 	>>> len(shapes)
 	663
+	
+To read a single shape by calling its index use the shape() method. The index
+is the shape's count from 0. So to read the 8th shape record you would use its
+index which is 7.
+
+
+	>>> s = sf.shape(7)
+
+	>>> # Read the bbox of the 8th shape to verify
+	>>> # Round coordinates to 3 decimal places
+	>>> ['%.3f' % coord for coord in s.bbox]
+	['-122.450', '37.801', '-122.442', '37.808']
 
 Each shape record contains the following attributes:
 
@@ -261,17 +277,16 @@ Each shape record contains the following attributes:
 		>>> ['%.3f' % coord for coord in shape]
 		['-122.471', '37.787']
 
-To read a single shape by calling its index use the shape() method. The index
-is the shape's count from 0. So to read the 8th shape record you would use its
-index which is 7.
+In most cases, however, if you need to more than just type or bounds checking, you may want 
+to convert the geometry to the more human-readable [GeoJSON format](http://geojson.org),
+where lines and polygons are grouped for you:
 
 
-	>>> s = sf.shape(7)
-
-	>>> # Read the bbox of the 8th shape to verify
-	>>> # Round coordinates to 3 decimal places
-	>>> ['%.3f' % coord for coord in s.bbox]
-	['-122.450', '37.801', '-122.442', '37.808']
+	>>> s = sf.shape(0)
+	>>> geoj = s.__geo_interface__
+	>>> geoj["type"]
+	'MultiPolygon'
+	
 
 ### Reading Records
 
@@ -331,6 +346,14 @@ You can get a list of the shapefile's records by calling the records() method:
 	>>> len(records)
 	663
 
+To read a single record call the record() method with the record's index:
+
+
+	>>> rec = sf.record(3)
+
+	>>> rec[1:3]
+	['060750601001', 4715]
+	
 Each record is a list containing an attribute corresponding to each field in
 the field list.
 
@@ -340,14 +363,6 @@ Francisco blockgroup:
 
 
 	>>> records[3][1:3]
-	['060750601001', 4715]
-
-To read a single record call the record() method with the record's index:
-
-
-	>>> rec = sf.record(3)
-
-	>>> rec[1:3]
 	['060750601001', 4715]
 
 ### Reading Geometry and Records Simultaneously
@@ -446,247 +461,12 @@ OR you can set it after the Writer is created:
 
 	>>> w.shapeType
 	1
-
-### Geometry and Record Balancing
-
-Because every shape must have a corresponding record it is critical that the
-number of records equals the number of shapes to create a valid shapefile. You
-must take care to add records and shapes in the same order so that the record
-data lines up with the geometry data. For example:
-
 	
-	>>> w = shapefile.Writer(shapeType=shapefile.POINT)
-	>>> w.field("field1", "C")
-	>>> w.field("field2", "C")
-	
-	>>> w.record("row", "one")
-	>>> w.point(1, 1)
-	
-	>>> w.record("row", "two")
-	>>> w.point(2, 2)
-	
-To help prevent accidental misalignment pyshp has an "auto balance" feature to
-make sure when you add either a shape or a record the two sides of the
-equation line up. This way if you forget to update an entry the
-shapefile will still be valid and handled correctly by most shapefile
-software. Autobalancing is NOT turned on by default. To activate it set
-the attribute autoBalance to 1 or True:
-
-
-    >>> w.autoBalance = 1
-	>>> w.record("row", "three")
-	>>> w.record("row", "four")
-	>>> w.point(4, 4)
-	
-	>>> w.recNum == w.shpNum
-	True
-
-You also have the option of manually calling the balance() method at any time
-to ensure the other side is up to date. When balancing is used
-null shapes are created on the geometry side or records
-with a value of "NULL" for each field is created on the attribute side.
-This gives you flexibility in how you build the shapefile.
-You can create all of the shapes and then create all of the records or vice versa. 
-
-
-    >>> w.autoBalance = 0
-	>>> w.record("row", "five")
-	>>> w.record("row", "six")
-	>>> w.record("row", "seven")
-	>>> w.point(5, 5)
-	>>> w.point(6, 6)
-	>>> w.balance()
-	
-	>>> w.recNum == w.shpNum
-	True
-
-If you do not use the autobalance or balance method and forget to manually
-balance the geometry and attributes the shapefile will be viewed as corrupt by
-most shapefile software.
-
-
-### Adding Geometry
-
-Geometry is added using one of several convenience methods. The "null" method is used
-for null shapes, "point" is used for point shapes, "multipoint" is used for multipoint shapes, "line" for lines,
-"poly" for polygons, and "multipatch" for multipatches. 
-
-**Adding a Point shape**
-
-Point shapes are added using the "point" method. A point is specified by an x and
-y value. 
-
-
-	>>> w = shapefile.Writer()
-	>>> w.field('name', 'C')
-	
-	>>> w.point(122, 37) 
-	>>> w.record('point1')
-	
-	>>> w.save('shapefiles/test/point')
-
-**Adding a MultiPoint shape**
-
-If your point data allows for the possibility of multiple points per feature, use "multipoint" instead. 
-These are specified as a list of xy point coordinates. 
-
-
-	>>> w = shapefile.Writer()
-	>>> w.field('name', 'C')
-	
-	>>> w.multipoint([[122,37], [124,32]]) 
-	>>> w.record('multipoint1')
-	
-	>>> w.save('shapefiles/test/multipoint')
-	
-**Adding a LineString shape**
-
-For LineString shapefiles, each line shape consists of multiple lines. Line shapes must be given as a list of lines, 
-even if there is just one line. Also, each line must have at least two points.
-	
-	
-	>>> w = shapefile.Writer()
-	>>> w.field('name', 'C')
-	
-	>>> w.line([
-				[[1,5],[5,5],[5,1],[3,3],[1,1]], # line 1
-				[[3,2],[2,6]] # line 2
-				])
-	
-	>>> w.record('linestring1')
-	
-	>>> w.save('shapefiles/test/line')
-	
-**Adding a Polygon shape**
-
-Similarly to LineString, Polygon shapes consist of multiple polygons, and must be given as a list of polygons.
-The main difference being that polygons must have at least 4 points and the last point must be the same as the first. 
-It's also okay if you forget to do so, PyShp automatically checks and closes the polygons if you don't. 
-
-It's important to note that for Polygon shapefiles, your polygon coordinates must be ordered in a clockwise direction.
-If any of the polygons have holes, then the hole polygon coordinates must be ordered in a counterclockwise direction.
-The direction of your polygons determines how shapefile readers will distinguish between polygons outlines and holes. 
-
-
-	>>> w = shapefile.Writer()
-	>>> w.field('name', 'C')
-
-	>>> w.poly([
-    ...			[[122,37], [117,36], [115,32], [118,20], [113,24]], # poly 1
-	...			[[15,2], [17,6], [22,7]], # hole 1
-	...			[[122,37], [117,36], [115,32] # poly 2
-    ...			])
-	>>> w.record('polygon1')
-	
-	>>> w.save('shapefiles/test/polygon')
-	
-**Adding a Null shape**
-
-A shapefile may contain some records for which geometry is not available, and may be set using the "null" method. 
-Because Null shape types (shape type 0) have no geometry the "null" method is called without any arguments. 
-
-
-	>>> w = shapefile.Writer()
-	>>> w.field('name', 'C')
-
-	>>> w.null()
-	>>> w.record('nullgeom')
-
-	>>> w.save('shapefiles/test/null')
-	
-**Adding shapes with measurement (M) values**
-
-Measured shape types are shapes that include a measurement value at each vertice, for instance speed measurements from a GPS device. 
-Shapes with measurement (M) values are added with following methods: "pointm", "multipointm", "linem", and "polygonm". 
-The M-values are specified by adding a third M value to each XY coordinate. Missing or unobserved M-values are specified with a None value,
-or by simply omitting the third M-coordinate. 
-	
-	
-	>>> w = shapefile.Writer()
-	>>> w.field('name', 'C')
-	
-	>>> w.linem([
-    ...			[[1,5,0],[5,5],[5,1,3],[3,3,None],[1,1,0]], # line with one omitted and one missing M-value
-	...			[[3,2],[2,6]] # line without any M-values
-	...			])
-	
-	>>> w.record('lineM1')
-	
-	>>> w.save('shapefiles/test/linem')
-	
-**Adding shapes with elevation (Z) values**
-
-Elevation shape types are shapes that include an elevation value at each vertice, for instance elevation from a GPS device. 
-Shapes with an elevation (Z) values are added with following methods: "pointz", "multipointz", "linez", and "polygonz". 
-The Z-values are specified by adding a third Z value to each XY coordinate. Z-values do not support the concept of missing data,
-but if you omit the third Z-coordinate it will default to 0. Note that Z-type shapes also support measurement (M) values added
-as a fourth M-coordinate. This too is optional. 
-	
-	
-	>>> w = shapefile.Writer()
-	>>> w.field('name', 'C')
-	
-	>>> w.linez([
-    ...			[[1,5,18],[5,5,20],[5,1,22],[3,3],[1,1]], # line with some omitted Z-values
-	...			[[3,2],[2,6]], # line without any Z-values
-	...			[[3,2,15,0],[2,6,13,3],[1,9,14,2]] # line with both Z and M-values
-	...			])
-	
-	>>> w.record('lineZ1')
-	
-	>>> w.save('shapefiles/test/linez')
-
-**Adding a 3D MultiPatch shape**
-
-Multipatch shapes are useful for storing composite 3-Dimensional objects. 
-A MultiPatch shape represents a 3D object made up of one or more surface parts.
-Each surface in "parts" is defined by a list of XYZM values (Z and M values optional), and its corresponding type
-given in the "partTypes" argument. The part type decides how the coordinate sequence is to be interpreted, and can be one 
-of the following module constants: TRIANGLE_STRIP, TRIANGLE_FAN, OUTER_RING, INNER_RING, FIRST_RING, or RING.
-For instance, a TRIANGLE_STRIP may be used to represent the walls of a building, combined with a TRIANGLE_FAN to represent 
-its roof: 
-
-	>>> from shapefile import TRIANGLE_STRIP, TRIANGLE_FAN
-	
-	>>> w = shapefile.Writer()
-	>>> w.field('name', 'C')
-	
-	>>> w.multipatch([
-    ...				 [[0,0,0],[0,0,3],[5,0,0],[5,0,3],[5,5,0],[5,5,3],[0,5,0],[0,5,3],[0,0,0],[0,0,3]], # TRIANGLE_STRIP for house walls
-	...				 [[2.5,2.5,5],[0,0,3],[5,0,3],[5,5,3],[0,5,3],[0,0,3]], # TRIANGLE_FAN for pointed house roof
-	...				 ],
-	...				 partTypes=[TRIANGLE_STRIP, TRIANGLE_FAN]) # one type for each part
-	
-	>>> w.record('house1')
-	
-	>>> w.save('shapefiles/test/multipatch')
-	
-For an introduction to the various part types and examples of how to create 3D MultiPatch objects see [this
-ESRI White Paper](http://downloads.esri.com/support/whitepapers/ao_/J9749_MultiPatch_Geometry_Type.pdf). 
-	
-**Adding from an existing Shape object**
-
-Finally, geometry can be added by passing an existing "Shape" object to the "shape" method.
-This can be particularly useful for copying from one file to another:
-
-
-	>>> r = shapefile.Reader('shapefiles/test/polygon')
-
-	>>> w = shapefile.Writer()
-	>>> w.fields = r.fields[1:] # skip first deletion field
-
-	>>> for shaperec in r.iterShapeRecords():
-	...     w.record(*shaperec.record)
-	...     w.shape(shaperec.shape)
-
-	>>> w.save('shapefiles/test/copy')
-
 
 ### Adding Records
 
-Adding record attributes involves two steps. Step 1 is to create fields to contain
-attribute values and step 2 is to populate the fields with values for each
-shape record. 
+Before you can add records you must first create the fields that define what types of 
+values will go into each attribute. 
 
 There are several different field types, all of which support storing None values as NULL. 
 
@@ -798,10 +578,178 @@ You can also add attributes using keyword arguments where the keys are field nam
 	>>> w.field('SECOND_FLD','C','40')
 	>>> w.record('First', 'Line')
 	>>> w.record(FIRST_FLD='First', SECOND_FLD='Line')
+
+### Adding Geometry
+
+Geometry is added using one of several convenience methods. The "null" method is used
+for null shapes, "point" is used for point shapes, "multipoint" is used for multipoint shapes, "line" for lines,
+"poly" for polygons. 
+
+**Adding a Null shape**
+
+A shapefile may contain some records for which geometry is not available, and may be set using the "null" method. 
+Because Null shape types (shape type 0) have no geometry the "null" method is called without any arguments. 
+
+
+	>>> w = shapefile.Writer()
+	>>> w.field('name', 'C')
+
+	>>> w.null()
+	>>> w.record('nullgeom')
+
+	>>> w.save('shapefiles/test/null')
+
+**Adding a Point shape**
+
+Point shapes are added using the "point" method. A point is specified by an x and
+y value. 
+
+
+	>>> w = shapefile.Writer()
+	>>> w.field('name', 'C')
 	
+	>>> w.point(122, 37) 
+	>>> w.record('point1')
+	
+	>>> w.save('shapefiles/test/point')
+
+**Adding a MultiPoint shape**
+
+If your point data allows for the possibility of multiple points per feature, use "multipoint" instead. 
+These are specified as a list of xy point coordinates. 
+
+
+	>>> w = shapefile.Writer()
+	>>> w.field('name', 'C')
+	
+	>>> w.multipoint([[122,37], [124,32]]) 
+	>>> w.record('multipoint1')
+	
+	>>> w.save('shapefiles/test/multipoint')
+	
+**Adding a LineString shape**
+
+For LineString shapefiles, each line shape consists of multiple lines. Line shapes must be given as a list of lines, 
+even if there is just one line. Also, each line must have at least two points.
+	
+	
+	>>> w = shapefile.Writer()
+	>>> w.field('name', 'C')
+	
+	>>> w.line([
+				[[1,5],[5,5],[5,1],[3,3],[1,1]], # line 1
+				[[3,2],[2,6]] # line 2
+				])
+	
+	>>> w.record('linestring1')
+	
+	>>> w.save('shapefiles/test/line')
+	
+**Adding a Polygon shape**
+
+Similarly to LineString, Polygon shapes consist of multiple polygons, and must be given as a list of polygons.
+The main difference being that polygons must have at least 4 points and the last point must be the same as the first. 
+It's also okay if you forget to do so, PyShp automatically checks and closes the polygons if you don't. 
+
+It's important to note that for Polygon shapefiles, your polygon coordinates must be ordered in a clockwise direction.
+If any of the polygons have holes, then the hole polygon coordinates must be ordered in a counterclockwise direction.
+The direction of your polygons determines how shapefile readers will distinguish between polygons outlines and holes. 
+
+
+	>>> w = shapefile.Writer()
+	>>> w.field('name', 'C')
+
+	>>> w.poly([
+    ...			[[122,37], [117,36], [115,32], [118,20], [113,24]], # poly 1
+	...			[[15,2], [17,6], [22,7]], # hole 1
+	...			[[122,37], [117,36], [115,32] # poly 2
+    ...			])
+	>>> w.record('polygon1')
+	
+	>>> w.save('shapefiles/test/polygon')
+		
+**Adding from an existing Shape object**
+
+Finally, geometry can be added by passing an existing "Shape" object to the "shape" method.
+You can also pass it any GeoJSON dictionary or _\_geo_interface\_\_ compatible object. 
+This can be particularly useful for copying from one file to another:
+
+
+	>>> r = shapefile.Reader('shapefiles/test/polygon')
+
+	>>> w = shapefile.Writer()
+	>>> w.fields = r.fields[1:] # skip first deletion field
+
+	>>> for shaperec in r.iterShapeRecords():
+	...     w.record(*shaperec.record)
+	...     w.shape(shaperec.shape)
+	
+	>>> for shaperec in r.iterShapeRecords():
+	...     w.record(*shaperec.record)
+	...     w.shape(shaperec.shape.__geo_interface__)
+	
+	>>> w.save('shapefiles/test/copy')	
 	
 
-### File Names
+### Geometry and Record Balancing
+
+Because every shape must have a corresponding record it is critical that the
+number of records equals the number of shapes to create a valid shapefile. You
+must take care to add records and shapes in the same order so that the record
+data lines up with the geometry data. For example:
+
+	
+	>>> w = shapefile.Writer(shapeType=shapefile.POINT)
+	>>> w.field("field1", "C")
+	>>> w.field("field2", "C")
+	
+	>>> w.record("row", "one")
+	>>> w.point(1, 1)
+	
+	>>> w.record("row", "two")
+	>>> w.point(2, 2)
+	
+To help prevent accidental misalignment pyshp has an "auto balance" feature to
+make sure when you add either a shape or a record the two sides of the
+equation line up. This way if you forget to update an entry the
+shapefile will still be valid and handled correctly by most shapefile
+software. Autobalancing is NOT turned on by default. To activate it set
+the attribute autoBalance to 1 or True:
+
+
+    >>> w.autoBalance = 1
+	>>> w.record("row", "three")
+	>>> w.record("row", "four")
+	>>> w.point(4, 4)
+	
+	>>> w.recNum == w.shpNum
+	True
+
+You also have the option of manually calling the balance() method at any time
+to ensure the other side is up to date. When balancing is used
+null shapes are created on the geometry side or records
+with a value of "NULL" for each field is created on the attribute side.
+This gives you flexibility in how you build the shapefile.
+You can create all of the shapes and then create all of the records or vice versa. 
+
+
+    >>> w.autoBalance = 0
+	>>> w.record("row", "five")
+	>>> w.record("row", "six")
+	>>> w.record("row", "seven")
+	>>> w.point(5, 5)
+	>>> w.point(6, 6)
+	>>> w.balance()
+	
+	>>> w.recNum == w.shpNum
+	True
+
+If you do not use the autobalance or balance method and forget to manually
+balance the geometry and attributes the shapefile will be viewed as corrupt by
+most shapefile software.
+	
+	
+### Saving to File Names
 
 File extensions are optional when reading or writing shapefiles. If you specify
 them PyShp ignores them anyway. When you save files you can specify a base
@@ -835,35 +783,106 @@ write them.
 	>>> # Normally you would call the "StringIO.getvalue()" method on these objects.
 	>>> shp = shx = dbf = None
 	
-## Python Geo Interface
-
-The Python \_\_geo_interface\_\_ convention provides a data interchange interface
-among geospatial Python libraries. The interface returns data as GeoJSON which gives you
-nice compatibility with other libraries and tools including Shapely, Fiona, and PostGIS. 
-More information on the \_\_geo_interface\_\_ protocol can be found at:
-[https://gist.github.com/sgillies/2217756](https://gist.github.com/sgillies/2217756).
-More information on GeoJSON is available at [http://geojson.org](http://geojson.org).
 
 
-	>>> s = sf.shape(0)
-	>>> s.__geo_interface__["type"]
-	'MultiPolygon'
+# More
+
+## 3D and Other Geometry Types
+
+Most shapefiles store conventional 2D points, lines, or polygons. But the shapefile format is also capable of storing
+various other types of geometries as well, including complex 3D surfaces and objects. 
+
+**Shapefiles with measurement (M) values**
+
+Measured shape types are shapes that include a measurement value at each vertice, for instance speed measurements from a GPS device. 
+Shapes with measurement (M) values are added with following methods: "pointm", "multipointm", "linem", and "polygonm". 
+The M-values are specified by adding a third M value to each XY coordinate. Missing or unobserved M-values are specified with a None value,
+or by simply omitting the third M-coordinate. 
 	
-Just as the library can expose its objects to other applications through the geo interface, 
-it also supports receiving objects with the geo interface from other applications. 
-To write shapes based on GeoJSON objects, simply send an object with the geo interface or a 
-GeoJSON dictionary to the shape() method instead of a Shape object. Alternatively, you can
-construct a Shape object from GeoJSON using the "geojson_as_shape()" function. 
-
-
+	
 	>>> w = shapefile.Writer()
 	>>> w.field('name', 'C')
 	
-	>>> w.shape( {"type":"Point", "coordinates":[1,1]} )
-	>>> w.record('one')
-
-	>>> w.save('shapefiles/test/geojson')
+	>>> w.linem([
+    ...			[[1,5,0],[5,5],[5,1,3],[3,3,None],[1,1,0]], # line with one omitted and one missing M-value
+	...			[[3,2],[2,6]] # line without any M-values
+	...			])
 	
+	>>> w.record('lineM1')
+	
+	>>> w.save('shapefiles/test/linem')
+	
+Shapefiles containing M-values can be examined in several ways:
+
+	>>> r = shapefile.Reader('shapefiles/test/linem')
+	
+	>>> r.measure # the lower and upper bound of M values in the shapefile
+	[0, 3]
+	
+	>>> r.shape(0).m # flat list of M values
+	[0, None, 3, None, 0, None, None]
+
+	
+**Shapefiles with elevation (Z) values**
+
+Elevation shape types are shapes that include an elevation value at each vertice, for instance elevation from a GPS device. 
+Shapes with an elevation (Z) values are added with following methods: "pointz", "multipointz", "linez", and "polygonz". 
+The Z-values are specified by adding a third Z value to each XY coordinate. Z-values do not support the concept of missing data,
+but if you omit the third Z-coordinate it will default to 0. Note that Z-type shapes also support measurement (M) values added
+as a fourth M-coordinate. This too is optional. 
+	
+	
+	>>> w = shapefile.Writer()
+	>>> w.field('name', 'C')
+	
+	>>> w.linez([
+    ...			[[1,5,18],[5,5,20],[5,1,22],[3,3],[1,1]], # line with some omitted Z-values
+	...			[[3,2],[2,6]], # line without any Z-values
+	...			[[3,2,15,0],[2,6,13,3],[1,9,14,2]] # line with both Z and M-values
+	...			])
+	
+	>>> w.record('lineZ1')
+	
+	>>> w.save('shapefiles/test/linez')
+	
+To examine a Z-type shapefile you can do:
+
+	>>> r = shapefile.Reader('shapefiles/test/linez')
+	
+	>>> r.measure # the lower and upper bound of Z values in the shapefile
+	[0, 22]
+	
+	>>> r.shape(0).z # flat list of Z values
+	[18, 20, 22, None, None, None, None, 15, 13, 14]
+
+**3D MultiPatch Shapefiles**
+
+Multipatch shapes are useful for storing composite 3-Dimensional objects. 
+A MultiPatch shape represents a 3D object made up of one or more surface parts.
+Each surface in "parts" is defined by a list of XYZM values (Z and M values optional), and its corresponding type
+given in the "partTypes" argument. The part type decides how the coordinate sequence is to be interpreted, and can be one 
+of the following module constants: TRIANGLE_STRIP, TRIANGLE_FAN, OUTER_RING, INNER_RING, FIRST_RING, or RING.
+For instance, a TRIANGLE_STRIP may be used to represent the walls of a building, combined with a TRIANGLE_FAN to represent 
+its roof: 
+
+	>>> from shapefile import TRIANGLE_STRIP, TRIANGLE_FAN
+	
+	>>> w = shapefile.Writer()
+	>>> w.field('name', 'C')
+	
+	>>> w.multipatch([
+    ...				 [[0,0,0],[0,0,3],[5,0,0],[5,0,3],[5,5,0],[5,5,3],[0,5,0],[0,5,3],[0,0,0],[0,0,3]], # TRIANGLE_STRIP for house walls
+	...				 [[2.5,2.5,5],[0,0,3],[5,0,3],[5,5,3],[0,5,3],[0,0,3]], # TRIANGLE_FAN for pointed house roof
+	...				 ],
+	...				 partTypes=[TRIANGLE_STRIP, TRIANGLE_FAN]) # one type for each part
+	
+	>>> w.record('house1')
+	
+	>>> w.save('shapefiles/test/multipatch')
+	
+For an introduction to the various part types and examples of how to create 3D MultiPatch objects see [this
+ESRI White Paper](http://downloads.esri.com/support/whitepapers/ao_/J9749_MultiPatch_Geometry_Type.pdf). 
+
 ## Working with Large Shapefiles
 
 Despite being a lightweight library, PyShp is designed to be able to read and write 
@@ -891,6 +910,10 @@ through them while keeping memory usage at a minimum.
 	...     # do something here
 	...     pass
 
+	>>> for shapeRec in sf: # same as iterShapeRecords()
+	...     # do something here
+	...     pass
+	
 The shapefile Writer class uses a similar streaming approach to keep memory 
 usage at a minimum, except you don't have change any of your code. 
 The library takes care of this under-the-hood by creating a set of temporary files
@@ -944,6 +967,7 @@ applies to both reading and writing.
 	>>> r.record(0) == [2, u'�and�']
 	True
 
+	
 # Testing
 
 The testing framework is doctest, which are located in this file README.md.
@@ -954,3 +978,5 @@ $ python shapefile.py
 
 Linux/Mac and similar platforms will need to run `$ dos2unix README.md` in order
 correct line endings in README.md.
+
+
