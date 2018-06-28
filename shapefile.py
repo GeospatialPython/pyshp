@@ -263,7 +263,7 @@ class Shape(object):
             raise Exception('Shape type "%s" cannot be represented as GeoJSON.' % SHAPETYPE_LOOKUP[self.shapeType])
 
     @staticmethod
-    def from_geojson(geoj):
+    def _from_geojson(geoj):
         # create empty shape
         shape = Shape()
         # set shapeType
@@ -953,16 +953,11 @@ class Writer(object):
         z = []
         for p in s.points:
             try:
-                z.append(p[2] if p[2] is not None else 0)
+                z.append(p[2])
             except IndexError:
-                #warnings.warn('One or more of the shape points had a missing z-value and were skipped when calculating the Z bounding box.')
-                pass
-        if not z:
-            # none of the shapes had z values
-            # z dimension does not have the concept of nodata values
-            # but setting them to 0 is probably ok, since it means all are on the same elavation
-            #warnings.warn('None of the shape points had any z-values, setting the Z bounding box to (0,0).')
-            z.append(0)
+                # point did not have z value
+                # setting it to 0 is probably ok, since it means all are on the same elavation
+                z.append(0)
         zbox = [min(z), max(z)]
         # update global
         if self._zbox:
@@ -978,14 +973,15 @@ class Writer(object):
         m = []
         for p in s.points:
             try:
-                m.append(p[mpos] if p[mpos] is not None else NODATA)
+                if p[mpos] is not None:
+                    # mbox should only be calculated on valid m values
+                    m.append(p[mpos])
             except IndexError:
-                #warnings.warn('One or more of the shape points had a missing m-value and were skipped when calculating the M bounding box.')
+                # point did not have m value so is missing
+                # mbox should only be calculated on valid m values
                 pass
         if not m:
-            # none of the shapes had m values
-            # be flexible on this and set them to m nodata values, as per the ESRI spec
-            #warnings.warn('None of the shape points had any m-values, setting the M bounding box to (nodata,nodata).')
+            # only if none of the shapes had m values, should mbox be set to missing m values
             m.append(NODATA)
         mbox = [min(m), max(m)]
         # update global
@@ -1110,7 +1106,7 @@ class Writer(object):
             if hasattr(s, "__geo_interface__"):
                 s = s.__geo_interface__
             if isinstance(s, dict):
-                s = Shape.from_geojson(s)
+                s = Shape._from_geojson(s)
             else:
                 raise Exception("Can only write Shape objects, GeoJSON dictionaries, "
                                 "or objects with the __geo_interface__, "
@@ -1214,7 +1210,7 @@ class Writer(object):
             if hasattr(s, "z"):
                 # if z values are stored in attribute
                 try:
-                    if not s.z or s.z[0] is None:
+                    if not s.z:
                         s.z = (0,)
                     f.write(pack("<d", s.z[0]))
                 except error:
@@ -1224,8 +1220,6 @@ class Writer(object):
                 try:
                     if len(s.points[0]) < 3:
                         s.points[0].append(0)
-                    elif s.points[0][2] is None:
-                        s.points[0][2] = 0
                     f.write(pack("<d", s.points[0][2]))
                 except error:
                     raise ShapefileException("Failed to write elevation value for record %s. Expected floats." % self.shpNum)

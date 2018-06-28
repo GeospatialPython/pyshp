@@ -223,7 +223,7 @@ Each shape record contains the following attributes:
 
 
 	>>> for name in dir(shapes[3]):
-	...     if not name.startswith('__'):
+	...     if not name.startswith('_'):
 	...         name
 	'bbox'
 	'parts'
@@ -637,9 +637,9 @@ even if there is just one line. Also, each line must have at least two points.
 	>>> w.field('name', 'C')
 	
 	>>> w.line([
-				[[1,5],[5,5],[5,1],[3,3],[1,1]], # line 1
-				[[3,2],[2,6]] # line 2
-				])
+	...			[[1,5],[5,5],[5,1],[3,3],[1,1]], # line 1
+	...			[[3,2],[2,6]] # line 2
+	...			])
 	
 	>>> w.record('linestring1')
 	
@@ -660,10 +660,10 @@ The direction of your polygons determines how shapefile readers will distinguish
 	>>> w.field('name', 'C')
 
 	>>> w.poly([
-    ...			[[122,37], [117,36], [115,32], [118,20], [113,24]], # poly 1
-	...			[[15,2], [17,6], [22,7]], # hole 1
-	...			[[122,37], [117,36], [115,32] # poly 2
-    ...			])
+	...	        [[122,37], [117,36], [115,32], [118,20], [113,24]], # poly 1
+	...	        [[15,2], [17,6], [22,7]], # hole 1
+	...         [[122,37], [117,36], [115,32]] # poly 2
+	...        ])
 	>>> w.record('polygon1')
 	
 	>>> w.save('shapefiles/test/polygon')
@@ -804,7 +804,7 @@ or by simply omitting the third M-coordinate.
 	>>> w.field('name', 'C')
 	
 	>>> w.linem([
-    ...			[[1,5,0],[5,5],[5,1,3],[3,3,None],[1,1,0]], # line with one omitted and one missing M-value
+	...			[[1,5,0],[5,5],[5,1,3],[3,3,None],[1,1,0]], # line with one omitted and one missing M-value
 	...			[[3,2],[2,6]] # line without any M-values
 	...			])
 	
@@ -817,10 +817,10 @@ Shapefiles containing M-values can be examined in several ways:
 	>>> r = shapefile.Reader('shapefiles/test/linem')
 	
 	>>> r.measure # the lower and upper bound of M values in the shapefile
-	[0, 3]
+	[0.0, 3.0]
 	
 	>>> r.shape(0).m # flat list of M values
-	[0, None, 3, None, 0, None, None]
+	[0.0, None, 3.0, None, 0.0, None, None]
 
 	
 **Shapefiles with elevation (Z) values**
@@ -836,7 +836,7 @@ as a fourth M-coordinate. This too is optional.
 	>>> w.field('name', 'C')
 	
 	>>> w.linez([
-    ...			[[1,5,18],[5,5,20],[5,1,22],[3,3],[1,1]], # line with some omitted Z-values
+	...			[[1,5,18],[5,5,20],[5,1,22],[3,3],[1,1]], # line with some omitted Z-values
 	...			[[3,2],[2,6]], # line without any Z-values
 	...			[[3,2,15,0],[2,6,13,3],[1,9,14,2]] # line with both Z and M-values
 	...			])
@@ -849,11 +849,11 @@ To examine a Z-type shapefile you can do:
 
 	>>> r = shapefile.Reader('shapefiles/test/linez')
 	
-	>>> r.measure # the lower and upper bound of Z values in the shapefile
-	[0, 22]
+	>>> r.elevation # the lower and upper bound of Z values in the shapefile
+	[0.0, 22.0]
 	
 	>>> r.shape(0).z # flat list of Z values
-	[18, 20, 22, None, None, None, None, 15, 13, 14]
+	[18.0, 20.0, 22.0, 0.0, 0.0, 0.0, 0.0, 15.0, 13.0, 14.0]
 
 **3D MultiPatch Shapefiles**
 
@@ -871,7 +871,7 @@ its roof:
 	>>> w.field('name', 'C')
 	
 	>>> w.multipatch([
-    ...				 [[0,0,0],[0,0,3],[5,0,0],[5,0,3],[5,5,0],[5,5,3],[0,5,0],[0,5,3],[0,0,0],[0,0,3]], # TRIANGLE_STRIP for house walls
+	...				 [[0,0,0],[0,0,3],[5,0,0],[5,0,3],[5,5,0],[5,5,3],[0,5,0],[0,5,3],[0,0,0],[0,0,3]], # TRIANGLE_STRIP for house walls
 	...				 [[2.5,2.5,5],[0,0,3],[5,0,3],[5,5,3],[0,5,3],[0,0,3]], # TRIANGLE_FAN for pointed house roof
 	...				 ],
 	...				 partTypes=[TRIANGLE_STRIP, TRIANGLE_FAN]) # one type for each part
@@ -880,7 +880,7 @@ its roof:
 	
 	>>> w.save('shapefiles/test/multipatch')
 	
-For an introduction to the various part types and examples of how to create 3D MultiPatch objects see [this
+For an introduction to the various multipatch part types and examples of how to create 3D MultiPatch objects see [this
 ESRI White Paper](http://downloads.esri.com/support/whitepapers/ao_/J9749_MultiPatch_Geometry_Type.pdf). 
 
 ## Working with Large Shapefiles
