@@ -1129,7 +1129,7 @@ class Writer(object):
             try:
                 f.write(pack("<4d", *self.__bbox(s)))
             except error:
-                raise ShapefileException("Failed to write bounding box for record %s. Expected floats." % recNum)
+                raise ShapefileException("Failed to write bounding box for record %s. Expected floats." % self.shpNum)
         # Shape types with parts
         if s.shapeType in (3,5,13,15,23,25,31):
             # Number of parts
@@ -1151,14 +1151,14 @@ class Writer(object):
             try:
                 [f.write(pack("<2d", *p[:2])) for p in s.points]
             except error:
-                raise ShapefileException("Failed to write points for record %s. Expected floats." % recNum)
+                raise ShapefileException("Failed to write points for record %s. Expected floats." % self.shpNum)
         # Write z extremes and values
         # Note: missing z values are autoset to 0, but not sure if this is ideal.
         if s.shapeType in (13,15,18,31):
             try:
                 f.write(pack("<2d", *self.__zbox(s)))
             except error:
-                raise ShapefileException("Failed to write elevation extremes for record %s. Expected floats." % recNum)
+                raise ShapefileException("Failed to write elevation extremes for record %s. Expected floats." % self.shpNum)
             try:
                 if hasattr(s,"z"):
                     # if z values are stored in attribute
@@ -1167,7 +1167,7 @@ class Writer(object):
                     # if z values are stored as 3rd dimension
                     [f.write(pack("<d", p[2] if len(p) > 2 else 0)) for p in s.points]  
             except error:
-                raise ShapefileException("Failed to write elevation values for record %s. Expected floats." % recNum)
+                raise ShapefileException("Failed to write elevation values for record %s. Expected floats." % self.shpNum)
         # Write m extremes and values
         # When reading a file, pyshp converts NODATA m values to None, so here we make sure to convert them back to NODATA
         # Note: missing m values are autoset to NODATA.
@@ -1175,7 +1175,7 @@ class Writer(object):
             try:
                 f.write(pack("<2d", *self.__mbox(s)))
             except error:
-                raise ShapefileException("Failed to write measure extremes for record %s. Expected floats" % recNum)
+                raise ShapefileException("Failed to write measure extremes for record %s. Expected floats" % self.shpNum)
             try:
                 if hasattr(s,"m"): 
                     # if m values are stored in attribute
@@ -1186,13 +1186,13 @@ class Writer(object):
                     mpos = 3 if s.shapeType in (13,15,18,31) else 2
                     [f.write(pack("<d", p[mpos] if len(p) > mpos and p[mpos] is not None else NODATA)) for p in s.points]
             except error:
-                raise ShapefileException("Failed to write measure values for record %s. Expected floats" % recNum)
+                raise ShapefileException("Failed to write measure values for record %s. Expected floats" % self.shpNum)
         # Write a single point
         if s.shapeType in (1,11,21):
             try:
                 f.write(pack("<2d", s.points[0][0], s.points[0][1]))
             except error:
-                raise ShapefileException("Failed to write point for record %s. Expected floats." % recNum)
+                raise ShapefileException("Failed to write point for record %s. Expected floats." % self.shpNum)
         # Write a single Z value
         # Note: missing z values are autoset to 0, but not sure if this is ideal.
         if s.shapeType == 11:
@@ -1206,7 +1206,7 @@ class Writer(object):
                         s.z = (0,)    
                     f.write(pack("<d", s.z[0]))
                 except error:
-                    raise ShapefileException("Failed to write elevation value for record %s. Expected floats." % recNum)
+                    raise ShapefileException("Failed to write elevation value for record %s. Expected floats." % self.shpNum)
             else:
                 # if z values are stored as 3rd dimension
                 try:
@@ -1214,7 +1214,7 @@ class Writer(object):
                         s.points[0].append(0)
                     f.write(pack("<d", s.points[0][2]))
                 except error:
-                    raise ShapefileException("Failed to write elevation value for record %s. Expected floats." % recNum)
+                    raise ShapefileException("Failed to write elevation value for record %s. Expected floats." % self.shpNum)
         # Write a single M value
         # Note: missing m values are autoset to NODATA.
         if s.shapeType in (11,21):
@@ -1228,7 +1228,7 @@ class Writer(object):
                         s.m = (NODATA,) 
                     f.write(pack("<1d", s.m[0]))
                 except error:
-                    raise ShapefileException("Failed to write measure value for record %s. Expected floats." % recNum)
+                    raise ShapefileException("Failed to write measure value for record %s. Expected floats." % self.shpNum)
             else:
                 # if m values are stored as 3rd/4th dimension
                 # 0-index position of m value is 3 if z type (x,y,z,m), or 2 if m type (x,y,m)
@@ -1238,7 +1238,7 @@ class Writer(object):
                         s.points[0].append(NODATA)
                     f.write(pack("<1d", s.points[0][mpos]))
                 except error:
-                    raise ShapefileException("Failed to write measure value for record %s. Expected floats." % recNum)
+                    raise ShapefileException("Failed to write measure value for record %s. Expected floats." % self.shpNum)
         # Finalize record length as 16-bit words
         finish = f.tell()
         length = (finish - start) // 2
