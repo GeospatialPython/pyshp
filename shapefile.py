@@ -230,24 +230,24 @@ class Shape(object):
                 }
             else:
                 ps = None
-                coordinates = []
+                rings = []
                 for part in self.parts:
                     if ps == None:
                         ps = part
                         continue
                     else:
-                        coordinates.append(tuple([tuple(p) for p in self.points[ps:part]]))
+                        rings.append(tuple([tuple(p) for p in self.points[ps:part]]))
                         ps = part
                 else:
-                    coordinates.append(tuple([tuple(p) for p in self.points[part:]]))
+                    rings.append(tuple([tuple(p) for p in self.points[part:]]))
                 polys = []
-                poly = [coordinates[0]]
-                for coord in coordinates[1:]:
-                    if signed_area(coord) < 0:
+                poly = [rings[0]]
+                for ring in rings[1:]:
+                    if signed_area(ring) < 0:
                         polys.append(poly)
-                        poly = [coord]
+                        poly = [ring]
                     else:
-                        poly.append(coord)
+                        poly.append(ring)
                 polys.append(poly)
                 if len(polys) == 1:
                     return {
@@ -297,7 +297,13 @@ class Shape(object):
             points = []
             parts = []
             index = 0
-            for ext_or_hole in geoj["coordinates"]:
+            for i,ext_or_hole in enumerate(geoj["coordinates"]):
+                if i == 0 and not signed_area(ext_or_hole) < 0:
+                    # flip exterior direction
+                    ext_or_hole = list(reversed(ext_or_hole))
+                elif i > 0 and not signed_area(ext_or_hole) >= 0:
+                    # flip hole direction
+                    ext_or_hole = list(reversed(ext_or_hole))
                 points.extend(ext_or_hole)
                 parts.append(index)
                 index += len(ext_or_hole)
@@ -318,7 +324,13 @@ class Shape(object):
             parts = []
             index = 0
             for polygon in geoj["coordinates"]:
-                for ext_or_hole in polygon:
+                for i,ext_or_hole in enumerate(polygon):
+                    if i == 0 and not signed_area(ext_or_hole) < 0:
+                        # flip exterior direction
+                        ext_or_hole = list(reversed(ext_or_hole))
+                    elif i > 0 and not signed_area(ext_or_hole) >= 0:
+                        # flip hole direction
+                        ext_or_hole = list(reversed(ext_or_hole))
                     points.extend(ext_or_hole)
                     parts.append(index)
                     index += len(ext_or_hole)
