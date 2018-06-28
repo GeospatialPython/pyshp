@@ -941,7 +941,7 @@ class Writer(object):
         z = []
         for p in s.points:
             try:
-                z.append(p[2])
+                z.append(p[2] if p[2] is not None else 0)
             except IndexError:
                 #warnings.warn('One or more of the shape points had a missing z-value and were skipped when calculating the Z bounding box.')
                 pass
@@ -966,7 +966,7 @@ class Writer(object):
         m = []
         for p in s.points:
             try:
-                m.append(p[mpos])
+                m.append(p[mpos] if p[mpos] is not None else NODATA)
             except IndexError:
                 #warnings.warn('One or more of the shape points had a missing m-value and were skipped when calculating the M bounding box.')
                 pass
@@ -1202,16 +1202,18 @@ class Writer(object):
             if hasattr(s, "z"):
                 # if z values are stored in attribute
                 try:
-                    if not s.z:
-                        s.z = (0,)    
+                    if not s.z or s.z[0] is None:
+                        s.z = (0,)
                     f.write(pack("<d", s.z[0]))
                 except error:
                     raise ShapefileException("Failed to write elevation value for record %s. Expected floats." % self.shpNum)
             else:
                 # if z values are stored as 3rd dimension
                 try:
-                    if len(s.points[0])<3:
+                    if len(s.points[0]) < 3:
                         s.points[0].append(0)
+                    elif s.points[0][2] is None:
+                        s.points[0][2] = 0
                     f.write(pack("<d", s.points[0][2]))
                 except error:
                     raise ShapefileException("Failed to write elevation value for record %s. Expected floats." % self.shpNum)
@@ -1224,7 +1226,7 @@ class Writer(object):
             if hasattr(s, "m"):
                 # if m values are stored in attribute
                 try:
-                    if not s.m:
+                    if not s.m or s.m[0] is None:
                         s.m = (NODATA,) 
                     f.write(pack("<1d", s.m[0]))
                 except error:
@@ -1234,8 +1236,10 @@ class Writer(object):
                 # 0-index position of m value is 3 if z type (x,y,z,m), or 2 if m type (x,y,m)
                 try:
                     mpos = 3 if s.shapeType == 11 else 2
-                    if len(s.points[0])<mpos+1:
+                    if len(s.points[0]) < mpos+1:
                         s.points[0].append(NODATA)
+                    elif s.points[0][mpos] is None:
+                        s.points[0][mpos] = NODATA
                     f.write(pack("<1d", s.points[0][mpos]))
                 except error:
                     raise ShapefileException("Failed to write measure value for record %s. Expected floats." % self.shpNum)
