@@ -1117,7 +1117,7 @@ class Writer(object):
         # Shape Type
         if self.shapeType is None and s.shapeType != NULL:
             self.shapeType = s.shapeType
-        if self.shapeType != 31 and s.shapeType != NULL and s.shapeType != self.shapeType:
+        if s.shapeType != NULL and s.shapeType != self.shapeType:
             raise Exception("The shape's type (%s) must match the type of the shapefile (%s)." % (s.shapeType, self.shapeType))
         f.write(pack("<i", s.shapeType))
 
