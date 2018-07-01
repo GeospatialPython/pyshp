@@ -874,18 +874,28 @@ class Reader(object):
 
 class Writer(object):
     """Provides write support for ESRI Shapefiles."""
-    def __init__(self, shapeType=None, autoBalance=False, bufsize=None, **kwargs):
+    def __init__(self, target=None, shapeType=None, autoBalance=False, **kwargs):
         self.autoBalance = autoBalance
         self.fields = []
         self.shapeType = shapeType
-        self.shp = None
-        self.shx = None
-        self.dbf = None
-        # Create temporary files for immediate writing, minus the header
-        self.bufsize = bufsize or 1056*1000*100 # default is 100 mb
-        self._shp = tempfile.TemporaryFile()
-        self._shx = tempfile.TemporaryFile()
-        self._dbf = tempfile.TemporaryFile()
+        self.shp = self.shx = self.dbf = None
+        if target:
+            self.shp = self.__getFileObj(os.path.splitext(target)[0] + '.shp')
+            self.shx = self.__getFileObj(os.path.splitext(target)[0] + '.shx')
+            self.dbf = self.__getFileObj(os.path.splitext(target)[0] + '.dbf')
+        elif kwargs.get('shp') or kwargs.get('shx') or kwargs.get('dbf'):
+            shp,shx,dbf = kwargs.get('shp'), kwargs.get('shx'), kwargs.get('dbf')
+            if shp:
+                self.shp = self.__getFileObj(shp)
+            elif shx:
+                self.shx = self.__getFileObj(shx)
+            elif dbf:
+                self.dbf = self.__getFileObj(dbf)
+        else:
+            raise Exception('Either the target filepath, or any of shp, shx, or dbf must be set to create a shapefile.')
+        # Initiate with empty headers, to be finalized upon closing
+        if self.shp: self.shp.write(b'9'*100) 
+        if self.shx: self.shx.write(b'9'*100) 
         # Geometry record offsets and lengths for writing shx file.
         self.recNum = 0
         self.shpNum = 0
@@ -904,6 +914,56 @@ class Writer(object):
         of the two."""
         return max(self.recNum, self.shpNum) 
 
+    def __enter__(self):
+        """
+        Enter phase of context manager.
+        """
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Exit phase of context manager, finish writing and close the files.
+        """
+        self.close()
+
+    def __del__(self):
+        self.close()
+
+    def close(self):
+        """
+        Write final shp, shx, and dbf headers, close opened files.
+        """
+        # Check if any of the files have already been closed
+        shp_open = self.shp and not (hasattr(self.shp, 'closed') and self.shp.closed)
+        shx_open = self.shx and not (hasattr(self.shx, 'closed') and self.shx.closed)
+        dbf_open = self.dbf and not (hasattr(self.dbf, 'closed') and self.dbf.closed)
+            
+        # Balance if already not balanced
+        if self.shp and shp_open and self.dbf and dbf_open:
+            if self.autoBalance:
+                self.balance()
+            if self.recNum != self.shpNum:
+                raise ShapefileException("When saving both the dbf and shp file, "
+                                         "the number of records (%s) must correspond "
+                                         "with the number of shapes (%s)" % (self.recNum, self.shpNum))
+        # Fill in the blank headers
+        if self.shp and shp_open:
+            self.__shapefileHeader(self.shp, headerType='shp')
+        if self.shx and shx_open:
+            self.__shapefileHeader(self.shx, headerType='shx')
+
+        # Update the dbf header with final length etc
+        if self.dbf and dbf_open:
+            self.__dbfHeader()
+
+        # Close files
+        for attribute in (self.shp, self.shx, self.dbf):
+            if hasattr(attribute, 'close'):
+                try:
+                    attribute.close()
+                except IOError:
+                    pass
+
     def __getFileObj(self, f):
         """Safety handler to verify file-like objects"""
         if not f:
@@ -914,17 +974,19 @@ class Writer(object):
             pth = os.path.split(f)[0]
             if pth and not os.path.exists(pth):
                 os.makedirs(pth)
-            return open(f, "wb")
+            return open(f, "wb+")
 
     def __shpFileLength(self):
         """Calculates the file length of the shp file."""
-        # Start with header length
-        size = 100
+        # Remember starting position
+        start = self.shp.tell()
         # Calculate size of all shapes
-        self._shp.seek(0,2)
-        size += self._shp.tell()
+        self.shp.seek(0,2)
+        size = self.shp.tell()
         # Calculate size as 16-bit words
         size //= 2
+        # Return to start
+        self.shp.seek(start)
         return size
 
     def __bbox(self, s):
@@ -1116,8 +1178,8 @@ class Writer(object):
         self.__shxRecord(offset, length)
 
     def __shpRecord(self, s):
-        f = self.__getFileObj(self._shp)
-        offset = 100 + f.tell()
+        f = self.__getFileObj(self.shp)
+        offset = f.tell()
         # Record number, Content length place holder
         self.shpNum += 1
         f.write(pack(">2i", self.shpNum, 0))
@@ -1260,7 +1322,7 @@ class Writer(object):
 
     def __shxRecord(self, offset, length):
          """Writes the shx records."""
-         f = self.__getFileObj(self._shx)
+         f = self.__getFileObj(self.shx)
          f.write(pack(">i", offset // 2))
          f.write(pack(">i", length))
 
@@ -1297,7 +1359,13 @@ class Writer(object):
 
     def __dbfRecord(self, record):
         """Writes the dbf records."""
-        f = self.__getFileObj(self._dbf)
+        f = self.__getFileObj(self.dbf)
+        if self.recNum == 0:
+            # first records, so all fields should be set
+            # allowing us to write the dbf header
+            # cannot change the fields after this point
+            self.__dbfHeader()
+        # begin
         self.recNum += 1
         if not self.fields[0][0].startswith("Deletion"):
             f.write(b' ') # deletion flag
@@ -1529,83 +1597,83 @@ class Writer(object):
                 "Shapefile Writer reached maximum number of fields: 2046.")
         self.fields.append((name, fieldType, size, decimal))
 
-    def saveShp(self, target):
-        """Save an shp file."""
-        if not hasattr(target, "write"):
-            target = os.path.splitext(target)[0] + '.shp'
-        self.shp = self.__getFileObj(target)
-        self.__shapefileHeader(self.shp, headerType='shp')
-        self.shp.seek(100)
-        self._shp.seek(0)
-        chunk = True
-        while chunk:
-            chunk = self._shp.read(self.bufsize)
-            self.shp.write(chunk)
+##    def saveShp(self, target):
+##        """Save an shp file."""
+##        if not hasattr(target, "write"):
+##            target = os.path.splitext(target)[0] + '.shp'
+##        self.shp = self.__getFileObj(target)
+##        self.__shapefileHeader(self.shp, headerType='shp')
+##        self.shp.seek(100)
+##        self._shp.seek(0)
+##        chunk = True
+##        while chunk:
+##            chunk = self._shp.read(self.bufsize)
+##            self.shp.write(chunk)
+##
+##    def saveShx(self, target):
+##        """Save an shx file."""
+##        if not hasattr(target, "write"):
+##            target = os.path.splitext(target)[0] + '.shx'
+##        self.shx = self.__getFileObj(target)
+##        self.__shapefileHeader(self.shx, headerType='shx')
+##        self.shx.seek(100)
+##        self._shx.seek(0)
+##        chunk = True
+##        while chunk:
+##            chunk = self._shx.read(self.bufsize)
+##            self.shx.write(chunk)
+##
+##    def saveDbf(self, target):
+##        """Save a dbf file."""
+##        if not hasattr(target, "write"):
+##            target = os.path.splitext(target)[0] + '.dbf'
+##        self.dbf = self.__getFileObj(target)
+##        self.__dbfHeader() # writes to .dbf
+##        self._dbf.seek(0)
+##        chunk = True
+##        while chunk:
+##            chunk = self._dbf.read(self.bufsize)
+##            self.dbf.write(chunk)
 
-    def saveShx(self, target):
-        """Save an shx file."""
-        if not hasattr(target, "write"):
-            target = os.path.splitext(target)[0] + '.shx'
-        self.shx = self.__getFileObj(target)
-        self.__shapefileHeader(self.shx, headerType='shx')
-        self.shx.seek(100)
-        self._shx.seek(0)
-        chunk = True
-        while chunk:
-            chunk = self._shx.read(self.bufsize)
-            self.shx.write(chunk)
-
-    def saveDbf(self, target):
-        """Save a dbf file."""
-        if not hasattr(target, "write"):
-            target = os.path.splitext(target)[0] + '.dbf'
-        self.dbf = self.__getFileObj(target)
-        self.__dbfHeader() # writes to .dbf
-        self._dbf.seek(0)
-        chunk = True
-        while chunk:
-            chunk = self._dbf.read(self.bufsize)
-            self.dbf.write(chunk)
-
-    def save(self, target=None, shp=None, shx=None, dbf=None):
-        """Save the shapefile data to three files or
-        three file-like objects. SHP and DBF files can also
-        be written exclusively using saveShp, saveShx, and saveDbf respectively.
-        If target is specified but not shp, shx, or dbf then the target path and
-        file name are used.  If no options or specified, a unique base file name
-        is generated to save the files and the base file name is returned as a 
-        string. 
-        """
-        # Balance if already not balanced
-        if shp and dbf:
-            if self.autoBalance:
-                self.balance()
-            if self.recNum != self.shpNum:
-                raise ShapefileException("When saving both the dbf and shp file, "
-                                         "the number of records (%s) must correspond "
-                                         "with the number of shapes (%s)" % (self.recNum, self.shpNum))
-        # Save
-        if shp:
-            self.saveShp(shp)
-        if shx:
-            self.saveShx(shx)
-        if dbf:
-            self.saveDbf(dbf)
-        # Create a unique file name if one is not defined
-        if not shp and not shx and not dbf:
-            generated = False
-            if not target:
-                temp = tempfile.NamedTemporaryFile(prefix="shapefile_",dir=os.getcwd())
-                target = temp.name
-                generated = True         
-            self.saveShp(target)
-            self.shp.close()
-            self.saveShx(target)
-            self.shx.close()
-            self.saveDbf(target)
-            self.dbf.close()
-            if generated:
-                return target
+##    def save(self, target=None, shp=None, shx=None, dbf=None):
+##        """Save the shapefile data to three files or
+##        three file-like objects. SHP and DBF files can also
+##        be written exclusively using saveShp, saveShx, and saveDbf respectively.
+##        If target is specified but not shp, shx, or dbf then the target path and
+##        file name are used.  If no options or specified, a unique base file name
+##        is generated to save the files and the base file name is returned as a 
+##        string. 
+##        """
+##        # Balance if already not balanced
+##        if shp and dbf:
+##            if self.autoBalance:
+##                self.balance()
+##            if self.recNum != self.shpNum:
+##                raise ShapefileException("When saving both the dbf and shp file, "
+##                                         "the number of records (%s) must correspond "
+##                                         "with the number of shapes (%s)" % (self.recNum, self.shpNum))
+##        # Save
+##        if shp:
+##            self.saveShp(shp)
+##        if shx:
+##            self.saveShx(shx)
+##        if dbf:
+##            self.saveDbf(dbf)
+##        # Create a unique file name if one is not defined
+##        if not shp and not shx and not dbf:
+##            generated = False
+##            if not target:
+##                temp = tempfile.NamedTemporaryFile(prefix="shapefile_",dir=os.getcwd())
+##                target = temp.name
+##                generated = True         
+##            self.saveShp(target)
+##            self.shp.close()
+##            self.saveShx(target)
+##            self.shx.close()
+##            self.saveDbf(target)
+##            self.dbf.close()
+##            if generated:
+##                return target
 
 # Begin Testing
 def test(**kwargs):

@@ -12,19 +12,19 @@ The Python Shapefile Library (pyshp) reads and writes ESRI Shapefiles in pure Py
 
 [Basic Use](#basic-use)
 - [Reading Shapefiles](#reading-shapefiles)
-  - [Reading Shapefile Using the Context Manager](#reading-shapefile-context-manager)
+  - [Reading Shapefiles Using the Context Manager](#reading-shapefiles-using-the-context-manager)
   - [Reading Shapefiles from File-Like Objects](#reading-shapefiles-from-file-like-objects)
   - [Reading Shapefile Meta-Data](#reading-shapefile-meta-data)
   - [Reading Geometry](#reading-geometry)
   - [Reading Records](#reading-records)
   - [Reading Geometry and Records Simultaneously](#reading-geometry-and-records-simultaneously)
 - [Writing Shapefiles](#writing-shapefiles)
+  - [Writing Shapefiles Using the Context Manager](#writing-shapefiles-using-the-context-manager)
+  - [Writing Shapefiles to File-Like Objects](#writing-shapefiles-to-file-like-objects)
   - [Setting the Shape Type](#setting-the-shape-type)
   - [Adding Records](#adding-records)
   - [Adding Geometry](#adding-geometry)
   - [Geometry and Record Balancing](#geometry-and-record-balancing)
-  - [Saving to File Names](#saving-to-file-names)
-  - [Saving to File-Like Objects](#saving-to-file-like-objects)
   
 [More](#more)
 - [3D and Other Geometry Types](#3d-and-other-geometry-types)
@@ -105,7 +105,7 @@ OR
 OR any of the other 5+ formats which are potentially part of a shapefile. The
 library does not care about file extensions.
 
-### Reading Shapefile Using the Context Manager
+### Reading Shapefiles Using the Context Manager
 
 The "Reader" class can be used as a context manager, to ensure open file
 objects are properly closed when done reading the data:
@@ -428,14 +428,58 @@ interest. Many precision agriculture chemical field sprayers also use the shp
 format as a control file for the sprayer system (usually in combination with
 custom database file formats).
 
-To create a shapefile you add geometry and/or attributes using methods in the
-Writer class until you are ready to save the file. 
-
-Create an instance of the Writer class to begin creating a shapefile:
+To create a shapefile you begin by initiating a new Writer instance, passing it
+the file path and name to save to:
 
 
-	>>> w = shapefile.Writer()
+	>>> w = shapefile.Writer('shapefile')
+	
+File extensions are optional when reading or writing shapefiles. If you specify
+them PyShp ignores them anyway. When you save files you can specify a base
+file name that is used for all three file types. Or you can specify a name for
+one or more file types:
 
+
+	>>> w = shapefile.Writer(dbf='onlydbf.dbf')
+	
+In that case, any file types not assigned will not
+save and only file types with file names will be saved. 
+
+### Writing Shapefiles Using the Context Manager
+
+After all the shapefiles are 
+For the written shapefile to be considered valid, the "Writer" class automatically 
+closes the open files and writes the final headers once it is garbage collected.
+In case of a crash and to make the code more readable, it is nevertheless recommended 
+you do this manually by calling the "close()" method: 
+
+	>>> w.close()
+
+
+Alternatively, you can also use the "Writer" class as a context manager, to ensure open file
+objects are properly closed and final headers written once you exit the with-clause:
+
+
+    >>> with shapefile.Writer("shapefiles/test/contextwriter") as shp:
+    ...     pass
+
+### Writing Shapefiles to File-Like Objects
+
+Just as you can read shapefiles from python file-like objects you can also
+write to them:
+
+
+	>>> try:
+	...     from StringIO import StringIO
+	... except ImportError:
+	...     from io import BytesIO as StringIO
+	>>> shp = StringIO()
+	>>> shx = StringIO()
+	>>> dbf = StringIO()
+	>>> w = shapefile.Writer(shp=shp, shx=shx, dbf=dbf)
+	>>> w.close()
+	>>> # To read back the files you could call the "StringIO.getvalue()" method later.
+	
 ### Setting the Shape Type
 
 The shape type defines the type of geometry contained in the shapefile. All of
@@ -449,7 +493,7 @@ There are three ways to set the shape type:
 To manually set the shape type for a Writer object when creating the Writer:
 
 
-	>>> w = shapefile.Writer(shapeType=3)
+	>>> w = shapefile.Writer('shapefile', shapeType=3)
 
 	>>> w.shapeType
 	3
@@ -474,13 +518,13 @@ Text fields are created using the 'C' type, and the third 'size' argument can be
 length of text values to save space:
 
 
-	>>> w = shapefile.Writer()
+	>>> w = shapefile.Writer('shapefiles/test/dtype')
 	>>> w.field('TEXT', 'C')
 	>>> w.field('SHORT_TEXT', 'C', size=5)
 	>>> w.field('LONG_TEXT', 'C', size=250)
 	>>> w.null()
 	>>> w.record('Hello', 'World', 'World'*50)
-	>>> w.save('shapefiles/test/dtype')
+	>>> w.close()
 	
 	>>> r = shapefile.Reader('shapefiles/test/dtype')
 	>>> assert r.record(0) == ['Hello', 'World', 'World'*50]
@@ -491,7 +535,7 @@ Field length or decimal have no impact on this type:
 
 
 	>>> from datetime import date
-	>>> w = shapefile.Writer()
+	>>> w = shapefile.Writer('shapefiles/test/dtype')
 	>>> w.field('DATE', 'D')
 	>>> w.null()
 	>>> w.null()
@@ -501,7 +545,7 @@ Field length or decimal have no impact on this type:
 	>>> w.record([1998,1,30])
 	>>> w.record('19980130')
 	>>> w.record(None)
-	>>> w.save('shapefiles/test/dtype')
+	>>> w.close()
 	
 	>>> r = shapefile.Reader('shapefiles/test/dtype')
 	>>> assert r.record(0) == [date(1898,1,30)]
@@ -516,7 +560,7 @@ To store very large numbers you must increase the field length size to the total
 (including comma and minus). 
 
 
-	>>> w = shapefile.Writer()
+	>>> w = shapefile.Writer('shapefiles/test/dtype')
 	>>> w.field('INT', 'N')
 	>>> w.field('LOWPREC', 'N', decimal=2)
 	>>> w.field('MEDPREC', 'N', decimal=10)
@@ -528,7 +572,7 @@ To store very large numbers you must increase the field length size to the total
 	>>> w.null()
 	>>> w.record(INT=nr, LOWPREC=nr, MEDPREC=nr, HIGHPREC=-3.2302e-25, FTYPE=nr, LARGENR=int(nr)*10**100)
 	>>> w.record(None, None, None, None, None, None)
-	>>> w.save('shapefiles/test/dtype')
+	>>> w.close()
 	
 	>>> r = shapefile.Reader('shapefiles/test/dtype')
 	>>> assert r.record(0) == [1, 1.32, 1.3217328, -3.2302e-25, 1.3217328, 10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000]
@@ -540,7 +584,7 @@ This field can take True or False values, or 1 (True) or 0 (False).
 None is interpreted as missing. 
 
 
-	>>> w = shapefile.Writer()
+	>>> w = shapefile.Writer('shapefiles/test/dtype')
 	>>> w.field('BOOLEAN', 'L')
 	>>> w.null()
 	>>> w.null()
@@ -554,7 +598,7 @@ None is interpreted as missing.
 	>>> w.record(0)
 	>>> w.record(None)
 	>>> w.record("Nonesense")
-	>>> w.save('shapefiles/test/dtype')
+	>>> w.close()
 	
 	>>> r = shapefile.Reader('shapefiles/test/dtype')
 	>>> r.record(0)
@@ -573,11 +617,14 @@ None is interpreted as missing.
 You can also add attributes using keyword arguments where the keys are field names.
 
 
-	>>> w = shapefile.Writer()
+	>>> w = shapefile.Writer('shapefiles/test/dtype')
 	>>> w.field('FIRST_FLD','C','40')
 	>>> w.field('SECOND_FLD','C','40')
+	>>> w.null()
+	>>> w.null()
 	>>> w.record('First', 'Line')
 	>>> w.record(FIRST_FLD='First', SECOND_FLD='Line')
+	>>> w.close()
 
 ### Adding Geometry
 
@@ -591,13 +638,13 @@ A shapefile may contain some records for which geometry is not available, and ma
 Because Null shape types (shape type 0) have no geometry the "null" method is called without any arguments. 
 
 
-	>>> w = shapefile.Writer()
+	>>> w = shapefile.Writer('shapefiles/test/null')
 	>>> w.field('name', 'C')
 
 	>>> w.null()
 	>>> w.record('nullgeom')
 
-	>>> w.save('shapefiles/test/null')
+	>>> w.close()
 
 **Adding a Point shape**
 
@@ -605,13 +652,13 @@ Point shapes are added using the "point" method. A point is specified by an x an
 y value. 
 
 
-	>>> w = shapefile.Writer()
+	>>> w = shapefile.Writer('shapefiles/test/point')
 	>>> w.field('name', 'C')
 	
 	>>> w.point(122, 37) 
 	>>> w.record('point1')
 	
-	>>> w.save('shapefiles/test/point')
+	>>> w.close()
 
 **Adding a MultiPoint shape**
 
@@ -619,13 +666,13 @@ If your point data allows for the possibility of multiple points per feature, us
 These are specified as a list of xy point coordinates. 
 
 
-	>>> w = shapefile.Writer()
+	>>> w = shapefile.Writer('shapefiles/test/multipoint')
 	>>> w.field('name', 'C')
 	
 	>>> w.multipoint([[122,37], [124,32]]) 
 	>>> w.record('multipoint1')
 	
-	>>> w.save('shapefiles/test/multipoint')
+	>>> w.close()
 	
 **Adding a LineString shape**
 
@@ -633,7 +680,7 @@ For LineString shapefiles, each line shape consists of multiple lines. Line shap
 even if there is just one line. Also, each line must have at least two points.
 	
 	
-	>>> w = shapefile.Writer()
+	>>> w = shapefile.Writer('shapefiles/test/line')
 	>>> w.field('name', 'C')
 	
 	>>> w.line([
@@ -643,7 +690,7 @@ even if there is just one line. Also, each line must have at least two points.
 	
 	>>> w.record('linestring1')
 	
-	>>> w.save('shapefiles/test/line')
+	>>> w.close()
 	
 **Adding a Polygon shape**
 
@@ -656,7 +703,7 @@ If any of the polygons have holes, then the hole polygon coordinates must be ord
 The direction of your polygons determines how shapefile readers will distinguish between polygons outlines and holes. 
 
 
-	>>> w = shapefile.Writer()
+	>>> w = shapefile.Writer('shapefiles/test/polygon')
 	>>> w.field('name', 'C')
 
 	>>> w.poly([
@@ -666,7 +713,7 @@ The direction of your polygons determines how shapefile readers will distinguish
 	...        ])
 	>>> w.record('polygon1')
 	
-	>>> w.save('shapefiles/test/polygon')
+	>>> w.close()
 		
 **Adding from an existing Shape object**
 
@@ -677,18 +724,20 @@ This can be particularly useful for copying from one file to another:
 
 	>>> r = shapefile.Reader('shapefiles/test/polygon')
 
-	>>> w = shapefile.Writer()
+	>>> w = shapefile.Writer('shapefiles/test/copy')
 	>>> w.fields = r.fields[1:] # skip first deletion field
 
+	>>> # adding existing Shape objects
 	>>> for shaperec in r.iterShapeRecords():
 	...     w.record(*shaperec.record)
 	...     w.shape(shaperec.shape)
 	
+	>>> # or GeoJSON dicts
 	>>> for shaperec in r.iterShapeRecords():
 	...     w.record(*shaperec.record)
 	...     w.shape(shaperec.shape.__geo_interface__)
 	
-	>>> w.save('shapefiles/test/copy')	
+	>>> w.close()	
 	
 
 ### Geometry and Record Balancing
@@ -699,7 +748,7 @@ must take care to add records and shapes in the same order so that the record
 data lines up with the geometry data. For example:
 
 	
-	>>> w = shapefile.Writer(shapeType=shapefile.POINT)
+	>>> w = shapefile.Writer('shapefiles/test/balancing', shapeType=shapefile.POINT)
 	>>> w.field("field1", "C")
 	>>> w.field("field2", "C")
 	
@@ -748,41 +797,6 @@ If you do not use the autobalance or balance method and forget to manually
 balance the geometry and attributes the shapefile will be viewed as corrupt by
 most shapefile software.
 	
-	
-### Saving to File Names
-
-File extensions are optional when reading or writing shapefiles. If you specify
-them PyShp ignores them anyway. When you save files you can specify a base
-file name that is used for all three file types. Or you can specify a name for
-one or more file types. In that case, any file types not assigned will not
-save and only file types with file names will be saved. If you do not specify
-any file names (i.e. save()), then a unique file name is generated with the
-prefix "shapefile_" followed by random characters which is used for all three
-files. The unique file name is returned as a string.
-
-
-	>>> targetName = w.save()
-	>>> assert("shapefile_" in targetName)
-
-### Saving to File-Like Objects
-
-Just as you can read shapefiles from python file-like objects you can also
-write them.
-
-
-	>>> try:
-	...     from StringIO import StringIO
-	... except ImportError:
-	...     from io import BytesIO as StringIO
-	>>> shp = StringIO()
-	>>> shx = StringIO()
-	>>> dbf = StringIO()
-	>>> w.saveShp(shp)
-	>>> w.saveShx(shx)
-	>>> w.saveDbf(dbf)
-	>>> # Normally you would call the "StringIO.getvalue()" method on these objects.
-	>>> shp = shx = dbf = None
-	
 
 
 # More
@@ -800,7 +814,7 @@ The M-values are specified by adding a third M value to each XY coordinate. Miss
 or by simply omitting the third M-coordinate. 
 	
 	
-	>>> w = shapefile.Writer()
+	>>> w = shapefile.Writer('shapefiles/test/linem')
 	>>> w.field('name', 'C')
 	
 	>>> w.linem([
@@ -808,9 +822,9 @@ or by simply omitting the third M-coordinate.
 	...			[[3,2],[2,6]] # line without any M-values
 	...			])
 	
-	>>> w.record('lineM1')
+	>>> w.record('linem1')
 	
-	>>> w.save('shapefiles/test/linem')
+	>>> w.close()
 	
 Shapefiles containing M-values can be examined in several ways:
 
@@ -832,7 +846,7 @@ but if you omit the third Z-coordinate it will default to 0. Note that Z-type sh
 as a fourth M-coordinate. This too is optional. 
 	
 	
-	>>> w = shapefile.Writer()
+	>>> w = shapefile.Writer('shapefiles/test/linez')
 	>>> w.field('name', 'C')
 	
 	>>> w.linez([
@@ -841,9 +855,9 @@ as a fourth M-coordinate. This too is optional.
 	...			[[3,2,15,0],[2,6,13,3],[1,9,14,2]] # line with both Z and M-values
 	...			])
 	
-	>>> w.record('lineZ1')
+	>>> w.record('linez1')
 	
-	>>> w.save('shapefiles/test/linez')
+	>>> w.close()
 	
 To examine a Z-type shapefile you can do:
 
@@ -867,7 +881,7 @@ its roof:
 
 	>>> from shapefile import TRIANGLE_STRIP, TRIANGLE_FAN
 	
-	>>> w = shapefile.Writer()
+	>>> w = shapefile.Writer('shapefiles/test/multipatch')
 	>>> w.field('name', 'C')
 	
 	>>> w.multipatch([
@@ -878,7 +892,7 @@ its roof:
 	
 	>>> w.record('house1')
 	
-	>>> w.save('shapefiles/test/multipatch')
+	>>> w.close()
 	
 For an introduction to the various multipatch part types and examples of how to create 3D MultiPatch objects see [this
 ESRI White Paper](http://downloads.esri.com/support/whitepapers/ao_/J9749_MultiPatch_Geometry_Type.pdf). 
@@ -915,13 +929,11 @@ through them while keeping memory usage at a minimum.
 	...     pass
 	
 The shapefile Writer class uses a similar streaming approach to keep memory 
-usage at a minimum, except you don't have change any of your code. 
-The library takes care of this under-the-hood by creating a set of temporary files
-and immediately writing each geometry and record to disk the moment they 
-are added using shape() or record(). You still have to call save() as usual
-in order to specify the final location of the output file and in order
-for the header information to be calculated and written to the beginning of the
-file. 
+usage at a minimum. The library takes care of this under-the-hood by immediately 
+writing each geometry and record to disk the moment they 
+are added using shape() or record(). Once the writer is closed, exited, or garbage 
+collected, the final header information is calculated and written to the beginning of 
+the file. 
 
 This means that as long as you are able to iterate through a source file without having
 to load everything into memory, such as a large CSV table or a large shapefile, you can 
@@ -947,11 +959,11 @@ as UTF-8. Provided the new encoding supports the characters you are trying to wr
 should give you the same unicode string you started with. 
 
 
-	>>> w = shapefile.Writer(encoding="utf8")
+	>>> w = shapefile.Writer("shapefiles/test/latin_as_utf8.shp", encoding="utf8")
 	>>> w.fields = r.fields[1:]
 	>>> w.record(*r.record(0))
 	>>> w.null()
-	>>> w.save("shapefiles/test/latin_as_utf8.shp")
+	>>> w.close()
 	
 	>>> r = shapefile.Reader("shapefiles/test/latin_as_utf8.shp", encoding="utf8")
 	>>> r.record(0) == [2, u'Ñandú']
