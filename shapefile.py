@@ -423,10 +423,10 @@ class Reader(object):
         info = ['shapefile Reader']
         if self.shp:
             info.append("    {} shapes (type '{}')".format(
-                len(self.shapes()), SHAPETYPE_LOOKUP[self.shapeType]))
+                len(self), SHAPETYPE_LOOKUP[self.shapeType]))
         if self.dbf:
             info.append('    {} records ({} fields)'.format(
-                self.numRecords, len(self.fields)))
+                len(self), len(self.fields)))
         return '\n'.join(info)
 
     def __enter__(self):

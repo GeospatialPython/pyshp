@@ -453,15 +453,15 @@ closes the open files and writes the final headers once it is garbage collected.
 In case of a crash and to make the code more readable, it is nevertheless recommended 
 you do this manually by calling the "close()" method: 
 
-	>>> w.close()
 
+	>>> w.close()
 
 Alternatively, you can also use the "Writer" class as a context manager, to ensure open file
 objects are properly closed and final headers written once you exit the with-clause:
 
 
-    >>> with shapefile.Writer("shapefiles/test/contextwriter") as shp:
-    ...     pass
+	>>> with shapefile.Writer("shapefiles/test/contextwriter") as shp:
+	...		pass
 
 ### Writing Shapefiles to File-Like Objects
 
