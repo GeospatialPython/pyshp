@@ -219,7 +219,7 @@ index which is 7.
 	>>> ['%.3f' % coord for coord in s.bbox]
 	['-122.450', '37.801', '-122.442', '37.808']
 
-Each shape record contains the following attributes:
+Each shape record (except Points) contain the following attributes. Records of shapeType Point do not have a bounding box 'bbox'.
 
 
 	>>> for name in dir(shapes[3]):
@@ -373,7 +373,7 @@ that.
 
 Calling the shapeRecords() method will return the geometry and attributes for
 all shapes as a list of ShapeRecord objects. Each ShapeRecord instance has a
-"shape" and "record" attribute. The shape attribute is a ShapeRecord object as
+"shape" and "record" attribute. The shape attribute is a Shape object as
 discussed in the first section "Reading Geometry". The record attribute is a
 list of field values as demonstrated in the "Reading Records" section.
 
@@ -447,9 +447,7 @@ save and only file types with file names will be saved.
 
 ### Writing Shapefiles Using the Context Manager
 
-After all the shapefiles are 
-For the written shapefile to be considered valid, the "Writer" class automatically 
-closes the open files and writes the final headers once it is garbage collected.
+The "Writer" class automatically closes the open files and writes the final headers once it is garbage collected.
 In case of a crash and to make the code more readable, it is nevertheless recommended 
 you do this manually by calling the "close()" method: 
 
