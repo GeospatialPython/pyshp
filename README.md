@@ -142,7 +142,7 @@ method.
     >>> len(list(sf.iterShapes()))
     663
 
-Each shape record contains the following attributes:
+Each shape record (except Points) contain the following attributes. Records of shapeType Point do not have a bounding box 'bbox'.
 
 
     >>> for name in dir(shapes[3]):
