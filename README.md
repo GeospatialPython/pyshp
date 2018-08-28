@@ -474,6 +474,9 @@ write to them:
 	>>> shx = StringIO()
 	>>> dbf = StringIO()
 	>>> w = shapefile.Writer(shp=shp, shx=shx, dbf=dbf)
+	>>> w.field('field1', 'C')
+	>>> w.record()
+	>>> w.null()
 	>>> w.close()
 	>>> # To read back the files you could call the "StringIO.getvalue()" method later.
 	
