@@ -887,9 +887,9 @@ class Writer(object):
             shp,shx,dbf = kwargs.get('shp'), kwargs.get('shx'), kwargs.get('dbf')
             if shp:
                 self.shp = self.__getFileObj(shp)
-            elif shx:
+            if shx:
                 self.shx = self.__getFileObj(shx)
-            elif dbf:
+            if dbf:
                 self.dbf = self.__getFileObj(dbf)
         else:
             raise Exception('Either the target filepath, or any of shp, shx, or dbf must be set to create a shapefile.')
