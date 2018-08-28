@@ -875,6 +875,7 @@ class Reader(object):
 class Writer(object):
     """Provides write support for ESRI Shapefiles."""
     def __init__(self, target=None, shapeType=None, autoBalance=False, **kwargs):
+        self.target = target
         self.autoBalance = autoBalance
         self.fields = []
         self.shapeType = shapeType
@@ -956,13 +957,14 @@ class Writer(object):
         if self.dbf and dbf_open:
             self.__dbfHeader()
 
-        # Close files
-        for attribute in (self.shp, self.shx, self.dbf):
-            if hasattr(attribute, 'close'):
-                try:
-                    attribute.close()
-                except IOError:
-                    pass
+        # Close files, if target is a filepath
+        if self.target:
+            for attribute in (self.shp, self.shx, self.dbf):
+                if hasattr(attribute, 'close'):
+                    try:
+                        attribute.close()
+                    except IOError:
+                        pass
 
     def __getFileObj(self, f):
         """Safety handler to verify file-like objects"""
