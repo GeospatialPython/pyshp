@@ -349,21 +349,40 @@ To read a single record call the record() method with the record's index:
 
 
 	>>> rec = sf.record(3)
+	
+Each record is a list-like Record object containing the values corresponding to each field in
+the field list. A record's values can be accessed by positional indexing or slicing.
+For example in the blockgroups shapefile the 2nd and 3rd fields are the blockgroup id 
+and the 1990 population count of that San Francisco blockgroup:
+
 
 	>>> rec[1:3]
 	['060750601001', 4715]
+
+For simpler access, the fields of a record can also accessed via the name of the field,
+either as a key or as an attribute name. The blockgroup id (BKG_KEY) of the blockgroups shapefile 
+can also be retrieved as:
+
+
+    >>> rec['BKG_KEY']
+    '060750601001'
+
+    >>> rec.BKG_KEY
+    '060750601001'
 	
-Each record is a list containing an attribute corresponding to each field in
-the field list.
-
-For example in the 4th record of the blockgroups shapefile the 2nd and 3rd
-fields are the blockgroup id and the 1990 population count of that San
-Francisco blockgroup:
+The record values can be easily integrated with other programs by converting it to a field-value dictionary:
 
 
-	>>> records[3][1:3]
-	['060750601001', 4715]
+	>>> rec.as_dict()
+	{'MALES': 2620, 'AGE_UNDER5': 597, 'AGE_65_UP': 30, 'MARHH_CHD': 79, 'UNITS10_49': 49, 'POP1990': 4715, 'BLACK': 1007, 'UNITS50_UP': 0, 'AMERI_ES': 6, 'SEPARATED': 49, 'AGE_30_49': 1681, 'DIVORCED': 149, 'AREA': 2.34385, 'UNITS3_9': 672, 'AGE_18_29': 1467, 'BKG_KEY': '060750601001', 'HOUSEHOLDS': 1195, 'HISPANIC': 416, 'HSEHLD_1_M': 22, 'UNITS_1DET': 43, 'POP90_SQMI': 2011.6, 'HSEHLD_1_F': 40, 'HSE_UNITS': 1258, 'MARRIED': 2021, 'MOBILEHOME': 0, 'MARHH_NO_C': 958, 'AGE_5_17': 848, 'OTHER': 288, 'FEMALES': 2095, 'WHITE': 2962, 'NEVERMARRY': 703, 'MEDIAN_VAL': 337500, 'WIDOWED': 37, 'UNITS2': 160, 'FHH_CHILD': 16, 'RENTER_OCC': 3733, 'AGE_50_64': 92, 'VACANT': 93, 'UNITS_1ATT': 302, 'ASIAN_PI': 452, 'MHH_CHILD': 0, 'OWNER_OCC': 66, 'MEDIANRENT': 739}
 
+If at a later point you need to check the record's index position in the original 
+shapefile, you can do this through the "oid" attribute:
+
+
+	>>> rec.oid
+	3
+	
 ### Reading Geometry and Records Simultaneously
 
 You may want to examine both the geometry and the attributes for a record at

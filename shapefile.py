@@ -341,6 +341,141 @@ class Shape(object):
     @property
     def shapeTypeName(self):
         return SHAPETYPE_LOOKUP[self.shapeType]
+
+class _Record(list):
+    """
+    A class to hold a record. Subclasses list to ensure compatibility with
+    former work and allows to use all the optimazations of the builtin list.
+    In addition to the list interface, the values of the record
+    can also be retrieved using the fields name. Eg. if the dbf contains
+    a field ID at position 0, the ID can be retrieved with the position, the field name
+    as a key or the field name as an attribute.
+
+    >>> # Create a Record with one field, normally the record is created by the Reader class
+    >>> r = _Record({'ID': 0}, [0])
+    >>> print(r[0])
+    >>> print(r['ID'])
+    >>> print(r.ID)
+    """
+
+    def __init__(self, field_positions, values, oid=None):
+        """
+        A Record should be created by the Reader class
+
+        :param field_positions: A dict mapping field names to field positions
+        :param values: A sequence of values
+        :param oid: The object id, an int (optional)
+        """
+        self.__field_positions = field_positions
+        if oid is not None:
+            self.__oid = oid
+        else:
+            self.__oid = -1
+        list.__init__(self, values)
+
+    def __getattr__(self, item):
+        """
+        __getattr__ is called if an attribute is used that does
+        not exist in the normal sense. Eg. r=Record(...), r.ID
+        calls r.__getattr__('ID'), but r.index(5) calls list.index(r, 5)
+        :param item: The field name, used as attribute
+        :return: Value of the field
+        :raises: Attribute error, if field does not exist
+                and IndexError, if field exists but not values in the Record
+        """
+        try:
+            index = self.__field_positions[item]
+            return list.__getitem__(self, index)
+        except KeyError:
+            raise AttributeError('{} is not a field name'.format(item))
+        except IndexError:
+            raise IndexError('{} found as a field but not enough values available.'.format(item))
+
+    def __setattr__(self, key, value):
+        """
+        Sets a value of a field attribute
+        :param key: The field name
+        :param value: the value of that field
+        :return: None
+        :raises: AttributeError, if key is not a field of the shapefile
+        """
+        if key.startswith('_'):  # Prevent infinite loop when setting mangled attribute
+            return list.__setattr__(self, key, value)
+        try:
+            index = self.__field_positions[key]
+            return list.__setitem__(self, index, value)
+        except KeyError:
+            raise AttributeError('{} is not a field name'.format(key))
+
+    def __getitem__(self, item):
+        """
+        Extends the normal list item access with
+        access using a fieldname
+
+        Eg. r['ID'], r[0]
+        :param item: Either the position of the value or the name of a field
+        :return: the value of the field
+        """
+        try:
+            return list.__getitem__(self, item)
+        except TypeError:
+            try:
+                index = self.__field_positions[item]
+            except KeyError:
+                index = None
+        if index is not None:
+            return list.__getitem__(self, index)
+        else:
+            raise IndexError('"{}" is not a field name and not an int'.format(item))
+
+    def __setitem__(self, key, value):
+        """
+        Extends the normal list item access with
+        access using a fieldname
+
+        Eg. r['ID']=2, r[0]=2
+        :param key: Either the position of the value or the name of a field
+        :param value: the new value of the field
+        """
+        try:
+            return list.__setitem__(self, key, value)
+        except TypeError:
+            index = self.__field_positions.get(key)
+            if index is not None:
+                return list.__setitem__(self, index, value)
+            else:
+                raise IndexError('{} is not a field name and not an int'.format(key))
+
+    @property
+    def oid(self):
+        """The index position of the record in the original shapefile"""
+        return self.__oid
+
+    @property
+    def fields(self):
+        """The field names of the record"""
+        srt = sorted(self.__field_positions.items(), key=lambda(f,i): i)
+        return [f for f,i in srt]
+
+    def as_dict(self):
+        """
+        Returns this Record as a dictionary using the field names as keys
+        :return: dict
+        """
+        return dict((f, self[i]) for f, i in self.__field_positions.items())
+
+    def __str__(self):
+        return 'record #{} '.format(self.__oid)
+
+    def __dir__(self):
+        """
+        Helps to show the field names in an interactive environment like IPython.
+        See: http://ipython.readthedocs.io/en/stable/config/integrating.html
+
+        :return: List of method names and fields
+        """
+        attrs = [attr for attr in vars(type(self)) if not attr.startswith('_')]
+        return attrs + self.fields
         
 class ShapeRecord(object):
     """A ShapeRecord object containing a shape along with its attributes."""
@@ -380,6 +515,7 @@ class Reader(object):
         self.numRecords = None
         self.fields = []
         self.__dbfHdrLength = 0
+        self.__fieldposition_lookup = {}
         self.encoding = kwargs.pop('encoding', 'utf-8')
         self.encodingErrors = kwargs.pop('encodingErrors', 'strict')
         # See if a shapefile name was passed as an argument
@@ -738,6 +874,9 @@ class Reader(object):
         fmt,fmtSize = self.__recordFmt()
         self.__recStruct = Struct(fmt)
 
+        # Store the field positions
+        self.__fieldposition_lookup = dict((f[0], i) for i, f in enumerate(self.fields[1:]))
+
     def __recordFmt(self):
         """Calculates the format and size of a .dbf record."""
         if self.numRecords is None:
@@ -751,7 +890,7 @@ class Reader(object):
             fmtSize += 1
         return (fmt, fmtSize)
 
-    def __record(self):
+    def __record(self, oid=None):
         """Reads and returns a dbf record row as a list of values."""
         f = self.__getFileObj(self.dbf)
         recordContents = self.__recStruct.unpack(f.read(self.__recStruct.size))
@@ -814,7 +953,8 @@ class Reader(object):
                 value = u(value, self.encoding, self.encodingErrors)
                 value = value.strip()
             record.append(value)
-        return record
+
+        return _Record(self.__fieldposition_lookup, record, oid)
 
     def record(self, i=0):
         """Returns a specific dbf record based on the supplied index."""
@@ -825,7 +965,7 @@ class Reader(object):
         recSize = self.__recStruct.size
         f.seek(0)
         f.seek(self.__dbfHdrLength + (i * recSize))
-        return self.__record()
+        return self.__record(oid=i)
 
     def records(self):
         """Returns all records in a dbf file."""
@@ -835,7 +975,7 @@ class Reader(object):
         f = self.__getFileObj(self.dbf)
         f.seek(self.__dbfHdrLength)
         for i in range(self.numRecords):
-            r = self.__record()
+            r = self.__record(oid=i)
             if r:
                 records.append(r)
         return records
