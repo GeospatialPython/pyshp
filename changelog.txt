@@ -18,6 +18,7 @@ VERSION 2.0.0
 	  - More convenient accessing of Record values as attributes. [@philippkraft]
 	  - More convenient shape type name checking. [@megies] 
 	* Add more support and documentation for MultiPatch 3D shapes. 
+	* The Reader "elevation" and "measure" attributes now renamed "zbox" and "mbox", to make it clear they refer to the min/max values. 
 	* Better documentation of previously unclear aspects, such as field types. 
 
 	Bug Fixes:
