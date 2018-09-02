@@ -2,8 +2,8 @@
 shapefile.py
 Provides read and write support for ESRI Shapefiles.
 author: jlawhead<at>geospatialpython.com
-date: 2017/04/29
-version: 2.0.0-dev
+date: 2018/09/01
+version: 2.0.0
 Compatible with Python versions 2.7-3.x
 """
 
