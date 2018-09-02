@@ -417,8 +417,9 @@ can also be retrieved as:
 The record values can be easily integrated with other programs by converting it to a field-value dictionary:
 
 
-	>>> rec.as_dict()
-	{'MALES': 2620, 'AGE_UNDER5': 597, 'AGE_65_UP': 30, 'MARHH_CHD': 79, 'UNITS10_49': 49, 'POP1990': 4715, 'BLACK': 1007, 'UNITS50_UP': 0, 'AMERI_ES': 6, 'SEPARATED': 49, 'AGE_30_49': 1681, 'DIVORCED': 149, 'AREA': 2.34385, 'UNITS3_9': 672, 'AGE_18_29': 1467, 'BKG_KEY': '060750601001', 'HOUSEHOLDS': 1195, 'HISPANIC': 416, 'HSEHLD_1_M': 22, 'UNITS_1DET': 43, 'POP90_SQMI': 2011.6, 'HSEHLD_1_F': 40, 'HSE_UNITS': 1258, 'MARRIED': 2021, 'MOBILEHOME': 0, 'MARHH_NO_C': 958, 'AGE_5_17': 848, 'OTHER': 288, 'FEMALES': 2095, 'WHITE': 2962, 'NEVERMARRY': 703, 'MEDIAN_VAL': 337500, 'WIDOWED': 37, 'UNITS2': 160, 'FHH_CHILD': 16, 'RENTER_OCC': 3733, 'AGE_50_64': 92, 'VACANT': 93, 'UNITS_1ATT': 302, 'ASIAN_PI': 452, 'MHH_CHILD': 0, 'OWNER_OCC': 66, 'MEDIANRENT': 739}
+	>>> dct = rec.as_dict()
+	>>> sorted(dct.items())
+	[('AGE_18_29', 1467), ('AGE_30_49', 1681), ('AGE_50_64', 92), ('AGE_5_17', 848), ('AGE_65_UP', 30), ('AGE_UNDER5', 597), ('AMERI_ES', 6), ('AREA', 2.34385), ('ASIAN_PI', 452), ('BKG_KEY', '060750601001'), ('BLACK', 1007), ('DIVORCED', 149), ('FEMALES', 2095), ('FHH_CHILD', 16), ('HISPANIC', 416), ('HOUSEHOLDS', 1195), ('HSEHLD_1_F', 40), ('HSEHLD_1_M', 22), ('HSE_UNITS', 1258), ('MALES', 2620), ('MARHH_CHD', 79), ('MARHH_NO_C', 958), ('MARRIED', 2021), ('MEDIANRENT', 739), ('MEDIAN_VAL', 337500), ('MHH_CHILD', 0), ('MOBILEHOME', 0), ('NEVERMARRY', 703), ('OTHER', 288), ('OWNER_OCC', 66), ('POP1990', 4715), ('POP90_SQMI', 2011.6), ('RENTER_OCC', 3733), ('SEPARATED', 49), ('UNITS10_49', 49), ('UNITS2', 160), ('UNITS3_9', 672), ('UNITS50_UP', 0), ('UNITS_1ATT', 302), ('UNITS_1DET', 43), ('VACANT', 93), ('WHITE', 2962), ('WIDOWED', 37)]
 
 If at a later point you need to check the record's index position in the original 
 shapefile, you can do this through the "oid" attribute:
