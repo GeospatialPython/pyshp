@@ -10,6 +10,8 @@ The Python Shapefile Library (pyshp) reads and writes ESRI Shapefiles in pure Py
 
 [Overview](#overview)
 
+[Version Changes](#version-changes)
+
 [Basic Use](#basic-use)
 - [Reading Shapefiles](#reading-shapefiles)
   - [Reading Shapefiles Using the Context Manager](#reading-shapefiles-using-the-context-manager)
@@ -33,6 +35,7 @@ The Python Shapefile Library (pyshp) reads and writes ESRI Shapefiles in pure Py
 
 [Testing](#testing)
 
+
 # Overview
 
 The Python Shapefile Library (pyshp) provides read and write support for the
@@ -53,7 +56,7 @@ despite the numerous ways to store and exchange GIS data available today.
 Pyshp is compatible with Python 2.7-3.x.
 
 This document provides examples for using pyshp to read and write shapefiles. However 
-many more examples are continually added to the pyshp wiki on GitHub, the blog [http://GeospatialPython.com](http://GeospatialPython.com),
+many more examples are continually added to the blog [http://GeospatialPython.com](http://GeospatialPython.com),
 and by searching for pyshp on [https://gis.stackexchange.com](https://gis.stackexchange.com). 
 
 Currently the sample census blockgroup shapefile referenced in the examples is available on the GitHub project site at
@@ -68,6 +71,47 @@ I sincerely hope this library eliminates the mundane distraction of simply
 reading and writing data, and allows you to focus on the challenging and FUN
 part of your geospatial project.
 
+
+# Version Changes
+
+## 2.0.0
+
+The newest version of PyShp, version 2.x introduced some major new features. 
+This resulted in some API changes that are incompatible with previous versions. 
+Users of the previous version 1.x should therefore take note of the following changes
+(Note: Some contributor attributions may be missing): 
+
+Major Changes:
+
+- Full support for unicode text, with custom encoding, and exception handling. 
+  - Means that the Reader returns unicode, and the Writer accepts unicode. 
+- PyShp has been simplified to a pure input-output library using the Reader and Writer classes, dropping the Editor class. 
+- Switched to a new streaming approach when writing files, keeping memory-usage at a minimum:
+  - Specify filepath/destination and text encoding when creating the Writer. 
+  - The file is written incrementally with each call to shape/record. 
+  - Adding shapes is now done using dedicated methods for each shapetype. 
+- Reading shapefiles is now more convenient:
+  - Shapefiles can be opened using the context manager, and files are properly closed. 
+  - Shapefiles can be iterated, have a length, and supports the geo interface. 
+  - New ways of inspecing shapefile metadata by printing. [@megies]
+  - More convenient accessing of Record values as attributes. [@philippkraft]
+  - More convenient shape type name checking. [@megies] 
+- Add more support and documentation for MultiPatch 3D shapes. 
+- Better documentation of previously unclear aspects, such as field types. 
+
+Important Fixes:
+
+- More reliable/robust:
+  - Fixed shapefile bbox error for empty or point type shapefiles. [@mcuprjak]
+  - Reading and writing Z and M type shapes is now more robust, fixing many errors, and has been added to the documentation. [@ShinNoNoir]
+  - Improved parsing of field value types, fixed errors and made more flexible. 
+  - Fixed bug when writing shapefiles with datefield and date values earlier than 1900 [@megies]
+- Fix some geo interface errors, including checking polygon directions.
+- Bug fixes for reading from case sensitive file names, individual files separately, and from file-like objects. [@gastoneb, @kb003308, @erickskb]
+- Enforce maximum field limit. [@mwtoews]
+
+A great thanks to all who have contributed code and raised issues for version 2.x, and for the patience and understanding during the
+transition period. 
 
 
 # Basic Use
@@ -393,7 +437,7 @@ Calling the shapeRecords() method will return the geometry and attributes for
 all shapes as a list of ShapeRecord objects. Each ShapeRecord instance has a
 "shape" and "record" attribute. The shape attribute is a Shape object as
 discussed in the first section "Reading Geometry". The record attribute is a
-list of field values as demonstrated in the "Reading Records" section.
+list-like object containing field values as demonstrated in the "Reading Records" section.
 
 
 	>>> shapeRecs = sf.shapeRecords()

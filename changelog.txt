@@ -1,8 +1,38 @@
-VERSION 2.0.0-dev
 
-... Tobias Megies <megies@geophysik.uni-muenchen.de>
-	* Fixed bug writing shapefiles with datefield and date values earlier than 1900
+VERSION 2.0.0
 
+2018-09-01
+	(Note: Some contributor attributions may be missing.)
+	New Features:
+	* Full support for unicode text, with custom encoding, and exception handling. 
+	  - Means that the Reader returns unicode, and the Writer accepts unicode. 
+	* PyShp has been simplified to a pure input-output library using the Reader and Writer classes, dropping the Editor class. 
+	* Switched to a new streaming approach when writing files, keeping memory-usage at a minimum:
+	  - Specify filepath/destination and text encoding when creating the Writer. 
+	  - The file is written incrementally with each call to shape/record. 
+	  - Adding shapes is now done using dedicated methods for each shapetype. 
+	* Reading shapefiles is now more convenient:
+	  - Shapefiles can be opened using the context manager, and files are properly closed. 
+	  - Shapefiles can be iterated, have a length, and supports the geo interface. 
+	  - New ways of inspecing shapefile metadata by printing. [@megies]
+	  - More convenient accessing of Record values as attributes. [@philippkraft]
+	  - More convenient shape type name checking. [@megies] 
+	* Add more support and documentation for MultiPatch 3D shapes. 
+	* Better documentation of previously unclear aspects, such as field types. 
+
+	Bug Fixes:
+	* More reliable/robust:
+	  - Fixed shapefile bbox error for empty or point type shapefiles. [@mcuprjak]
+	  - Reading and writing Z and M type shapes is now more robust, fixing many errors, and has been added to the documentation. [@ShinNoNoir]
+	  - Improved parsing of field value types, fixed errors and made more flexible. 
+	  - Fixed bug when writing shapefiles with datefield and date values earlier than 1900 [@megies]
+	* Fix some geo interface errors, including checking polygon directions.
+	* Bug fixes for reading from case sensitive file names, individual files separately, and from file-like objects. [@gastoneb, @kb003308, @erickskb]
+	* Enforce maximum field limit. [@mwtoews]
+	
+VERSION 1.2.12
+	* ?
+	
 VERSION 1.2.11
 
 2017-04-29 Karim Bahgat <karim.bahgat.norway@gmail.com>
