@@ -495,7 +495,7 @@ To create a shapefile you begin by initiating a new Writer instance, passing it
 the file path and name to save to:
 
 
-	>>> w = shapefile.Writer('shapefile')
+	>>> w = shapefile.Writer('shapefiles/test/testfile')
 	
 File extensions are optional when reading or writing shapefiles. If you specify
 them PyShp ignores them anyway. When you save files you can specify a base
@@ -503,7 +503,7 @@ file name that is used for all three file types. Or you can specify a name for
 one or more file types:
 
 
-	>>> w = shapefile.Writer(dbf='onlydbf.dbf')
+	>>> w = shapefile.Writer(dbf='shapefiles/test/onlydbf.dbf')
 	
 In that case, any file types not assigned will not
 save and only file types with file names will be saved. 
@@ -557,7 +557,7 @@ There are three ways to set the shape type:
 To manually set the shape type for a Writer object when creating the Writer:
 
 
-	>>> w = shapefile.Writer('shapefile', shapeType=3)
+	>>> w = shapefile.Writer('shapefiles/test/shapetype', shapeType=3)
 
 	>>> w.shapeType
 	3
