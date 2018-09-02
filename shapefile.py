@@ -451,12 +451,6 @@ class _Record(list):
         """The index position of the record in the original shapefile"""
         return self.__oid
 
-    @property
-    def fields(self):
-        """The field names of the record"""
-        srt = sorted(self.__field_positions.items(), key=lambda x: x[1])
-        return [f for f,i in srt]
-
     def as_dict(self):
         """
         Returns this Record as a dictionary using the field names as keys
@@ -465,7 +459,7 @@ class _Record(list):
         return dict((f, self[i]) for f, i in self.__field_positions.items())
 
     def __str__(self):
-        return 'record #{} '.format(self.__oid)
+        return 'Record #{} '.format(self.__oid)
 
     def __dir__(self):
         """
@@ -475,7 +469,7 @@ class _Record(list):
         :return: List of method names and fields
         """
         attrs = [attr for attr in vars(type(self)) if not attr.startswith('_')]
-        return attrs + self.fields
+        return attrs + self.__field_positions.values() # plus field names (random order)
         
 class ShapeRecord(object):
     """A ShapeRecord object containing a shape along with its attributes."""
