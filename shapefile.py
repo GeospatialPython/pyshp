@@ -454,7 +454,7 @@ class _Record(list):
     @property
     def fields(self):
         """The field names of the record"""
-        srt = sorted(self.__field_positions.items(), key=lambda(f,i): i)
+        srt = sorted(self.__field_positions.items(), key=lambda x: x[1])
         return [f for f,i in srt]
 
     def as_dict(self):
