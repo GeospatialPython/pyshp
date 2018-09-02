@@ -7,7 +7,7 @@ version: 2.0.0-dev
 Compatible with Python versions 2.7-3.x
 """
 
-__version__ = "2.0.0-dev"
+__version__ = "2.0.0"
 
 from struct import pack, unpack, calcsize, error, Struct
 import os
