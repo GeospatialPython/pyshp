@@ -701,15 +701,15 @@ class Reader(object):
         # The shapefile's bounding box (lower left, upper right)
         self.bbox = _Array('d', unpack("<4d", shp.read(32)))
         # Elevation
-        self.elevation = _Array('d', unpack("<2d", shp.read(16)))
+        self.zbox = _Array('d', unpack("<2d", shp.read(16)))
         # Measure
-        self.measure = []
+        self.mbox = []
         for m in _Array('d', unpack("<2d", shp.read(16))):
             # Measure values less than -10e38 are nodata values according to the spec
             if m > NODATA:
-                self.measure.append(m)
+                self.mbox.append(m)
             else:
-                self.measure.append(None)
+                self.mbox.append(None)
 
     def __shape(self):
         """Returns the header info and geometry for a single shape."""

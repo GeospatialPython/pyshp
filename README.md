@@ -99,6 +99,7 @@ Users of the previous version 1.x should therefore take note of the following ch
   - More convenient accessing of Record values as attributes. [@philippkraft]
   - More convenient shape type name checking. [@megies] 
 - Add more support and documentation for MultiPatch 3D shapes. 
+- The Reader "elevation" and "measure" attributes now renamed "zbox" and "mbox", to make it clear they refer to the min/max values. 
 - Better documentation of previously unclear aspects, such as field types. 
 
 ### Important Fixes:
@@ -893,7 +894,7 @@ Shapefiles containing M-values can be examined in several ways:
 
 	>>> r = shapefile.Reader('shapefiles/test/linem')
 	
-	>>> r.measure # the lower and upper bound of M values in the shapefile
+	>>> r.mbox # the lower and upper bound of M values in the shapefile
 	[0.0, 3.0]
 	
 	>>> r.shape(0).m # flat list of M values
@@ -926,7 +927,7 @@ To examine a Z-type shapefile you can do:
 
 	>>> r = shapefile.Reader('shapefiles/test/linez')
 	
-	>>> r.elevation # the lower and upper bound of Z values in the shapefile
+	>>> r.zbox # the lower and upper bound of Z values in the shapefile
 	[0.0, 22.0]
 	
 	>>> r.shape(0).z # flat list of Z values
