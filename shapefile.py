@@ -2,12 +2,12 @@
 shapefile.py
 Provides read and write support for ESRI Shapefiles.
 author: jlawhead<at>geospatialpython.com
-date: 2017/08/24
-version: 1.2.12
+date: 2018/09/8
+version: 1.2.13
 Compatible with Python versions 2.7-3.x
 """
 
-__version__ = "1.2.12"
+__version__ = "1.2.13"
 
 from struct import pack, unpack, calcsize, error, Struct
 import os
@@ -989,8 +989,8 @@ class Writer:
                     else:
                         value = b(' ') # unknown is set to space
                 else:
-                    # anything else is forced to string
-                    value = str(value)[:size].ljust(size)
+                    # anything else is forced to byte string
+                    value = b(value)[:size].ljust(size)
                 if len(value) != size:
                     raise ShapefileException(
                         "Shapefile Writer unable to pack incorrect sized value"
