@@ -8,9 +8,12 @@ python:
 
 install:
   - pip install .
+  - pip install -r requirements.test.txt
 
 script:
+  - python -m compileall *.py
   - python shapefile.py
+  - python -m pytest
 
 deploy:
   provider: pypi
