@@ -20,7 +20,6 @@ def test_empty_shape_geo_interface():
     with pytest.raises(Exception):
         shape.__geo_interface__
 
-
 def test_reader_context_manager():
     """
     Assert that the Reader context manager
@@ -29,24 +28,22 @@ def test_reader_context_manager():
     """
     # note uses an actual shapefile from
     # the projects "shapefiles" directory
-    with shapefile.Reader("shapefiles/blockgroups") as shp:
+    with shapefile.Reader("shapefiles/blockgroups") as sf:
         pass
 
-    assert shp.shp.closed is True
-    assert shp.dbf.closed is True
-    assert shp.shx.closed is True
-
+    assert sf.shp.closed is True
+    assert sf.dbf.closed is True
+    assert sf.shx.closed is True
 
 def test_reader_shapefile_type():
     """
     Assert that the type of the shapefile
     is returned correctly.
     """
-    with shapefile.Reader("shapefiles/blockgroups") as shp:
-        assert shp.shapeType is 5   # 5 means Polygon
-        assert shp.shapeType is shapefile.POLYGON
-        assert shp.shapeTypeName is "POLYGON"
-
+    with shapefile.Reader("shapefiles/blockgroups") as sf:
+        assert sf.shapeType is 5   # 5 means Polygon
+        assert sf.shapeType is shapefile.POLYGON
+        assert sf.shapeTypeName is "POLYGON"
 
 def test_reader_shapefile_length():
     """
@@ -54,5 +51,52 @@ def test_reader_shapefile_length():
     matches up with the number of records
     in the file.
     """
-    with shapefile.Reader("shapefiles/blockgroups") as shp:
-        assert len(shp) == len(shp.shapes())
+    with shapefile.Reader("shapefiles/blockgroups") as sf:
+        assert len(sf) == len(sf.shapes())
+
+def test_shape_metadata():
+    with shapefile.Reader("shapefiles/blockgroups") as sf:
+        shape = sf.shape(0)
+        assert shape.shapeType is 5 # Polygon
+        assert shape.shapeType is shapefile.POLYGON
+        assert sf.shapeTypeName is "POLYGON"
+
+def test_reader_fields():
+    """
+    Assert that the reader's fields attribute
+    gives the shapefile's fields as a list.
+    Assert that each field has a name,
+    type, field length, and decimal length.
+    """
+    with shapefile.Reader("shapefiles/blockgroups") as sf:
+        fields = sf.fields
+        assert isinstance(fields, list)
+
+        field = fields[0]
+        assert isinstance(field[0], str)    # field name
+        assert field[1] in ["C", "N", "F", "L", "D", "M"]   # field type
+        assert isinstance(field[2], int)    # field length
+        assert isinstance(field[3], int)    # decimal length
+
+def test_records_match_shapes():
+    """
+    Assert that the number of records matches
+    the number of shapes in the shapefile.
+    """
+    with shapefile.Reader("shapefiles/blockgroups") as sf:
+        records = sf.records()
+        shapes = sf.shapes()
+        assert len(records) == len(shapes)
+
+def test_record_attributes():
+    """
+    Assert that record values can be accessed as
+    attributes and dictionary items.
+    """
+    # note
+    # second element in fields matches first element
+    # in record because records dont have DeletionFlag
+    with shapefile.Reader("shapefiles/blockgroups") as sf:
+        field_name = sf.fields[1][0]
+        record = sf.record(0)
+        assert record[0] == record[field_name] == getattr(record, field_name)
