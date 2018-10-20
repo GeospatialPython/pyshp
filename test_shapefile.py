@@ -100,3 +100,67 @@ def test_record_attributes():
         field_name = sf.fields[1][0]
         record = sf.record(0)
         assert record[0] == record[field_name] == getattr(record, field_name)
+
+def test_record_as_dict():
+    """
+    Assert that a record object can be converted
+    into a dictionary and data remains correct.
+    """
+    with shapefile.Reader("shapefiles/blockgroups") as sf:
+        record = sf.record(0)
+        as_dict = record.as_dict()
+
+        assert len(record) == len(as_dict)
+        for key, value in as_dict.items():
+            assert record[key] == value
+
+def test_record_oid():
+    """
+    Assert that the record's oid attribute returns
+    its index in the shapefile.
+    """
+    with shapefile.Reader("shapefiles/blockgroups") as sf:
+        record = sf.record(0)
+        assert record.oid is 0
+
+def test_shaperecords_shaperecord():
+    """
+    Assert that shapeRecords returns a list of
+    ShapeRecord objects.
+    Assert that shapeRecord returns a single
+    ShapeRecord at the given index.
+    """
+    with shapefile.Reader("shapefiles/blockgroups") as sf:
+        shaperecs = sf.shapeRecords()
+        shaperec = sf.shapeRecord(0)
+        should_match = shaperecs[0]
+
+        # assert record is equal
+        assert shaperec.record == should_match.record
+
+        # assert shape is equal
+        shaperec_json = shaperec.shape.__geo_interface__
+        should_match_json = should_match.shape.__geo_interface__
+        assert shaperec_json == should_match_json
+
+def test_shaperecord_shape():
+    """
+    Assert that a ShapeRecord object has a shape
+    attribute that contains shape data.
+    """
+    with shapefile.Reader("shapefiles/blockgroups") as sf:
+        shaperec = sf.shapeRecord(3)
+        shape = shaperec.shape
+        point = shape.points[0]
+        assert len(point) is 2
+
+def test_shaperecord_record():
+    """
+    Assert that a ShapeRecord object has a record
+    attribute that contains record data.
+    """
+    with shapefile.Reader("shapefiles/blockgroups") as sf:
+        shaperec = sf.shapeRecord(3)
+        record = shaperec.record
+
+        assert record[1:3] == ['060750601001', 4715]
