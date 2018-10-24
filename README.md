@@ -872,7 +872,7 @@ various other types of geometries as well, including complex 3D surfaces and obj
 
 **Shapefiles with measurement (M) values**
 
-Measured shape types are shapes that include a measurement value at each vertice, for instance speed measurements from a GPS device. 
+Measured shape types are shapes that include a measurement value at each vertex, for instance speed measurements from a GPS device. 
 Shapes with measurement (M) values are added with following methods: "pointm", "multipointm", "linem", and "polygonm". 
 The M-values are specified by adding a third M value to each XY coordinate. Missing or unobserved M-values are specified with a None value,
 or by simply omitting the third M-coordinate. 
@@ -903,7 +903,7 @@ Shapefiles containing M-values can be examined in several ways:
 	
 **Shapefiles with elevation (Z) values**
 
-Elevation shape types are shapes that include an elevation value at each vertice, for instance elevation from a GPS device. 
+Elevation shape types are shapes that include an elevation value at each vertex, for instance elevation from a GPS device. 
 Shapes with an elevation (Z) values are added with following methods: "pointz", "multipointz", "linez", and "polygonz". 
 The Z-values are specified by adding a third Z value to each XY coordinate. Z-values do not support the concept of missing data,
 but if you omit the third Z-coordinate it will default to 0. Note that Z-type shapes also support measurement (M) values added
