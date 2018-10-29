@@ -1055,4 +1055,36 @@ $ python shapefile.py
 Linux/Mac and similar platforms will need to run `$ dos2unix README.md` in order
 correct line endings in README.md.
 
+# Contributors
 
+```
+Atle Frenvik Sveen
+Bas Couwenberg
+Casey Meisenzahl
+Charles Arnold
+David A. Riggs
+davidh-ssec
+Evan Heidtmann
+geospatialpython
+Hannes
+Ignacio Martinez Vazquez
+Jason Moujaes
+Karim Bahgat
+Kyle Kelley
+Louis Tiao
+Marcin Cuprjak
+Micah Cochran
+Michael Davis
+Michal Čihař
+Mike Toews
+Nilo
+Paulo Ernesto
+Raynor Vliegendhart
+Razzi Abuissa
+Ross Rogers
+Ryan Brideau
+Tobias Megies
+Tommi Penttinen
+Uli Köhler
+Zac Miller
+```
