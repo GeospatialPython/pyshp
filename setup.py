@@ -1,16 +1,11 @@
-import codecs
-import sys
-
 from setuptools import setup
 
 
-PYTHON3 = sys.version_info[0] == 3
-
 def read_file(file):
-    if PYTHON3:
-        return open(file, encoding='utf-8').read()
-    else:
-        return codecs.open(file, encoding='utf-8').read()
+    with open(file, 'rb') as fh:
+        data = fh.read()
+
+    return data.decode('utf-8')
 
 setup(name='pyshp',
       version='2.0.0',
