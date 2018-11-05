@@ -1,9 +1,21 @@
+import codecs
+import sys
+
 from setuptools import setup
+
+
+PYTHON3 = sys.version_info[0] == 3
+
+def read_file(file):
+    if PYTHON3:
+        return open(file, encoding='utf-8').read()
+    else:
+        return codecs.open(file, encoding='utf-8').read()
 
 setup(name='pyshp',
       version='2.0.0',
       description='Pure Python read/write support for ESRI Shapefile format',
-      long_description=open('README.md').read(),
+      long_description=read_file('README.md'),
       author='Joel Lawhead',
       author_email='jlawhead@geospatialpython.com',
       url='https://github.com/GeospatialPython/pyshp',
