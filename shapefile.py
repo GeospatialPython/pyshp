@@ -84,7 +84,7 @@ MISSING = [None,'']
 NODATA = -10e38 # as per the ESRI shapefile spec, only used for m-values. 
 
 if PYTHON3:
-    def b(v, encoding='utf-8', encodingErrors='ignore'):
+    def b(v, encoding='utf-8', encodingErrors='strict'):
         if isinstance(v, str):
             # For python 3 encode str to bytes.
             return v.encode(encoding, encodingErrors)
@@ -98,10 +98,13 @@ if PYTHON3:
             # Force string representation.
             return str(v).encode(encoding, encodingErrors)
 
-    def u(v, encoding='utf-8', encodingErrors='ignore'):
+    def u(v, encoding='utf-8', encodingErrors='strict', other_encoding='cp1252'):
         if isinstance(v, bytes):
             # For python 3 decode bytes to str.
-            return v.decode(encoding, encodingErrors)
+            try:
+                return v.decode(encoding, encodingErrors)
+            except:
+                return v.decode(other_encoding, encodingErrors)
         elif isinstance(v, str):
             # Already str.
             return v
@@ -116,7 +119,7 @@ if PYTHON3:
         return isinstance(v, str)
 
 else:
-    def b(v, encoding='utf-8', encodingErrors='ignore'):
+    def b(v, encoding='utf-8', encodingErrors='strict'):
         if isinstance(v, unicode):
             # For python 2 encode unicode to bytes.
             return v.encode(encoding, encodingErrors)
@@ -130,10 +133,13 @@ else:
             # Force string representation.
             return unicode(v).encode(encoding, encodingErrors)
 
-    def u(v, encoding='utf-8', encodingErrors='ignore'):
+    def u(v, encoding='utf-8', encodingErrors='strict', other_encoding='cp1252'):
         if isinstance(v, bytes):
             # For python 2 decode bytes to unicode.
-            return v.decode(encoding, encodingErrors)
+            try:
+                return v.decode(encoding, encodingErrors)
+            except:
+                return v.decode(other_encoding, encodingErrors)
         elif isinstance(v, unicode):
             # Already unicode.
             return v
@@ -943,6 +949,7 @@ class Reader(object):
                         value = None # unknown value is set to missing
             else:
                 # anything else is forced to string/unicode
+                print(f"Self Ecoding = {self.encoding}")
                 value = u(value, self.encoding, self.encodingErrors)
                 value = value.strip()
             record.append(value)
@@ -1818,7 +1825,7 @@ def test(**kwargs):
     if verbosity == 0:
         print('Running doctests...')
 
-    # ignore py2-3 unicode differences
+    # strict py2-3 unicode differences
     import re
     class Py23DocChecker(doctest.OutputChecker):
         def check_output(self, want, got, optionflags):
