@@ -84,7 +84,7 @@ MISSING = [None,'']
 NODATA = -10e38 # as per the ESRI shapefile spec, only used for m-values. 
 
 if PYTHON3:
-    def b(v, encoding='utf-8', encodingErrors='strict'):
+    def b(v, encoding='utf-8', encodingErrors='replace'):
         if isinstance(v, str):
             # For python 3 encode str to bytes.
             return v.encode(encoding, encodingErrors)
@@ -98,7 +98,7 @@ if PYTHON3:
             # Force string representation.
             return str(v).encode(encoding, encodingErrors)
 
-    def u(v, encoding='utf-8', encodingErrors='strict'):
+    def u(v, encoding='utf-8', encodingErrors='replace'):
         if isinstance(v, bytes):
             # For python 3 decode bytes to str.
             return v.decode(encoding, encodingErrors)
@@ -116,7 +116,7 @@ if PYTHON3:
         return isinstance(v, str)
 
 else:
-    def b(v, encoding='utf-8', encodingErrors='strict'):
+    def b(v, encoding='utf-8', encodingErrors='replace'):
         if isinstance(v, unicode):
             # For python 2 encode unicode to bytes.
             return v.encode(encoding, encodingErrors)
@@ -130,7 +130,7 @@ else:
             # Force string representation.
             return unicode(v).encode(encoding, encodingErrors)
 
-    def u(v, encoding='utf-8', encodingErrors='strict'):
+    def u(v, encoding='utf-8', encodingErrors='replace'):
         if isinstance(v, bytes):
             # For python 2 decode bytes to unicode.
             return v.decode(encoding, encodingErrors)
