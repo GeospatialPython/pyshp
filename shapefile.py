@@ -949,7 +949,6 @@ class Reader(object):
                         value = None # unknown value is set to missing
             else:
                 # anything else is forced to string/unicode
-                print(f"Self Ecoding = {self.encoding}")
                 value = u(value, self.encoding, self.encodingErrors)
                 value = value.strip()
             record.append(value)
