@@ -99,7 +99,6 @@ if PYTHON3:
             return str(v).encode(encoding, encodingErrors)
 
     def u(v, encoding='utf-8', encodingErrors='replace'):
-		print(v)
         if isinstance(v, bytes):
             # For python 3 decode bytes to str.
             return v.decode(encoding, encodingErrors)
