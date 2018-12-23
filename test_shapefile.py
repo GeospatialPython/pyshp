@@ -2,6 +2,7 @@
 This module tests the functionality of shapefile.py.
 """
 # std lib imports
+import os.path
 
 # third party imports
 import pytest
@@ -20,6 +21,7 @@ def test_empty_shape_geo_interface():
     with pytest.raises(Exception):
         shape.__geo_interface__
 
+
 def test_reader_context_manager():
     """
     Assert that the Reader context manager
@@ -35,6 +37,7 @@ def test_reader_context_manager():
     assert sf.dbf.closed is True
     assert sf.shx.closed is True
 
+
 def test_reader_shapefile_type():
     """
     Assert that the type of the shapefile
@@ -45,6 +48,7 @@ def test_reader_shapefile_type():
         assert sf.shapeType is shapefile.POLYGON
         assert sf.shapeTypeName is "POLYGON"
 
+
 def test_reader_shapefile_length():
     """
     Assert that the length the reader gives us
@@ -54,12 +58,14 @@ def test_reader_shapefile_length():
     with shapefile.Reader("shapefiles/blockgroups") as sf:
         assert len(sf) == len(sf.shapes())
 
+
 def test_shape_metadata():
     with shapefile.Reader("shapefiles/blockgroups") as sf:
         shape = sf.shape(0)
         assert shape.shapeType is 5 # Polygon
         assert shape.shapeType is shapefile.POLYGON
         assert sf.shapeTypeName is "POLYGON"
+
 
 def test_reader_fields():
     """
@@ -78,6 +84,7 @@ def test_reader_fields():
         assert isinstance(field[2], int)    # field length
         assert isinstance(field[3], int)    # decimal length
 
+
 def test_records_match_shapes():
     """
     Assert that the number of records matches
@@ -87,6 +94,7 @@ def test_records_match_shapes():
         records = sf.records()
         shapes = sf.shapes()
         assert len(records) == len(shapes)
+
 
 def test_record_attributes():
     """
@@ -101,6 +109,7 @@ def test_record_attributes():
         record = sf.record(0)
         assert record[0] == record[field_name] == getattr(record, field_name)
 
+
 def test_record_as_dict():
     """
     Assert that a record object can be converted
@@ -114,6 +123,7 @@ def test_record_as_dict():
         for key, value in as_dict.items():
             assert record[key] == value
 
+
 def test_record_oid():
     """
     Assert that the record's oid attribute returns
@@ -122,6 +132,7 @@ def test_record_oid():
     with shapefile.Reader("shapefiles/blockgroups") as sf:
         record = sf.record(0)
         assert record.oid is 0
+
 
 def test_shaperecords_shaperecord():
     """
@@ -143,6 +154,7 @@ def test_shaperecords_shaperecord():
         should_match_json = should_match.shape.__geo_interface__
         assert shaperec_json == should_match_json
 
+
 def test_shaperecord_shape():
     """
     Assert that a ShapeRecord object has a shape
@@ -154,6 +166,7 @@ def test_shaperecord_shape():
         point = shape.points[0]
         assert len(point) is 2
 
+
 def test_shaperecord_record():
     """
     Assert that a ShapeRecord object has a record
@@ -164,3 +177,46 @@ def test_shaperecord_record():
         record = shaperec.record
 
         assert record[1:3] == ['060750601001', 4715]
+
+
+def test_write_shp_only(tmpdir):
+    """
+    Assert that specifying only the
+    shp argument to the shapefile writer
+    creates just a shp file.
+    """
+    filename = tmpdir.join("test.shp").strpath
+    with shapefile.Writer(shp=filename) as writer:
+        pass
+
+    # assert test.shp exists
+    assert os.path.exists(filename)
+
+    # assert test.shx does not exist
+    assert not os.path.exists(tmpdir.join("test.shx"))
+
+    # assert test.dbf does not exist
+    assert not os.path.exists(tmpdir.join("test.dbf"))
+
+
+def test_write_shx_only():
+    """
+    """
+    pass
+
+def test_write_dbf_only():
+    """
+    """
+    pass
+
+
+def test_write_default_shp_shpx_dbf():
+    """
+    """
+    pass
+
+
+def test_write_shapefile_extension_ignored():
+    """
+    """
+    pass
