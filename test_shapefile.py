@@ -181,7 +181,7 @@ def test_shaperecord_record():
 
 def test_write_shp_only(tmpdir):
     """
-    Assert that specifying only the
+    Assert that specifying just the
     shp argument to the shapefile writer
     creates just a shp file.
     """
@@ -199,24 +199,78 @@ def test_write_shp_only(tmpdir):
     assert not os.path.exists(tmpdir.join("test.dbf"))
 
 
-def test_write_shx_only():
+def test_write_shx_only(tmpdir):
     """
+    Assert that specifying just the
+    shx argument to the shapefile writer
+    creates just a shx file.
     """
-    pass
+    filename = tmpdir.join("test.shx").strpath
+    with shapefile.Writer(shx=filename) as writer:
+        pass
 
-def test_write_dbf_only():
-    """
-    """
-    pass
+    # assert test.shx exists
+    assert os.path.exists(filename)
+
+    # assert test.shp does not exist
+    assert not os.path.exists(tmpdir.join("test.shp"))
+
+    # assert test.dbf does not exist
+    assert not os.path.exists(tmpdir.join("test.dbf"))
 
 
-def test_write_default_shp_shpx_dbf():
+def test_write_dbf_only(tmpdir):
     """
+    Assert that specifying just the
+    dbf argument to the shapefile writer
+    creates just a dbf file.
     """
-    pass
+    filename = tmpdir.join("test.dbf").strpath
+    with shapefile.Writer(dbf=filename) as writer:
+        pass
+
+    # assert test.dbf exists
+    assert os.path.exists(filename)
+
+    # assert test.shp does not exist
+    assert not os.path.exists(tmpdir.join("test.shp"))
+
+    # assert test.shx does not exist
+    assert not os.path.exists(tmpdir.join("test.shx"))
 
 
-def test_write_shapefile_extension_ignored():
+def test_write_default_shp_shx_dbf(tmpdir):
     """
+    Assert that creating the shapefile writer without
+    specifying the shp, shx, or dbf arguments
+    creates a set of shp, shx, and dbf files.
     """
-    pass
+    filename = tmpdir.join("test").strpath
+    with shapefile.Writer(filename) as writer:
+        pass
+
+    # assert shp, shx, dbf files exist
+    assert os.path.exists(filename + ".shp")
+    assert os.path.exists(filename + ".shx")
+    assert os.path.exists(filename + ".dbf")
+
+
+def test_write_shapefile_extension_ignored(tmpdir):
+    """
+    Assert that the filename's extension is
+    ignored when creating a shapefile.
+    """
+    base = "test"
+    ext = ".abc"
+    filename = tmpdir.join(base + ext).strpath
+    with shapefile.Writer(filename) as writer:
+        pass
+
+    # assert shp, shx, dbf files exist
+    basepath = tmpdir.join(base).strpath
+    assert os.path.exists(basepath + ".shp")
+    assert os.path.exists(basepath + ".shx")
+    assert os.path.exists(basepath + ".dbf")
+
+    # assert test.abc does not exist
+    assert not os.path.exists(basepath + ext)
