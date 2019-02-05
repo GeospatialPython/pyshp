@@ -1,6 +1,6 @@
 # PyShp
 
-The Python Shapefile Library (pyshp) reads and writes ESRI Shapefiles in pure Python.
+The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Python.
 
 ![pyshp logo](http://4.bp.blogspot.com/_SBi37QEsCvg/TPQuOhlHQxI/AAAAAAAAAE0/QjFlWfMx0tQ/S350/GSP_Logo.png "PyShp")
 
@@ -38,7 +38,7 @@ The Python Shapefile Library (pyshp) reads and writes ESRI Shapefiles in pure Py
 
 # Overview
 
-The Python Shapefile Library (pyshp) provides read and write support for the
+The Python Shapefile Library (PyShp) provides read and write support for the
 Esri Shapefile format. The Shapefile format is a popular Geographic
 Information System vector data format created by Esri. For more information
 about this format please read the well-written "ESRI Shapefile Technical
@@ -55,9 +55,9 @@ despite the numerous ways to store and exchange GIS data available today.
 
 Pyshp is compatible with Python 2.7-3.x.
 
-This document provides examples for using pyshp to read and write shapefiles. However 
+This document provides examples for using PyShp to read and write shapefiles. However 
 many more examples are continually added to the blog [http://GeospatialPython.com](http://GeospatialPython.com),
-and by searching for pyshp on [https://gis.stackexchange.com](https://gis.stackexchange.com). 
+and by searching for PyShp on [https://gis.stackexchange.com](https://gis.stackexchange.com). 
 
 Currently the sample census blockgroup shapefile referenced in the examples is available on the GitHub project site at
 [https://github.com/GeospatialPython/pyshp](https://github.com/GeospatialPython/pyshp). These
@@ -123,7 +123,7 @@ Before doing anything you must import the library.
 
 The examples below will use a shapefile created from the U.S. Census Bureau
 Blockgroups data set near San Francisco, CA and available in the git
-repository of the pyshp GitHub site.
+repository of the PyShp GitHub site.
 
 ## Reading Shapefiles
 
@@ -163,7 +163,7 @@ objects are properly closed when done reading the data:
 
 You can also load shapefiles from any Python file-like object using keyword
 arguments to specify any of the three files. This feature is very powerful and
-allows you to load shapefiles from a url, from a zip file, serialized object,
+allows you to load shapefiles from a url, a zip file, a serialized object,
 or in some cases a database.
 
 
@@ -172,8 +172,8 @@ or in some cases a database.
 	>>> r = shapefile.Reader(shp=myshp, dbf=mydbf)
 
 Notice in the examples above the shx file is never used. The shx file is a
-very simple fixed-record index for the variable length records in the shp
-file. This file is optional for reading. If it's available pyshp will use the
+very simple fixed-record index for the variable-length records in the shp
+file. This file is optional for reading. If it's available PyShp will use the
 shx file to access shape records a little faster but will do just fine without
 it.
 
@@ -188,8 +188,8 @@ shapeType attribute.
 	5
 
 Shape types are represented by numbers between 0 and 31 as defined by the
-shapefile specification and listed below. It is important to note that numbering system has
-several reserved numbers which have not been used yet therefore the numbers of
+shapefile specification and listed below. It is important to note that the numbering system has
+several reserved numbers that have not been used yet, therefore the numbers of
 the existing shape types are not sequential:
 
 - NULL = 0
@@ -221,8 +221,8 @@ For convenience, you can also get the name of the shape type as a string:
 	>>> sf.shapeTypeName == 'POLYGON'
 	True
 	
-Other pieces of meta-data that we can check includes the number of features, 
-or the bounding box area the shapefile covers:
+Other pieces of meta-data that we can check include the number of features 
+and the bounding box area the shapefile covers:
 
 
 	>>> len(sf)
@@ -270,7 +270,8 @@ index which is 7.
 	>>> ['%.3f' % coord for coord in s.bbox]
 	['-122.450', '37.801', '-122.442', '37.808']
 
-Each shape record (except Points) contain the following attributes. Records of shapeType Point do not have a bounding box 'bbox'.
+Each shape record (except Points) contains the following attributes. Records of
+shapeType Point do not have a bounding box 'bbox'.
 
 
 	>>> for name in dir(shapes[3]):
@@ -328,7 +329,7 @@ Each shape record (except Points) contain the following attributes. Records of s
 		>>> ['%.3f' % coord for coord in shape]
 		['-122.471', '37.787']
 
-In most cases, however, if you need to more than just type or bounds checking, you may want 
+In most cases, however, if you need to do more than just type or bounds checking, you may want 
 to convert the geometry to the more human-readable [GeoJSON format](http://geojson.org),
 where lines and polygons are grouped for you:
 
@@ -348,7 +349,7 @@ The results from the shapes() method similiarly supports converting to GeoJSON:
 ### Reading Records
 
 A record in a shapefile contains the attributes for each shape in the
-collection of geometry. Records are stored in the dbf file. The link between
+collection of geometries. Records are stored in the dbf file. The link between
 geometry and attributes is the foundation of all geographic information systems.
 This critical link is implied by the order of shapes and corresponding records
 in the shp geometry file and the dbf attribute file.
@@ -778,12 +779,13 @@ even if there is just one line. Also, each line must have at least two points.
 **Adding a Polygon shape**
 
 Similarly to LineString, Polygon shapes consist of multiple polygons, and must be given as a list of polygons.
-The main difference being that polygons must have at least 4 points and the last point must be the same as the first. 
-It's also okay if you forget to do so, PyShp automatically checks and closes the polygons if you don't. 
+The main difference is that polygons must have at least 4 points and the last point must be the same as the first. 
+It's also okay if you forget to repeat the first point at the end; PyShp automatically checks and closes the polygons
+if you don't.
 
 It's important to note that for Polygon shapefiles, your polygon coordinates must be ordered in a clockwise direction.
 If any of the polygons have holes, then the hole polygon coordinates must be ordered in a counterclockwise direction.
-The direction of your polygons determines how shapefile readers will distinguish between polygons outlines and holes. 
+The direction of your polygons determines how shapefile readers will distinguish between polygon outlines and holes. 
 
 
 	>>> w = shapefile.Writer('shapefiles/test/polygon')
@@ -841,7 +843,7 @@ data lines up with the geometry data. For example:
 	>>> w.record("row", "two")
 	>>> w.point(2, 2)
 	
-To help prevent accidental misalignment pyshp has an "auto balance" feature to
+To help prevent accidental misalignment PyShp has an "auto balance" feature to
 make sure when you add either a shape or a record the two sides of the
 equation line up. This way if you forget to update an entry the
 shapefile will still be valid and handled correctly by most shapefile
@@ -876,7 +878,7 @@ You can create all of the shapes and then create all of the records or vice vers
 	>>> w.recNum == w.shpNum
 	True
 
-If you do not use the autobalance or balance method and forget to manually
+If you do not use the autoBalance() or balance() method and forget to manually
 balance the geometry and attributes the shapefile will be viewed as corrupt by
 most shapefile software.
 	
@@ -886,17 +888,18 @@ most shapefile software.
 
 ## 3D and Other Geometry Types
 
-Most shapefiles store conventional 2D points, lines, or polygons. But the shapefile format is also capable of storing
-various other types of geometries as well, including complex 3D surfaces and objects. 
+Most shapefiles store conventional 2D points, lines, or polygons. But the shapefile format is also capable
+of storing various other types of geometries as well, including complex 3D surfaces and objects. 
 
 **Shapefiles with measurement (M) values**
 
-Measured shape types are shapes that include a measurement value at each vertex, for instance speed measurements from a GPS device. 
-Shapes with measurement (M) values are added with following methods: "pointm", "multipointm", "linem", and "polygonm". 
-The M-values are specified by adding a third M value to each XY coordinate. Missing or unobserved M-values are specified with a None value,
-or by simply omitting the third M-coordinate. 
-	
-	
+Measured shape types are shapes that include a measurement value at each vertex, for instance
+speed measurements from a GPS device. Shapes with measurement (M) values are added with the following
+methods: "pointm", "multipointm", "linem", and "polygonm". The M-values are specified by adding a
+third M value to each XY coordinate. Missing or unobserved M-values are specified with a None value,
+or by simply omitting the third M-coordinate.
+
+
 	>>> w = shapefile.Writer('shapefiles/test/linem')
 	>>> w.field('name', 'C')
 	
@@ -913,17 +916,17 @@ Shapefiles containing M-values can be examined in several ways:
 
 	>>> r = shapefile.Reader('shapefiles/test/linem')
 	
-	>>> r.mbox # the lower and upper bound of M values in the shapefile
+	>>> r.mbox # the lower and upper bound of M-values in the shapefile
 	[0.0, 3.0]
 	
-	>>> r.shape(0).m # flat list of M values
+	>>> r.shape(0).m # flat list of M-values
 	[0.0, None, 3.0, None, 0.0, None, None]
 
 	
 **Shapefiles with elevation (Z) values**
 
 Elevation shape types are shapes that include an elevation value at each vertex, for instance elevation from a GPS device. 
-Shapes with an elevation (Z) values are added with following methods: "pointz", "multipointz", "linez", and "polygonz". 
+Shapes with elevation (Z) values are added with the following methods: "pointz", "multipointz", "linez", and "polygonz". 
 The Z-values are specified by adding a third Z value to each XY coordinate. Z-values do not support the concept of missing data,
 but if you omit the third Z-coordinate it will default to 0. Note that Z-type shapes also support measurement (M) values added
 as a fourth M-coordinate. This too is optional. 
@@ -935,7 +938,7 @@ as a fourth M-coordinate. This too is optional.
 	>>> w.linez([
 	...			[[1,5,18],[5,5,20],[5,1,22],[3,3],[1,1]], # line with some omitted Z-values
 	...			[[3,2],[2,6]], # line without any Z-values
-	...			[[3,2,15,0],[2,6,13,3],[1,9,14,2]] # line with both Z and M-values
+	...			[[3,2,15,0],[2,6,13,3],[1,9,14,2]] # line with both Z- and M-values
 	...			])
 	
 	>>> w.record('linez1')
@@ -946,17 +949,17 @@ To examine a Z-type shapefile you can do:
 
 	>>> r = shapefile.Reader('shapefiles/test/linez')
 	
-	>>> r.zbox # the lower and upper bound of Z values in the shapefile
+	>>> r.zbox # the lower and upper bound of Z-values in the shapefile
 	[0.0, 22.0]
 	
-	>>> r.shape(0).z # flat list of Z values
+	>>> r.shape(0).z # flat list of Z-values
 	[18.0, 20.0, 22.0, 0.0, 0.0, 0.0, 0.0, 15.0, 13.0, 14.0]
 
 **3D MultiPatch Shapefiles**
 
 Multipatch shapes are useful for storing composite 3-Dimensional objects. 
 A MultiPatch shape represents a 3D object made up of one or more surface parts.
-Each surface in "parts" is defined by a list of XYZM values (Z and M values optional), and its corresponding type
+Each surface in "parts" is defined by a list of XYZM values (Z and M values optional), and its corresponding type is
 given in the "partTypes" argument. The part type decides how the coordinate sequence is to be interpreted, and can be one 
 of the following module constants: TRIANGLE_STRIP, TRIANGLE_FAN, OUTER_RING, INNER_RING, FIRST_RING, or RING.
 For instance, a TRIANGLE_STRIP may be used to represent the walls of a building, combined with a TRIANGLE_FAN to represent 
@@ -1020,9 +1023,9 @@ the file.
 
 This means that as long as you are able to iterate through a source file without having
 to load everything into memory, such as a large CSV table or a large shapefile, you can 
-process and write any number of items, and even merging many different source files into a single 
+process and write any number of items, and even merge many different source files into a single 
 large shapefile. If you need to edit or undo any of your writing you would have to read the 
-file back in, one record at a time, make your changes, and write it back out. 
+file back in one record at a time, make your changes, and write it back out. 
 
 ## Unicode and Shapefile Encodings
 
