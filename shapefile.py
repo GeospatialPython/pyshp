@@ -856,9 +856,9 @@ class Reader(object):
             else:
                 idx = len(fieldDesc[name]) - 1
             fieldDesc[name] = fieldDesc[name][:idx]
-            fieldDesc[name] = u(fieldDesc[name], "ascii")
+            fieldDesc[name] = u(fieldDesc[name], self.encoding, self.encodingErrors)
             fieldDesc[name] = fieldDesc[name].lstrip()
-            fieldDesc[1] = u(fieldDesc[1], "ascii")
+            fieldDesc[1] = u(fieldDesc[1], 'ascii')
             self.fields.append(fieldDesc)
         terminator = dbf.read(1)
         if terminator != b"\r":
@@ -1269,7 +1269,7 @@ class Writer(object):
         year -= 1900
         # Remove deletion flag placeholder from fields
         for field in self.fields:
-            if str(field[0]).startswith("Deletion"):
+            if field[0].startswith("Deletion"):
                 self.fields.remove(field)
         numRecs = self.recNum
         numFields = len(self.fields)
@@ -1284,10 +1284,10 @@ class Writer(object):
         # Field descriptors
         for field in self.fields:
             name, fieldType, size, decimal = field
-            name = b(name, 'ascii', self.encodingErrors)
+            name = b(name, self.encoding, self.encodingErrors)
             name = name.replace(b' ', b'_')
             name = name.ljust(11).replace(b' ', b'\x00')
-            fieldType = b(fieldType, 'ascii', self.encodingErrors)
+            fieldType = b(fieldType, 'ascii')
             size = int(size)
             fld = pack('<11sc4xBB14x', name, fieldType, size, decimal)
             f.write(fld)
@@ -1833,7 +1833,7 @@ def test(**kwargs):
     # run tests
     runner = doctest.DocTestRunner(checker=Py23DocChecker(), verbose=verbosity)
     with open("README.md","rb") as fobj:
-        test = doctest.DocTestParser().get_doctest(string=fobj.read().decode("utf8"), globs={}, name="README", filename="README.md", lineno=0)
+        test = doctest.DocTestParser().get_doctest(string=fobj.read().decode("utf8").replace('\r\n','\n'), globs={}, name="README", filename="README.md", lineno=0)
     failure_count, test_count = runner.run(test)
 
     # print results
