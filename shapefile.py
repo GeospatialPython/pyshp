@@ -457,8 +457,8 @@ class _Record(list):
         """
         return dict((f, self[i]) for f, i in self.__field_positions.items())
 
-    def __str__(self):
-        return 'Record #{} '.format(self.__oid)
+    def __repr__(self):
+        return 'Record #{}: {}'.format(self.__oid, list(self))
 
     def __dir__(self):
         """
