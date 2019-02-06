@@ -229,6 +229,14 @@ or the bounding box area the shapefile covers:
 	663
 	>>> sf.bbox
 	[-122.515048, 37.652916, -122.327622, 37.863433]
+	
+Finally, if you would prefer to work with the entire shapefile in a different
+format, you can convert all of it to a GeoJSON dictionary, although you may lose
+some information in the process, such as z- and m-values: 
+
+
+	>>> sf.__geo_interface__['type']
+	'FeatureCollection'
 
 ### Reading Geometry
 
@@ -329,6 +337,12 @@ where lines and polygons are grouped for you:
 	>>> geoj = s.__geo_interface__
 	>>> geoj["type"]
 	'MultiPolygon'
+	
+The results from the shapes() method similiarly supports converting to GeoJSON:
+
+
+	>>> shapes.__geo_interface__['type']
+	'GeometryCollection'
 	
 
 ### Reading Records
@@ -449,19 +463,24 @@ Let's read the blockgroup key and the population for the 4th blockgroup:
 	>>> shapeRecs[3].record[1:3]
 	['060750601001', 4715]
 
-Now let's read the first two points for that same record:
+The results from the shapeRecords() method is a list-like object that can be easily converted
+to GeoJSON through the __geo_interface__:
 
 
-	>>> points = shapeRecs[3].shape.points[0:2]
-
-	>>> len(points)
-	2
+	>>> shapeRecs.__geo_interface__['type']
+	'FeatureCollection'
 
 The shapeRecord() method reads a single shape/record pair at the specified index.
 To get the 4th shape record from the blockgroups shapefile use the third index:
 
 
 	>>> shapeRec = sf.shapeRecord(3)
+	
+Each individual shape record also supports the __geo_interface__ to convert it to a GeoJSON:
+
+
+	>>> shapeRec.__geo_interface__['type']
+	'Feature'
 
 The blockgroup key and population count:
 
@@ -666,17 +685,17 @@ None is interpreted as missing.
 	
 	>>> r = shapefile.Reader('shapefiles/test/dtype')
 	>>> r.record(0)
-	[True]
+	Record #0: [True]
 	>>> r.record(1)
-	[True]
+	Record #1: [True]
 	>>> r.record(2)
-	[False]
+	Record #2: [False]
 	>>> r.record(3)
-	[False]
+	Record #3: [False]
 	>>> r.record(4)
-	[None]
+	Record #4: [None]
 	>>> r.record(5)
-	[None]
+	Record #5: [None]
 	
 You can also add attributes using keyword arguments where the keys are field names.
 

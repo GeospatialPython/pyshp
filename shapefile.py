@@ -472,10 +472,45 @@ class _Record(list):
         return default + fnames 
         
 class ShapeRecord(object):
-    """A ShapeRecord object containing a shape along with its attributes."""
+    """A ShapeRecord object containing a shape along with its attributes.
+    Provides the GeoJSON __geo_interface__ to return a Feature dictionary."""
     def __init__(self, shape=None, record=None):
         self.shape = shape
         self.record = record
+
+    @property
+    def __geo_interface__(self):
+        return {'type': 'Feature',
+                'properties': self.record.as_dict(),
+                'geometry': self.shape.__geo_interface__}
+
+class Shapes(list):
+    """A class to hold a list of Shape objects. Subclasses list to ensure compatibility with
+    former work and allows to use all the optimazations of the builtin list.
+    In addition to the list interface, this also provides the GeoJSON __geo_interface__
+    to return a GeometryCollection dictionary. """
+
+    def __repr__(self):
+        return 'Shapes: {}'.format(list(self))
+
+    @property
+    def __geo_interface__(self):
+        return {'type': 'GeometryCollection',
+                'geometries': [g.__geo_interface__ for g in self]}
+
+class ShapeRecords(list):
+    """A class to hold a list of ShapeRecord objects. Subclasses list to ensure compatibility with
+    former work and allows to use all the optimazations of the builtin list.
+    In addition to the list interface, this also provides the GeoJSON __geo_interface__
+    to return a FeatureCollection dictionary. """
+
+    def __repr__(self):
+        return 'ShapeRecords: {}'.format(list(self))
+
+    @property
+    def __geo_interface__(self):
+        return {'type': 'FeatureCollection',
+                'features': [f.__geo_interface__ for f in self]}
 
 class ShapefileException(Exception):
     """An exception to handle shapefile specific problems."""
@@ -586,9 +621,7 @@ class Reader(object):
         features = []
         for feat in self.iterShapeRecords():
             fdict = {'type': 'Feature',
-                     'properties': dict(*zip(fieldnames,
-                                             list(feat.record)
-                                             )),
+                     'properties': dict(zip(fieldnames,feat.record)),
                      'geometry': feat.shape.__geo_interface__}
             features.append(fdict)
         return {'type': 'FeatureCollection',
@@ -830,7 +863,7 @@ class Reader(object):
         shp.seek(0,2)
         self.shpLength = shp.tell()
         shp.seek(100)
-        shapes = []
+        shapes = Shapes()
         while shp.tell() < self.shpLength:
             shapes.append(self.__shape())
         return shapes
@@ -1002,9 +1035,8 @@ class Reader(object):
     def shapeRecords(self):
         """Returns a list of combination geometry/attribute records for
         all records in a shapefile."""
-        shapeRecords = []
-        return [ShapeRecord(shape=rec[0], record=rec[1]) \
-                                for rec in zip(self.shapes(), self.records())]
+        return ShapeRecords([ShapeRecord(shape=rec[0], record=rec[1]) \
+                                for rec in zip(self.shapes(), self.records())])
 
     def iterShapeRecords(self):
         """Returns a generator of combination geometry/attribute records for
