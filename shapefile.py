@@ -748,14 +748,18 @@ class Reader(object):
             record.z = _Array('d', unpack("<%sd" % nPoints, f.read(nPoints * 8)))
         # Read m extremes and values
         if shapeType in (13,15,18,23,25,28,31):
-            (mmin, mmax) = unpack("<2d", f.read(16))
+            if next - f.tell() >= 16:
+                (mmin, mmax) = unpack("<2d", f.read(16))
             # Measure values less than -10e38 are nodata values according to the spec
-            record.m = []
-            for m in _Array('d', unpack("<%sd" % nPoints, f.read(nPoints * 8))):
-                if m > NODATA:
-                    record.m.append(m)
-                else:
-                    record.m.append(None)
+            if next - f.tell() >= nPoints * 8:
+                record.m = []
+                for m in _Array('d', unpack("<%sd" % nPoints, f.read(nPoints * 8))):
+                    if m > NODATA:
+                        record.m.append(m)
+                    else:
+                        record.m.append(None)
+            else:
+                record.m = [None for _ in range(nPoints)]
         # Read a single point
         if shapeType in (1,11,21):
             record.points = [_Array('d', unpack("<2d", f.read(16)))]
@@ -763,8 +767,11 @@ class Reader(object):
         if shapeType == 11:
             record.z = list(unpack("<d", f.read(8)))
         # Read a single M value
-        if shapeType == 21 or (shapeType == 11 and f.tell() < next):
-            (m,) = unpack("<d", f.read(8))
+        if shapeType in (21,11):
+            if next - f.tell() >= 8:
+                (m,) = unpack("<d", f.read(8))
+            else:
+                m = NODATA
             # Measure values less than -10e38 are nodata values according to the spec
             if m > NODATA:
                 record.m = [m]
