@@ -467,8 +467,9 @@ class _Record(list):
 
         :return: List of method names and fields
         """
-        attrs = [attr for attr in vars(type(self)) if not attr.startswith('_')]
-        return attrs + self.__field_positions.values() # plus field names (random order)
+        default = list(dir(type(self))) # default list methods and attributes of this class
+        fnames = list(self.__field_positions.keys()) # plus field names (random order)
+        return default + fnames 
         
 class ShapeRecord(object):
     """A ShapeRecord object containing a shape along with its attributes."""
