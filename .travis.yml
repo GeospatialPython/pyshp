@@ -8,6 +8,7 @@ python:
 
 install:
   - pip install .
+  - pip install -U setuptools>=38.6.0
 
 script:
   - python shapefile.py
