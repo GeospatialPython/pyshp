@@ -1087,6 +1087,7 @@ Charles Arnold
 David A. Riggs
 davidh-ssec
 Evan Heidtmann
+ezcitron
 geospatialpython
 Hannes
 Ignacio Martinez Vazquez
@@ -1100,6 +1101,7 @@ Michael Davis
 Michal Čihař
 Mike Toews
 Nilo
+pakoun
 Paulo Ernesto
 Raynor Vliegendhart
 Razzi Abuissa
