@@ -9,6 +9,7 @@ python:
 install:
   - pip install .
   - pip install -r requirements.test.txt
+  - pip install -U setuptools>=38.6.0
 
 script:
   - python -m compileall *.py

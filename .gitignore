@@ -16,3 +16,4 @@ shapefiles/test/null.shx
 
 *.py[cod]
 __pycache__/
+__cache__/
