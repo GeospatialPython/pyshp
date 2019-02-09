@@ -185,7 +185,7 @@ def test_write_shp_only(tmpdir):
     shp argument to the shapefile writer
     creates just a shp file.
     """
-    filename = tmpdir.join("test.shp").strpath
+    filename = str(tmpdir.join("test.shp"))
     with shapefile.Writer(shp=filename) as writer:
         pass
 
@@ -205,7 +205,7 @@ def test_write_shx_only(tmpdir):
     shx argument to the shapefile writer
     creates just a shx file.
     """
-    filename = tmpdir.join("test.shx").strpath
+    filename = str(tmpdir.join("test.shx"))
     with shapefile.Writer(shx=filename) as writer:
         pass
 
@@ -225,7 +225,7 @@ def test_write_dbf_only(tmpdir):
     dbf argument to the shapefile writer
     creates just a dbf file.
     """
-    filename = tmpdir.join("test.dbf").strpath
+    filename = str(tmpdir.join("test.dbf"))
     with shapefile.Writer(dbf=filename) as writer:
         pass
 
@@ -245,7 +245,7 @@ def test_write_default_shp_shx_dbf(tmpdir):
     specifying the shp, shx, or dbf arguments
     creates a set of shp, shx, and dbf files.
     """
-    filename = tmpdir.join("test").strpath
+    filename = str(tmpdir.join("test"))
     with shapefile.Writer(filename) as writer:
         pass
 
@@ -262,7 +262,7 @@ def test_write_shapefile_extension_ignored(tmpdir):
     """
     base = "test"
     ext = ".abc"
-    filename = tmpdir.join(base + ext).strpath
+    filename = str(tmpdir.join(base + ext))
     with shapefile.Writer(filename) as writer:
         pass
 
