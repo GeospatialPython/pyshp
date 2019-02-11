@@ -465,7 +465,7 @@ Let's read the blockgroup key and the population for the 4th blockgroup:
 	['060750601001', 4715]
 
 The results from the shapeRecords() method is a list-like object that can be easily converted
-to GeoJSON through the __geo_interface__:
+to GeoJSON through the _\_geo_interface\_\_:
 
 
 	>>> shapeRecs.__geo_interface__['type']
@@ -477,7 +477,7 @@ To get the 4th shape record from the blockgroups shapefile use the third index:
 
 	>>> shapeRec = sf.shapeRecord(3)
 	
-Each individual shape record also supports the __geo_interface__ to convert it to a GeoJSON:
+Each individual shape record also supports the _\_geo_interface\_\_ to convert it to a GeoJSON:
 
 
 	>>> shapeRec.__geo_interface__['type']
@@ -488,11 +488,6 @@ The blockgroup key and population count:
 
 	>>> shapeRec.record[1:3]
 	['060750601001', 4715]
-
-	>>> points = shapeRec.shape.points[0:2]
-
-	>>> len(points)
-	2
 	
 
 ## Writing Shapefiles
@@ -760,8 +755,8 @@ These are specified as a list of xy point coordinates.
 	
 **Adding a LineString shape**
 
-For LineString shapefiles, each line shape consists of multiple lines. Line shapes must be given as a list of lines, 
-even if there is just one line. Also, each line must have at least two points.
+For LineString shapefiles, each shape is given as a list of one or more linear features. 
+Each of the linear features must have at least two points. 
 	
 	
 	>>> w = shapefile.Writer('shapefiles/test/line')
@@ -1025,7 +1020,7 @@ This means that as long as you are able to iterate through a source file without
 to load everything into memory, such as a large CSV table or a large shapefile, you can 
 process and write any number of items, and even merge many different source files into a single 
 large shapefile. If you need to edit or undo any of your writing you would have to read the 
-file back in one record at a time, make your changes, and write it back out. 
+file back in, one record at a time, make your changes, and write it back out. 
 
 ## Unicode and Shapefile Encodings
 
