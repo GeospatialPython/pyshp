@@ -74,6 +74,19 @@ part of your geospatial project.
 
 # Version Changes
 
+## 2.1.0
+
+### New Features:
+- Added back read/write support for unicode field names. 
+- Improved Record representation
+- More support for geojson on Reader, ShapeRecord, ShapeRecords, and shapes()
+
+### Bug fixes:
+
+- Fixed error when reading optional m-values
+- Fixed Record attribute autocomplete in Python 3
+- Misc readme cleanup
+
 ## 2.0.0
 
 The newest version of PyShp, version 2.0 introduced some major new improvements. 
