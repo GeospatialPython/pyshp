@@ -14,16 +14,12 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 
 [Examples](#examples)
 - [Reading Shapefiles](#reading-shapefiles)
-  - [Reading Shapefiles Using the Context Manager](#reading-shapefiles-using-the-context-manager)
-  - [Reading Shapefiles from File-Like Objects](#reading-shapefiles-from-file-like-objects)
-  - [Reading Shapefile Meta-Data](#reading-shapefile-meta-data)
+  - [The Reader Class](#the-reader-class)
   - [Reading Geometry](#reading-geometry)
   - [Reading Records](#reading-records)
   - [Reading Geometry and Records Simultaneously](#reading-geometry-and-records-simultaneously)
 - [Writing Shapefiles](#writing-shapefiles)
-  - [Writing Shapefiles Using the Context Manager](#writing-shapefiles-using-the-context-manager)
-  - [Writing Shapefiles to File-Like Objects](#writing-shapefiles-to-file-like-objects)
-  - [Setting the Shape Type](#setting-the-shape-type)
+  - [The Writer Class](#the-writer-class)
   - [Adding Records](#adding-records)
   - [Adding Geometry](#adding-geometry)
   - [Geometry and Record Balancing](#geometry-and-record-balancing)
@@ -140,6 +136,8 @@ repository of the PyShp GitHub site.
 
 ## Reading Shapefiles
 
+### The Shapefile Class
+
 To read a shapefile create a new "Reader" object and pass it the name of an
 existing shapefile. The shapefile format is actually a collection of three
 files. You specify the base filename of the shapefile or the complete filename
@@ -161,7 +159,7 @@ OR
 OR any of the other 5+ formats which are potentially part of a shapefile. The
 library does not care about file extensions.
 
-### Reading Shapefiles Using the Context Manager
+#### Reading Shapefiles Using the Context Manager
 
 The "Reader" class can be used as a context manager, to ensure open file
 objects are properly closed when done reading the data:
@@ -172,7 +170,7 @@ objects are properly closed when done reading the data:
         663 shapes (type 'POLYGON')
         663 records (44 fields)
 
-### Reading Shapefiles from File-Like Objects
+#### Reading Shapefiles from File-Like Objects
 
 You can also load shapefiles from any Python file-like object using keyword
 arguments to specify any of the three files. This feature is very powerful and
@@ -190,7 +188,7 @@ file. This file is optional for reading. If it's available PyShp will use the
 shx file to access shape records a little faster but will do just fine without
 it.
 
-### Reading Shapefile Meta-Data
+#### Reading Shapefile Meta-Data
 
 Shapefiles have a number of attributes for inspecting the file contents.
 A shapefile is a container for a specific type of geometry, and this can be checked using the 
@@ -505,6 +503,8 @@ The blockgroup key and population count:
 
 ## Writing Shapefiles
 
+### The Writer Class
+
 PyShp tries to be as flexible as possible when writing shapefiles while
 maintaining some degree of automatic validation to make sure you don't
 accidentally write an invalid file.
@@ -536,7 +536,7 @@ one or more file types:
 In that case, any file types not assigned will not
 save and only file types with file names will be saved. 
 
-### Writing Shapefiles Using the Context Manager
+#### Writing Shapefiles Using the Context Manager
 
 The "Writer" class automatically closes the open files and writes the final headers once it is garbage collected.
 In case of a crash and to make the code more readable, it is nevertheless recommended 
@@ -552,7 +552,7 @@ objects are properly closed and final headers written once you exit the with-cla
 	>>> with shapefile.Writer("shapefiles/test/contextwriter") as shp:
 	...		pass
 
-### Writing Shapefiles to File-Like Objects
+#### Writing Shapefiles to File-Like Objects
 
 Just as you can read shapefiles from python file-like objects you can also
 write to them:
@@ -572,7 +572,7 @@ write to them:
 	>>> w.close()
 	>>> # To read back the files you could call the "StringIO.getvalue()" method later.
 	
-### Setting the Shape Type
+#### Setting the Shape Type
 
 The shape type defines the type of geometry contained in the shapefile. All of
 the shapes must match the shape type setting.
