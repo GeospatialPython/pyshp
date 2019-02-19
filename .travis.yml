@@ -9,7 +9,6 @@ python:
 install:
   - pip install .
   - pip install -r requirements.test.txt --no-cache-dir
-  - pip install -U setuptools>=38.6.0
 
 script:
   - python -m compileall *.py
