@@ -1269,7 +1269,7 @@ class Writer(object):
         if self.shapeType != 0:
             try:
                 bbox = self.bbox()
-                if bbox is None:
+                if not bbox:
                     # The bbox is initialized with None, so this would mean the shapefile contains no valid geometries.
                     # In such cases of empty shapefiles, ESRI spec says the bbox values are 'unspecified'.
                     # Not sure what that means, so for now just setting to 0s, which is the same behavior as in previous versions.
@@ -1296,6 +1296,10 @@ class Writer(object):
             mbox = [0,0]
         # Try writing
         try:
+            if not zbox:
+                zbox = [0,0]
+            if not mbox:
+                mbox = [0,0]
             f.write(pack("<4d", zbox[0], zbox[1], mbox[0], mbox[1]))
         except error:
             raise ShapefileException("Failed to write shapefile elevation and measure values. Floats required.")
