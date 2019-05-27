@@ -151,7 +151,7 @@ else:
 # Begin
 
 class _Array(array.array):
-    """Converts python tuples to lits of the appropritate type.
+    """Converts python tuples to lists of the appropritate type.
     Used to unpack different shapefile header parts."""
     def __repr__(self):
         return str(self.tolist())
@@ -250,7 +250,7 @@ class Shape(object):
         specified in the Shapefile spec. Shape types are
         usually point, polyline, or polygons. Every shape type
         except the "Null" type contains points at some level for
-        example verticies in a polygon. If a shape type has
+        example vertices in a polygon. If a shape type has
         multiple shapes containing points within a single
         geometry record then those shapes are called parts. Parts
         are designated by their starting index in geometry record's
@@ -512,11 +512,11 @@ class Shape(object):
 class _Record(list):
     """
     A class to hold a record. Subclasses list to ensure compatibility with
-    former work and allows to use all the optimazations of the builtin list.
+    former work and to reuse all the optimizations of the builtin list.
     In addition to the list interface, the values of the record
-    can also be retrieved using the fields name. Eg. if the dbf contains
+    can also be retrieved using the field's name. For example if the dbf contains
     a field ID at position 0, the ID can be retrieved with the position, the field name
-    as a key or the field name as an attribute.
+    as a key, or the field name as an attribute.
 
     >>> # Create a Record with one field, normally the record is created by the Reader class
     >>> r = _Record({'ID': 0}, [0])
@@ -543,12 +543,13 @@ class _Record(list):
     def __getattr__(self, item):
         """
         __getattr__ is called if an attribute is used that does
-        not exist in the normal sense. Eg. r=Record(...), r.ID
+        not exist in the normal sense. For example r=Record(...), r.ID
         calls r.__getattr__('ID'), but r.index(5) calls list.index(r, 5)
         :param item: The field name, used as attribute
         :return: Value of the field
-        :raises: Attribute error, if field does not exist
-                and IndexError, if field exists but not values in the Record
+        :raises: AttributeError, if item is not a field of the shapefile
+                and IndexError, if the field exists but the field's 
+                corresponding value in the Record does not exist
         """
         try:
             index = self.__field_positions[item]
@@ -579,7 +580,7 @@ class _Record(list):
         Extends the normal list item access with
         access using a fieldname
 
-        Eg. r['ID'], r[0]
+        For example r['ID'], r[0]
         :param item: Either the position of the value or the name of a field
         :return: the value of the field
         """
@@ -600,7 +601,7 @@ class _Record(list):
         Extends the normal list item access with
         access using a fieldname
 
-        Eg. r['ID']=2, r[0]=2
+        For example r['ID']=2, r[0]=2
         :param key: Either the position of the value or the name of a field
         :param value: the new value of the field
         """
@@ -636,7 +637,7 @@ class _Record(list):
         :return: List of method names and fields
         """
         default = list(dir(type(self))) # default list methods and attributes of this class
-        fnames = list(self.__field_positions.keys()) # plus field names (random order)
+        fnames = list(self.__field_positions.keys()) # plus field names (random order if Python version < 3.6)
         return default + fnames 
         
 class ShapeRecord(object):
@@ -654,9 +655,9 @@ class ShapeRecord(object):
 
 class Shapes(list):
     """A class to hold a list of Shape objects. Subclasses list to ensure compatibility with
-    former work and allows to use all the optimazations of the builtin list.
+    former work and to reuse all the optimizations of the builtin list.
     In addition to the list interface, this also provides the GeoJSON __geo_interface__
-    to return a GeometryCollection dictionary. """
+    to return a GeometryCollection dictionary."""
 
     def __repr__(self):
         return 'Shapes: {}'.format(list(self))
@@ -670,9 +671,9 @@ class Shapes(list):
 
 class ShapeRecords(list):
     """A class to hold a list of ShapeRecord objects. Subclasses list to ensure compatibility with
-    former work and allows to use all the optimazations of the builtin list.
+    former work and to reuse all the optimizations of the builtin list.
     In addition to the list interface, this also provides the GeoJSON __geo_interface__
-    to return a FeatureCollection dictionary. """
+    to return a FeatureCollection dictionary."""
 
     def __repr__(self):
         return 'ShapeRecords: {}'.format(list(self))
@@ -1033,7 +1034,7 @@ class Reader(object):
         return shapes
 
     def iterShapes(self):
-        """Serves up shapes in a shapefile as an iterator. Useful
+        """Returns a generator of shapes in a shapefile. Useful
         for handling large shapefiles."""
         shp = self.__getFileObj(self.shp)
         shp.seek(0,2)
@@ -1179,7 +1180,7 @@ class Reader(object):
         return records
 
     def iterRecords(self):
-        """Serves up records in a dbf file as an iterator.
+        """Returns a generator of records in a dbf file.
         Useful for large shapefiles or dbf files."""
         if self.numRecords is None:
             self.__dbfHeader()
