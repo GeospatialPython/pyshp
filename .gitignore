@@ -14,3 +14,7 @@ shapefiles/test/null.dbf
 shapefiles/test/null.shp
 shapefiles/test/null.shx
 __cache__/
+build/
+dist/
+*.egg-info/
+*.pyc
