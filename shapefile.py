@@ -1516,7 +1516,7 @@ class Writer(object):
         record = []
         fieldCount = len(self.fields)
         # Compensate for deletion flag
-        if self.fields[0][0].startswith("Deletion"): fieldCount -= 1
+        if self.fields and self.fields[0][0].startswith("Deletion"): fieldCount -= 1
         if recordList:
             record = [recordList[i] for i in range(fieldCount)]
         elif recordDict:
@@ -1542,7 +1542,7 @@ class Writer(object):
             self.__dbfHeader()
         # begin
         self.recNum += 1
-        if not self.fields[0][0].startswith("Deletion"):
+        if self.fields and not self.fields[0][0].startswith("Deletion"):
             f.write(b' ') # deletion flag
         for (fieldName, fieldType, size, deci), value in zip(self.fields, record):
             fieldType = fieldType.upper()
