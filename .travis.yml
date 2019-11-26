@@ -1,14 +1,17 @@
 language: python
 
 python:
-  - '2.7'
-  - '3.3'
-  - '3.4'
-  - '3.5'
+  - "2.7"
+  - "3.5"
+  - "3.6"
+  - "3.7"
+  - "3.8"
+  - "pypy"
+  - "pypy3"
 
 install:
   - pip install .
-  - pip install -U setuptools>=38.6.0
+  - pip install -U setuptools
 
 script:
   - python shapefile.py
