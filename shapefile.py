@@ -617,7 +617,7 @@ class Reader(object):
 
     @property
     def __geo_interface__(self):
-        fieldnames = [f[0] for f in self.fields]
+        fieldnames = [f[0] for f in self.fields if f[0] != 'DeletionFlag']
         features = []
         for feat in self.iterShapeRecords():
             fdict = {'type': 'Feature',
