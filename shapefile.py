@@ -186,9 +186,6 @@ class Shape(object):
 
     @property
     def __geo_interface__(self):
-        if not self.parts or not self.points:
-            Exception('Invalid shape, cannot create GeoJSON representation. Shape type is "%s" but does not contain any parts and/or points.' % SHAPETYPE_LOOKUP[self.shapeType])
-
         if self.shapeType in [POINT, POINTM, POINTZ]:
             # point
             return {
@@ -203,10 +200,10 @@ class Shape(object):
             }
         elif self.shapeType in [POLYLINE, POLYLINEM, POLYLINEZ]:
             if len(self.parts) == 0:
-                # although geojson spec allows geometry types with 'empty' coordinates,
-                # not all applications are required to handle them.
-                # safest to instead represent this as null-geometry.
-                return None
+                # the shape has no coordinate information, i.e. is 'empty'
+                # the geojson spec does not define a proper null-geometry type
+                # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
+                return {'type':'LineString', 'coordinates':tuple()}
             elif len(self.parts) == 1:
                 # linestring
                 return {
@@ -232,10 +229,10 @@ class Shape(object):
                 }
         elif self.shapeType in [POLYGON, POLYGONM, POLYGONZ]:
             if len(self.parts) == 0:
-                # although geojson spec allows geometry types with 'empty' coordinates,
-                # not all applications are required to handle them.
-                # safest to instead represent this as null-geometry.
-                return None
+                # the shape has no coordinate information, i.e. is 'empty'
+                # the geojson spec does not define a proper null-geometry type
+                # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
+                return {'type':'Polygon', 'coordinates':tuple()}
             elif len(self.parts) == 1:
                 # polygon
                 return {
