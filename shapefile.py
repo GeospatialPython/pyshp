@@ -190,22 +190,31 @@ class Shape(object):
             Exception('Invalid shape, cannot create GeoJSON representation. Shape type is "%s" but does not contain any parts and/or points.' % SHAPETYPE_LOOKUP[self.shapeType])
 
         if self.shapeType in [POINT, POINTM, POINTZ]:
+            # point
             return {
             'type': 'Point',
             'coordinates': tuple(self.points[0])
             }
         elif self.shapeType in [MULTIPOINT, MULTIPOINTM, MULTIPOINTZ]:
+            # multipoint
             return {
             'type': 'MultiPoint',
             'coordinates': tuple([tuple(p) for p in self.points])
             }
         elif self.shapeType in [POLYLINE, POLYLINEM, POLYLINEZ]:
-            if len(self.parts) == 1:
+            if len(self.parts) == 0:
+                # although geojson spec allows geometry types with 'empty' coordinates,
+                # not all applications are required to handle them.
+                # safest to instead represent this as null-geometry.
+                return None
+            elif len(self.parts) == 1:
+                # linestring
                 return {
                 'type': 'LineString',
                 'coordinates': tuple([tuple(p) for p in self.points])
                 }
             else:
+                # multilinestring
                 ps = None
                 coordinates = []
                 for part in self.parts:
@@ -222,12 +231,19 @@ class Shape(object):
                 'coordinates': tuple(coordinates)
                 }
         elif self.shapeType in [POLYGON, POLYGONM, POLYGONZ]:
-            if len(self.parts) == 1:
+            if len(self.parts) == 0:
+                # although geojson spec allows geometry types with 'empty' coordinates,
+                # not all applications are required to handle them.
+                # safest to instead represent this as null-geometry.
+                return None
+            elif len(self.parts) == 1:
+                # polygon
                 return {
                 'type': 'Polygon',
                 'coordinates': (tuple([tuple(p) for p in self.points]),)
                 }
             else:
+                # multipolygon
                 ps = None
                 rings = []
                 for part in self.parts:
