@@ -245,34 +245,40 @@ class Shape(object):
                 # the geojson spec does not define a proper null-geometry type
                 # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
                 return {'type':'Polygon', 'coordinates':tuple()}
-            elif len(self.parts) == 1:
-                # polygon
-                return {
-                'type': 'Polygon',
-                'coordinates': (tuple([tuple(p) for p in self.points]),)
-                }
             else:
-                # multipolygon
-                ps = None
-                rings = []
-                for part in self.parts:
-                    if ps == None:
-                        ps = part
-                        continue
-                    else:
-                        rings.append(tuple([tuple(p) for p in self.points[ps:part]]))
-                        ps = part
-                else:
-                    rings.append(tuple([tuple(p) for p in self.points[part:]]))
+                # shapefile polygon is a sequence of rings
+                # where exterior rings are clockwise, and holes counterclockwise
+                # there is no definition of which holes belong to which exteriors
+                # but it can probably generally be assumed that exteriors precede their holes
+                
+                # iterate rings
                 polys = []
-                poly = [rings[0]]
-                for ring in rings[1:]:
+                poly = []
+                for i in xrange(len(self.parts)):
+                    # get indexes of start and end points of the ring
+                    start = self.parts[i]
+                    try:
+                        end = self.parts[i+1]
+                    except IndexError:
+                        end = len(self.points)
+
+                    # extract the points that make up the ring
+                    ring = tuple([tuple(p) for p in self.points[start:end]])
+
+                    # process the ring as exterior or hole based on orientation
                     if signed_area(ring) < 0:
+                        # ring is new exterior, finish current polygon
                         polys.append(poly)
+                        # use ring as start of next polygon
                         poly = [ring]
                     else:
+                        # ring is a hole, add to current polygon
                         poly.append(ring)
+
+                # add last poly
                 polys.append(poly)
+
+                # return geojson
                 if len(polys) == 1:
                     return {
                     'type': 'Polygon',
