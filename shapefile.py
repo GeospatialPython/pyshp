@@ -188,16 +188,28 @@ class Shape(object):
     def __geo_interface__(self):
         if self.shapeType in [POINT, POINTM, POINTZ]:
             # point
-            return {
-            'type': 'Point',
-            'coordinates': tuple(self.points[0])
-            }
+            if len(self.points) == 0:
+                # the shape has no coordinate information, i.e. is 'empty'
+                # the geojson spec does not define a proper null-geometry type
+                # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
+                return {'type':'Point', 'coordinates':tuple()}
+            else:
+                return {
+                'type': 'Point',
+                'coordinates': tuple(self.points[0])
+                }
         elif self.shapeType in [MULTIPOINT, MULTIPOINTM, MULTIPOINTZ]:
-            # multipoint
-            return {
-            'type': 'MultiPoint',
-            'coordinates': tuple([tuple(p) for p in self.points])
-            }
+            if len(self.points) == 0:
+                # the shape has no coordinate information, i.e. is 'empty'
+                # the geojson spec does not define a proper null-geometry type
+                # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
+                return {'type':'MultiPoint', 'coordinates':tuple()}
+            else:
+                # multipoint
+                return {
+                'type': 'MultiPoint',
+                'coordinates': tuple([tuple(p) for p in self.points])
+                }
         elif self.shapeType in [POLYLINE, POLYLINEM, POLYLINEZ]:
             if len(self.parts) == 0:
                 # the shape has no coordinate information, i.e. is 'empty'
@@ -508,6 +520,8 @@ class Shapes(list):
 
     @property
     def __geo_interface__(self):
+        # Note: currently this will fail if any of the shapes are null-geometries
+        # could be fixed by storing the shapefile shapeType upon init, returning geojson type with empty coords
         return {'type': 'GeometryCollection',
                 'geometries': [shape.__geo_interface__ for shape in self]}
 
