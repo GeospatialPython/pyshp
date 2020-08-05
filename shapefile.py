@@ -495,7 +495,7 @@ class ShapeRecord(object):
     def __geo_interface__(self):
         return {'type': 'Feature',
                 'properties': self.record.as_dict(),
-                'geometry': self.shape.__geo_interface__}
+                'geometry': None if self.shape.shapeType == NULL else self.shape.__geo_interface__}
 
 class Shapes(list):
     """A class to hold a list of Shape objects. Subclasses list to ensure compatibility with
@@ -509,7 +509,7 @@ class Shapes(list):
     @property
     def __geo_interface__(self):
         return {'type': 'GeometryCollection',
-                'geometries': [g.__geo_interface__ for g in self]}
+                'geometries': [shape.__geo_interface__ for shape in self]}
 
 class ShapeRecords(list):
     """A class to hold a list of ShapeRecord objects. Subclasses list to ensure compatibility with
@@ -523,7 +523,7 @@ class ShapeRecords(list):
     @property
     def __geo_interface__(self):
         return {'type': 'FeatureCollection',
-                'features': [f.__geo_interface__ for f in self]}
+                'features': [shaperec.__geo_interface__ for shaperec in self]}
 
 class ShapefileException(Exception):
     """An exception to handle shapefile specific problems."""
@@ -630,16 +630,10 @@ class Reader(object):
 
     @property
     def __geo_interface__(self):
-        fieldnames = [f[0] for f in self.fields]
-        features = []
-        for feat in self.iterShapeRecords():
-            fdict = {'type': 'Feature',
-                     'properties': dict(zip(fieldnames,feat.record)),
-                     'geometry': feat.shape.__geo_interface__}
-            features.append(fdict)
-        return {'type': 'FeatureCollection',
-                'bbox': self.bbox,
-                'features': features}
+        shaperecords = self.shapeRecords()
+        fcollection = shaperecords.__geo_interface__
+        fcollection['bbox'] = self.bbox
+        return fcollection
 
     @property
     def shapeTypeName(self):
@@ -889,7 +883,7 @@ class Reader(object):
         self.shpLength = shp.tell()
         shp.seek(100)
         while shp.tell() < self.shpLength:
-            yield self.__shape()    
+            yield self.__shape()
 
     def __dbfHeader(self):
         """Reads a dbf header. Xbase-related code borrows heavily from ActiveState Python Cookbook Recipe 362715 by Raymond Hettinger"""
@@ -1048,8 +1042,7 @@ class Reader(object):
     def shapeRecords(self):
         """Returns a list of combination geometry/attribute records for
         all records in a shapefile."""
-        return ShapeRecords([ShapeRecord(shape=rec[0], record=rec[1]) \
-                                for rec in zip(self.shapes(), self.records())])
+        return ShapeRecords(self.iterShapeRecords())
 
     def iterShapeRecords(self):
         """Returns a generator of combination geometry/attribute records for
