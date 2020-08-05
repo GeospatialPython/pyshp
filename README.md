@@ -136,7 +136,7 @@ repository of the PyShp GitHub site.
 
 ## Reading Shapefiles
 
-### The Shapefile Class
+### The Reader Class
 
 To read a shapefile create a new "Reader" object and pass it the name of an
 existing shapefile. The shapefile format is actually a collection of three
