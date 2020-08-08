@@ -165,6 +165,85 @@ def signed_area(coords):
     ys.append(ys[1])
     return sum(xs[i]*(ys[i+1]-ys[i-1]) for i in range(1, len(coords)))/2.0
 
+def ring_sample(coords, ccw=False):
+    """Return a sample point guaranteed to be within a ring, by efficiently
+    finding the first centroid of a coordinate triplet whose orientation
+    matches the orientation of the ring. The orientation of the ring is assumed
+    to be clockwise, unless ccw (counter-clockwise) is set to True. 
+    """
+    # TODO: handle duplicate coordinates
+    # TODO: handle coordinates in a straight line that dont form a triangle
+    coords = tuple(coords) + (coords[1],) # add the second coordinate to the end to allow checking the last triplet
+    for i in xrange(len(coords)-3):
+        triplet = coords[i:i+3] + (coords[i],) # add the first point in order to close triplet ring
+        # get triplet orientation
+        triplet_ccw = signed_area(triplet) >= 0
+        if ccw == triplet_ccw:
+            # a triplet with the same orientation as the ring, means the triplet centroid is inside the ring
+            xs,ys = zip(*triplet[:3]) # exclude the repeated closing point
+            xmean,ymean = sum(xs) / 3.0, sum(ys) / 3.0
+            return xmean,ymean
+
+def ring_bbox(coords):
+    """Calculates and returns the bounding box of a ring.
+    """
+    xs,ys = zip(*coords)
+    bbox = min(xs),min(ys),max(xs),max(ys)
+    return bbox
+
+def bbox_overlap(bbox1, bbox2):
+    """Tests whether two bounding boxes overlap, returning a boolean
+    """
+    xmin1,ymin1,xmax1,ymax1 = bbox1
+    xmin2,ymin2,xmax2,ymax2 = bbox2
+    overlap = (xmin1 <= xmax2 and xmax1 >= xmin2 and ymin1 <= ymax2 and ymax1 >= ymin2)
+    return overlap
+
+def ring_contains_point(coords, p):
+    """Fast point-in-polygon crossings algorithm, MacMartin optimization.
+
+    Adapted from code by Eric Haynes
+    http://www.realtimerendering.com/resources/GraphicsGems//gemsiv/ptpoly_haines/ptinpoly.c
+    
+    Original description:
+        Shoot a test ray along +X axis.  The strategy, from MacMartin, is to
+        compare vertex Y values to the testing point's Y and quickly discard
+        edges which are entirely to one side of the test ray.
+    """
+    tx,ty = p
+
+    # get test bit for above/below X axis
+    vtx0 = coords[0]
+    yflag0 = ( vtx0[1] >= ty )
+    vtx1 = coords[1]
+
+    inside_flag = False
+    for j in xrange(len(coords)-2): 
+        yflag1 = ( vtx1[1] >= ty )
+        # check if endpoints straddle (are on opposite sides) of X axis
+        # (i.e. the Y's differ); if so, +X ray could intersect this edge.
+        if yflag0 != yflag1: 
+            xflag0 = ( vtx0[0] >= tx )
+            # check if endpoints are on same side of the Y axis (i.e. X's
+            # are the same); if so, it's easy to test if edge hits or misses.
+            if xflag0 == ( vtx1[0] >= tx ):
+                # if edge's X values both right of the point, must hit
+                if xflag0:
+                    inside_flag = not inside_flag
+            else:
+                # compute intersection of pgon segment with +X ray, note
+                # if >= point's X; if so, the ray hits it.
+                if ( vtx1[0] - (vtx1[1]-ty) * ( vtx0[0]-vtx1[0]) / (vtx0[1]-vtx1[1]) ) >= tx:
+                    inside_flag = not inside_flag
+
+        # move to next pair of vertices, retaining info as possible
+        yflag0 = yflag1
+        vtx0 = vtx1
+        vtx1 = coords[j+2]
+
+    return inside_flag
+    
+
 class Shape(object):
     def __init__(self, shapeType=NULL, points=None, parts=None, partTypes=None):
         """Stores the geometry of the different shape types
@@ -248,12 +327,12 @@ class Shape(object):
             else:
                 # shapefile polygon is a sequence of rings
                 # where exterior rings are clockwise, and holes counterclockwise
-                # there is no definition of which holes belong to which exteriors
-                # but it can probably generally be assumed that exteriors precede their holes
+                # however there is no definition of which holes belong to which exteriors
+                # so have to do efficient checking of hole-to-exterior containment
                 
-                # iterate rings
-                polys = []
-                poly = []
+                # iterate rings and classify as exterior or hole
+                exteriors = []
+                holes = []
                 for i in xrange(len(self.parts)):
                     # get indexes of start and end points of the ring
                     start = self.parts[i]
@@ -267,28 +346,86 @@ class Shape(object):
 
                     # process the ring as exterior or hole based on orientation
                     if signed_area(ring) < 0:
-                        # ring is new exterior, finish current polygon
-                        polys.append(poly)
-                        # use ring as start of next polygon
-                        poly = [ring]
+                        # ring is exterior
+                        exteriors.append(ring)
                     else:
-                        # ring is a hole, add to current polygon
-                        poly.append(ring)
+                        # ring is a hole
+                        holes.append(ring)
 
-                # add last poly
-                polys.append(poly)
-
-                # return geojson
-                if len(polys) == 1:
+                # if only one exterior, then all holes belong to that exterior
+                if len(exteriors) == 1:
+                    # return geojson
+                    poly = [exteriors[0]] + holes
                     return {
                     'type': 'Polygon',
-                    'coordinates': tuple(polys[0])
+                    'coordinates': tuple(poly)
                     }
-                elif len(polys) > 1:
+
+                # multiple exteriors, ie multi-polygon, have to group holes with correct exterior
+                elif len(exteriors) > 1:
+                    # first group rings based on simple bbox overlap test
+                    hole_exteriors = dict([(hole_i,[]) for hole_i in xrange(len(holes))])
+                    exterior_bboxes = [ring_bbox(ring) for ring in exteriors]
+                    for hole_i in hole_exteriors.keys():
+                        hole_bbox = ring_bbox(holes[hole_i])
+                        for ext_i,ext_bbox in enumerate(exterior_bboxes):
+                            if bbox_overlap(hole_bbox, ext_bbox):
+                                hole_exteriors[hole_i].append( ext_i )
+
+                    # then, for holes with more than one possble exterior, do more detailed hole-in-ring test
+                    for hole_i,exterior_candidates in hole_exteriors.items():
+
+                        if not exterior_candidates:
+                            # check that hole isn't orphaned
+                            raise Exception('Shapefile shape has invalid polygon: found orphan hole (not contained by any of the exteriors)')
+                        
+                        if len(exterior_candidates) > 1:
+                            # get sample point from within hole
+                            hole_sample = ring_sample(holes[hole_i], ccw=True)
+                            new_exterior_candidates = []
+                            for ext_i in exterior_candidates:
+                                hole_in_exterior = ring_contains_point(exteriors[ext_i], hole_sample)
+                                if hole_in_exterior:
+                                    new_exterior_candidates.append(ext_i)
+
+                            # check that hole isn't orphaned
+                            if not new_exterior_candidates:
+                                raise Exception('Shapefile shape has invalid polygon: found orphan hole (not contained by any of the exteriors)')
+
+                            # set new exterior candidates
+                            hole_exteriors[hole_i] = new_exterior_candidates
+
+                    # still holes with more than one possble exterior, means we have an exterior hole nested inside another exterior's hole
+                    for hole_i,exterior_candidates in hole_exteriors.items():
+                        if len(exterior_candidates) > 1:
+                            raise NotImplementedError("Shapefile shape has an exterior hole nested inside another exterior's hole - this is not currently supported")
+
+                    # each hole should now only belong to one exterior, group into exterior-holes polygons
+                    polys = []
+                    for ext_i,ext in enumerate(exteriors):
+                        poly = [ext]
+                        # find relevant holes
+                        poly_holes = []
+                        for hole_i,exterior_candidates in hole_exteriors.items():
+                            # validate that hole only has one unambiguous exterior
+                            if len(exterior_candidates) > 1:
+                                raise Exception('Shapefile shape has invalid polygon: hole is contained by more than one possible exterior polygons. Unable to determine parent polygon. ')
+                            # hole is relevant if previously matched with this exterior
+                            if exterior_candidates[0] == ext_i:
+                                poly_holes.append( holes[hole_i] )
+                        poly += poly_holes
+                        polys.append(poly)
+
+                    # return geojson
                     return {
                     'type': 'MultiPolygon',
                     'coordinates': polys
                     }
+
+                # no exteriors, bug? 
+                else:
+                    raise Exception('Shapefile shape has invalid polygon: no exterior rings found (clockwise orientation)')
+
         else:
             raise Exception('Shape type "%s" cannot be represented as GeoJSON.' % SHAPETYPE_LOOKUP[self.shapeType])
 
