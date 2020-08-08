@@ -800,9 +800,9 @@ The direction of your polygons determines how shapefile readers will distinguish
 	>>> w.field('name', 'C')
 
 	>>> w.poly([
-	...	        [[122,37], [117,36], [115,32], [118,20], [113,24]], # poly 1
-	...	        [[15,2], [17,6], [22,7]], # hole 1
-	...         [[122,37], [117,36], [115,32]] # poly 2
+	...	        [[113,24], [112,32], [117,36], [122,37], [118,20]], # poly 1
+	...	        [[116,29],[116,26],[119,29],[119,32]], # hole 1
+	...         [[15,2], [17,6], [22,7]]  # poly 2
 	...        ])
 	>>> w.record('polygon1')
 	
