@@ -13,7 +13,9 @@ shapefiles/test/latin_as_utf8.shx
 shapefiles/test/null.dbf
 shapefiles/test/null.shp
 shapefiles/test/null.shx
-
-*.py[cod]
 __pycache__/
 __cache__/
+build/
+dist/
+*.egg-info/
+*.py[cod]

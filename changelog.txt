@@ -1,4 +1,17 @@
 
+VERSION 2.1.0
+
+2019-02-15
+	New Features:
+	* Added back read/write support for unicode field names. 
+	* Improved Record representation
+	* More support for geojson on Reader, ShapeRecord, ShapeRecords, and shapes()
+
+	Bug fixes:
+	* Fixed error when reading optional m-values
+	* Fixed Record attribute autocomplete in Python 3
+	* Misc readme cleanup
+
 VERSION 2.0.1
 
 2018-11-05

@@ -2,11 +2,11 @@
 shapefile.py
 Provides read and write support for ESRI Shapefiles.
 author: jlawhead<at>geospatialpython.com
-version: 2.0.1
+version: 2.1.0
 Compatible with Python versions 2.7-3.x
 """
 
-__version__ = "2.0.1"
+__version__ = "2.1.0"
 
 from struct import pack, unpack, calcsize, error, Struct
 import os
@@ -151,7 +151,7 @@ else:
 # Begin
 
 class _Array(array.array):
-    """Converts python tuples to lits of the appropritate type.
+    """Converts python tuples to lists of the appropritate type.
     Used to unpack different shapefile header parts."""
     def __repr__(self):
         return str(self.tolist())
@@ -165,13 +165,92 @@ def signed_area(coords):
     ys.append(ys[1])
     return sum(xs[i]*(ys[i+1]-ys[i-1]) for i in range(1, len(coords)))/2.0
 
+def ring_sample(coords, ccw=False):
+    """Return a sample point guaranteed to be within a ring, by efficiently
+    finding the first centroid of a coordinate triplet whose orientation
+    matches the orientation of the ring. The orientation of the ring is assumed
+    to be clockwise, unless ccw (counter-clockwise) is set to True. 
+    """
+    # TODO: handle duplicate coordinates
+    # TODO: handle coordinates in a straight line that dont form a triangle
+    coords = tuple(coords) + (coords[1],) # add the second coordinate to the end to allow checking the last triplet
+    for i in xrange(len(coords)-3):
+        triplet = coords[i:i+3] + (coords[i],) # add the first point in order to close triplet ring
+        # get triplet orientation
+        triplet_ccw = signed_area(triplet) >= 0
+        if ccw == triplet_ccw:
+            # a triplet with the same orientation as the ring, means the triplet centroid is inside the ring
+            xs,ys = zip(*triplet[:3]) # exclude the repeated closing point
+            xmean,ymean = sum(xs) / 3.0, sum(ys) / 3.0
+            return xmean,ymean
+
+def ring_bbox(coords):
+    """Calculates and returns the bounding box of a ring.
+    """
+    xs,ys = zip(*coords)
+    bbox = min(xs),min(ys),max(xs),max(ys)
+    return bbox
+
+def bbox_overlap(bbox1, bbox2):
+    """Tests whether two bounding boxes overlap, returning a boolean
+    """
+    xmin1,ymin1,xmax1,ymax1 = bbox1
+    xmin2,ymin2,xmax2,ymax2 = bbox2
+    overlap = (xmin1 <= xmax2 and xmax1 >= xmin2 and ymin1 <= ymax2 and ymax1 >= ymin2)
+    return overlap
+
+def ring_contains_point(coords, p):
+    """Fast point-in-polygon crossings algorithm, MacMartin optimization.
+
+    Adapted from code by Eric Haynes
+    http://www.realtimerendering.com/resources/GraphicsGems//gemsiv/ptpoly_haines/ptinpoly.c
+    
+    Original description:
+        Shoot a test ray along +X axis.  The strategy, from MacMartin, is to
+        compare vertex Y values to the testing point's Y and quickly discard
+        edges which are entirely to one side of the test ray.
+    """
+    tx,ty = p
+
+    # get test bit for above/below X axis
+    vtx0 = coords[0]
+    yflag0 = ( vtx0[1] >= ty )
+    vtx1 = coords[1]
+
+    inside_flag = False
+    for j in xrange(len(coords)-2): 
+        yflag1 = ( vtx1[1] >= ty )
+        # check if endpoints straddle (are on opposite sides) of X axis
+        # (i.e. the Y's differ); if so, +X ray could intersect this edge.
+        if yflag0 != yflag1: 
+            xflag0 = ( vtx0[0] >= tx )
+            # check if endpoints are on same side of the Y axis (i.e. X's
+            # are the same); if so, it's easy to test if edge hits or misses.
+            if xflag0 == ( vtx1[0] >= tx ):
+                # if edge's X values both right of the point, must hit
+                if xflag0:
+                    inside_flag = not inside_flag
+            else:
+                # compute intersection of pgon segment with +X ray, note
+                # if >= point's X; if so, the ray hits it.
+                if ( vtx1[0] - (vtx1[1]-ty) * ( vtx0[0]-vtx1[0]) / (vtx0[1]-vtx1[1]) ) >= tx:
+                    inside_flag = not inside_flag
+
+        # move to next pair of vertices, retaining info as possible
+        yflag0 = yflag1
+        vtx0 = vtx1
+        vtx1 = coords[j+2]
+
+    return inside_flag
+    
+
 class Shape(object):
     def __init__(self, shapeType=NULL, points=None, parts=None, partTypes=None):
         """Stores the geometry of the different shape types
         specified in the Shapefile spec. Shape types are
         usually point, polyline, or polygons. Every shape type
         except the "Null" type contains points at some level for
-        example verticies in a polygon. If a shape type has
+        example vertices in a polygon. If a shape type has
         multiple shapes containing points within a single
         geometry record then those shapes are called parts. Parts
         are designated by their starting index in geometry record's
@@ -186,26 +265,44 @@ class Shape(object):
 
     @property
     def __geo_interface__(self):
-        if not self.parts or not self.points:
-            Exception('Invalid shape, cannot create GeoJSON representation. Shape type is "%s" but does not contain any parts and/or points.' % SHAPETYPE_LOOKUP[self.shapeType])
-
         if self.shapeType in [POINT, POINTM, POINTZ]:
-            return {
-            'type': 'Point',
-            'coordinates': tuple(self.points[0])
-            }
+            # point
+            if len(self.points) == 0:
+                # the shape has no coordinate information, i.e. is 'empty'
+                # the geojson spec does not define a proper null-geometry type
+                # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
+                return {'type':'Point', 'coordinates':tuple()}
+            else:
+                return {
+                'type': 'Point',
+                'coordinates': tuple(self.points[0])
+                }
         elif self.shapeType in [MULTIPOINT, MULTIPOINTM, MULTIPOINTZ]:
-            return {
-            'type': 'MultiPoint',
-            'coordinates': tuple([tuple(p) for p in self.points])
-            }
+            if len(self.points) == 0:
+                # the shape has no coordinate information, i.e. is 'empty'
+                # the geojson spec does not define a proper null-geometry type
+                # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
+                return {'type':'MultiPoint', 'coordinates':tuple()}
+            else:
+                # multipoint
+                return {
+                'type': 'MultiPoint',
+                'coordinates': tuple([tuple(p) for p in self.points])
+                }
         elif self.shapeType in [POLYLINE, POLYLINEM, POLYLINEZ]:
-            if len(self.parts) == 1:
+            if len(self.parts) == 0:
+                # the shape has no coordinate information, i.e. is 'empty'
+                # the geojson spec does not define a proper null-geometry type
+                # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
+                return {'type':'LineString', 'coordinates':tuple()}
+            elif len(self.parts) == 1:
+                # linestring
                 return {
                 'type': 'LineString',
                 'coordinates': tuple([tuple(p) for p in self.points])
                 }
             else:
+                # multilinestring
                 ps = None
                 coordinates = []
                 for part in self.parts:
@@ -222,42 +319,113 @@ class Shape(object):
                 'coordinates': tuple(coordinates)
                 }
         elif self.shapeType in [POLYGON, POLYGONM, POLYGONZ]:
-            if len(self.parts) == 1:
-                return {
-                'type': 'Polygon',
-                'coordinates': (tuple([tuple(p) for p in self.points]),)
-                }
+            if len(self.parts) == 0:
+                # the shape has no coordinate information, i.e. is 'empty'
+                # the geojson spec does not define a proper null-geometry type
+                # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
+                return {'type':'Polygon', 'coordinates':tuple()}
             else:
-                ps = None
-                rings = []
-                for part in self.parts:
-                    if ps == None:
-                        ps = part
-                        continue
-                    else:
-                        rings.append(tuple([tuple(p) for p in self.points[ps:part]]))
-                        ps = part
-                else:
-                    rings.append(tuple([tuple(p) for p in self.points[part:]]))
-                polys = []
-                poly = [rings[0]]
-                for ring in rings[1:]:
+                # shapefile polygon is a sequence of rings
+                # where exterior rings are clockwise, and holes counterclockwise
+                # however there is no definition of which holes belong to which exteriors
+                # so have to do efficient checking of hole-to-exterior containment
+                
+                # iterate rings and classify as exterior or hole
+                exteriors = []
+                holes = []
+                for i in xrange(len(self.parts)):
+                    # get indexes of start and end points of the ring
+                    start = self.parts[i]
+                    try:
+                        end = self.parts[i+1]
+                    except IndexError:
+                        end = len(self.points)
+
+                    # extract the points that make up the ring
+                    ring = tuple([tuple(p) for p in self.points[start:end]])
+
+                    # process the ring as exterior or hole based on orientation
                     if signed_area(ring) < 0:
-                        polys.append(poly)
-                        poly = [ring]
+                        # ring is exterior
+                        exteriors.append(ring)
                     else:
-                        poly.append(ring)
-                polys.append(poly)
-                if len(polys) == 1:
+                        # ring is a hole
+                        holes.append(ring)
+
+                # if only one exterior, then all holes belong to that exterior
+                if len(exteriors) == 1:
+                    # return geojson
+                    poly = [exteriors[0]] + holes
                     return {
                     'type': 'Polygon',
-                    'coordinates': tuple(polys[0])
+                    'coordinates': tuple(poly)
                     }
-                elif len(polys) > 1:
+
+                # multiple exteriors, ie multi-polygon, have to group holes with correct exterior
+                elif len(exteriors) > 1:
+                    # first group rings based on simple bbox overlap test
+                    hole_exteriors = dict([(hole_i,[]) for hole_i in xrange(len(holes))])
+                    exterior_bboxes = [ring_bbox(ring) for ring in exteriors]
+                    for hole_i in hole_exteriors.keys():
+                        hole_bbox = ring_bbox(holes[hole_i])
+                        for ext_i,ext_bbox in enumerate(exterior_bboxes):
+                            if bbox_overlap(hole_bbox, ext_bbox):
+                                hole_exteriors[hole_i].append( ext_i )
+
+                    # then, for holes with more than one possible exterior, do more detailed hole-in-ring test
+                    for hole_i,exterior_candidates in hole_exteriors.items():
+
+                        if not exterior_candidates:
+                            # check that hole isn't orphaned
+                            raise Exception('Shapefile shape has invalid polygon: found orphan hole (not contained by any of the exteriors)')
+                        
+                        if len(exterior_candidates) > 1:
+                            # get sample point from within hole
+                            hole_sample = ring_sample(holes[hole_i], ccw=True)
+                            new_exterior_candidates = []
+                            for ext_i in exterior_candidates:
+                                hole_in_exterior = ring_contains_point(exteriors[ext_i], hole_sample)
+                                if hole_in_exterior:
+                                    new_exterior_candidates.append(ext_i)
+
+                            # check that hole isn't orphaned
+                            if not new_exterior_candidates:
+                                raise Exception('Shapefile shape has invalid polygon: found orphan hole (not contained by any of the exteriors)')
+
+                            # set new exterior candidates
+                            hole_exteriors[hole_i] = new_exterior_candidates
+
+                    # still holes with more than one possble exterior, means we have an exterior hole nested inside another exterior's hole
+                    for hole_i,exterior_candidates in hole_exteriors.items():
+                        if len(exterior_candidates) > 1:
+                            raise NotImplementedError("Shapefile shape has an exterior hole nested inside another exterior's hole - this is not currently supported")
+
+                    # each hole should now only belong to one exterior, group into exterior-holes polygons
+                    polys = []
+                    for ext_i,ext in enumerate(exteriors):
+                        poly = [ext]
+                        # find relevant holes
+                        poly_holes = []
+                        for hole_i,exterior_candidates in hole_exteriors.items():
+                            # validate that hole only has one unambiguous exterior
+                            if len(exterior_candidates) > 1:
+                                raise Exception('Shapefile shape has invalid polygon: hole is contained by more than one possible exterior polygons. Unable to determine parent polygon. ')
+                            # hole is relevant if previously matched with this exterior
+                            if exterior_candidates[0] == ext_i:
+                                poly_holes.append( holes[hole_i] )
+                        poly += poly_holes
+                        polys.append(poly)
+
+                    # return geojson
                     return {
                     'type': 'MultiPolygon',
                     'coordinates': polys
                     }
+
+                # no exteriors, bug? 
+                else:
+                    raise Exception('Shapefile shape has invalid polygon: no exterior rings found (clockwise orientation)')
+
         else:
             raise Exception('Shape type "%s" cannot be represented as GeoJSON.' % SHAPETYPE_LOOKUP[self.shapeType])
 
@@ -344,11 +512,11 @@ class Shape(object):
 class _Record(list):
     """
     A class to hold a record. Subclasses list to ensure compatibility with
-    former work and allows to use all the optimazations of the builtin list.
+    former work and to reuse all the optimizations of the builtin list.
     In addition to the list interface, the values of the record
-    can also be retrieved using the fields name. Eg. if the dbf contains
+    can also be retrieved using the field's name. For example if the dbf contains
     a field ID at position 0, the ID can be retrieved with the position, the field name
-    as a key or the field name as an attribute.
+    as a key, or the field name as an attribute.
 
     >>> # Create a Record with one field, normally the record is created by the Reader class
     >>> r = _Record({'ID': 0}, [0])
@@ -375,12 +543,13 @@ class _Record(list):
     def __getattr__(self, item):
         """
         __getattr__ is called if an attribute is used that does
-        not exist in the normal sense. Eg. r=Record(...), r.ID
+        not exist in the normal sense. For example r=Record(...), r.ID
         calls r.__getattr__('ID'), but r.index(5) calls list.index(r, 5)
         :param item: The field name, used as attribute
         :return: Value of the field
-        :raises: Attribute error, if field does not exist
-                and IndexError, if field exists but not values in the Record
+        :raises: AttributeError, if item is not a field of the shapefile
+                and IndexError, if the field exists but the field's 
+                corresponding value in the Record does not exist
         """
         try:
             index = self.__field_positions[item]
@@ -411,7 +580,7 @@ class _Record(list):
         Extends the normal list item access with
         access using a fieldname
 
-        Eg. r['ID'], r[0]
+        For example r['ID'], r[0]
         :param item: Either the position of the value or the name of a field
         :return: the value of the field
         """
@@ -432,7 +601,7 @@ class _Record(list):
         Extends the normal list item access with
         access using a fieldname
 
-        Eg. r['ID']=2, r[0]=2
+        For example r['ID']=2, r[0]=2
         :param key: Either the position of the value or the name of a field
         :param value: the new value of the field
         """
@@ -468,7 +637,7 @@ class _Record(list):
         :return: List of method names and fields
         """
         default = list(dir(type(self))) # default list methods and attributes of this class
-        fnames = list(self.__field_positions.keys()) # plus field names (random order)
+        fnames = list(self.__field_positions.keys()) # plus field names (random order if Python version < 3.6)
         return default + fnames 
         
 class ShapeRecord(object):
@@ -482,27 +651,29 @@ class ShapeRecord(object):
     def __geo_interface__(self):
         return {'type': 'Feature',
                 'properties': self.record.as_dict(),
-                'geometry': self.shape.__geo_interface__}
+                'geometry': None if self.shape.shapeType == NULL else self.shape.__geo_interface__}
 
 class Shapes(list):
     """A class to hold a list of Shape objects. Subclasses list to ensure compatibility with
-    former work and allows to use all the optimazations of the builtin list.
+    former work and to reuse all the optimizations of the builtin list.
     In addition to the list interface, this also provides the GeoJSON __geo_interface__
-    to return a GeometryCollection dictionary. """
+    to return a GeometryCollection dictionary."""
 
     def __repr__(self):
         return 'Shapes: {}'.format(list(self))
 
     @property
     def __geo_interface__(self):
+        # Note: currently this will fail if any of the shapes are null-geometries
+        # could be fixed by storing the shapefile shapeType upon init, returning geojson type with empty coords
         return {'type': 'GeometryCollection',
-                'geometries': [g.__geo_interface__ for g in self]}
+                'geometries': [shape.__geo_interface__ for shape in self]}
 
 class ShapeRecords(list):
     """A class to hold a list of ShapeRecord objects. Subclasses list to ensure compatibility with
-    former work and allows to use all the optimazations of the builtin list.
+    former work and to reuse all the optimizations of the builtin list.
     In addition to the list interface, this also provides the GeoJSON __geo_interface__
-    to return a FeatureCollection dictionary. """
+    to return a FeatureCollection dictionary."""
 
     def __repr__(self):
         return 'ShapeRecords: {}'.format(list(self))
@@ -510,7 +681,7 @@ class ShapeRecords(list):
     @property
     def __geo_interface__(self):
         return {'type': 'FeatureCollection',
-                'features': [f.__geo_interface__ for f in self]}
+                'features': [shaperec.__geo_interface__ for shaperec in self]}
 
 class ShapefileException(Exception):
     """An exception to handle shapefile specific problems."""
@@ -617,16 +788,10 @@ class Reader(object):
 
     @property
     def __geo_interface__(self):
-        fieldnames = [f[0] for f in self.fields]
-        features = []
-        for feat in self.iterShapeRecords():
-            fdict = {'type': 'Feature',
-                     'properties': dict(zip(fieldnames,feat.record)),
-                     'geometry': feat.shape.__geo_interface__}
-            features.append(fdict)
-        return {'type': 'FeatureCollection',
-                'bbox': self.bbox,
-                'features': features}
+        shaperecords = self.shapeRecords()
+        fcollection = shaperecords.__geo_interface__
+        fcollection['bbox'] = self.bbox
+        return fcollection
 
     @property
     def shapeTypeName(self):
@@ -840,7 +1005,7 @@ class Reader(object):
             return self._offsets[i]
 
     def shape(self, i=0):
-        """Returns a shape object for a shape in the the geometry
+        """Returns a shape object for a shape in the geometry
         record file."""
         shp = self.__getFileObj(self.shp)
         i = self.__restrictIndex(i)
@@ -869,14 +1034,14 @@ class Reader(object):
         return shapes
 
     def iterShapes(self):
-        """Serves up shapes in a shapefile as an iterator. Useful
+        """Returns a generator of shapes in a shapefile. Useful
         for handling large shapefiles."""
         shp = self.__getFileObj(self.shp)
         shp.seek(0,2)
         self.shpLength = shp.tell()
         shp.seek(100)
         while shp.tell() < self.shpLength:
-            yield self.__shape()    
+            yield self.__shape()
 
     def __dbfHeader(self):
         """Reads a dbf header. Xbase-related code borrows heavily from ActiveState Python Cookbook Recipe 362715 by Raymond Hettinger"""
@@ -1015,7 +1180,7 @@ class Reader(object):
         return records
 
     def iterRecords(self):
-        """Serves up records in a dbf file as an iterator.
+        """Returns a generator of records in a dbf file.
         Useful for large shapefiles or dbf files."""
         if self.numRecords is None:
             self.__dbfHeader()
@@ -1035,8 +1200,7 @@ class Reader(object):
     def shapeRecords(self):
         """Returns a list of combination geometry/attribute records for
         all records in a shapefile."""
-        return ShapeRecords([ShapeRecord(shape=rec[0], record=rec[1]) \
-                                for rec in zip(self.shapes(), self.records())])
+        return ShapeRecords(self.iterShapeRecords())
 
     def iterShapeRecords(self):
         """Returns a generator of combination geometry/attribute records for
@@ -1076,8 +1240,8 @@ class Writer(object):
         self._bbox = None
         self._zbox = None
         self._mbox = None
-        # Use deletion flags in dbf? Default is false (0).
-        self.deletionFlag = 0
+        # Use deletion flags in dbf? Default is false (0). Note: Currently has no effect, records should NOT contain deletion flags.
+        self.deletionFlag = 0 
         # Encoding
         self.encoding = kwargs.pop('encoding', 'utf-8')
         self.encodingErrors = kwargs.pop('encodingErrors', 'strict')
@@ -1307,22 +1471,23 @@ class Writer(object):
         version = 3
         year, month, day = time.localtime()[:3]
         year -= 1900
-        # Remove deletion flag placeholder from fields
-        for field in self.fields:
-            if field[0].startswith("Deletion"):
-                self.fields.remove(field)
+        # Get all fields, ignoring DeletionFlag if specified
+        fields = [field for field in self.fields if field[0] != 'DeletionFlag']
+        # Ensure has at least one field
+        if not fields:
+            raise ShapefileException("Shapefile dbf file must contain at least one field.")
         numRecs = self.recNum
-        numFields = len(self.fields)
+        numFields = len(fields)
         headerLength = numFields * 32 + 33
         if headerLength >= 65535:
             raise ShapefileException(
                     "Shapefile dbf header length exceeds maximum length.")
-        recordLength = sum([int(field[2]) for field in self.fields]) + 1
+        recordLength = sum([int(field[2]) for field in fields]) + 1
         header = pack('<BBBBLHH20x', version, year, month, day, numRecs,
                 headerLength, recordLength)
         f.write(header)
         # Field descriptors
-        for field in self.fields:
+        for field in fields:
             name, fieldType, size, decimal = field
             name = b(name, self.encoding, self.encodingErrors)
             name = name.replace(b' ', b'_')
@@ -1513,14 +1678,13 @@ class Writer(object):
         if self.autoBalance and self.recNum > self.shpNum:
             self.balance()
             
-        record = []
-        fieldCount = len(self.fields)
-        # Compensate for deletion flag
-        if self.fields[0][0].startswith("Deletion"): fieldCount -= 1
         if recordList:
-            record = [recordList[i] for i in range(fieldCount)]
+            record = list(recordList)
         elif recordDict:
+            record = []
             for field in self.fields:
+                if field[0] == 'DeletionFlag':
+                    continue # ignore deletionflag field in case it was specified
                 if field[0] in recordDict:
                     val = recordDict[field[0]]
                     if val is None:
@@ -1529,7 +1693,7 @@ class Writer(object):
                         record.append(val)
         else:
             # Blank fields for empty record
-            record = ["" for i in range(fieldCount)]
+            record = ["" for field in self.fields if field[0] != 'DeletionFlag']
         self.__dbfRecord(record)
 
     def __dbfRecord(self, record):
@@ -1540,11 +1704,13 @@ class Writer(object):
             # allowing us to write the dbf header
             # cannot change the fields after this point
             self.__dbfHeader()
+        # first byte of the record is deletion flag, always disabled
+        f.write(b' ')
         # begin
         self.recNum += 1
-        if not self.fields[0][0].startswith("Deletion"):
-            f.write(b' ') # deletion flag
-        for (fieldName, fieldType, size, deci), value in zip(self.fields, record):
+        fields = (field for field in self.fields if field[0] != 'DeletionFlag') # ignore deletionflag field in case it was specified
+        for (fieldName, fieldType, size, deci), value in zip(fields, record):
+            # write 
             fieldType = fieldType.upper()
             size = int(size)
             if fieldType in ("N","F"):
@@ -1747,6 +1913,12 @@ class Writer(object):
         polyShape = Shape(shapeType)
         polyShape.parts = []
         polyShape.points = []
+        # Make sure polygon rings (parts) are closed
+        if shapeType in (5,15,25,31):
+            for part in parts:
+                if part[0] != part[-1]:
+                    part.append(part[0])
+        # Add points and part indexes
         for part in parts:
             # set part index position
             polyShape.parts.append(len(polyShape.points))

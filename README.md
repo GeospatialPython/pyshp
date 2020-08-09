@@ -14,16 +14,12 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 
 [Examples](#examples)
 - [Reading Shapefiles](#reading-shapefiles)
-  - [Reading Shapefiles Using the Context Manager](#reading-shapefiles-using-the-context-manager)
-  - [Reading Shapefiles from File-Like Objects](#reading-shapefiles-from-file-like-objects)
-  - [Reading Shapefile Meta-Data](#reading-shapefile-meta-data)
+  - [The Reader Class](#the-reader-class)
   - [Reading Geometry](#reading-geometry)
   - [Reading Records](#reading-records)
   - [Reading Geometry and Records Simultaneously](#reading-geometry-and-records-simultaneously)
 - [Writing Shapefiles](#writing-shapefiles)
-  - [Writing Shapefiles Using the Context Manager](#writing-shapefiles-using-the-context-manager)
-  - [Writing Shapefiles to File-Like Objects](#writing-shapefiles-to-file-like-objects)
-  - [Setting the Shape Type](#setting-the-shape-type)
+  - [The Writer Class](#the-writer-class)
   - [Adding Records](#adding-records)
   - [Adding Geometry](#adding-geometry)
   - [Geometry and Record Balancing](#geometry-and-record-balancing)
@@ -73,6 +69,19 @@ part of your geospatial project.
 
 
 # Version Changes
+
+## 2.1.0
+
+### New Features:
+- Added back read/write support for unicode field names. 
+- Improved Record representation
+- More support for geojson on Reader, ShapeRecord, ShapeRecords, and shapes()
+
+### Bug fixes:
+
+- Fixed error when reading optional m-values
+- Fixed Record attribute autocomplete in Python 3
+- Misc readme cleanup
 
 ## 2.0.0
 
@@ -127,6 +136,8 @@ repository of the PyShp GitHub site.
 
 ## Reading Shapefiles
 
+### The Reader Class
+
 To read a shapefile create a new "Reader" object and pass it the name of an
 existing shapefile. The shapefile format is actually a collection of three
 files. You specify the base filename of the shapefile or the complete filename
@@ -148,7 +159,7 @@ OR
 OR any of the other 5+ formats which are potentially part of a shapefile. The
 library does not care about file extensions.
 
-### Reading Shapefiles Using the Context Manager
+#### Reading Shapefiles Using the Context Manager
 
 The "Reader" class can be used as a context manager, to ensure open file
 objects are properly closed when done reading the data:
@@ -159,7 +170,7 @@ objects are properly closed when done reading the data:
         663 shapes (type 'POLYGON')
         663 records (44 fields)
 
-### Reading Shapefiles from File-Like Objects
+#### Reading Shapefiles from File-Like Objects
 
 You can also load shapefiles from any Python file-like object using keyword
 arguments to specify any of the three files. This feature is very powerful and
@@ -177,7 +188,7 @@ file. This file is optional for reading. If it's available PyShp will use the
 shx file to access shape records a little faster but will do just fine without
 it.
 
-### Reading Shapefile Meta-Data
+#### Reading Shapefile Meta-Data
 
 Shapefiles have a number of attributes for inspecting the file contents.
 A shapefile is a container for a specific type of geometry, and this can be checked using the 
@@ -465,7 +476,7 @@ Let's read the blockgroup key and the population for the 4th blockgroup:
 	['060750601001', 4715]
 
 The results from the shapeRecords() method is a list-like object that can be easily converted
-to GeoJSON through the __geo_interface__:
+to GeoJSON through the _\_geo_interface\_\_:
 
 
 	>>> shapeRecs.__geo_interface__['type']
@@ -477,7 +488,7 @@ To get the 4th shape record from the blockgroups shapefile use the third index:
 
 	>>> shapeRec = sf.shapeRecord(3)
 	
-Each individual shape record also supports the __geo_interface__ to convert it to a GeoJSON:
+Each individual shape record also supports the _\_geo_interface\_\_ to convert it to a GeoJSON:
 
 
 	>>> shapeRec.__geo_interface__['type']
@@ -488,14 +499,11 @@ The blockgroup key and population count:
 
 	>>> shapeRec.record[1:3]
 	['060750601001', 4715]
-
-	>>> points = shapeRec.shape.points[0:2]
-
-	>>> len(points)
-	2
 	
 
 ## Writing Shapefiles
+
+### The Writer Class
 
 PyShp tries to be as flexible as possible when writing shapefiles while
 maintaining some degree of automatic validation to make sure you don't
@@ -516,6 +524,7 @@ the file path and name to save to:
 
 
 	>>> w = shapefile.Writer('shapefiles/test/testfile')
+	>>> w.field('field1', 'C')
 	
 File extensions are optional when reading or writing shapefiles. If you specify
 them PyShp ignores them anyway. When you save files you can specify a base
@@ -524,11 +533,12 @@ one or more file types:
 
 
 	>>> w = shapefile.Writer(dbf='shapefiles/test/onlydbf.dbf')
+	>>> w.field('field1', 'C')
 	
 In that case, any file types not assigned will not
 save and only file types with file names will be saved. 
 
-### Writing Shapefiles Using the Context Manager
+#### Writing Shapefiles Using the Context Manager
 
 The "Writer" class automatically closes the open files and writes the final headers once it is garbage collected.
 In case of a crash and to make the code more readable, it is nevertheless recommended 
@@ -541,10 +551,11 @@ Alternatively, you can also use the "Writer" class as a context manager, to ensu
 objects are properly closed and final headers written once you exit the with-clause:
 
 
-	>>> with shapefile.Writer("shapefiles/test/contextwriter") as shp:
-	...		pass
+	>>> with shapefile.Writer("shapefiles/test/contextwriter") as w:
+	... 	w.field('field1', 'C')
+	... 	pass
 
-### Writing Shapefiles to File-Like Objects
+#### Writing Shapefiles to File-Like Objects
 
 Just as you can read shapefiles from python file-like objects you can also
 write to them:
@@ -564,7 +575,7 @@ write to them:
 	>>> w.close()
 	>>> # To read back the files you could call the "StringIO.getvalue()" method later.
 	
-### Setting the Shape Type
+#### Setting the Shape Type
 
 The shape type defines the type of geometry contained in the shapefile. All of
 the shapes must match the shape type setting.
@@ -578,6 +589,7 @@ To manually set the shape type for a Writer object when creating the Writer:
 
 
 	>>> w = shapefile.Writer('shapefiles/test/shapetype', shapeType=3)
+	>>> w.field('field1', 'C')
 
 	>>> w.shapeType
 	3
@@ -760,8 +772,8 @@ These are specified as a list of xy point coordinates.
 	
 **Adding a LineString shape**
 
-For LineString shapefiles, each line shape consists of multiple lines. Line shapes must be given as a list of lines, 
-even if there is just one line. Also, each line must have at least two points.
+For LineString shapefiles, each shape is given as a list of one or more linear features. 
+Each of the linear features must have at least two points. 
 	
 	
 	>>> w = shapefile.Writer('shapefiles/test/line')
@@ -792,9 +804,9 @@ The direction of your polygons determines how shapefile readers will distinguish
 	>>> w.field('name', 'C')
 
 	>>> w.poly([
-	...	        [[122,37], [117,36], [115,32], [118,20], [113,24]], # poly 1
-	...	        [[15,2], [17,6], [22,7]], # hole 1
-	...         [[122,37], [117,36], [115,32]] # poly 2
+	...	        [[113,24], [112,32], [117,36], [122,37], [118,20]], # poly 1
+	...	        [[116,29],[116,26],[119,29],[119,32]], # hole 1
+	...         [[15,2], [17,6], [22,7]]  # poly 2
 	...        ])
 	>>> w.record('polygon1')
 	
@@ -1025,7 +1037,7 @@ This means that as long as you are able to iterate through a source file without
 to load everything into memory, such as a large CSV table or a large shapefile, you can 
 process and write any number of items, and even merge many different source files into a single 
 large shapefile. If you need to edit or undo any of your writing you would have to read the 
-file back in one record at a time, make your changes, and write it back out. 
+file back in, one record at a time, make your changes, and write it back out. 
 
 ## Unicode and Shapefile Encodings
 
