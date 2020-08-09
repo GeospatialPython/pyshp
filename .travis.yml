@@ -11,10 +11,12 @@ python:
 
 install:
   - pip install .
-  - pip install -U setuptools
+  - pip install -r requirements.test.txt --no-cache-dir
 
 script:
+  - python -m compileall *.py
   - python shapefile.py
+  - python -m pytest
 
 deploy:
   provider: pypi
