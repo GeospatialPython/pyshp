@@ -227,7 +227,7 @@ def test_write_dbf_only(tmpdir):
     """
     filename = tmpdir.join("test.dbf").strpath
     with shapefile.Writer(dbf=filename) as writer:
-        pass
+        writer.field('field1', 'C') # required to create a valid dbf file
 
     # assert test.dbf exists
     assert os.path.exists(filename)
@@ -247,7 +247,7 @@ def test_write_default_shp_shx_dbf(tmpdir):
     """
     filename = tmpdir.join("test").strpath
     with shapefile.Writer(filename) as writer:
-        pass
+        writer.field('field1', 'C') # required to create a valid dbf file
 
     # assert shp, shx, dbf files exist
     assert os.path.exists(filename + ".shp")
@@ -264,7 +264,7 @@ def test_write_shapefile_extension_ignored(tmpdir):
     ext = ".abc"
     filename = tmpdir.join(base + ext).strpath
     with shapefile.Writer(filename) as writer:
-        pass
+        writer.field('field1', 'C') # required to create a valid dbf file
 
     # assert shp, shx, dbf files exist
     basepath = tmpdir.join(base).strpath

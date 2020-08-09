@@ -747,7 +747,7 @@ class Reader(object):
                     self.dbf.seek(0)
                 except (NameError, io.UnsupportedOperation):
                     self.dbf = io.BytesIO(self.dbf.read())
-        if self.shp or self.dbf:        
+        if self.shp or self.dbf:
             self.load()
         else:
             raise ShapefileException("Shapefile Reader requires a shapefile or file-like object.")
@@ -1670,7 +1670,7 @@ class Writer(object):
         """Creates a dbf attribute record. You can submit either a sequence of
         field values or keyword arguments of field names and values. Before
         adding records you must add fields for the record values using the
-        fields() method. If the record values exceed the number of fields the
+        field() method. If the record values exceed the number of fields the
         extra ones won't be added. In the case of using keyword arguments to specify
         field/value pairs only fields matching the already registered fields
         will be added."""
