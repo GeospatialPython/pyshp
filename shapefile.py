@@ -1910,6 +1910,12 @@ class Writer(object):
         polyShape = Shape(shapeType)
         polyShape.parts = []
         polyShape.points = []
+        # Make sure polygon rings (parts) are closed
+        if shapeType in (5,15,25,31):
+            for part in parts:
+                if part[0] != part[-1]:
+                    part.append(part[0])
+        # Add points and part indexes
         for part in parts:
             # set part index position
             polyShape.parts.append(len(polyShape.points))
