@@ -372,7 +372,7 @@ class Shape(object):
                             if bbox_overlap(hole_bbox, ext_bbox):
                                 hole_exteriors[hole_i].append( ext_i )
 
-                    # then, for holes with more than one possble exterior, do more detailed hole-in-ring test
+                    # then, for holes with more than one possible exterior, do more detailed hole-in-ring test
                     for hole_i,exterior_candidates in hole_exteriors.items():
 
                         if not exterior_candidates:
@@ -1239,8 +1239,8 @@ class Writer(object):
         self._bbox = None
         self._zbox = None
         self._mbox = None
-        # Use deletion flags in dbf? Default is false (0).
-        self.deletionFlag = 0
+        # Use deletion flags in dbf? Default is false (0). Note: Currently has no effect, records should NOT contain deletion flags.
+        self.deletionFlag = 0 
         # Encoding
         self.encoding = kwargs.pop('encoding', 'utf-8')
         self.encodingErrors = kwargs.pop('encodingErrors', 'strict')
@@ -1470,22 +1470,23 @@ class Writer(object):
         version = 3
         year, month, day = time.localtime()[:3]
         year -= 1900
-        # Remove deletion flag placeholder from fields
-        for field in self.fields:
-            if field[0].startswith("Deletion"):
-                self.fields.remove(field)
+        # Get all fields, ignoring DeletionFlag if specified
+        fields = [field for field in self.fields if field[0] != 'DeletionFlag']
+        # Ensure has at least one field
+        if not fields:
+            raise ShapefileException("Shapefile dbf file must contain at least one field.")
         numRecs = self.recNum
-        numFields = len(self.fields)
+        numFields = len(fields)
         headerLength = numFields * 32 + 33
         if headerLength >= 65535:
             raise ShapefileException(
                     "Shapefile dbf header length exceeds maximum length.")
-        recordLength = sum([int(field[2]) for field in self.fields]) + 1
+        recordLength = sum([int(field[2]) for field in fields]) + 1
         header = pack('<BBBBLHH20x', version, year, month, day, numRecs,
                 headerLength, recordLength)
         f.write(header)
         # Field descriptors
-        for field in self.fields:
+        for field in fields:
             name, fieldType, size, decimal = field
             name = b(name, self.encoding, self.encodingErrors)
             name = name.replace(b' ', b'_')
@@ -1676,14 +1677,13 @@ class Writer(object):
         if self.autoBalance and self.recNum > self.shpNum:
             self.balance()
             
-        record = []
-        fieldCount = len(self.fields)
-        # Compensate for deletion flag
-        if self.fields[0][0].startswith("Deletion"): fieldCount -= 1
         if recordList:
-            record = [recordList[i] for i in range(fieldCount)]
+            record = list(recordList)
         elif recordDict:
+            record = []
             for field in self.fields:
+                if field[0] == 'DeletionFlag':
+                    continue # ignore deletionflag field in case it was specified
                 if field[0] in recordDict:
                     val = recordDict[field[0]]
                     if val is None:
@@ -1692,7 +1692,7 @@ class Writer(object):
                         record.append(val)
         else:
             # Blank fields for empty record
-            record = ["" for i in range(fieldCount)]
+            record = ["" for field in self.fields if field[0] != 'DeletionFlag']
         self.__dbfRecord(record)
 
     def __dbfRecord(self, record):
@@ -1703,11 +1703,13 @@ class Writer(object):
             # allowing us to write the dbf header
             # cannot change the fields after this point
             self.__dbfHeader()
+        # first byte of the record is deletion flag, always disabled
+        f.write(b' ')
         # begin
         self.recNum += 1
-        if not self.fields[0][0].startswith("Deletion"):
-            f.write(b' ') # deletion flag
-        for (fieldName, fieldType, size, deci), value in zip(self.fields, record):
+        fields = (field for field in self.fields if field[0] != 'DeletionFlag') # ignore deletionflag field in case it was specified
+        for (fieldName, fieldType, size, deci), value in zip(fields, record):
+            # write 
             fieldType = fieldType.upper()
             size = int(size)
             if fieldType in ("N","F"):

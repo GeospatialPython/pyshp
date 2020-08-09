@@ -524,6 +524,7 @@ the file path and name to save to:
 
 
 	>>> w = shapefile.Writer('shapefiles/test/testfile')
+	>>> w.field('field1', 'C')
 	
 File extensions are optional when reading or writing shapefiles. If you specify
 them PyShp ignores them anyway. When you save files you can specify a base
@@ -532,6 +533,7 @@ one or more file types:
 
 
 	>>> w = shapefile.Writer(dbf='shapefiles/test/onlydbf.dbf')
+	>>> w.field('field1', 'C')
 	
 In that case, any file types not assigned will not
 save and only file types with file names will be saved. 
@@ -549,8 +551,9 @@ Alternatively, you can also use the "Writer" class as a context manager, to ensu
 objects are properly closed and final headers written once you exit the with-clause:
 
 
-	>>> with shapefile.Writer("shapefiles/test/contextwriter") as shp:
-	...		pass
+	>>> with shapefile.Writer("shapefiles/test/contextwriter") as w:
+	... 	w.field('field1', 'C')
+	... 	pass
 
 #### Writing Shapefiles to File-Like Objects
 
@@ -586,6 +589,7 @@ To manually set the shape type for a Writer object when creating the Writer:
 
 
 	>>> w = shapefile.Writer('shapefiles/test/shapetype', shapeType=3)
+	>>> w.field('field1', 'C')
 
 	>>> w.shapeType
 	3
