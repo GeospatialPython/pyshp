@@ -1,2 +1,2 @@
 pytest==3.2.5
-setuptools==36.8.0 ; python_version=="3.3"
+setuptools
