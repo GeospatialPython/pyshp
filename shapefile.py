@@ -281,7 +281,7 @@ def organize_polygon_rings(rings):
                 if bbox_overlap(hole_bbox, ext_bbox):
                     hole_exteriors[hole_i].append( ext_i )
 
-        # then, for holes with more than one possible exterior, do more detailed hole-in-ring test
+        # then, for holes with still more than one possible exterior, do more detailed hole-in-ring test
         for hole_i,exterior_candidates in hole_exteriors.items():
             
             if len(exterior_candidates) > 1:
@@ -305,6 +305,15 @@ def organize_polygon_rings(rings):
                 ext_i = sorted(exterior_candidates, key=lambda x: abs(signed_area(exteriors[x])))[0]
                 hole_exteriors[hole_i] = [ext_i]
 
+        # check for holes that are orphaned (not contained by any exterior)
+        orphan_holes = []
+        for hole_i,exterior_candidates in list(hole_exteriors.items()):
+            if not exterior_candidates:
+                warnings.warn('Shapefile shape has invalid polygon: found orphan hole (not contained by any of the exteriors); interpreting as exterior.')
+                orphan_holes.append( hole_i )
+                del hole_exteriors[hole_i]
+                continue
+
         # each hole should now only belong to one exterior, group into exterior-holes polygons
         polys = []
         for ext_i,ext in enumerate(exteriors):
@@ -312,30 +321,26 @@ def organize_polygon_rings(rings):
             # find relevant holes
             poly_holes = []
             for hole_i,exterior_candidates in list(hole_exteriors.items()):
-                # ignore any hole that is orphaned (not contained by an exterior)
-                if not exterior_candidates:
-                    warnings.warn('Shapefile shape has invalid polygon: found orphan hole (not contained by any of the exteriors); ignoring.')
-                    del hole_exteriors[hole_i]
-                    continue
-                # ignore any hole that is ambiguous (more than one possible exteriors)
-                # this shouldn't happen however, since ambiguous exteriors are resolved
-                # in the previous stage as the one with the smallest area.
-                if len(exterior_candidates) > 1:
-                    warnings.warn('Algorithm error: algorithm was unable to resolve hole exterior among multiple possible candidates; ignoring.')
-                    del hole_exteriors[hole_i]
-                    continue
+
                 # hole is relevant if previously matched with this exterior
                 if exterior_candidates[0] == ext_i:
                     poly_holes.append( holes[hole_i] )
             poly += poly_holes
             polys.append(poly)
 
+        # add orphan holes as exteriors
+        for hole_i in orphan_holes:
+            poly = [holes[hole_i]]
+            polys.append(poly)
+
         return polys
 
     # no exteriors, bug? 
     else:
-        raise Exception('Shapefile shape has invalid polygon: no exterior rings found (must have clockwise orientation)')
-    
+        warnings.warn('Shapefile shape has invalid polygon: no exterior rings found (must have clockwise orientation); interpreting holes as exteriors.')
+        exteriors = holes # could potentially reverse their order, but in geojson winding order doesn't matter
+        polys = [[ext] for ext in exteriors]
+        return polys
 
 class Shape(object):
     def __init__(self, shapeType=NULL, points=None, parts=None, partTypes=None):
