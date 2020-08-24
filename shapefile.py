@@ -18,6 +18,8 @@ import warnings
 import io
 from datetime import date
 
+warnings.simplefilter("always")
+
 
 # Constants for shape types
 NULL = 0
@@ -165,25 +167,6 @@ def signed_area(coords):
     ys.append(ys[1])
     return sum(xs[i]*(ys[i+1]-ys[i-1]) for i in range(1, len(coords)))/2.0
 
-def ring_sample(coords, ccw=False):
-    """Return a sample point guaranteed to be within a ring, by efficiently
-    finding the first centroid of a coordinate triplet whose orientation
-    matches the orientation of the ring. The orientation of the ring is assumed
-    to be clockwise, unless ccw (counter-clockwise) is set to True. 
-    """
-    # TODO: handle duplicate coordinates
-    # TODO: handle coordinates in a straight line that dont form a triangle
-    coords = tuple(coords) + (coords[1],) # add the second coordinate to the end to allow checking the last triplet
-    for i in xrange(len(coords)-3):
-        triplet = coords[i:i+3] + (coords[i],) # add the first point in order to close triplet ring
-        # get triplet orientation
-        triplet_ccw = signed_area(triplet) >= 0
-        if ccw == triplet_ccw:
-            # a triplet with the same orientation as the ring, means the triplet centroid is inside the ring
-            xs,ys = zip(*triplet[:3]) # exclude the repeated closing point
-            xmean,ymean = sum(xs) / 3.0, sum(ys) / 3.0
-            return xmean,ymean
-
 def ring_bbox(coords):
     """Calculates and returns the bounding box of a ring.
     """
@@ -212,13 +195,12 @@ def ring_contains_point(coords, p):
     """
     tx,ty = p
 
-    # get test bit for above/below X axis
+    # get initial test bit for above/below X axis
     vtx0 = coords[0]
     yflag0 = ( vtx0[1] >= ty )
-    vtx1 = coords[1]
 
     inside_flag = False
-    for j in xrange(len(coords)-2): 
+    for vtx1 in coords[1:]: 
         yflag1 = ( vtx1[1] >= ty )
         # check if endpoints straddle (are on opposite sides) of X axis
         # (i.e. the Y's differ); if so, +X ray could intersect this edge.
@@ -239,9 +221,120 @@ def ring_contains_point(coords, p):
         # move to next pair of vertices, retaining info as possible
         yflag0 = yflag1
         vtx0 = vtx1
-        vtx1 = coords[j+2]
 
     return inside_flag
+
+def ring_contains_ring(coords1, coords2):
+    '''Returns True if all vertexes in coords2 are fully inside coords1.
+    '''
+    return all((ring_contains_point(coords1, p2) for p2 in coords2))
+
+def organize_polygon_rings(rings):
+    '''Organize a list of coordinate rings into one or more polygons with holes.
+    Returns a list of polygons, where each polygon is composed of a single exterior
+    ring, and one or more interior holes.
+
+    Rings must be closed, and cannot intersect each other (non-self-intersecting polygon).
+    Rings are determined as exteriors if they run in clockwise direction, or interior
+    holes if they run in counter-clockwise direction. This method is used to construct
+    GeoJSON (multi)polygons from the shapefile polygon shape type, which does not
+    explicitly store the structure of the polygons beyond exterior/interior ring orientation. 
+    '''
+    # first iterate rings and classify as exterior or hole
+    exteriors = []
+    holes = []
+    for ring in rings:
+        # shapefile format defines a polygon as a sequence of rings
+        # where exterior rings are clockwise, and holes counterclockwise
+        if signed_area(ring) < 0:
+            # ring is exterior
+            exteriors.append(ring)
+        else:
+            # ring is a hole
+            holes.append(ring)
+                
+    # if only one exterior, then all holes belong to that exterior
+    if len(exteriors) == 1:
+        # exit early
+        poly = [exteriors[0]] + holes
+        polys = [poly]
+        return polys
+
+    # multiple exteriors, ie multi-polygon, have to group holes with correct exterior
+    # shapefile format does not specify which holes belong to which exteriors
+    # so have to do efficient multi-stage checking of hole-to-exterior containment
+    elif len(exteriors) > 1:
+        # exit early if no holes
+        if not holes:
+            polys = []
+            for ext in exteriors:
+                poly = [ext]
+                polys.append(poly)
+            return polys
+        
+        # first determine each hole's candidate exteriors based on simple bbox overlap test
+        hole_exteriors = dict([(hole_i,[]) for hole_i in xrange(len(holes))])
+        exterior_bboxes = [ring_bbox(ring) for ring in exteriors]
+        for hole_i in hole_exteriors.keys():
+            hole_bbox = ring_bbox(holes[hole_i])
+            for ext_i,ext_bbox in enumerate(exterior_bboxes):
+                if bbox_overlap(hole_bbox, ext_bbox):
+                    hole_exteriors[hole_i].append( ext_i )
+
+        # then, for holes with more than one possible exterior, do more detailed hole-in-ring test
+        for hole_i,exterior_candidates in hole_exteriors.items():
+            
+            if len(exterior_candidates) > 1:
+                # get new exterior candidates
+                hole = holes[hole_i]
+                new_exterior_candidates = []
+                for ext_i in exterior_candidates:
+                    ext = exteriors[ext_i]
+                    hole_in_exterior = ring_contains_ring(ext, hole)
+                    if hole_in_exterior:
+                        new_exterior_candidates.append(ext_i)
+
+                # set new exterior candidates
+                hole_exteriors[hole_i] = new_exterior_candidates
+
+        # if still holes with more than one possible exterior, means we have an exterior hole nested inside another exterior's hole
+        for hole_i,exterior_candidates in hole_exteriors.items():
+            
+            if len(exterior_candidates) > 1:
+                # exterior candidate with the smallest area is the hole's most immediate parent
+                ext_i = sorted(exterior_candidates, key=lambda x: abs(signed_area(exteriors[x])))[0]
+                hole_exteriors[hole_i] = [ext_i]
+
+        # each hole should now only belong to one exterior, group into exterior-holes polygons
+        polys = []
+        for ext_i,ext in enumerate(exteriors):
+            poly = [ext]
+            # find relevant holes
+            poly_holes = []
+            for hole_i,exterior_candidates in list(hole_exteriors.items()):
+                # ignore any hole that is orphaned (not contained by an exterior)
+                if not exterior_candidates:
+                    warnings.warn('Shapefile shape has invalid polygon: found orphan hole (not contained by any of the exteriors); ignoring.')
+                    del hole_exteriors[hole_i]
+                    continue
+                # ignore any hole that is ambiguous (more than one possible exteriors)
+                # this shouldn't happen however, since ambiguous exteriors are resolved
+                # in the previous stage as the one with the smallest area.
+                if len(exterior_candidates) > 1:
+                    warnings.warn('Algorithm error: algorithm was unable to resolve hole exterior among multiple possible candidates; ignoring.')
+                    del hole_exteriors[hole_i]
+                    continue
+                # hole is relevant if previously matched with this exterior
+                if exterior_candidates[0] == ext_i:
+                    poly_holes.append( holes[hole_i] )
+            poly += poly_holes
+            polys.append(poly)
+
+        return polys
+
+    # no exteriors, bug? 
+    else:
+        raise Exception('Shapefile shape has invalid polygon: no exterior rings found (must have clockwise orientation)')
     
 
 class Shape(object):
@@ -282,24 +375,24 @@ class Shape(object):
                 # the shape has no coordinate information, i.e. is 'empty'
                 # the geojson spec does not define a proper null-geometry type
                 # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
-                return {'type':'MultiPoint', 'coordinates':tuple()}
+                return {'type':'MultiPoint', 'coordinates':[]}
             else:
                 # multipoint
                 return {
                 'type': 'MultiPoint',
-                'coordinates': tuple([tuple(p) for p in self.points])
+                'coordinates': [tuple(p) for p in self.points]
                 }
         elif self.shapeType in [POLYLINE, POLYLINEM, POLYLINEZ]:
             if len(self.parts) == 0:
                 # the shape has no coordinate information, i.e. is 'empty'
                 # the geojson spec does not define a proper null-geometry type
                 # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
-                return {'type':'LineString', 'coordinates':tuple()}
+                return {'type':'LineString', 'coordinates':[]}
             elif len(self.parts) == 1:
                 # linestring
                 return {
                 'type': 'LineString',
-                'coordinates': tuple([tuple(p) for p in self.points])
+                'coordinates': [tuple(p) for p in self.points]
                 }
             else:
                 # multilinestring
@@ -310,29 +403,23 @@ class Shape(object):
                         ps = part
                         continue
                     else:
-                        coordinates.append(tuple([tuple(p) for p in self.points[ps:part]]))
+                        coordinates.append([tuple(p) for p in self.points[ps:part]])
                         ps = part
                 else:
-                    coordinates.append(tuple([tuple(p) for p in self.points[part:]]))
+                    coordinates.append([tuple(p) for p in self.points[part:]])
                 return {
                 'type': 'MultiLineString',
-                'coordinates': tuple(coordinates)
+                'coordinates': coordinates
                 }
         elif self.shapeType in [POLYGON, POLYGONM, POLYGONZ]:
             if len(self.parts) == 0:
                 # the shape has no coordinate information, i.e. is 'empty'
                 # the geojson spec does not define a proper null-geometry type
                 # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
-                return {'type':'Polygon', 'coordinates':tuple()}
+                return {'type':'Polygon', 'coordinates':[]}
             else:
-                # shapefile polygon is a sequence of rings
-                # where exterior rings are clockwise, and holes counterclockwise
-                # however there is no definition of which holes belong to which exteriors
-                # so have to do efficient checking of hole-to-exterior containment
-                
-                # iterate rings and classify as exterior or hole
-                exteriors = []
-                holes = []
+                # get all polygon rings
+                rings = []
                 for i in xrange(len(self.parts)):
                     # get indexes of start and end points of the ring
                     start = self.parts[i]
@@ -342,89 +429,24 @@ class Shape(object):
                         end = len(self.points)
 
                     # extract the points that make up the ring
-                    ring = tuple([tuple(p) for p in self.points[start:end]])
+                    ring = [tuple(p) for p in self.points[start:end]]
+                    rings.append(ring)
 
-                    # process the ring as exterior or hole based on orientation
-                    if signed_area(ring) < 0:
-                        # ring is exterior
-                        exteriors.append(ring)
-                    else:
-                        # ring is a hole
-                        holes.append(ring)
+                # organize rings into list of polygons, where each polygon is defined as list of rings.
+                # the first ring is the exterior and any remaining rings are holes (same as GeoJSON). 
+                polys = organize_polygon_rings(rings)
 
-                # if only one exterior, then all holes belong to that exterior
-                if len(exteriors) == 1:
-                    # return geojson
-                    poly = [exteriors[0]] + holes
+                # return as geojson
+                if len(polys) == 1:
                     return {
                     'type': 'Polygon',
-                    'coordinates': tuple(poly)
+                    'coordinates': polys[0]
                     }
-
-                # multiple exteriors, ie multi-polygon, have to group holes with correct exterior
-                elif len(exteriors) > 1:
-                    # first group rings based on simple bbox overlap test
-                    hole_exteriors = dict([(hole_i,[]) for hole_i in xrange(len(holes))])
-                    exterior_bboxes = [ring_bbox(ring) for ring in exteriors]
-                    for hole_i in hole_exteriors.keys():
-                        hole_bbox = ring_bbox(holes[hole_i])
-                        for ext_i,ext_bbox in enumerate(exterior_bboxes):
-                            if bbox_overlap(hole_bbox, ext_bbox):
-                                hole_exteriors[hole_i].append( ext_i )
-
-                    # then, for holes with more than one possible exterior, do more detailed hole-in-ring test
-                    for hole_i,exterior_candidates in hole_exteriors.items():
-
-                        if not exterior_candidates:
-                            # check that hole isn't orphaned
-                            raise Exception('Shapefile shape has invalid polygon: found orphan hole (not contained by any of the exteriors)')
-                        
-                        if len(exterior_candidates) > 1:
-                            # get sample point from within hole
-                            hole_sample = ring_sample(holes[hole_i], ccw=True)
-                            new_exterior_candidates = []
-                            for ext_i in exterior_candidates:
-                                hole_in_exterior = ring_contains_point(exteriors[ext_i], hole_sample)
-                                if hole_in_exterior:
-                                    new_exterior_candidates.append(ext_i)
-
-                            # check that hole isn't orphaned
-                            if not new_exterior_candidates:
-                                raise Exception('Shapefile shape has invalid polygon: found orphan hole (not contained by any of the exteriors)')
-
-                            # set new exterior candidates
-                            hole_exteriors[hole_i] = new_exterior_candidates
-
-                    # still holes with more than one possble exterior, means we have an exterior hole nested inside another exterior's hole
-                    for hole_i,exterior_candidates in hole_exteriors.items():
-                        if len(exterior_candidates) > 1:
-                            raise NotImplementedError("Shapefile shape has an exterior hole nested inside another exterior's hole - this is not currently supported")
-
-                    # each hole should now only belong to one exterior, group into exterior-holes polygons
-                    polys = []
-                    for ext_i,ext in enumerate(exteriors):
-                        poly = [ext]
-                        # find relevant holes
-                        poly_holes = []
-                        for hole_i,exterior_candidates in hole_exteriors.items():
-                            # validate that hole only has one unambiguous exterior
-                            if len(exterior_candidates) > 1:
-                                raise Exception('Shapefile shape has invalid polygon: hole is contained by more than one possible exterior polygons. Unable to determine parent polygon. ')
-                            # hole is relevant if previously matched with this exterior
-                            if exterior_candidates[0] == ext_i:
-                                poly_holes.append( holes[hole_i] )
-                        poly += poly_holes
-                        polys.append(poly)
-
-                    # return geojson
+                else:
                     return {
                     'type': 'MultiPolygon',
                     'coordinates': polys
                     }
-
-                # no exteriors, bug? 
-                else:
-                    raise Exception('Shapefile shape has invalid polygon: no exterior rings found (clockwise orientation)')
 
         else:
             raise Exception('Shape type "%s" cannot be represented as GeoJSON.' % SHAPETYPE_LOOKUP[self.shapeType])
