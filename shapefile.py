@@ -305,7 +305,7 @@ def organize_polygon_rings(rings):
                 ext_i = sorted(exterior_candidates, key=lambda x: abs(signed_area(exteriors[x])))[0]
                 hole_exteriors[hole_i] = [ext_i]
 
-        # check for holes that are orphaned (not contained by any exterior)
+        # separate out holes that are orphaned (not contained by any exterior)
         orphan_holes = []
         for hole_i,exterior_candidates in list(hole_exteriors.items()):
             if not exterior_candidates:
@@ -321,7 +321,6 @@ def organize_polygon_rings(rings):
             # find relevant holes
             poly_holes = []
             for hole_i,exterior_candidates in list(hole_exteriors.items()):
-
                 # hole is relevant if previously matched with this exterior
                 if exterior_candidates[0] == ext_i:
                     poly_holes.append( holes[hole_i] )
@@ -330,12 +329,13 @@ def organize_polygon_rings(rings):
 
         # add orphan holes as exteriors
         for hole_i in orphan_holes:
-            poly = [holes[hole_i]]
+            ext = holes[hole_i] # could potentially reverse their order, but in geojson winding order doesn't matter
+            poly = [ext]
             polys.append(poly)
 
         return polys
 
-    # no exteriors, bug? 
+    # no exteriors, be nice and assume due to incorrect winding order
     else:
         warnings.warn('Shapefile shape has invalid polygon: no exterior rings found (must have clockwise orientation); interpreting holes as exteriors.')
         exteriors = holes # could potentially reverse their order, but in geojson winding order doesn't matter
