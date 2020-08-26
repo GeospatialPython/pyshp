@@ -182,6 +182,14 @@ def bbox_overlap(bbox1, bbox2):
     overlap = (xmin1 <= xmax2 and xmax1 >= xmin2 and ymin1 <= ymax2 and ymax1 >= ymin2)
     return overlap
 
+def bbox_contains(bbox1, bbox2):
+    """Tests whether bbox1 fully contains bbox2, returning a boolean
+    """
+    xmin1,ymin1,xmax1,ymax1 = bbox1
+    xmin2,ymin2,xmax2,ymax2 = bbox2
+    contains = (xmin1 < xmin2 and xmax1 > xmax2 and ymin1 < ymin2 and ymax1 > ymax2)
+    return contains
+
 def ring_contains_point(coords, p):
     """Fast point-in-polygon crossings algorithm, MacMartin optimization.
 
@@ -223,6 +231,44 @@ def ring_contains_point(coords, p):
         vtx0 = vtx1
 
     return inside_flag
+
+def ring_sample(coords, ccw=False):
+    """Return a sample point guaranteed to be within a ring, by efficiently
+    finding the first centroid of a coordinate triplet whose orientation
+    matches the orientation of the ring and passes the point-in-ring test.
+    The orientation of the ring is assumed to be clockwise, unless ccw
+    (counter-clockwise) is set to True. 
+    """
+    coords = tuple(coords) + (coords[1],) # add the second coordinate to the end to allow checking the last triplet
+    triplet = []
+    for p in coords:
+        # add point to triplet (but not if duplicate)
+        if p not in triplet:
+            triplet.append(p)
+            
+        # new triplet, try to get sample
+        if len(triplet) == 3:
+            # check that triplet does not form a straight line (not a triangle)
+            is_straight_line = (triplet[0][1] - triplet[1][1]) * (triplet[0][0] - triplet[2][0]) == (triplet[0][1] - triplet[2][1]) * (triplet[0][0] - triplet[1][0])
+            if not is_straight_line:
+                # get triplet orientation
+                closed_triplet = triplet + [triplet[0]]
+                triplet_ccw = signed_area(closed_triplet) >= 0
+                # check that triplet has the same orientation as the ring (means triangle is inside the ring)
+                if ccw == triplet_ccw:
+                    # get triplet centroid
+                    xs,ys = zip(*triplet)
+                    xmean,ymean = sum(xs) / 3.0, sum(ys) / 3.0
+                    # check that triplet centroid is truly inside the ring
+                    if ring_contains_point(coords, (xmean,ymean)):
+                        return xmean,ymean
+
+            # failed to get sample point from this triplet
+            # remove oldest triplet coord to allow iterating to next triplet
+            triplet.pop(0)
+            
+    else:
+        raise Exception('Unexpected error: Unable to find a ring sample point.')
 
 def ring_contains_ring(coords1, coords2):
     '''Returns True if all vertexes in coords2 are fully inside coords1.
@@ -272,25 +318,26 @@ def organize_polygon_rings(rings):
                 polys.append(poly)
             return polys
         
-        # first determine each hole's candidate exteriors based on simple bbox overlap test
+        # first determine each hole's candidate exteriors based on simple bbox contains test
         hole_exteriors = dict([(hole_i,[]) for hole_i in xrange(len(holes))])
         exterior_bboxes = [ring_bbox(ring) for ring in exteriors]
         for hole_i in hole_exteriors.keys():
             hole_bbox = ring_bbox(holes[hole_i])
             for ext_i,ext_bbox in enumerate(exterior_bboxes):
-                if bbox_overlap(hole_bbox, ext_bbox):
+                if bbox_contains(ext_bbox, hole_bbox):
                     hole_exteriors[hole_i].append( ext_i )
 
         # then, for holes with still more than one possible exterior, do more detailed hole-in-ring test
         for hole_i,exterior_candidates in hole_exteriors.items():
             
             if len(exterior_candidates) > 1:
-                # get new exterior candidates
-                hole = holes[hole_i]
+                # get hole sample point
+                hole_sample = ring_sample(holes[hole_i], ccw=True)
+                # collect new exterior candidates
                 new_exterior_candidates = []
                 for ext_i in exterior_candidates:
-                    ext = exteriors[ext_i]
-                    hole_in_exterior = ring_contains_ring(ext, hole)
+                    # check that hole sample point is inside exterior
+                    hole_in_exterior = ring_contains_point(exteriors[ext_i], hole_sample)
                     if hole_in_exterior:
                         new_exterior_candidates.append(ext_i)
 
