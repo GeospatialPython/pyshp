@@ -70,9 +70,27 @@ part of your geospatial project.
 
 # Version Changes
 
+## 2.1.1
+
+### Improvements:
+
+- Handle shapes with no coords and represent as geojson with no coords (GeoJSON null-equivalent)
+- Expand testing to Python 3.6, 3.7, 3.8 and PyPy; drop 3.3 and 3.4 [@mwtoews]
+- Added pytest testing [@jmoujaes]
+
+### Bug fixes:
+
+- Fix incorrect geo interface handling of multipolygons with complex exterior-hole relations [see #202]
+- Enforce shapefile requirement of at least one field, to avoid writing invalid shapefiles [@Jonty]
+- Fix Reader geo interface including DeletionFlag field in feature properties [@nnseva]
+- Fix polygons not being auto closed, which was accidentally dropped
+- Fix error for null geometries in feature geojson
+- Misc docstring cleanup [@fiveham]
+
 ## 2.1.0
 
 ### New Features:
+
 - Added back read/write support for unicode field names. 
 - Improved Record representation
 - More support for geojson on Reader, ShapeRecord, ShapeRecords, and shapes()
