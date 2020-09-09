@@ -1,7 +1,7 @@
 
 VERSION 2.1.1
 
-2020-08-26
+2020-09-09
 	Improvements:
 	* Handle shapes with no coords and represent as geojson with no coords (GeoJSON null-equivalent)
 	* Expand testing to Python 3.6, 3.7, 3.8 and PyPy; drop 3.3 and 3.4 [@mwtoews]

@@ -7,14 +7,14 @@ def read_file(file):
     return data.decode('utf-8')
 
 setup(name='pyshp',
-      version='2.1.0',
+      version='2.1.1',
       description='Pure Python read/write support for ESRI Shapefile format',
       long_description=read_file('README.md'),
       long_description_content_type='text/markdown',
       author='Joel Lawhead',
       author_email='jlawhead@geospatialpython.com',
       url='https://github.com/GeospatialPython/pyshp',
-      download_url='https://github.com/GeospatialPython/pyshp/archive/2.1.0.tar.gz',
+      download_url='https://github.com/GeospatialPython/pyshp/archive/2.1.1.tar.gz',
       py_modules=['shapefile'],
       license='MIT',
       zip_safe=False,

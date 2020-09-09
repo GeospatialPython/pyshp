@@ -1118,10 +1118,12 @@ David A. Riggs
 davidh-ssec
 Evan Heidtmann
 ezcitron
+fiveham
 geospatialpython
 Hannes
 Ignacio Martinez Vazquez
 Jason Moujaes
+Jonty Wareing
 Karim Bahgat
 Kyle Kelley
 Louis Tiao
@@ -1140,5 +1142,6 @@ Ryan Brideau
 Tobias Megies
 Tommi Penttinen
 Uli Köhler
+Vsevolod Novikov
 Zac Miller
 ```
