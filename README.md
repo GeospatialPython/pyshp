@@ -70,6 +70,12 @@ part of your geospatial project.
 
 # Version Changes
 
+## 2.1.2
+
+### Bug fixes:
+
+- Fix issue where `warnings.simplefilter('always')` changes global warning behavior [see #203]
+
 ## 2.1.1
 
 ### Improvements:
