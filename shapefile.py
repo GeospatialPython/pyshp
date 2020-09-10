@@ -18,8 +18,6 @@ import warnings
 import io
 from datetime import date
 
-warnings.simplefilter("always")
-
 
 # Constants for shape types
 NULL = 0
