@@ -1,4 +1,10 @@
 
+VERSION 2.1.2
+
+2020-09-10
+	Bug fixes:
+	* Fix issue where `warnings.simplefilter('always')` changes global warning behavior [see #203]
+
 VERSION 2.1.1
 
 2020-09-09
