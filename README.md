@@ -74,7 +74,7 @@ part of your geospatial project.
 
 ### Bug fixes:
 
-- Fix issue where `warnings.simplefilter('always')` changes global warning behavior [see #203]
+- Fix issue where warnings.simplefilter('always') changes global warning behavior [see #203]
 
 ## 2.1.1
 
