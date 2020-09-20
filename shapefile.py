@@ -1306,15 +1306,9 @@ class Writer(object):
 
                 if shp:
                     self.shp = self.__getFileObj(shp)
-                    self.shp.seek(0)
-                    # Initiate with empty headers, to be finalized upon closing
-                    self.shp.write(b'9'*100)
                     self.shp.seek(0,2)
                 if shx:
                     self.shx = self.__getFileObj(shx)
-                    self.shx.seek(0)
-                    # Initiate with empty headers, to be finalized upon closing
-                    self.shx.write(b'9'*100)
                     self.shx.seek(0,2)
                 if dbf:
                     self.dbf = self.__getFileObj(dbf)
