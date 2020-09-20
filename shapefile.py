@@ -1283,35 +1283,75 @@ class Reader(object):
 
 class Writer(object):
     """Provides write support for ESRI Shapefiles."""
-    def __init__(self, target=None, shapeType=None, autoBalance=False, **kwargs):
+    def __init__(self, target=None, shapeType=None, autoBalance=False, append = False, **kwargs):
         self.target = target
         self.autoBalance = autoBalance
-        self.fields = []
-        self.shapeType = shapeType
-        self.shp = self.shx = self.dbf = None
-        if target:
-            self.shp = self.__getFileObj(os.path.splitext(target)[0] + '.shp')
-            self.shx = self.__getFileObj(os.path.splitext(target)[0] + '.shx')
-            self.dbf = self.__getFileObj(os.path.splitext(target)[0] + '.dbf')
-        elif kwargs.get('shp') or kwargs.get('shx') or kwargs.get('dbf'):
-            shp,shx,dbf = kwargs.get('shp'), kwargs.get('shx'), kwargs.get('dbf')
-            if shp:
-                self.shp = self.__getFileObj(shp)
-            if shx:
-                self.shx = self.__getFileObj(shx)
-            if dbf:
-                self.dbf = self.__getFileObj(dbf)
-        else:
-            raise Exception('Either the target filepath, or any of shp, shx, or dbf must be set to create a shapefile.')
-        # Initiate with empty headers, to be finalized upon closing
-        if self.shp: self.shp.write(b'9'*100) 
-        if self.shx: self.shx.write(b'9'*100) 
-        # Geometry record offsets and lengths for writing shx file.
-        self.recNum = 0
-        self.shpNum = 0
-        self._bbox = None
-        self._zbox = None
-        self._mbox = None
+        self.append = append
+
+        if self.append:
+            try:
+                with Reader(target) as sr:
+                    self.fields = sr.fields
+                    self.shapeType = sr.shapeType
+                    shp = sr.shp.name
+                    shx = sr.shx.name
+                    dbf = sr.dbf.name
+
+                    # Geometry record offsets and lengths for writing shx file.
+                    self.recNum = sr.numRecords
+                    self.shpNum = len(sr.shapes())
+                    self._bbox = sr.bbox
+                    self._zbox = sr.zbox
+                    self._mbox = sr.mbox
+
+                if shp:
+                    self.shp = self.__getFileObj(shp)
+                    self.shp.seek(0)
+                    # Initiate with empty headers, to be finalized upon closing
+                    self.shp.write(b'9'*100)
+                    self.shp.seek(0,2)
+                if shx:
+                    self.shx = self.__getFileObj(shx)
+                    self.shx.seek(0)
+                    # Initiate with empty headers, to be finalized upon closing
+                    self.shx.write(b'9'*100)
+                    self.shx.seek(0,2)
+                if dbf:
+                    self.dbf = self.__getFileObj(dbf)
+                    self.dbf.seek(0,2)
+
+            except:
+                # Failed to load existing shapefile -> Create new one
+                self.append = False
+
+        if not self.append:
+            self.fields = []
+            self.shapeType = shapeType
+            self.shp = self.shx = self.dbf = None
+            if target:
+                self.shp = self.__getFileObj(os.path.splitext(target)[0] + '.shp')
+                self.shx = self.__getFileObj(os.path.splitext(target)[0] + '.shx')
+                self.dbf = self.__getFileObj(os.path.splitext(target)[0] + '.dbf')
+            elif kwargs.get('shp') or kwargs.get('shx') or kwargs.get('dbf'):
+                shp,shx,dbf = kwargs.get('shp'), kwargs.get('shx'), kwargs.get('dbf')
+                if shp:
+                    self.shp = self.__getFileObj(shp)
+                if shx:
+                    self.shx = self.__getFileObj(shx)
+                if dbf:
+                    self.dbf = self.__getFileObj(dbf)
+            else:
+                raise Exception('Either the target filepath, or any of shp, shx, or dbf must be set to create a shapefile.')
+            # Initiate with empty headers, to be finalized upon closing
+            if self.shp: self.shp.write(b'9'*100) 
+            if self.shx: self.shx.write(b'9'*100) 
+            # Geometry record offsets and lengths for writing shx file.
+            self.recNum = 0
+            self.shpNum = 0
+            self._bbox = None
+            self._zbox = None
+            self._mbox = None
+
         # Use deletion flags in dbf? Default is false (0). Note: Currently has no effect, records should NOT contain deletion flags.
         self.deletionFlag = 0 
         # Encoding
@@ -1382,10 +1422,18 @@ class Writer(object):
         elif hasattr(f, "write"):
             return f
         else:
-            pth = os.path.split(f)[0]
-            if pth and not os.path.exists(pth):
-                os.makedirs(pth)
-            return open(f, "wb+")
+            if self.append:
+                #Append mode. Read/write access to exsting file
+                fmode = "rb+"
+            else:
+                pth = os.path.split(f)[0]
+                if pth and not os.path.exists(pth):
+                    os.makedirs(pth)
+
+                #New file/ Overwrite mode
+                fmode = "wb+"
+
+            return open(f, fmode)
 
     def __shpFileLength(self):
         """Calculates the file length of the shp file."""
