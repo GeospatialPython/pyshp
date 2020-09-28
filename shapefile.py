@@ -237,9 +237,15 @@ def ring_sample(coords, ccw=False):
     The orientation of the ring is assumed to be clockwise, unless ccw
     (counter-clockwise) is set to True. 
     """
-    coords = tuple(coords) + (coords[1],) # add the second coordinate to the end to allow checking the last triplet
     triplet = []
-    for p in coords:
+    def itercoords():
+        # iterate full closed ring
+        for p in coords:
+            yield p
+        # finally, yield the second coordinate to the end to allow checking the last triplet
+        yield coords[1]
+        
+    for p in itercoords(): 
         # add point to triplet (but not if duplicate)
         if p not in triplet:
             triplet.append(p)
