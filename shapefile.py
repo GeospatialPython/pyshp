@@ -1305,6 +1305,8 @@ class Writer(object):
         self.shapeType = shapeType
         self.shp = self.shx = self.dbf = None
         if target:
+            if not is_string(target):
+                raise Exception('The target filepath {} must be of type str/unicode, not {}.'.format(repr(target), type(target)) )
             self.shp = self.__getFileObj(os.path.splitext(target)[0] + '.shp')
             self.shx = self.__getFileObj(os.path.splitext(target)[0] + '.shx')
             self.dbf = self.__getFileObj(os.path.splitext(target)[0] + '.dbf')

@@ -211,6 +211,7 @@ def test_expected_shape_geo_interface(typ, points, parts, expected):
     shape = shapefile.Shape(typ, points, parts)
     geoj = shape.__geo_interface__
     assert geoj == expected
+    
 
 def test_reader_context_manager():
     """
