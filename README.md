@@ -962,7 +962,7 @@ Shapefiles containing M-values can be examined in several ways:
 **Shapefiles with elevation (Z) values**
 
 Elevation shape types are shapes that include an elevation value at each vertex, for instance elevation from a GPS device. 
-Shapes with elevation (Z) values are added with the following methods: "pointz", "multipointz", "linez", and "polygonz". 
+Shapes with elevation (Z) values are added with the following methods: "pointz", "multipointz", "linez", and "polyz". 
 The Z-values are specified by adding a third Z value to each XY coordinate. Z-values do not support the concept of missing data,
 but if you omit the third Z-coordinate it will default to 0. Note that Z-type shapes also support measurement (M) values added
 as a fourth M-coordinate. This too is optional. 
