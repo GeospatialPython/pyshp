@@ -478,7 +478,9 @@ def test_write_geojson(tmpdir):
         w.record('text', 123, datetime.date(1898,1,30))
         w.record('text', 123, [1998,1,30])
         w.record('text', 123, '19980130')
+        w.record('text', 123, '-9999999') # faulty date
         w.record(None, None, None)
+        w.null()
         w.null()
         w.null()
         w.null()
