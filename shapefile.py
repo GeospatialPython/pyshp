@@ -1206,14 +1206,18 @@ class Reader(object):
                             value = None
             elif typ == 'D':
                 # date: 8 bytes - date stored as a string in the format YYYYMMDD.
-                if value.count(b'0') == len(value):  # QGIS NULL is all '0' chars
+                if not value.replace(b'\x00', b'').replace(b' ', b'').replace(b'0', b''):
+                    # dbf date field has no official null value
+                    # but can check for all hex null-chars, all spaces, or all 0s (QGIS null)
                     value = None
                 else:
                     try:
+                        # return as python date object
                         y, m, d = int(value[:4]), int(value[4:6]), int(value[6:8])
                         value = date(y, m, d)
                     except:
-                        value = value.strip()
+                        # if invalid date, just return as unicode string so user can decide
+                        value = u(value.strip())
             elif typ == 'L':
                 # logical: 1 byte - initialized to 0x20 (space) otherwise T or F.
                 if value == b" ":
