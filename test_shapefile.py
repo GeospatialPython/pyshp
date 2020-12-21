@@ -6,6 +6,8 @@ import os.path
 
 # third party imports
 import pytest
+import json
+import datetime
 
 # our imports
 import shapefile
@@ -463,3 +465,27 @@ def test_write_shapefile_extension_ignored(tmpdir):
     # assert test.abc does not exist
     assert not os.path.exists(basepath + ext)
 
+
+def test_write_geojson(tmpdir):
+    """
+    Assert that the output of geo interface can be written to json.
+    """
+    filename = tmpdir.join("test").strpath
+    with shapefile.Writer(filename) as w:
+        w.field('TEXT', 'C')
+        w.field('NUMBER', 'N')
+        w.field('DATE', 'D')
+        w.record('text', 123, datetime.date(1898,1,30))
+        w.record('text', 123, [1998,1,30])
+        w.record('text', 123, '19980130')
+        w.record(None, None, None)
+        w.null()
+        w.null()
+        w.null()
+        w.null()
+
+    with shapefile.Reader(filename) as r:
+        for feat in r:
+            assert json.dumps(feat.__geo_interface__)
+        assert json.dumps(r.shapeRecords().__geo_interface__)
+        assert json.dumps(r.__geo_interface__)

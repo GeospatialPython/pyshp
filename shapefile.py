@@ -697,12 +697,17 @@ class _Record(list):
         """The index position of the record in the original shapefile"""
         return self.__oid
 
-    def as_dict(self):
+    def as_dict(self, date_strings=False):
         """
         Returns this Record as a dictionary using the field names as keys
         :return: dict
         """
-        return dict((f, self[i]) for f, i in self.__field_positions.items())
+        dct = dict((f, self[i]) for f, i in self.__field_positions.items())
+        if date_strings:
+            for k,v in dct.items():
+                if isinstance(v, date):
+                    dct[k] = '{:04d}{:02d}{:02d}'.format(v.year, v.month, v.day)
+        return dct
 
     def __repr__(self):
         return 'Record #{}: {}'.format(self.__oid, list(self))
@@ -728,7 +733,7 @@ class ShapeRecord(object):
     @property
     def __geo_interface__(self):
         return {'type': 'Feature',
-                'properties': self.record.as_dict(),
+                'properties': self.record.as_dict(date_strings=True),
                 'geometry': None if self.shape.shapeType == NULL else self.shape.__geo_interface__}
 
 class Shapes(list):
@@ -868,7 +873,7 @@ class Reader(object):
     def __geo_interface__(self):
         shaperecords = self.shapeRecords()
         fcollection = shaperecords.__geo_interface__
-        fcollection['bbox'] = self.bbox
+        fcollection['bbox'] = list(self.bbox)
         return fcollection
 
     @property
