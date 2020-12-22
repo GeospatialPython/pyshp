@@ -1537,6 +1537,9 @@ class Writer(object):
         if self.shapeType in (11,13,15,18):
             # Z values are present in Z type
             zbox = self.zbox()
+            if zbox is None:
+                # means we have empty shapefile/only null geoms (see commentary on bbox above)
+                zbox = [0,0]
         else:
             # As per the ESRI shapefile spec, the zbox for non-Z type shapefiles are set to 0s
             zbox = [0,0]
@@ -1544,6 +1547,9 @@ class Writer(object):
         if self.shapeType in (11,13,15,18,21,23,25,28,31):
             # M values are present in M or Z type
             mbox = self.mbox()
+            if mbox is None:
+                # means we have empty shapefile/only null geoms (see commentary on bbox above)
+                mbox = [0,0]
         else:
             # As per the ESRI shapefile spec, the mbox for non-M type shapefiles are set to 0s
             mbox = [0,0]

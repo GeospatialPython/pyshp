@@ -492,3 +492,17 @@ def test_write_geojson(tmpdir):
             assert json.dumps(feat.__geo_interface__)
         assert json.dumps(r.shapeRecords().__geo_interface__)
         assert json.dumps(r.__geo_interface__)
+
+shape_types = [k for k in shapefile.SHAPETYPE_LOOKUP.keys() if k != 31] # exclude multipatch
+
+@pytest.mark.parametrize("shape_type", shape_types)
+def test_write_empty_shapefile(tmpdir, shape_type):
+    """
+    Assert that can write an empty shapefile
+    """
+    filename = tmpdir.join("test").strpath
+    with shapefile.Writer(filename, shapeType=shape_type) as w:
+        w.field('field1', 'C') # required to create a valid dbf file
+
+    with shapefile.Reader(filename) as r:
+        assert r.shapeType == shape_type
