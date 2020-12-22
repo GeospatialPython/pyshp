@@ -160,7 +160,7 @@ def signed_area(coords):
     """Return the signed area enclosed by a ring using the linear time
     algorithm. A value >= 0 indicates a counter-clockwise oriented ring.
     """
-    xs, ys = map(list, zip(*coords))
+    xs, ys = map(list, list(zip(*coords))[:2]) # ignore any z or m values
     xs.append(xs[1])
     ys.append(ys[1])
     return sum(xs[i]*(ys[i+1]-ys[i-1]) for i in range(1, len(coords)))/2.0
