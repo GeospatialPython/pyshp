@@ -276,6 +276,93 @@ def test_reader_fields():
         assert isinstance(field[3], int)    # decimal length
 
 
+def test_reader_shapefile_extension_ignored():
+    """
+    Assert that the filename's extension is
+    ignored when reading a shapefile.
+    """
+    base = "shapefiles/blockgroups"
+    ext = ".abc"
+    filename = base + ext
+    with shapefile.Reader(filename) as sf:
+        assert len(sf) == 663
+
+    # assert test.abc does not exist
+    assert not os.path.exists(filename)
+
+
+def test_reader_dbf_only():
+    """
+    Assert that specifying just the
+    dbf argument to the shapefile reader
+    reads just the dbf file.
+    """
+    with shapefile.Reader(dbf="shapefiles/blockgroups.dbf") as sf:
+        assert len(sf) == 663
+        record = sf.record(3)
+        assert record[1:3] == ['060750601001', 4715]
+
+
+def test_reader_shp_shx_only():
+    """
+    Assert that specifying just the
+    shp and shx argument to the shapefile reader
+    reads just the shp and shx file.
+    """
+    with shapefile.Reader(shp="shapefiles/blockgroups.shp", shx="shapefiles/blockgroups.shx") as sf:
+        assert len(sf) == 663
+        shape = sf.shape(3)
+        assert len(shape.points) is 173
+
+
+def test_reader_shx_optional():
+    """
+    Assert that specifying just the
+    shp argument to the shapefile reader
+    reads just the shp file (shx optional).
+    """
+    with shapefile.Reader(shp="shapefiles/blockgroups.shp") as sf:
+        assert len(sf) == 663
+        shape = sf.shape(3)
+        assert len(shape.points) is 173
+
+
+def test_reader_filelike_dbf_only():
+    """
+    Assert that specifying just the
+    dbf argument to the shapefile reader
+    reads just the dbf file.
+    """
+    with shapefile.Reader(dbf=open("shapefiles/blockgroups.dbf", "rb")) as sf:
+        assert len(sf) == 663
+        record = sf.record(3)
+        assert record[1:3] == ['060750601001', 4715]
+
+
+def test_reader_filelike_shp_shx_only():
+    """
+    Assert that specifying just the
+    shp and shx argument to the shapefile reader
+    reads just the shp and shx file.
+    """
+    with shapefile.Reader(shp=open("shapefiles/blockgroups.shp", "rb"), shx=open("shapefiles/blockgroups.shx", "rb")) as sf:
+        assert len(sf) == 663
+        shape = sf.shape(3)
+        assert len(shape.points) is 173
+
+
+def test_reader_filelike_shx_optional():
+    """
+    Assert that specifying just the
+    shp argument to the shapefile reader
+    reads just the shp file (shx optional).
+    """
+    with shapefile.Reader(shp=open("shapefiles/blockgroups.shp", "rb")) as sf:
+        assert len(sf) == 663
+        shape = sf.shape(3)
+        assert len(shape.points) is 173
+
+
 def test_records_match_shapes():
     """
     Assert that the number of records matches
@@ -498,7 +585,7 @@ shape_types = [k for k in shapefile.SHAPETYPE_LOOKUP.keys() if k != 31] # exclud
 @pytest.mark.parametrize("shape_type", shape_types)
 def test_write_empty_shapefile(tmpdir, shape_type):
     """
-    Assert that can write an empty shapefile
+    Assert that can write an empty shapefile, for all different shape types. 
     """
     filename = tmpdir.join("test").strpath
     with shapefile.Writer(filename, shapeType=shape_type) as w:

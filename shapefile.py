@@ -796,6 +796,7 @@ class Reader(object):
         self._offsets = []
         self.shpLength = None
         self.numRecords = None
+        self.numShapes = None
         self.fields = []
         self.__dbfHdrLength = 0
         self.__fieldposition_lookup = {}
@@ -862,7 +863,38 @@ class Reader(object):
 
     def __len__(self):
         """Returns the number of shapes/records in the shapefile."""
-        return self.numRecords
+        if self.dbf:
+            # Preferably use dbf record count
+            if self.numRecords is None:
+                self.__dbfHeader()
+                
+            return self.numRecords
+        
+        elif self.shp:
+            # Otherwise use shape count
+            if self.shx:
+                # Use index file to get total count
+                if self.numShapes is None:
+                    # File length (16-bit word * 2 = bytes) - header length
+                    self.shx.seek(24)
+                    shxRecordLength = (unpack(">i", self.shx.read(4))[0] * 2) - 100
+                    self.numShapes = shxRecordLength // 8
+                    
+                return self.numShapes
+            
+            else:
+                # Index file not available, iterate all shapes to get total count
+                if self.numShapes is None:
+                    i = 0
+                    for i,shape in enumerate(self.iterShapes()):
+                        i += 1
+                    self.numShapes = i
+                    
+                return self.numShapes
+            
+        else:
+            # No file loaded yet, treat as 'empty' shapefile
+            return 0 
 
     def __iter__(self):
         """Iterates through the shapes/records in the shapefile."""
@@ -1072,15 +1104,16 @@ class Reader(object):
         if not shx:
             return None
         if not self._offsets:
-            # File length (16-bit word * 2 = bytes) - header length
-            shx.seek(24)
-            shxRecordLength = (unpack(">i", shx.read(4))[0] * 2) - 100
-            numRecords = shxRecordLength // 8
+            if self.numShapes is None:
+                # File length (16-bit word * 2 = bytes) - header length
+                shx.seek(24)
+                shxRecordLength = (unpack(">i", shx.read(4))[0] * 2) - 100
+                self.numShapes = shxRecordLength // 8
             # Jump to the first record.
             shx.seek(100)
             shxRecords = _Array('i')
             # Each offset consists of two nrs, only the first one matters
-            shxRecords.fromfile(shx, 2 * numRecords)
+            shxRecords.fromfile(shx, 2 * self.numShapes)
             if sys.byteorder != 'big':
                  shxRecords.byteswap()
             self._offsets = [2 * el for el in shxRecords[::2]]
