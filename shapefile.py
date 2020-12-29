@@ -802,11 +802,12 @@ class Reader(object):
         self.__fieldposition_lookup = {}
         self.encoding = kwargs.pop('encoding', 'utf-8')
         self.encodingErrors = kwargs.pop('encodingErrors', 'strict')
-        # See if a shapefile name was passed as an argument
+        # See if a shapefile name was passed as the first argument
         if len(args) > 0:
             if is_string(args[0]):
                 self.load(args[0])
                 return
+        # Otherwise, load from separate shp/shx/dbf args (must be file-like)
         if "shp" in kwargs.keys():
             if hasattr(kwargs["shp"], "read"):
                 self.shp = kwargs["shp"]
@@ -815,6 +816,9 @@ class Reader(object):
                     self.shp.seek(0)
                 except (NameError, io.UnsupportedOperation):
                     self.shp = io.BytesIO(self.shp.read())
+            else:
+                raise ShapefileException('The shp arg must be file-like.')
+            
             if "shx" in kwargs.keys():
                 if hasattr(kwargs["shx"], "read"):
                     self.shx = kwargs["shx"]
@@ -823,6 +827,9 @@ class Reader(object):
                         self.shx.seek(0)
                     except (NameError, io.UnsupportedOperation):
                         self.shx = io.BytesIO(self.shx.read())
+                else:
+                    raise ShapefileException('The shx arg must be file-like.')
+                
         if "dbf" in kwargs.keys():
             if hasattr(kwargs["dbf"], "read"):
                 self.dbf = kwargs["dbf"]
@@ -831,10 +838,12 @@ class Reader(object):
                     self.dbf.seek(0)
                 except (NameError, io.UnsupportedOperation):
                     self.dbf = io.BytesIO(self.dbf.read())
+            else:
+                raise ShapefileException('The dbf arg must be file-like.')
+            
+        # Load the files
         if self.shp or self.dbf:
             self.load()
-        else:
-            raise ShapefileException("Shapefile Reader requires a shapefile or file-like object.")
 
     def __str__(self):
         """

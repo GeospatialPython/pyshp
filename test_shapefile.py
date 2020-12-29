@@ -291,42 +291,6 @@ def test_reader_shapefile_extension_ignored():
     assert not os.path.exists(filename)
 
 
-def test_reader_dbf_only():
-    """
-    Assert that specifying just the
-    dbf argument to the shapefile reader
-    reads just the dbf file.
-    """
-    with shapefile.Reader(dbf="shapefiles/blockgroups.dbf") as sf:
-        assert len(sf) == 663
-        record = sf.record(3)
-        assert record[1:3] == ['060750601001', 4715]
-
-
-def test_reader_shp_shx_only():
-    """
-    Assert that specifying just the
-    shp and shx argument to the shapefile reader
-    reads just the shp and shx file.
-    """
-    with shapefile.Reader(shp="shapefiles/blockgroups.shp", shx="shapefiles/blockgroups.shx") as sf:
-        assert len(sf) == 663
-        shape = sf.shape(3)
-        assert len(shape.points) is 173
-
-
-def test_reader_shx_optional():
-    """
-    Assert that specifying just the
-    shp argument to the shapefile reader
-    reads just the shp file (shx optional).
-    """
-    with shapefile.Reader(shp="shapefiles/blockgroups.shp") as sf:
-        assert len(sf) == 663
-        shape = sf.shape(3)
-        assert len(shape.points) is 173
-
-
 def test_reader_filelike_dbf_only():
     """
     Assert that specifying just the
@@ -361,6 +325,20 @@ def test_reader_filelike_shx_optional():
         assert len(sf) == 663
         shape = sf.shape(3)
         assert len(shape.points) is 173
+
+
+def test_reader_shapefile_delayed_load():
+    """
+    Assert that the filename's extension is
+    ignored when reading a shapefile.
+    """
+    with shapefile.Reader() as sf:
+        # assert that data request raises exception, since no file has been provided yet
+        with pytest.raises(shapefile.ShapefileException):
+            sf.shape(0) 
+        # assert that works after loading file manually
+        sf.load("shapefiles/blockgroups")
+        assert len(sf) == 663
 
 
 def test_records_match_shapes():
