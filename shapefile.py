@@ -1628,7 +1628,7 @@ class Writer(object):
             name, fieldType, size, decimal = field
             name = b(name, self.encoding, self.encodingErrors)
             name = name.replace(b' ', b'_')
-            name = name.ljust(11).replace(b' ', b'\x00')
+            name = name[:10].ljust(11).replace(b' ', b'\x00')
             fieldType = b(fieldType, 'ascii')
             size = int(size)
             fld = pack('<11sc4xBB14x', name, fieldType, size, decimal)

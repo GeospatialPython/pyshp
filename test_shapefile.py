@@ -435,6 +435,27 @@ def test_shaperecord_record():
         assert record[1:3] == ['060750601001', 4715]
 
 
+def test_write_field_name_limit(tmpdir):
+    """
+    Abc...
+    """
+    filename = tmpdir.join("test.shp").strpath
+    with shapefile.Writer(filename) as writer:
+        writer.field('a'*5, 'C') # many under length limit
+        writer.field('a'*9, 'C') # 1 under length limit
+        writer.field('a'*10, 'C') # at length limit
+        writer.field('a'*11, 'C') # 1 over length limit
+        writer.field('a'*20, 'C') # many over limit
+
+    with shapefile.Reader(filename) as reader:
+        fields = reader.fields[1:]
+        assert len(fields[0][0]) == 5
+        assert len(fields[1][0]) == 9
+        assert len(fields[2][0]) == 10
+        assert len(fields[3][0]) == 10
+        assert len(fields[4][0]) == 10
+
+
 def test_write_shp_only(tmpdir):
     """
     Assert that specifying just the
