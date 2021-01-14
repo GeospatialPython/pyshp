@@ -229,6 +229,22 @@ def test_reader_context_manager():
     assert sf.shx.closed is True
 
 
+def test_reader_close():
+    """
+    Assert that manually callcin Reader.close()
+    closes the shp, shx, and dbf files
+    on exit.
+    """
+    # note uses an actual shapefile from
+    # the projects "shapefiles" directory
+    with shapefile.Reader("shapefiles/blockgroups") as sf:
+        pass
+
+    assert sf.shp.closed is True
+    assert sf.dbf.closed is True
+    assert sf.shx.closed is True
+
+
 def test_reader_shapefile_type():
     """
     Assert that the type of the shapefile
