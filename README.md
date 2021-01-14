@@ -70,6 +70,22 @@ part of your geospatial project.
 
 # Version Changes
 
+## 2.1.3
+
+### Bug fixes:
+
+- Fix recent bug in geojson hole-in-polygon checking (see #205)
+- Misc fixes to allow geo interface dump to json (eg dates as strings)
+- Handle additional dbf date null values, and return faulty dates as unicode (see #187)
+- Add writer target typecheck
+- Fix bugs to allow reading shp/shx/dbf separately
+- Allow delayed shapefile loading by passing no args
+- Fix error with writing empty z/m shapefile (@mcuprjak)
+- Fix signed_area() so ignores z/m coords
+- Enforce writing the 11th field name character as null-terminator (only first 10 are used)
+- Minor README fixes
+- Added more tests
+
 ## 2.1.2
 
 ### Bug fixes:
@@ -1134,6 +1150,7 @@ Karim Bahgat
 Kyle Kelley
 Louis Tiao
 Marcin Cuprjak
+mcuprjak
 Micah Cochran
 Michael Davis
 Michal Čihař
@@ -1143,6 +1160,7 @@ pakoun
 Paulo Ernesto
 Raynor Vliegendhart
 Razzi Abuissa
+RosBer97
 Ross Rogers
 Ryan Brideau
 Tobias Megies
