@@ -6,6 +6,8 @@ version: 2.1.3
 Compatible with Python versions 2.7-3.x
 """
 
+from __future__ import division
+
 __version__ = "2.1.3"
 
 from struct import pack, unpack, calcsize, error, Struct
@@ -163,7 +165,7 @@ def signed_area(coords):
     xs, ys = map(list, list(zip(*coords))[:2]) # ignore any z or m values
     xs.append(xs[1])
     ys.append(ys[1])
-    return sum(xs[i]*(ys[i+1]-ys[i-1]) for i in range(1, len(coords)))/2.0
+    return sum(xs[i]*(ys[i+1]-ys[i-1]) for i in range(1, len(coords))) / 2
 
 def ring_bbox(coords):
     """Calculates and returns the bounding box of a ring.
@@ -262,7 +264,7 @@ def ring_sample(coords, ccw=False):
                 if ccw == triplet_ccw:
                     # get triplet centroid
                     xs,ys = zip(*triplet)
-                    xmean,ymean = sum(xs) / 3.0, sum(ys) / 3.0
+                    xmean,ymean = sum(xs) / 3, sum(ys) / 3
                     # check that triplet centroid is truly inside the ring
                     if ring_contains_point(coords, (xmean,ymean)):
                         return xmean,ymean
