@@ -1316,7 +1316,7 @@ class Reader(object):
         f = self.__getFileObj(self.dbf)
         f.seek(self.__dbfHdrLength)
         for i in xrange(self.numRecords):
-            r = self.__record()
+            r = self.__record(oid=i)
             if r:
                 yield r
 
