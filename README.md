@@ -144,7 +144,7 @@ Users of the previous version 1.x should therefore take note of the following ch
 - Reading shapefiles is now more convenient:
   - Shapefiles can be opened using the context manager, and files are properly closed. 
   - Shapefiles can be iterated, have a length, and supports the geo interface. 
-  - New ways of inspecing shapefile metadata by printing. [@megies]
+  - New ways of inspecting shapefile metadata by printing. [@megies]
   - More convenient accessing of Record values as attributes. [@philippkraft]
   - More convenient shape type name checking. [@megies] 
 - Add more support and documentation for MultiPatch 3D shapes. 
@@ -390,7 +390,7 @@ where lines and polygons are grouped for you:
 	>>> geoj["type"]
 	'MultiPolygon'
 	
-The results from the shapes() method similiarly supports converting to GeoJSON:
+The results from the shapes() method similarly supports converting to GeoJSON:
 
 
 	>>> shapes.__geo_interface__['type']
