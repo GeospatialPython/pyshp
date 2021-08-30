@@ -894,10 +894,9 @@ class Reader(object):
             else:
                 # Index file not available, iterate all shapes to get total count
                 if self.numShapes is None:
-                    i = 0
                     for i,shape in enumerate(self.iterShapes()):
-                        i += 1
-                    self.numShapes = i
+                        pass
+                    self.numShapes = i + 1
                     
                 return self.numShapes
             
