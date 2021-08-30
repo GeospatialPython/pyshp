@@ -402,8 +402,18 @@ def test_record_oid():
     its index in the shapefile.
     """
     with shapefile.Reader("shapefiles/blockgroups") as sf:
-        record = sf.record(0)
-        assert record.oid is 0
+        for i in range(len(sf)):
+            record = sf.record(i)
+            assert record.oid == i
+
+        for i,record in enumerate(sf.records()):
+            assert record.oid == i
+
+        for i,record in enumerate(sf.iterRecords()):
+            assert record.oid == i
+
+        for i,shaperec in enumerate(sf.iterShapeRecords()):
+            assert shaperec.record.oid == i
 
 
 def test_shaperecords_shaperecord():
