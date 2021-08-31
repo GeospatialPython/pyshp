@@ -404,6 +404,14 @@ The results from the shapes() method similiarly supports converting to GeoJSON:
 
 	>>> shapes.__geo_interface__['type']
 	'GeometryCollection'
+
+Note: In some cases, if the conversion from shapefile geometry to GeoJSON encountered any problems
+or potential issues, a warning message will be displayed with information about the affected
+geometry. To ignore or suppress these warnings, you can disable this behavior by setting the 
+module constant VERBOSE to False: 
+
+
+	>>> shapefile.VERBOSE = False
 	
 
 ### Reading Records
