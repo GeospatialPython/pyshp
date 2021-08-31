@@ -159,14 +159,32 @@ class _Array(array.array):
     def __repr__(self):
         return str(self.tolist())
 
-def signed_area(coords):
+def signed_area(coords, fast=False):
     """Return the signed area enclosed by a ring using the linear time
     algorithm. A value >= 0 indicates a counter-clockwise oriented ring.
+    A faster version is possible by setting 'fast' to True, which returns
+    2x the area, e.g. if you're only interested in the sign of the area.
     """
     xs, ys = map(list, list(zip(*coords))[:2]) # ignore any z or m values
     xs.append(xs[1])
     ys.append(ys[1])
-    return sum(xs[i]*(ys[i+1]-ys[i-1]) for i in range(1, len(coords)))/2.0
+    area2 = sum(xs[i]*(ys[i+1]-ys[i-1]) for i in range(1, len(coords)))
+    if fast:
+        return area2
+    else:
+        return area2 / 2.0
+
+def is_cw(coords):
+    """Returns True if a polygon ring has clockwise orientation, determined
+    by a negatively signed area. 
+    """
+    area2 = signed_area(coords, fast=True)
+    return area2 < 0
+
+def rewind(coords):
+    """Returns the input coords in reversed order.
+    """
+    return list(reversed(coords))
 
 def ring_bbox(coords):
     """Calculates and returns the bounding box of a ring.
@@ -260,7 +278,7 @@ def ring_sample(coords, ccw=False):
             if not is_straight_line:
                 # get triplet orientation
                 closed_triplet = triplet + [triplet[0]]
-                triplet_ccw = signed_area(closed_triplet) >= 0
+                triplet_ccw = not is_cw(closed_triplet)
                 # check that triplet has the same orientation as the ring (means triangle is inside the ring)
                 if ccw == triplet_ccw:
                     # get triplet centroid
@@ -300,11 +318,13 @@ def organize_polygon_rings(rings, return_errors=None):
     for ring in rings:
         # shapefile format defines a polygon as a sequence of rings
         # where exterior rings are clockwise, and holes counterclockwise
-        if signed_area(ring) < 0:
+        if is_cw(ring):
             # ring is exterior
+            ring = rewind(ring) # GeoJSON and Shapefile exteriors have opposite orientation
             exteriors.append(ring)
         else:
             # ring is a hole
+            ring = rewind(ring) # GeoJSON and Shapefile holes have opposite orientation
             holes.append(ring)
                 
     # if only one exterior, then all holes belong to that exterior
@@ -340,7 +360,8 @@ def organize_polygon_rings(rings, return_errors=None):
             
             if len(exterior_candidates) > 1:
                 # get hole sample point
-                hole_sample = ring_sample(holes[hole_i], ccw=True)
+                # Note: all rings now follow GeoJSON orientation, i.e. holes are clockwise
+                hole_sample = ring_sample(holes[hole_i], ccw=False)
                 # collect new exterior candidates
                 new_exterior_candidates = []
                 for ext_i in exterior_candidates:
@@ -357,7 +378,7 @@ def organize_polygon_rings(rings, return_errors=None):
             
             if len(exterior_candidates) > 1:
                 # exterior candidate with the smallest area is the hole's most immediate parent
-                ext_i = sorted(exterior_candidates, key=lambda x: abs(signed_area(exteriors[x])))[0]
+                ext_i = sorted(exterior_candidates, key=lambda x: abs(signed_area(exteriors[x], fast=True)))[0]
                 hole_exteriors[hole_i] = [ext_i]
 
         # separate out holes that are orphaned (not contained by any exterior)
@@ -383,7 +404,10 @@ def organize_polygon_rings(rings, return_errors=None):
 
         # add orphan holes as exteriors
         for hole_i in orphan_holes:
-            ext = holes[hole_i] # could potentially reverse their order, but in geojson winding order doesn't matter
+            ext = holes[hole_i]
+            # since this was previously a clockwise ordered hole, inverse the winding order
+            ext = rewind(ext)
+            # add as single exterior without any holes
             poly = [ext]
             polys.append(poly)
 
@@ -396,7 +420,10 @@ def organize_polygon_rings(rings, return_errors=None):
     else:
         if return_errors is not None:
             return_errors['polygon_only_holes'] = len(holes)
-        exteriors = holes # could potentially reverse their order, but in geojson winding order doesn't matter
+        exteriors = holes
+        # since these were previously clockwise ordered holes, inverse the winding order
+        exteriors = [rewind(ext) for ext in exteriors]
+        # add as single exterior without any holes
         polys = [[ext] for ext in exteriors]
         return polys
 
@@ -577,12 +604,15 @@ still included but were encoded as GeoJSON exterior rings instead of holes.'
             parts = []
             index = 0
             for i,ext_or_hole in enumerate(geoj["coordinates"]):
-                if i == 0 and not signed_area(ext_or_hole) < 0:
+                # although the latest GeoJSON spec states that exterior rings should have 
+                # counter-clockwise orientation, we explicitly check orientation since older 
+                # GeoJSONs might not enforce this. 
+                if i == 0 and not is_cw(ext_or_hole):
                     # flip exterior direction
-                    ext_or_hole = list(reversed(ext_or_hole))
-                elif i > 0 and not signed_area(ext_or_hole) >= 0:
+                    ext_or_hole = rewind(ext_or_hole)
+                elif i > 0 and is_cw(ext_or_hole):
                     # flip hole direction
-                    ext_or_hole = list(reversed(ext_or_hole))
+                    ext_or_hole = rewind(ext_or_hole)
                 points.extend(ext_or_hole)
                 parts.append(index)
                 index += len(ext_or_hole)
@@ -604,12 +634,15 @@ still included but were encoded as GeoJSON exterior rings instead of holes.'
             index = 0
             for polygon in geoj["coordinates"]:
                 for i,ext_or_hole in enumerate(polygon):
-                    if i == 0 and not signed_area(ext_or_hole) < 0:
+                    # although the latest GeoJSON spec states that exterior rings should have 
+                    # counter-clockwise orientation, we explicitly check orientation since older 
+                    # GeoJSONs might not enforce this. 
+                    if i == 0 and not is_cw(ext_or_hole):
                         # flip exterior direction
-                        ext_or_hole = list(reversed(ext_or_hole))
-                    elif i > 0 and not signed_area(ext_or_hole) >= 0:
+                        ext_or_hole = rewind(ext_or_hole)
+                    elif i > 0 and is_cw(ext_or_hole):
                         # flip hole direction
-                        ext_or_hole = list(reversed(ext_or_hole))
+                        ext_or_hole = rewind(ext_or_hole)
                     points.extend(ext_or_hole)
                     parts.append(index)
                     index += len(ext_or_hole)
