@@ -14,10 +14,13 @@ import sys
 import time
 import array
 import tempfile
-import warnings
+import logging
 import io
 from datetime import date
 
+
+# Module settings
+VERBOSE = True
 
 # Constants for shape types
 NULL = 0
@@ -279,10 +282,11 @@ def ring_contains_ring(coords1, coords2):
     '''
     return all((ring_contains_point(coords1, p2) for p2 in coords2))
 
-def organize_polygon_rings(rings):
+def organize_polygon_rings(rings, return_errors=None):
     '''Organize a list of coordinate rings into one or more polygons with holes.
     Returns a list of polygons, where each polygon is composed of a single exterior
-    ring, and one or more interior holes.
+    ring, and one or more interior holes. If a return_errors dict is provided (optional), 
+    any errors encountered will be added to it. 
 
     Rings must be closed, and cannot intersect each other (non-self-intersecting polygon).
     Rings are determined as exteriors if they run in clockwise direction, or interior
@@ -360,7 +364,6 @@ def organize_polygon_rings(rings):
         orphan_holes = []
         for hole_i,exterior_candidates in list(hole_exteriors.items()):
             if not exterior_candidates:
-                warnings.warn('Shapefile shape has invalid polygon: found orphan hole (not contained by any of the exteriors); interpreting as exterior.')
                 orphan_holes.append( hole_i )
                 del hole_exteriors[hole_i]
                 continue
@@ -384,11 +387,15 @@ def organize_polygon_rings(rings):
             poly = [ext]
             polys.append(poly)
 
+        if orphan_holes and return_errors is not None:
+            return_errors['polygon_orphaned_holes'] = len(orphan_holes)
+
         return polys
 
     # no exteriors, be nice and assume due to incorrect winding order
     else:
-        warnings.warn('Shapefile shape has invalid polygon: no exterior rings found (must have clockwise orientation); interpreting holes as exteriors.')
+        if return_errors is not None:
+            return_errors['polygon_only_holes'] = len(holes)
         exteriors = holes # could potentially reverse their order, but in geojson winding order doesn't matter
         polys = [[ext] for ext in exteriors]
         return polys
@@ -411,6 +418,8 @@ class Shape(object):
         self.parts = parts or []
         if partTypes:
             self.partTypes = partTypes
+        # and a dict to silently record any errors encountered
+        self._errors = {}
 
     @property
     def __geo_interface__(self):
@@ -490,7 +499,25 @@ class Shape(object):
 
                 # organize rings into list of polygons, where each polygon is defined as list of rings.
                 # the first ring is the exterior and any remaining rings are holes (same as GeoJSON). 
-                polys = organize_polygon_rings(rings)
+                polys = organize_polygon_rings(rings, self._errors)
+                
+                # if VERBOSE is True, issue detailed warning about any shape errors
+                # encountered during the Shapefile to GeoJSON conversion
+                if VERBOSE and self._errors: 
+                    header = 'Possible issue encountered when converting Shape to GeoJSON: '
+                    orphans = self._errors.get('polygon_orphaned_holes', None)
+                    if orphans:
+                        msg = header + 'GeoJSON format requires that all polygon interior holes be contained by an exterior ring, \
+but the Shape contained interior holes (defined by counter-clockwise orientation in the shapefile format) that were \
+orphaned, i.e. not contained by any exterior rings. The rings were still included but were \
+encoded as GeoJSON exterior rings instead of holes.'
+                        logging.warning(msg)
+                    only_holes = self._errors.get('polygon_only_holes', None)
+                    if only_holes:
+                        msg = header + 'GeoJSON format requires that polygons contain at least one exterior ring, \
+but the Shape was entirely made up of interior holes (defined by counter-clockwise orientation in the shapefile format). The rings were \
+still included but were encoded as GeoJSON exterior rings instead of holes.'
+                        logging.warning(msg)
 
                 # return as geojson
                 if len(polys) == 1:
@@ -749,8 +776,9 @@ class Shapes(list):
     def __geo_interface__(self):
         # Note: currently this will fail if any of the shapes are null-geometries
         # could be fixed by storing the shapefile shapeType upon init, returning geojson type with empty coords
-        return {'type': 'GeometryCollection',
-                'geometries': [shape.__geo_interface__ for shape in self]}
+        collection = {'type': 'GeometryCollection',
+                      'geometries': [shape.__geo_interface__ for shape in self]}
+        return collection
 
 class ShapeRecords(list):
     """A class to hold a list of ShapeRecord objects. Subclasses list to ensure compatibility with
@@ -763,12 +791,49 @@ class ShapeRecords(list):
 
     @property
     def __geo_interface__(self):
-        return {'type': 'FeatureCollection',
-                'features': [shaperec.__geo_interface__ for shaperec in self]}
+        collection =  {'type': 'FeatureCollection',
+                        'features': [shaperec.__geo_interface__ for shaperec in self]}
+        return collection
 
 class ShapefileException(Exception):
     """An exception to handle shapefile specific problems."""
     pass
+
+# def warn_geojson_collection(shapes):
+#     # collect information about any potential errors with the GeoJSON
+#     errors = {}
+#     for i,shape in enumerate(shapes):
+#         shape_errors = shape._errors
+#         if shape_errors:
+#             for error in shape_errors.keys():
+#                 errors[error] = errors[error] + [i] if error in errors else []
+
+#     # warn if any errors were found
+#     if errors:
+#         messages = ['Summary of possibles issues encountered during shapefile to GeoJSON conversion:']
+
+#         # polygon orphan holes
+#         orphans = errors.get('polygon_orphaned_holes', None)
+#         if orphans:
+#             msg = 'GeoJSON format requires that all interior holes be contained by an exterior ring, \
+# but the Shapefile contained {} records of polygons where some of its interior holes were \
+# orphaned (not contained by any other rings). The rings were still included but were \
+# encoded as GeoJSON exterior rings instead of holes. Shape ids: {}'.format(len(orphans), orphans)
+#             messages.append(msg)
+
+#         # polygon only holes/wrong orientation
+#         only_holes = errors.get('polygon_only_holes', None)
+#         if only_holes:
+#             msg = 'GeoJSON format requires that polygons contain at least one exterior ring, but \
+# the Shapefile contained {} records of polygons where all of its component rings were stored as interior \
+# holes. The rings were still included but were encoded as GeoJSON exterior rings instead of holes. \
+# Shape ids: {}'.format(len(only_holes), only_holes)
+#             messages.append(msg)
+
+#         if len(messages) > 1:
+#             # more than just the "Summary of..." header
+#             msg = '\n'.join(messages)
+#             logging.warning(msg)
 
 class Reader(object):
     """Reads the three files of a shapefile as a unit or

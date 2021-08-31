@@ -211,7 +211,35 @@ def test_expected_shape_geo_interface(typ, points, parts, expected):
     shape = shapefile.Shape(typ, points, parts)
     geoj = shape.__geo_interface__
     assert geoj == expected
-    
+
+
+def test_reader_geo_interface():
+    with shapefile.Reader("shapefiles/blockgroups") as r:
+        geoj = r.__geo_interface__
+        assert geoj['type'] == 'FeatureCollection'
+        assert 'bbox' in geoj
+        assert json.dumps(geoj)
+
+
+def test_shapes_geo_interface():
+    with shapefile.Reader("shapefiles/blockgroups") as r:
+        geoj = r.shapes().__geo_interface__
+        assert geoj['type'] == 'GeometryCollection'
+        assert json.dumps(geoj)
+
+
+def test_shaperecords_geo_interface():
+    with shapefile.Reader("shapefiles/blockgroups") as r:
+        geoj = r.shapeRecords().__geo_interface__
+        assert geoj['type'] == 'FeatureCollection'
+        assert json.dumps(geoj)
+
+
+def test_shaperecord_geo_interface():
+    with shapefile.Reader("shapefiles/blockgroups") as r:
+        for shaperec in r:
+            assert json.dumps(shaperec.__geo_interface__)
+
 
 def test_reader_context_manager():
     """
