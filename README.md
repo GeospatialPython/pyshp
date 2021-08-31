@@ -315,6 +315,8 @@ index which is 7.
 
 
 	>>> s = sf.shape(7)
+	>>> s
+	Shape #7: POLYGON
 
 	>>> # Read the bbox of the 8th shape to verify
 	>>> # Round coordinates to 3 decimal places
@@ -329,10 +331,17 @@ shapeType Point do not have a bounding box 'bbox'.
 	...     if not name.startswith('_'):
 	...         name
 	'bbox'
+	'oid'
 	'parts'
 	'points'
 	'shapeType'
 	'shapeTypeName'
+
+  * oid: The shape's index position in the original shapefile.
+
+
+	>>> shapes[3].oid
+	3
 
   * shapeType: an integer representing the type of shape as defined by the
 	  shapefile specification.

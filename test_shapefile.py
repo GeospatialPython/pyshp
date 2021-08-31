@@ -444,6 +444,26 @@ def test_record_oid():
             assert shaperec.record.oid == i
 
 
+def test_shape_oid():
+    """
+    Assert that the shape's oid attribute returns
+    its index in the shapefile.
+    """
+    with shapefile.Reader("shapefiles/blockgroups") as sf:
+        for i in range(len(sf)):
+            shape = sf.shape(i)
+            assert shape.oid == i
+
+        for i,shape in enumerate(sf.shapes()):
+            assert shape.oid == i
+
+        for i,shape in enumerate(sf.iterShapes()):
+            assert shape.oid == i
+
+        for i,shaperec in enumerate(sf.iterShapeRecords()):
+            assert shaperec.shape.oid == i
+
+
 def test_shaperecords_shaperecord():
     """
     Assert that shapeRecords returns a list of

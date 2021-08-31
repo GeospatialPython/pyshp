@@ -401,7 +401,7 @@ def organize_polygon_rings(rings, return_errors=None):
         return polys
 
 class Shape(object):
-    def __init__(self, shapeType=NULL, points=None, parts=None, partTypes=None):
+    def __init__(self, shapeType=NULL, points=None, parts=None, partTypes=None, oid=None):
         """Stores the geometry of the different shape types
         specified in the Shapefile spec. Shape types are
         usually point, polyline, or polygons. Every shape type
@@ -418,8 +418,15 @@ class Shape(object):
         self.parts = parts or []
         if partTypes:
             self.partTypes = partTypes
+        
         # and a dict to silently record any errors encountered
         self._errors = {}
+        
+        # add oid
+        if oid is not None:
+            self.__oid = oid
+        else:
+            self.__oid = -1
 
     @property
     def __geo_interface__(self):
@@ -504,17 +511,17 @@ class Shape(object):
                 # if VERBOSE is True, issue detailed warning about any shape errors
                 # encountered during the Shapefile to GeoJSON conversion
                 if VERBOSE and self._errors: 
-                    header = 'Possible issue encountered when converting Shape to GeoJSON: '
+                    header = 'Possible issue encountered when converting Shape #{} to GeoJSON: '.format(self.oid)
                     orphans = self._errors.get('polygon_orphaned_holes', None)
                     if orphans:
-                        msg = header + 'GeoJSON format requires that all polygon interior holes be contained by an exterior ring, \
+                        msg = header + 'Shapefile format requires that all polygon interior holes be contained by an exterior ring, \
 but the Shape contained interior holes (defined by counter-clockwise orientation in the shapefile format) that were \
 orphaned, i.e. not contained by any exterior rings. The rings were still included but were \
 encoded as GeoJSON exterior rings instead of holes.'
                         logging.warning(msg)
                     only_holes = self._errors.get('polygon_only_holes', None)
                     if only_holes:
-                        msg = header + 'GeoJSON format requires that polygons contain at least one exterior ring, \
+                        msg = header + 'Shapefile format requires that polygons contain at least one exterior ring, \
 but the Shape was entirely made up of interior holes (defined by counter-clockwise orientation in the shapefile format). The rings were \
 still included but were encoded as GeoJSON exterior rings instead of holes.'
                         logging.warning(msg)
@@ -611,8 +618,16 @@ still included but were encoded as GeoJSON exterior rings instead of holes.'
         return shape
 
     @property
+    def oid(self):
+        """The index position of the shape in the original shapefile"""
+        return self.__oid
+
+    @property
     def shapeTypeName(self):
         return SHAPETYPE_LOOKUP[self.shapeType]
+
+    def __repr__(self):
+        return 'Shape #{}: {}'.format(self.__oid, self.shapeTypeName)
 
 class _Record(list):
     """
@@ -1097,10 +1112,10 @@ class Reader(object):
             else:
                 self.mbox.append(None)
 
-    def __shape(self):
+    def __shape(self, oid=None):
         """Returns the header info and geometry for a single shape."""
         f = self.__getFileObj(self.shp)
-        record = Shape()
+        record = Shape(oid=oid)
         nParts = nPoints = zmin = zmax = mmin = mmax = None
         (recNum, recLength) = unpack(">2i", f.read(8))
         # Determine the start of the next record
@@ -1205,7 +1220,7 @@ class Reader(object):
                 if j == i:
                     return k
         shp.seek(offset)
-        return self.__shape()
+        return self.__shape(oid=i)
 
     def shapes(self):
         """Returns all shapes in a shapefile."""
@@ -1219,7 +1234,8 @@ class Reader(object):
         shp.seek(100)
         shapes = Shapes()
         while shp.tell() < self.shpLength:
-            shapes.append(self.__shape())
+            i = len(shapes)
+            shapes.append(self.__shape(oid=i))
         return shapes
 
     def iterShapes(self):
@@ -1229,8 +1245,10 @@ class Reader(object):
         shp.seek(0,2)
         self.shpLength = shp.tell()
         shp.seek(100)
+        i = 0
         while shp.tell() < self.shpLength:
-            yield self.__shape()
+            yield self.__shape(oid=i)
+            i += 1
 
     def __dbfHeader(self):
         """Reads a dbf header. Xbase-related code borrows heavily from ActiveState Python Cookbook Recipe 362715 by Raymond Hettinger"""
