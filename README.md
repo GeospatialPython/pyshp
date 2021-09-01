@@ -337,26 +337,26 @@ shapeType Point do not have a bounding box 'bbox'.
 	'shapeType'
 	'shapeTypeName'
 
-  * oid: The shape's index position in the original shapefile.
+  * `oid`: The shape's index position in the original shapefile.
 
 
-	>>> shapes[3].oid
-	3
+		>>> shapes[3].oid
+		3
 
-  * shapeType: an integer representing the type of shape as defined by the
+  * `shapeType`: an integer representing the type of shape as defined by the
 	  shapefile specification.
 
 
 		>>> shapes[3].shapeType
 		5
 
-  * shapeTypeName: a string representation of the type of shape as defined by shapeType. Read-only. 
+  * `shapeTypeName`: a string representation of the type of shape as defined by shapeType. Read-only. 
 
 
 		>>> shapes[3].shapeTypeName
 		'POLYGON'
 		
-  * bbox: If the shape type contains multiple points this tuple describes the
+  * `bbox`: If the shape type contains multiple points this tuple describes the
 	  lower left (x,y) coordinate and upper right corner coordinate creating a
 	  complete box around the points. If the shapeType is a
 	  Null (shapeType == 0) then an AttributeError is raised.
@@ -368,7 +368,7 @@ shapeType Point do not have a bounding box 'bbox'.
 		>>> ['%.3f' % coord for coord in bbox]
 		['-122.486', '37.787', '-122.446', '37.811']
 
-  * parts: Parts simply group collections of points into shapes. If the shape
+  * `parts`: Parts simply group collections of points into shapes. If the shape
 	  record has multiple parts this attribute contains the index of the first
 	  point of each part. If there is only one part then a list containing 0 is
 	  returned.
@@ -377,7 +377,7 @@ shapeType Point do not have a bounding box 'bbox'.
 		>>> shapes[3].parts
 		[0]
 
-  * points: The points attribute contains a list of tuples containing an
+  * `points`: The points attribute contains a list of tuples containing an
 	  (x,y) coordinate for each point in the shape.
 
 
