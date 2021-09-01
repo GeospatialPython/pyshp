@@ -2,11 +2,11 @@
 shapefile.py
 Provides read and write support for ESRI Shapefiles.
 author: jlawhead<at>geospatialpython.com
-version: 2.1.3
+version: 2.2.1dev
 Compatible with Python versions 2.7-3.x
 """
 
-__version__ = "2.1.3"
+__version__ = "2.2.1dev"
 
 from struct import pack, unpack, calcsize, error, Struct
 import os
@@ -1093,10 +1093,16 @@ class Reader(object):
         self.close()
 
     def close(self):
-        for attribute in (self.shp, self.shx, self.dbf):
-            if hasattr(attribute, 'close'):
+        for attribute in ('shp','shx','dbf'):
+            try:
+                obj = getattr(self, attribute)
+            except AttributeError:
+                # deepcopies fail to copy these attributes and raises exception during
+                # garbage collection - https://github.com/mattijn/topojson/issues/120
+                obj = None
+            if obj and hasattr(obj, 'close'):
                 try:
-                    attribute.close()
+                    obj.close()
                 except IOError:
                     pass
 
