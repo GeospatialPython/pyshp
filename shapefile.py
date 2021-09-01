@@ -154,7 +154,7 @@ else:
 # Begin
 
 class _Array(array.array):
-    """Converts python tuples to lists of the appropritate type.
+    """Converts python tuples to lists of the appropriate type.
     Used to unpack different shapefile header parts."""
     def __repr__(self):
         return str(self.tolist())
@@ -1603,7 +1603,7 @@ class Writer(object):
                 z.append(p[2])
             except IndexError:
                 # point did not have z value
-                # setting it to 0 is probably ok, since it means all are on the same elavation
+                # setting it to 0 is probably ok, since it means all are on the same elevation
                 z.append(0)
         zbox = [min(z), max(z)]
         # update global
@@ -2141,7 +2141,7 @@ class Writer(object):
         PartTypes is a list of types that define each of the surface patches.
         The types can be any of the following module constants: TRIANGLE_STRIP,
         TRIANGLE_FAN, OUTER_RING, INNER_RING, FIRST_RING, or RING.
-        If the z (elavation) value is not included, it defaults to 0.
+        If the z (elevation) value is not included, it defaults to 0.
         If the m (measure) value is not included, it defaults to None (NoData)."""
         shapeType = MULTIPATCH
         polyShape = Shape(shapeType)
