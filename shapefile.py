@@ -912,7 +912,7 @@ class Reader(object):
         self.numShapes = None
         self.fields = []
         self.__dbfHdrLength = 0
-        self.__fieldposition_lookup = {}
+        self.__fieldLookup = {}
         self.encoding = kwargs.pop('encoding', 'utf-8')
         self.encodingErrors = kwargs.pop('encodingErrors', 'strict')
         # See if a shapefile name was passed as the first argument
@@ -1315,38 +1315,104 @@ class Reader(object):
         terminator = dbf.read(1)
         if terminator != b"\r":
             raise ShapefileException("Shapefile dbf header lacks expected terminator. (likely corrupt?)")
+        
+        # insert deletion field at start
         self.fields.insert(0, ('DeletionFlag', 'C', 1, 0))
-        fmt,fmtSize = self.__recordFmt()
-        self.__recStruct = Struct(fmt)
 
-        # Store the field positions
-        self.__fieldposition_lookup = dict((f[0], i) for i, f in enumerate(self.fields[1:]))
+        # store all field positions for easy lookups
+        # note: fieldLookup gives the index position of a field inside Reader.fields
+        self.__fieldLookup = dict((f[0], i) for i, f in enumerate(self.fields))
 
-    def __recordFmt(self):
-        """Calculates the format and size of a .dbf record."""
+        # by default, read all fields except the deletion flag, hence "[1:]"
+        # note: recLookup gives the index position of a field inside a _Record list
+        fieldnames = [f[0] for f in self.fields[1:]]
+        fieldTuples,recLookup,recStruct = self.__recordFields(fieldnames)
+        self.__fullRecStruct = recStruct
+        self.__fullRecLookup = recLookup
+
+    def __recordFmt(self, fields=None):
+        """Calculates the format and size of a .dbf record. Optional 'fields' arg 
+        specifies which fieldnames to unpack and which to ignore. Note that this
+        always includes the DeletionFlag at index 0, regardless of the 'fields' arg. 
+        """
         if self.numRecords is None:
             self.__dbfHeader()
-        fmt = ''.join(['%ds' % fieldinfo[2] for fieldinfo in self.fields])
+        structcodes = ['%ds' % fieldinfo[2]
+                        for fieldinfo in self.fields]
+        if fields is not None:
+            # only unpack specified fields, ignore others using padbytes (x)
+            structcodes = [code if fieldinfo[0] in fields 
+                            or fieldinfo[0] == 'DeletionFlag' # always unpack delflag
+                            else '%dx' % fieldinfo[2]
+                            for fieldinfo,code in zip(self.fields, structcodes)]
+        fmt = ''.join(structcodes)
         fmtSize = calcsize(fmt)
         # total size of fields should add up to recordlength from the header
         while fmtSize < self.__recordLength:
             # if not, pad byte until reaches recordlength
-            fmt += "x" 
+            fmt += "x"
             fmtSize += 1
         return (fmt, fmtSize)
 
-    def __record(self, oid=None):
-        """Reads and returns a dbf record row as a list of values."""
+    def __recordFields(self, fields=None):
+        """Returns the necessary info required to unpack a record's fields,
+        restricted to a subset of fieldnames 'fields' if specified. 
+        Returns a list of field info tuples, a name-index lookup dict, 
+        and a Struct instance for unpacking these fields. Note that DeletionFlag
+        is not a valid field. 
+        """
+        if fields is not None:
+            # restrict info to the specified fields
+            # first ignore repeated field names (order doesn't matter)
+            fields = list(set(fields))
+            # get the struct
+            fmt, fmtSize = self.__recordFmt(fields=fields)
+            recStruct = Struct(fmt)
+            # make sure the given fieldnames exist
+            for name in fields:
+                if name not in self.__fieldLookup or name == 'DeletionFlag':
+                    raise ValueError('"{}" is not a valid field name'.format(name))
+            # fetch relevant field info tuples
+            fieldTuples = []
+            for fieldinfo in self.fields[1:]:
+                name = fieldinfo[0]
+                if name in fields:
+                    fieldTuples.append(fieldinfo)
+            # store the field positions
+            recLookup = dict((f[0], i) for i,f in enumerate(fieldTuples))
+        else:
+            # use all the dbf fields
+            fieldTuples = self.fields[1:] # sans deletion flag
+            recStruct = self.__fullRecStruct
+            recLookup = self.__fullRecLookup
+        return fieldTuples, recLookup, recStruct
+
+    def __record(self, fieldTuples, recLookup, recStruct, oid=None):
+        """Reads and returns a dbf record row as a list of values. Requires specifying
+        a list of field info tuples 'fieldTuples', a record name-index dict 'recLookup', 
+        and a Struct instance 'recStruct' for unpacking these fields. 
+        """
         f = self.__getFileObj(self.dbf)
-        recordContents = self.__recStruct.unpack(f.read(self.__recStruct.size))
+
+        recordContents = recStruct.unpack(f.read(recStruct.size))
+        
+        # deletion flag field is always unpacked as first value (see __recordFmt)
         if recordContents[0] != b' ':
             # deleted record
             return None
+
+        # drop deletion flag from values
+        recordContents = recordContents[1:]
+
+        # check that values match fields
+        if len(fieldTuples) != len(recordContents):
+            raise ShapefileException('Number of record values ({}) is different from the requested \
+                            number of fields ({})'.format(len(recordContents), len(fieldTuples)))
+
+        # parse each value
         record = []
-        for (name, typ, size, deci), value in zip(self.fields, recordContents):
-            if name == 'DeletionFlag':
-                continue
-            elif typ in ("N","F"):
+        for (name, typ, size, deci),value in zip(fieldTuples, recordContents):
+            if typ in ("N","F"):
                 # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field. 
                 value = value.split(b'\0')[0]
                 value = value.replace(b'*', b'')  # QGIS NULL is all '*' chars
@@ -1403,59 +1469,80 @@ class Reader(object):
                 value = value.strip()
             record.append(value)
 
-        return _Record(self.__fieldposition_lookup, record, oid)
+        return _Record(recLookup, record, oid)
 
-    def record(self, i=0):
-        """Returns a specific dbf record based on the supplied index."""
+    def record(self, i=0, fields=None):
+        """Returns a specific dbf record based on the supplied index.
+        To only read some of the fields, specify the 'fields' arg as a
+        list of one or more fieldnames. 
+        """
         f = self.__getFileObj(self.dbf)
         if self.numRecords is None:
             self.__dbfHeader()
         i = self.__restrictIndex(i)
-        recSize = self.__recStruct.size
+        recSize = self.__recordLength
         f.seek(0)
         f.seek(self.__dbfHdrLength + (i * recSize))
-        return self.__record(oid=i)
+        fieldTuples,recLookup,recStruct = self.__recordFields(fields)
+        return self.__record(oid=i, fieldTuples=fieldTuples, recLookup=recLookup, recStruct=recStruct)
 
-    def records(self):
-        """Returns all records in a dbf file."""
+    def records(self, fields=None):
+        """Returns all records in a dbf file. 
+        To only read some of the fields, specify the 'fields' arg as a
+        list of one or more fieldnames.
+        """
         if self.numRecords is None:
             self.__dbfHeader()
         records = []
         f = self.__getFileObj(self.dbf)
         f.seek(self.__dbfHdrLength)
+        fieldTuples,recLookup,recStruct = self.__recordFields(fields)
         for i in range(self.numRecords):
-            r = self.__record(oid=i)
+            r = self.__record(oid=i, fieldTuples=fieldTuples, recLookup=recLookup, recStruct=recStruct)
             if r:
                 records.append(r)
         return records
 
-    def iterRecords(self):
+    def iterRecords(self, fields=None):
         """Returns a generator of records in a dbf file.
-        Useful for large shapefiles or dbf files."""
+        Useful for large shapefiles or dbf files.
+        To only read some of the fields, specify the 'fields' arg as a
+        list of one or more fieldnames.
+        """
         if self.numRecords is None:
             self.__dbfHeader()
         f = self.__getFileObj(self.dbf)
         f.seek(self.__dbfHdrLength)
+        fieldTuples,recLookup,recStruct = self.__recordFields(fields)
         for i in xrange(self.numRecords):
-            r = self.__record(oid=i)
+            r = self.__record(oid=i, fieldTuples=fieldTuples, recLookup=recLookup, recStruct=recStruct)
             if r:
                 yield r
 
-    def shapeRecord(self, i=0):
+    def shapeRecord(self, i=0, fields=None):
         """Returns a combination geometry and attribute record for the
-        supplied record index."""
+        supplied record index. 
+        To only read some of the fields, specify the 'fields' arg as a
+        list of one or more fieldnames. 
+        """
         i = self.__restrictIndex(i)
-        return ShapeRecord(shape=self.shape(i), record=self.record(i))
+        return ShapeRecord(shape=self.shape(i), record=self.record(i, fields=fields))
 
-    def shapeRecords(self):
+    def shapeRecords(self, fields=None):
         """Returns a list of combination geometry/attribute records for
-        all records in a shapefile."""
-        return ShapeRecords(self.iterShapeRecords())
+        all records in a shapefile.
+        To only read some of the fields, specify the 'fields' arg as a
+        list of one or more fieldnames. 
+        """
+        return ShapeRecords(self.iterShapeRecords(fields=fields))
 
-    def iterShapeRecords(self):
+    def iterShapeRecords(self, fields=None):
         """Returns a generator of combination geometry/attribute records for
-        all records in a shapefile."""
-        for shape, record in izip(self.iterShapes(), self.iterRecords()):
+        all records in a shapefile.
+        To only read some of the fields, specify the 'fields' arg as a
+        list of one or more fieldnames. 
+        """
+        for shape, record in izip(self.iterShapes(), self.iterRecords(fields=fields)):
             yield ShapeRecord(shape=shape, record=record)
 
 

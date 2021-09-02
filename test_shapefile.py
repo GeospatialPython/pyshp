@@ -399,18 +399,89 @@ def test_records_match_shapes():
         assert len(records) == len(shapes)
 
 
-def test_record_attributes():
+def test_record_attributes(fields=None):
     """
-    Assert that record values can be accessed as
-    attributes and dictionary items.
+    Assert that record retrieves all relevant values and can 
+    be accessed as attributes and dictionary items.
     """
     # note
     # second element in fields matches first element
     # in record because records dont have DeletionFlag
     with shapefile.Reader("shapefiles/blockgroups") as sf:
-        field_name = sf.fields[1][0]
-        record = sf.record(0)
-        assert record[0] == record[field_name] == getattr(record, field_name)
+        for i in range(len(sf)):
+            # full record
+            full_record = sf.record(i)
+            # user-fetched record
+            if fields is not None:
+                # only a subset of fields
+                record = sf.record(i, fields=fields)
+            else:
+                # default all fields
+                record = full_record
+                fields = [field[0] for field in sf.fields[1:]] # fieldnames, sans del flag
+            # check correct length
+            assert len(record) == len(set(fields))
+            # check record values (should be in same order as shapefile fields)
+            i = 0
+            for field in sf.fields:
+                field_name = field[0]
+                if field_name in fields:
+                    assert record[i] == record[field_name] == getattr(record, field_name)
+                    i += 1
+
+
+def test_record_subfields():
+    """
+    Assert that reader correctly retrieves only a subset 
+    of fields when specified.
+    """
+    fields = ["AREA","POP1990","MALES","FEMALES","MOBILEHOME"]
+    test_record_attributes(fields=fields)
+
+
+def test_record_subfields_unordered():
+    """
+    Assert that reader correctly retrieves only a subset 
+    of fields when specified, given in random order but 
+    retrieved in the order of the shapefile fields. 
+    """
+    fields = sorted(["AREA","POP1990","MALES","FEMALES","MOBILEHOME"])
+    test_record_attributes(fields=fields)
+
+
+def test_record_subfields_delflag_notvalid():
+    """
+    Assert that reader does not consider DeletionFlag as a valid field name.
+    """
+    fields = ["DeletionFlag","AREA","POP1990","MALES","FEMALES","MOBILEHOME"]
+    with pytest.raises(ValueError):
+        test_record_attributes(fields=fields)
+
+
+def test_record_subfields_duplicates():
+    """
+    Assert that reader correctly retrieves only a subset
+    of fields when specified, handling duplicate input fields. 
+    """
+    fields = ["AREA","AREA","AREA","MALES","MALES","MOBILEHOME"]
+    test_record_attributes(fields=fields)
+    # check that only 3 values
+    with shapefile.Reader("shapefiles/blockgroups") as sf:
+        rec = sf.record(0, fields=fields)
+        assert len(rec) == len(set(fields))
+
+
+def test_record_subfields_empty():
+    """
+    Assert that reader does not retrieve any fields when given
+    an empty list. 
+    """
+    fields = []
+    test_record_attributes(fields=fields)
+    # check that only 3 values
+    with shapefile.Reader("shapefiles/blockgroups") as sf:
+        rec = sf.record(0, fields=fields)
+        assert len(rec) == 0
 
 
 def test_record_as_dict():
