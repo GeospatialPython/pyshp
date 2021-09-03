@@ -1151,7 +1151,7 @@ class Reader(object):
             else:
                 self.mbox.append(None)
 
-    def __shape(self, oid=None):
+    def __shape(self, oid=None, bbox=None):
         """Returns the header info and geometry for a single shape."""
         f = self.__getFileObj(self.shp)
         record = Shape(oid=oid)
@@ -1167,6 +1167,12 @@ class Reader(object):
         # All shape types capable of having a bounding box
         elif shapeType in (3,5,8,13,15,18,23,25,28,31):
             record.bbox = _Array('d', unpack("<4d", f.read(32)))
+            # if bbox specified and no overlap, skip this shape
+            if bbox is not None and not bbox_overlap(bbox, record.bbox):
+                # because we stop parsing this shape, skip to beginning of
+                # next shape before we return
+                f.seek(next)
+                return None
         # Shape types with parts
         if shapeType in (3,5,13,15,23,25,31):
             nParts = unpack("<i", f.read(4))[0]
@@ -1247,9 +1253,12 @@ class Reader(object):
         if not i == None:
             return self._offsets[i]
 
-    def shape(self, i=0):
+    def shape(self, i=0, bbox=None):
         """Returns a shape object for a shape in the geometry
-        record file."""
+        record file.
+        If the 'bbox' arg is given (list or tuple of xmin,ymin,xmax,ymax), 
+        returns None if the shape is not within that region. 
+        """
         shp = self.__getFileObj(self.shp)
         i = self.__restrictIndex(i)
         offset = self.__shapeIndex(i)
@@ -1259,10 +1268,13 @@ class Reader(object):
                 if j == i:
                     return k
         shp.seek(offset)
-        return self.__shape(oid=i)
+        return self.__shape(oid=i, bbox=bbox)
 
-    def shapes(self):
-        """Returns all shapes in a shapefile."""
+    def shapes(self, bbox=None):
+        """Returns all shapes in a shapefile.
+        To only read shapes within a given spatial region, specify the 'bbox'
+        arg as a list or tuple of xmin,ymin,xmax,ymax. 
+        """
         shp = self.__getFileObj(self.shp)
         # Found shapefiles which report incorrect
         # shp file length in the header. Can't trust
@@ -1272,21 +1284,29 @@ class Reader(object):
         self.shpLength = shp.tell()
         shp.seek(100)
         shapes = Shapes()
+        i = 0
         while shp.tell() < self.shpLength:
-            i = len(shapes)
-            shapes.append(self.__shape(oid=i))
+            shape = self.__shape(oid=i, bbox=bbox)
+            if shape:
+                shapes.append(shape)
+            i += 1
         return shapes
 
-    def iterShapes(self):
+    def iterShapes(self, bbox=None):
         """Returns a generator of shapes in a shapefile. Useful
-        for handling large shapefiles."""
+        for handling large shapefiles.
+        To only read shapes within a given spatial region, specify the 'bbox'
+        arg as a list or tuple of xmin,ymin,xmax,ymax. 
+        """
         shp = self.__getFileObj(self.shp)
         shp.seek(0,2)
         self.shpLength = shp.tell()
         shp.seek(100)
         i = 0
         while shp.tell() < self.shpLength:
-            yield self.__shape(oid=i)
+            shape = self.__shape(oid=i, bbox=bbox)
+            if shape:
+                yield shape
             i += 1
 
     def __dbfHeader(self):
@@ -1519,31 +1539,53 @@ class Reader(object):
             if r:
                 yield r
 
-    def shapeRecord(self, i=0, fields=None):
+    def shapeRecord(self, i=0, fields=None, bbox=None):
         """Returns a combination geometry and attribute record for the
         supplied record index. 
         To only read some of the fields, specify the 'fields' arg as a
         list of one or more fieldnames. 
+        If the 'bbox' arg is given (list or tuple of xmin,ymin,xmax,ymax), 
+        returns None if the shape is not within that region. 
         """
         i = self.__restrictIndex(i)
-        return ShapeRecord(shape=self.shape(i), record=self.record(i, fields=fields))
+        shape = self.shape(i, bbox=bbox)
+        if shape:
+            record = self.record(i, fields=fields)
+            return ShapeRecord(shape=shape, record=record)
 
-    def shapeRecords(self, fields=None):
+    def shapeRecords(self, fields=None, bbox=None):
         """Returns a list of combination geometry/attribute records for
         all records in a shapefile.
         To only read some of the fields, specify the 'fields' arg as a
         list of one or more fieldnames. 
+        To only read entries within a given spatial region, specify the 'bbox'
+        arg as a list or tuple of xmin,ymin,xmax,ymax. 
         """
-        return ShapeRecords(self.iterShapeRecords(fields=fields))
+        return ShapeRecords(self.iterShapeRecords(fields=fields, bbox=bbox))
 
-    def iterShapeRecords(self, fields=None):
+    def iterShapeRecords(self, fields=None, bbox=None):
         """Returns a generator of combination geometry/attribute records for
         all records in a shapefile.
         To only read some of the fields, specify the 'fields' arg as a
         list of one or more fieldnames. 
+        To only read entries within a given spatial region, specify the 'bbox'
+        arg as a list or tuple of xmin,ymin,xmax,ymax. 
         """
-        for shape, record in izip(self.iterShapes(), self.iterRecords(fields=fields)):
-            yield ShapeRecord(shape=shape, record=record)
+        if bbox is None:
+            # iterate through all shapes and records
+            for shape, record in izip(self.iterShapes(), self.iterRecords(fields=fields)):
+                yield ShapeRecord(shape=shape, record=record)
+        else:
+            # only iterate where shape.bbox overlaps with the given bbox
+            # TODO: internal __record method should be faster but would have to
+            # make sure to seek to correct file location... 
+
+            #fieldTuples,recLookup,recStruct = self.__recordFields(fields)
+            for shape in self.iterShapes(bbox=bbox):
+                if shape:
+                    #record = self.__record(oid=i, fieldTuples=fieldTuples, recLookup=recLookup, recStruct=recStruct)
+                    record = self.record(i=shape.oid, fields=fields) 
+                    yield ShapeRecord(shape=shape, record=record)
 
 
 class Writer(object):

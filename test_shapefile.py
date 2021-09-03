@@ -538,6 +538,149 @@ def test_shape_oid():
             assert shaperec.shape.oid == i
 
 
+def test_bboxfilter_shape():
+    """
+    Assert that applying the bbox filter to shape() correctly ignores the shape
+    if it falls outside, and returns it if inside. 
+    """
+    inside = [-122.4, 37.8, -122.35, 37.82]
+    outside = list(inside)
+    outside[0] *= 10
+    outside[2] *= 10
+    with shapefile.Reader("shapefiles/blockgroups") as sf:
+        assert sf.shape(0, bbox=inside) is not None
+        assert sf.shape(0, bbox=outside) is None
+
+
+def test_bboxfilter_shapes():
+    """
+    Assert that applying the bbox filter to shapes() correctly ignores shapes
+    that fall outside, and returns those that fall inside. 
+    """
+    bbox = [-122.4, 37.8, -122.35, 37.82]
+    with shapefile.Reader("shapefiles/blockgroups") as sf:
+        # apply bbox filter
+        shapes = sf.shapes(bbox=bbox)
+        # manually check bboxes
+        manual = shapefile.Shapes()
+        for shape in sf.iterShapes():
+            if shapefile.bbox_overlap(shape.bbox, bbox):
+                manual.append(shape)
+        # compare
+        assert len(shapes) == len(manual)
+        # check that they line up
+        for shape,man in zip(shapes,manual):
+            assert shape.oid == man.oid
+            assert shape.__geo_interface__ == man.__geo_interface__
+
+
+def test_bboxfilter_shapes_outside():
+    """
+    Assert that applying the bbox filter to shapes() correctly returns
+    no shapes when the bbox is outside the entire shapefile. 
+    """
+    bbox = [-180, 89, -179, 90]
+    with shapefile.Reader("shapefiles/blockgroups") as sf:
+        shapes = sf.shapes(bbox=bbox)
+        assert len(shapes) == 0
+
+
+def test_bboxfilter_itershapes():
+    """
+    Assert that applying the bbox filter to iterShapes() correctly ignores shapes
+    that fall outside, and returns those that fall inside. 
+    """
+    bbox = [-122.4, 37.8, -122.35, 37.82]
+    with shapefile.Reader("shapefiles/blockgroups") as sf:
+        # apply bbox filter
+        shapes = list(sf.iterShapes(bbox=bbox))
+        # manually check bboxes
+        manual = shapefile.Shapes()
+        for shape in sf.iterShapes():
+            if shapefile.bbox_overlap(shape.bbox, bbox):
+                manual.append(shape)
+        # compare
+        assert len(shapes) == len(manual)
+        # check that they line up
+        for shape,man in zip(shapes,manual):
+            assert shape.oid == man.oid
+            assert shape.__geo_interface__ == man.__geo_interface__
+
+
+def test_bboxfilter_shaperecord():
+    """
+    Assert that applying the bbox filter to shapeRecord() correctly ignores the shape
+    if it falls outside, and returns it if inside. 
+    """
+    inside = [-122.4, 37.8, -122.35, 37.82]
+    outside = list(inside)
+    outside[0] *= 10
+    outside[2] *= 10
+    with shapefile.Reader("shapefiles/blockgroups") as sf:
+        # inside
+        shaperec = sf.shapeRecord(0, bbox=inside)
+        assert shaperec is not None
+        assert shaperec.shape.oid == shaperec.record.oid
+        # outside
+        assert sf.shapeRecord(0, bbox=outside) is None
+
+
+def test_bboxfilter_shaperecords():
+    """
+    Assert that applying the bbox filter to shapeRecords() correctly ignores shapes
+    that fall outside, and returns those that fall inside. 
+    """
+    bbox = [-122.4, 37.8, -122.35, 37.82]
+    with shapefile.Reader("shapefiles/blockgroups") as sf:
+        # apply bbox filter
+        shaperecs = sf.shapeRecords(bbox=bbox)
+        # manually check bboxes
+        manual = shapefile.ShapeRecords()
+        for shaperec in sf.iterShapeRecords():
+            if shapefile.bbox_overlap(shaperec.shape.bbox, bbox):
+                manual.append(shaperec)
+        # compare
+        assert len(shaperecs) == len(manual)
+        # check that they line up
+        for shaperec,man in zip(shaperecs,manual):
+            # oids
+            assert shaperec.shape.oid == shaperec.record.oid
+            # same shape as manual
+            assert shaperec.shape.oid == man.shape.oid
+            assert shaperec.shape.__geo_interface__ == man.shape.__geo_interface__
+            # same record as manual
+            assert shaperec.record.oid == man.record.oid
+            assert shaperec.record == man.record
+
+
+def test_bboxfilter_itershaperecords():
+    """
+    Assert that applying the bbox filter to iterShapeRecords() correctly ignores shapes
+    that fall outside, and returns those that fall inside. 
+    """
+    bbox = [-122.4, 37.8, -122.35, 37.82]
+    with shapefile.Reader("shapefiles/blockgroups") as sf:
+        # apply bbox filter
+        shaperecs = list(sf.iterShapeRecords(bbox=bbox))
+        # manually check bboxes
+        manual = shapefile.ShapeRecords()
+        for shaperec in sf.iterShapeRecords():
+            if shapefile.bbox_overlap(shaperec.shape.bbox, bbox):
+                manual.append(shaperec)
+        # compare
+        assert len(shaperecs) == len(manual)
+        # check that they line up
+        for shaperec,man in zip(shaperecs,manual):
+            # oids
+            assert shaperec.shape.oid == shaperec.record.oid
+            # same shape as manual
+            assert shaperec.shape.oid == man.shape.oid
+            assert shaperec.shape.__geo_interface__ == man.shape.__geo_interface__
+            # same record as manual
+            assert shaperec.record.oid == man.record.oid
+            assert shaperec.record == man.record
+
+
 def test_shaperecords_shaperecord():
     """
     Assert that shapeRecords returns a list of
