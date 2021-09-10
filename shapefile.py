@@ -2068,8 +2068,11 @@ class Writer(object):
         if self.autoBalance and self.recNum > self.shpNum:
             self.balance()
             
+        fieldCount = sum((1 for field in self.fields if field[0] != 'DeletionFlag'))
         if recordList:
             record = list(recordList)
+            while len(record) < fieldCount:
+                record.append("")
         elif recordDict:
             record = []
             for field in self.fields:
@@ -2081,9 +2084,11 @@ class Writer(object):
                         record.append("")
                     else:
                         record.append(val)
+                else:
+                    record.append("") # need empty value for missing dict entries
         else:
             # Blank fields for empty record
-            record = ["" for field in self.fields if field[0] != 'DeletionFlag']
+            record = ["" for _ in range(fieldCount)]
         self.__dbfRecord(record)
 
     def __dbfRecord(self, record):

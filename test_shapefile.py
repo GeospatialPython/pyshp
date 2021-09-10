@@ -844,6 +844,64 @@ def test_write_shapefile_extension_ignored(tmpdir):
     assert not os.path.exists(basepath + ext)
 
 
+def test_write_record(tmpdir):
+    """
+    Test that .record() correctly writes a record using either a list of *args
+    or a dict of **kwargs. 
+    """
+    filename = tmpdir.join("test.shp").strpath
+    with shapefile.Writer(filename) as writer:
+        writer.autoBalance = True
+
+        writer.field('one', 'C') # many under length limit
+        writer.field('two', 'C') # 1 under length limit
+        writer.field('three', 'C') # at length limit
+        writer.field('four', 'C') # 1 over length limit
+        
+        values = ['one','two','three','four']
+        writer.record(*values)
+        writer.record(*values)
+
+        valuedict = dict(zip(values, values))
+        writer.record(**valuedict)
+        writer.record(**valuedict)
+
+    with shapefile.Reader(filename) as reader:
+        for record in reader.iterRecords():
+            assert record == values
+
+
+def test_write_partial_record(tmpdir):
+    """
+    Test that .record() correctly writes a partial record (given only some of the values)
+    using either a list of *args or a dict of **kwargs. Should fill in the gaps. 
+    """
+    filename = tmpdir.join("test.shp").strpath
+    with shapefile.Writer(filename) as writer:
+        writer.autoBalance = True
+        
+        writer.field('one', 'C') # many under length limit
+        writer.field('two', 'C') # 1 under length limit
+        writer.field('three', 'C') # at length limit
+        writer.field('four', 'C') # 1 over length limit
+        
+        values = ['one','two']
+        writer.record(*values)
+        writer.record(*values)
+
+        valuedict = dict(zip(values, values))
+        writer.record(**valuedict)
+        writer.record(**valuedict)
+
+    with shapefile.Reader(filename) as reader:
+        expected = list(values)
+        expected.extend(['',''])
+        for record in reader.iterRecords():
+            assert record == expected
+
+        assert len(reader.records()) == 4
+
+
 def test_write_geojson(tmpdir):
     """
     Assert that the output of geo interface can be written to json.
