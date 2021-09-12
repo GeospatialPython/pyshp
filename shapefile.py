@@ -17,6 +17,7 @@ import tempfile
 import logging
 import io
 from datetime import date
+import zipfile
 
 
 # Module settings
@@ -918,8 +919,44 @@ class Reader(object):
         # See if a shapefile name was passed as the first argument
         if len(args) > 0:
             if is_string(args[0]):
-                self.load(args[0])
-                return
+                path = args[0]
+                if '.zip' in path:
+                    # Shapefile is inside a zipfile
+                    if path.count('.zip') > 1:
+                        # Multiple nested zipfiles
+                        raise ShapefileException('Reading from multiple nested zipfiles is not supported: %s' % args[0])
+                    # Open the zipfile archive
+                    if path.endswith('.zip'):
+                        # Only the zipfile path is given
+                        # Inspect zipfile contents to find the full shapefile path
+                        archive = zipfile.ZipFile(path, 'r')
+                        shapefiles = [name
+                                    for name in archive.namelist()
+                                    if name.endswith('.shp')]
+                        # The zipfile must contain exactly one shapefile
+                        if len(shapefiles) == 0:
+                            raise ShapefileException('Zipfile does not contain any shapefiles')
+                        elif len(shapefiles) == 1:
+                            shapefile = shapefiles[0]
+                        else:
+                            raise ShapefileException('Zipfile contains more than one shapefile: %s. Please specify the full \
+                                path to the shapefile you would like to open.' % shapefiles )
+                    else:
+                        # Full shapefile path is given
+                        zpath,shapefile = path[:path.find('.zip')+4], path[path.find('.zip')+4+1:]
+                        archive = zipfile.ZipFile(zpath, 'r')
+                    # Try to extract file-like objects from zipfile
+                    shapefile = os.path.splitext(shapefile)[0] # root shapefile name
+                    try: self.shp = archive.open(shapefile+'.shp')
+                    except: pass
+                    try: self.shx = archive.open(shapefile+'.shx')
+                    except: pass
+                    try: self.dbf = archive.open(shapefile+'.dbf')
+                    except: pass
+                else:
+                    # Normal path
+                    self.load(path)
+                    return
         # Otherwise, load from separate shp/shx/dbf args (must be file-like)
         if "shp" in kwargs.keys():
             if hasattr(kwargs["shp"], "read"):
