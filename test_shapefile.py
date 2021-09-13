@@ -260,6 +260,65 @@ def test_reader_context_manager():
     assert sf.shx.closed is True
 
 
+def test_reader_url():
+    """
+    Assert that Reader can open shapefiles from a url.
+    """
+    # test with extension
+    url = "https://github.com/nvkelso/natural-earth-vector/blob/master/110m_cultural/ne_110m_admin_0_tiny_countries.shp?raw=true"
+    with shapefile.Reader(url) as sf:
+        for recShape in sf.iterShapeRecords():
+            pass
+
+    # test without extension
+    url = "https://github.com/nvkelso/natural-earth-vector/blob/master/110m_cultural/ne_110m_admin_0_tiny_countries?raw=true"
+    with shapefile.Reader(url) as sf:
+        for recShape in sf.iterShapeRecords():
+            pass
+        assert len(sf) > 0
+
+    # test no files found
+    url = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/README.md"
+    with pytest.raises(shapefile.ShapefileException):
+        with shapefile.Reader(url) as sf:
+            pass
+
+    # test reading zipfile from url
+    url = "https://biogeo.ucdavis.edu/data/diva/rrd/NIC_rrd.zip"
+    with shapefile.Reader(url) as sf:
+        for recShape in sf.iterShapeRecords():
+            pass
+        assert len(sf) > 0
+
+
+def test_reader_zip():
+    """
+    Assert that Reader can open shapefiles inside a zipfile.
+    """
+    # test reading zipfile only
+    with shapefile.Reader("shapefiles/blockgroups.zip") as sf:
+        for recShape in sf.iterShapeRecords():
+            pass
+        assert len(sf) > 0
+    
+    # test require specific path when reading multi-shapefile zipfile
+    with pytest.raises(shapefile.ShapefileException):
+        with shapefile.Reader("shapefiles/blockgroups_multishapefile.zip") as sf:
+            pass
+
+    # test specifying the path when reading multi-shapefile zipfile (with extension)
+    with shapefile.Reader("shapefiles/blockgroups_multishapefile.zip/blockgroups2.shp") as sf:
+        for recShape in sf.iterShapeRecords():
+            pass
+        assert len(sf) > 0
+
+    # test specifying the path when reading multi-shapefile zipfile (without extension)
+    with shapefile.Reader("shapefiles/blockgroups_multishapefile.zip/blockgroups2") as sf:
+        for recShape in sf.iterShapeRecords():
+            pass
+        assert len(sf) > 0
+
+
 def test_reader_close():
     """
     Assert that manually callcin Reader.close()

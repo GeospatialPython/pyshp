@@ -78,8 +78,22 @@ PYTHON3 = sys.version_info[0] == 3
 if PYTHON3:
     xrange = range
     izip = zip
+
+    from urllib.parse import urlparse, urlunparse
+    from urllib.request import build_opener, install_opener, urlretrieve
+    opener = build_opener()
+    opener.addheaders = [('User-agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36')]
+    install_opener(opener)
+    
 else:
     from itertools import izip
+
+    from urlparse import urlparse, urlunparse
+    from urllib import urlretrieve
+    from urllib2 import build_opener, install_opener
+    opener = build_opener()
+    opener.addheaders = [('User-agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36')]
+    install_opener(opener)
 
 
 # Helpers
@@ -925,11 +939,26 @@ class Reader(object):
                     if path.count('.zip') > 1:
                         # Multiple nested zipfiles
                         raise ShapefileException('Reading from multiple nested zipfiles is not supported: %s' % args[0])
-                    # Open the zipfile archive
+                    # Split into zipfile and shapefile paths
                     if path.endswith('.zip'):
+                        zpath = path
+                        shapefile = None
+                    else:
+                        zpath = path[:path.find('.zip')+4]
+                        shapefile = path[path.find('.zip')+4+1:]
+                    # Handle url inputs
+                    if zpath.startswith('http'):
+                        # Shapefile is from a url
+                        # Download to a temporary url and treat as normal zipfile
+                        dpath, headers = urlretrieve(zpath)
+                        src,dst = dpath, dpath+'.zip'
+                        os.rename(src, dst)
+                        zpath = dst
+                    # Open the zipfile archive
+                    archive = zipfile.ZipFile(zpath, 'r')
+                    if not shapefile:
                         # Only the zipfile path is given
                         # Inspect zipfile contents to find the full shapefile path
-                        archive = zipfile.ZipFile(path, 'r')
                         shapefiles = [name
                                     for name in archive.namelist()
                                     if name.endswith('.shp')]
@@ -941,10 +970,6 @@ class Reader(object):
                         else:
                             raise ShapefileException('Zipfile contains more than one shapefile: %s. Please specify the full \
                                 path to the shapefile you would like to open.' % shapefiles )
-                    else:
-                        # Full shapefile path is given
-                        zpath,shapefile = path[:path.find('.zip')+4], path[path.find('.zip')+4+1:]
-                        archive = zipfile.ZipFile(zpath, 'r')
                     # Try to extract file-like objects from zipfile
                     shapefile = os.path.splitext(shapefile)[0] # root shapefile name
                     try: self.shp = archive.open(shapefile+'.shp')
@@ -954,7 +979,31 @@ class Reader(object):
                     try: self.dbf = archive.open(shapefile+'.dbf')
                     except: pass
                 else:
-                    # Normal path
+                    # Direct path to a shapefile given
+                    if path.startswith('http'):
+                        # Shapefile is from a url
+                        # Download each file to temporary path and treat as normal shapefile path
+                        urlinfo = urlparse(path)
+                        urlpath = urlinfo[2]
+                        urlpath,_ = os.path.splitext(urlpath)
+                        shapefile = os.path.basename(urlpath)
+                        dst = None
+                        for ext in ['.shp','.shx','.dbf']:
+                            try:
+                                _urlinfo = list(urlinfo)
+                                _urlinfo[2] = urlpath+ext
+                                _path = urlunparse(_urlinfo)
+                                dpath, headers = urlretrieve(_path)
+                                dpathdir = os.path.dirname(dpath)
+                                src,dst = dpath, os.path.join(dpathdir, shapefile+ext)
+                                os.rename(src,dst)
+                            except:
+                                pass
+                        if dst:
+                            path = os.path.splitext(dst)[0]
+                        else:
+                            raise ShapefileException("No shp, shx, or dbf file found at url: %s" % path)
+                    # Load and exit early
                     self.load(path)
                     return
         # Otherwise, load from separate shp/shx/dbf args (must be file-like)
