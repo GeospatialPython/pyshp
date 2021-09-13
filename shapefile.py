@@ -971,12 +971,16 @@ class Reader(object):
                                 path to the shapefile you would like to open.' % shapefiles )
                     # Try to extract file-like objects from zipfile
                     shapefile = os.path.splitext(shapefile)[0] # root shapefile name
-                    try: self.shp = archive.open(shapefile+'.shp')
-                    except: pass
-                    try: self.shx = archive.open(shapefile+'.shx')
-                    except: pass
-                    try: self.dbf = archive.open(shapefile+'.dbf')
-                    except: pass
+                    tempdir = tempfile.gettempdir()
+                    for ext in ['shp','shx','dbf']:
+                        try:
+                            # Note: archive.open() would be easier, but loads file into memory
+                            # and cannot always use .seek()
+                            temppath = archive.extract(shapefile+'.'+ext, tempdir)
+                            fileobj = open(temppath, 'rb')
+                            setattr(self, ext, fileobj)
+                        except:
+                            pass
                 else:
                     # Direct path to a shapefile given
                     if path.startswith('http'):
