@@ -80,20 +80,15 @@ if PYTHON3:
     izip = zip
 
     from urllib.parse import urlparse, urlunparse
-    from urllib.request import build_opener, install_opener, urlretrieve
-    opener = build_opener()
-    opener.addheaders = [('User-agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36')]
-    install_opener(opener)
+    from urllib.error import HTTPError
+    from urllib.request import urlopen, Request
     
 else:
     from itertools import izip
 
     from urlparse import urlparse, urlunparse
-    from urllib import urlretrieve
-    from urllib2 import build_opener, install_opener
-    opener = build_opener()
-    opener.addheaders = [('User-agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36')]
-    install_opener(opener)
+    from urllib2 import HTTPError
+    from urllib2 import urlopen, Request
 
 
 # Helpers
@@ -950,10 +945,14 @@ class Reader(object):
                     if zpath.startswith('http'):
                         # Shapefile is from a url
                         # Download to a temporary url and treat as normal zipfile
-                        dpath, headers = urlretrieve(zpath)
-                        src,dst = dpath, dpath+'.zip'
-                        os.rename(src, dst)
-                        zpath = dst
+                        req = Request(zpath, headers={'User-agent':'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'})
+                        resp = urlopen(req)
+                        zfile = os.path.basename(zpath)
+                        dpathdir = tempfile.gettempdir()
+                        dpath = os.path.join(dpathdir, zfile)
+                        with open(dpath, 'wb') as f:
+                            f.write(resp.read())
+                        zpath = dpath
                     # Open the zipfile archive
                     archive = zipfile.ZipFile(zpath, 'r')
                     if not shapefile:
@@ -987,20 +986,22 @@ class Reader(object):
                         urlpath = urlinfo[2]
                         urlpath,_ = os.path.splitext(urlpath)
                         shapefile = os.path.basename(urlpath)
-                        dst = None
+                        dpath = None
                         for ext in ['.shp','.shx','.dbf']:
                             try:
                                 _urlinfo = list(urlinfo)
                                 _urlinfo[2] = urlpath+ext
                                 _path = urlunparse(_urlinfo)
-                                dpath, headers = urlretrieve(_path)
-                                dpathdir = os.path.dirname(dpath)
-                                src,dst = dpath, os.path.join(dpathdir, shapefile+ext)
-                                os.rename(src,dst)
-                            except:
+                                req = Request(_path, headers={'User-agent':'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'})
+                                resp = urlopen(req)
+                                dpathdir = tempfile.gettempdir()
+                                dpath = os.path.join(dpathdir, shapefile+ext)
+                                with open(dpath, 'wb') as f:
+                                    f.write(resp.read())
+                            except HTTPError:
                                 pass
-                        if dst:
-                            path = os.path.splitext(dst)[0]
+                        if dpath:
+                            path = os.path.splitext(dpath)[0]
                         else:
                             raise ShapefileException("No shp, shx, or dbf file found at url: %s" % path)
                     # Load and exit early
