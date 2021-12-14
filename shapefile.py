@@ -1577,7 +1577,7 @@ class Reader(object):
             else:
                 # anything else is forced to string/unicode
                 value = u(value, self.encoding, self.encodingErrors)
-                value = value.strip()
+                value = value.strip().rstrip('\x00') # remove null-padding at end of strings
             record.append(value)
 
         return _Record(recLookup, record, oid)

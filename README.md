@@ -214,7 +214,7 @@ If your shapefile is wrapped inside a zip file, the library is able to handle th
 If the zip file contains multiple shapefiles, just specify which shapefile to read by additionally specifying the relative path after the ".zip" part:
 
 
-	>>> sf = shapefile.Reader("shapfiles/blockgroups_multishapefile.zip/blockgroups2.shp")
+	>>> sf = shapefile.Reader("shapefiles/blockgroups_multishapefile.zip/blockgroups2.shp")
 
 #### Reading Shapefiles From URLs
 
@@ -1128,6 +1128,9 @@ By default when reading the attribute records of a shapefile, pyshp unpacks and 
 	>>> for rec in sf.iterRecords(fields=fields):
 	... 	# do something
 	... 	pass
+	>>> rec
+	Record #4595: ['Birgu', 'Malta']
+	
 
 ### Attribute filtering
 
@@ -1135,12 +1138,18 @@ In many cases, we aren't interested in all entries of a shapefile, but rather on
 
 
 	>>> filter_field = "geonunit"
-	>>> filter_value = "Germany"
+	>>> filter_value = "Eritrea"
 	>>> for rec in sf.iterRecords(fields=[filter_field]):
 	...     if rec[filter_field] == filter_value:
 	... 		# load full record and shape
-    ... 		shapeRec = sf.shapeRecord(rec.oid)
+	... 		shapeRec = sf.shapeRecord(rec.oid)
 	... 		shapeRec.record["name"]
+	'Debubawi Keyih Bahri'
+	'Debub'
+	'Semenawi Keyih Bahri'
+	'Gash Barka'
+	'Maekel'
+	'Anseba'
 
 Selectively reading only the necessary data in this way is particularly useful for efficiently processing a limited subset of data from very large files or when looping through a large number of files, especially if they contain large attribute tables or complex shape geometries. 
 
@@ -1149,12 +1158,31 @@ Selectively reading only the necessary data in this way is particularly useful f
 Another common use-case is that we only want to read those records that are located in some region of interest. Because the shapefile stores the bounding box of each shape separately from the geometry data, it's possible to quickly retrieve all shapes that might overlap a given bounding box region without having to load the full shape geometry data for every shape. This can be done by specifying the `bbox` argument to any of the record or shape methods:
 
 
-	>>> bbox = []
+	>>> bbox = [36.423, 12.360, 43.123, 18.004] # ca bbox of Eritrea
 	>>> fields = ["geonunit","name"]
 	>>> for shapeRec in sf.iterShapeRecords(bbox=bbox, fields=fields):
 	... 	shapeRec.record
+	Record #368: ['Afar', 'Ethiopia']
+	Record #369: ['Tadjourah', 'Djibouti']
+	Record #375: ['Obock', 'Djibouti']
+	Record #376: ['Debubawi Keyih Bahri', 'Eritrea']
+	Record #1106: ['Amhara', 'Ethiopia']
+	Record #1107: ['Gedarif', 'Sudan']
+	Record #1108: ['Tigray', 'Ethiopia']
+	Record #1414: ['Sa`dah', 'Yemen']
+	Record #1415: ['`Asir', 'Saudi Arabia']
+	Record #1416: ['Hajjah', 'Yemen']
+	Record #1417: ['Jizan', 'Saudi Arabia']
+	Record #1598: ['Debub', 'Eritrea']
+	Record #1599: ['Red Sea', 'Sudan']
+	Record #1600: ['Semenawi Keyih Bahri', 'Eritrea']
+	Record #1601: ['Gash Barka', 'Eritrea']
+	Record #1602: ['Kassala', 'Sudan']
+	Record #1603: ['Maekel', 'Eritrea']
+	Record #2037: ['Al Hudaydah', 'Yemen']
+	Record #3741: ['Anseba', 'Eritrea']
 
-This functionality means that shapefiles can be used as a bare-bones spatially indexed database, with very fast bounding box queries for even the largest of shapefiles. Note how, as with all spatial indexing, this method does not guarantee that the *geometries* of the resulting matches overlap the queried region, only that their *bounding boxes* overlap. 
+This functionality means that shapefiles can be used as a bare-bones spatially indexed database, with very fast bounding box queries for even the largest of shapefiles. Note that, as with all spatial indexing, this method does not guarantee that the *geometries* of the resulting matches overlap the queried region, only that their *bounding boxes* overlap. 
 
 ## Writing large shapefiles
 
