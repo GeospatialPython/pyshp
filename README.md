@@ -12,27 +12,69 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 
 [Version Changes](#version-changes)
 
-[Examples](#examples)
-- [Reading Shapefiles](#reading-shapefiles)
-  - [The Reader Class](#the-reader-class)
-  - [Reading Geometry](#reading-geometry)
-  - [Reading Records](#reading-records)
-  - [Reading Geometry and Records Simultaneously](#reading-geometry-and-records-simultaneously)
-- [Writing Shapefiles](#writing-shapefiles)
-  - [The Writer Class](#the-writer-class)
-  - [Adding Records](#adding-records)
-  - [Adding Geometry](#adding-geometry)
-  - [Geometry and Record Balancing](#geometry-and-record-balancing)
+[The Basics](#the-basics)
+- [PyShp](#pyshp)
+	- [Contents](#contents)
+- [Overview](#overview)
+- [Version Changes](#version-changes)
+	- [2.2.0](#220)
+		- [New Features:](#new-features)
+		- [Bug fixes:](#bug-fixes)
+	- [2.1.3](#213)
+		- [Bug fixes:](#bug-fixes-1)
+	- [2.1.2](#212)
+		- [Bug fixes:](#bug-fixes-2)
+	- [2.1.1](#211)
+		- [Improvements:](#improvements)
+		- [Bug fixes:](#bug-fixes-3)
+	- [2.1.0](#210)
+		- [New Features:](#new-features-1)
+		- [Bug fixes:](#bug-fixes-4)
+	- [2.0.0](#200)
+		- [Major Changes:](#major-changes)
+		- [Important Fixes:](#important-fixes)
+- [The Basics](#the-basics)
+	- [Reading Shapefiles](#reading-shapefiles)
+		- [The Reader Class](#the-reader-class)
+			- [Reading Shapefiles from Local Files](#reading-shapefiles-from-local-files)
+			- [Reading Shapefiles from Zip Files](#reading-shapefiles-from-zip-files)
+			- [Reading Shapefiles from URLs](#reading-shapefiles-from-urls)
+			- [Reading Shapefiles from File-Like Objects](#reading-shapefiles-from-file-like-objects)
+			- [Reading Shapefiles Using the Context Manager](#reading-shapefiles-using-the-context-manager)
+			- [Reading Shapefile Meta-Data](#reading-shapefile-meta-data)
+		- [Reading Geometry](#reading-geometry)
+		- [Reading Records](#reading-records)
+		- [Reading Geometry and Records Simultaneously](#reading-geometry-and-records-simultaneously)
+	- [Writing Shapefiles](#writing-shapefiles)
+		- [The Writer Class](#the-writer-class)
+			- [Writing Shapefiles to Local Files](#writing-shapefiles-to-local-files)
+			- [Writing Shapefiles to File-Like Objects](#writing-shapefiles-to-file-like-objects)
+			- [Writing Shapefiles Using the Context Manager](#writing-shapefiles-using-the-context-manager)
+			- [Setting the Shape Type](#setting-the-shape-type)
+		- [Adding Records](#adding-records)
+		- [Adding Geometry](#adding-geometry)
+		- [Geometry and Record Balancing](#geometry-and-record-balancing)
+- [Advanced Use](#advanced-use)
+	- [Shapefile Language and Character Encoding](#shapefile-language-and-character-encoding)
+	- [Reading Large Shapefiles](#reading-large-shapefiles)
+		- [Iterating through a shapefile](#iterating-through-a-shapefile)
+		- [Extracting attribute values](#extracting-attribute-values)
+		- [Attribute filtering](#attribute-filtering)
+		- [Spatial filtering](#spatial-filtering)
+	- [Writing large shapefiles](#writing-large-shapefiles)
+	- [3D and Other Geometry Types](#3d-and-other-geometry-types)
+- [Testing](#testing)
+- [Contributors](#contributors)
   
-[How To's](#how-tos)
-- [3D and Other Geometry Types](#3d-and-other-geometry-types)
+[Advanced Use](#advanced-use)
+- [Shapefile Language and Character Encoding](#shapefile-language-and-character-encoding)
 - [Reading Large Shapefiles](#reading-large-shapefiles)
   - [Iterating through a shapefile](#iterating-through-a-shapefile)
   - [Extracting attribute values](#extracting-attribute-values)
   - [Attribute filtering](#attribute-filtering)
   - [Spatial filtering](#spatial-filtering)
 - [Writing Large Shapefiles](#writing-large-shapefiles)
-- [Unicode and Shapefile Encodings](#unicode-and-shapefile-encodings)
+- [3D and Other Geometry Types](#3d-and-other-geometry-types)
 
 [Testing](#testing)
 
@@ -74,6 +116,12 @@ part of your geospatial project.
 
 
 # Version Changes
+
+## 2.2.0
+
+### New Features:
+
+### Bug fixes:
 
 ## 2.1.3
 
@@ -168,7 +216,7 @@ Users of the previous version 1.x should therefore take note of the following ch
 - Enforce maximum field limit. [@mwtoews]
 
 
-# Examples
+# The Basics
 
 Before doing anything you must import the library.
 
@@ -182,6 +230,8 @@ repository of the PyShp GitHub site.
 ## Reading Shapefiles
 
 ### The Reader Class
+
+#### Reading Shapefiles from Local Files
 
 To read a shapefile create a new "Reader" object and pass it the name of an
 existing shapefile. The shapefile format is actually a collection of three
@@ -204,7 +254,7 @@ OR
 OR any of the other 5+ formats which are potentially part of a shapefile. The
 library does not care about file extensions.
 
-#### Reading Shapefiles From Zip Files
+#### Reading Shapefiles from Zip Files
 
 If your shapefile is wrapped inside a zip file, the library is able to handle that too, meaning you don't have to worry about unzipping the contents: 
 
@@ -216,16 +266,16 @@ If the zip file contains multiple shapefiles, just specify which shapefile to re
 
 	>>> sf = shapefile.Reader("shapefiles/blockgroups_multishapefile.zip/blockgroups2.shp")
 
-#### Reading Shapefiles From URLs
+#### Reading Shapefiles from URLs
 
-Finally, you can use all of the above methods to read shapefiles directly from the internet, by giving their url instead of their local path, e.g.: 
+Finally, you can use all of the above methods to read shapefiles directly from the internet, by giving a url instead of a local path, e.g.: 
 
 
 	>>> # from a zipped shapefile on website
 	>>> sf = shapefile.Reader("https://biogeo.ucdavis.edu/data/diva/rrd/NIC_rrd.zip")
 
 	>>> # from a shapefile collection of files in a github repository
-	>>> sf = shapefile.Reader("https://github.com/nvkelso/natural-earth-vector/blob/master/110m_cultural/ne_110m_admin_0_tiny_countries?raw=true")
+	>>> sf = shapefile.Reader("https://github.com/nvkelso/natural-earth-vector/blob/master/110m_cultural/ne_110m_admin_0_tiny_countries.shp?raw=true")
 
 This will automatically download the file(s) to a temporary location before reading, saving you a lot of time and repetitive boilerplate code when you just want quick access to some external data.
 
@@ -606,6 +656,8 @@ interest. Many precision agriculture chemical field sprayers also use the shp
 format as a control file for the sprayer system (usually in combination with
 custom database file formats).
 
+#### Writing Shapefiles to Local Files
+
 To create a shapefile you begin by initiating a new Writer instance, passing it
 the file path and name to save to:
 
@@ -624,23 +676,6 @@ one or more file types:
 	
 In that case, any file types not assigned will not
 save and only file types with file names will be saved. 
-
-#### Writing Shapefiles Using the Context Manager
-
-The "Writer" class automatically closes the open files and writes the final headers once it is garbage collected.
-In case of a crash and to make the code more readable, it is nevertheless recommended 
-you do this manually by calling the "close()" method: 
-
-
-	>>> w.close()
-
-Alternatively, you can also use the "Writer" class as a context manager, to ensure open file
-objects are properly closed and final headers written once you exit the with-clause:
-
-
-	>>> with shapefile.Writer("shapefiles/test/contextwriter") as w:
-	... 	w.field('field1', 'C')
-	... 	pass
 
 #### Writing Shapefiles to File-Like Objects
 
@@ -661,6 +696,23 @@ write to them:
 	>>> w.null()
 	>>> w.close()
 	>>> # To read back the files you could call the "StringIO.getvalue()" method later.
+
+#### Writing Shapefiles Using the Context Manager
+
+The "Writer" class automatically closes the open files and writes the final headers once it is garbage collected.
+In case of a crash and to make the code more readable, it is nevertheless recommended 
+you do this manually by calling the "close()" method: 
+
+
+	>>> w.close()
+
+Alternatively, you can also use the "Writer" class as a context manager, to ensure open file
+objects are properly closed and final headers written once you exit the with-clause:
+
+
+	>>> with shapefile.Writer("shapefiles/test/contextwriter") as w:
+	... 	w.field('field1', 'C')
+	... 	pass
 	
 #### Setting the Shape Type
 
@@ -983,104 +1035,46 @@ most shapefile software.
 	
 
 
-# How To's
+# Advanced Use
 
-## 3D and Other Geometry Types
+## Shapefile Language and Character Encoding
 
-Most shapefiles store conventional 2D points, lines, or polygons. But the shapefile format is also capable
-of storing various other types of geometries as well, including complex 3D surfaces and objects. 
-
-**Shapefiles with measurement (M) values**
-
-Measured shape types are shapes that include a measurement value at each vertex, for instance
-speed measurements from a GPS device. Shapes with measurement (M) values are added with the following
-methods: "pointm", "multipointm", "linem", and "polygonm". The M-values are specified by adding a
-third M value to each XY coordinate. Missing or unobserved M-values are specified with a None value,
-or by simply omitting the third M-coordinate.
+PyShp supports reading and writing shapefiles in any language or character encoding, and provides several options for decoding and encoding text. 
+Most shapefiles are written in UTF-8 encoding, PyShp's default encoding, so in most cases you don't 
+have to specify the encoding. For reading shapefiles in any other encoding, such as Latin-1, just 
+supply the encoding option when creating the Reader class. 
 
 
-	>>> w = shapefile.Writer('shapefiles/test/linem')
-	>>> w.field('name', 'C')
+	>>> r = shapefile.Reader("shapefiles/test/latin1.shp", encoding="latin1")
+	>>> r.record(0) == [2, u'Ñandú']
+	True
 	
-	>>> w.linem([
-	...			[[1,5,0],[5,5],[5,1,3],[3,3,None],[1,1,0]], # line with one omitted and one missing M-value
-	...			[[3,2],[2,6]] # line without any M-values
-	...			])
-	
-	>>> w.record('linem1')
-	
+Once you have loaded the shapefile, you may choose to save it using another more supportive encoding such 
+as UTF-8. Assuming the new encoding supports the characters you are trying to write, reading it back in 
+should give you the same unicode string you started with. 
+
+
+	>>> w = shapefile.Writer("shapefiles/test/latin_as_utf8.shp", encoding="utf8")
+	>>> w.fields = r.fields[1:]
+	>>> w.record(*r.record(0))
+	>>> w.null()
 	>>> w.close()
 	
-Shapefiles containing M-values can be examined in several ways:
+	>>> r = shapefile.Reader("shapefiles/test/latin_as_utf8.shp", encoding="utf8")
+	>>> r.record(0) == [2, u'Ñandú']
+	True
+	
+If you supply the wrong encoding and the string is unable to be decoded, PyShp will by default raise an
+exception. If however, on rare occasion, you are unable to find the correct encoding and want to ignore
+or replace encoding errors, you can specify the "encodingErrors" to be used by the decode method. This
+applies to both reading and writing. 
 
-	>>> r = shapefile.Reader('shapefiles/test/linem')
-	
-	>>> r.mbox # the lower and upper bound of M-values in the shapefile
-	[0.0, 3.0]
-	
-	>>> r.shape(0).m # flat list of M-values
-	[0.0, None, 3.0, None, 0.0, None, None]
 
-	
-**Shapefiles with elevation (Z) values**
+	>>> r = shapefile.Reader("shapefiles/test/latin1.shp", encoding="ascii", encodingErrors="replace")
+	>>> r.record(0) == [2, u'�and�']
+	True
 
-Elevation shape types are shapes that include an elevation value at each vertex, for instance elevation from a GPS device. 
-Shapes with elevation (Z) values are added with the following methods: "pointz", "multipointz", "linez", and "polyz". 
-The Z-values are specified by adding a third Z value to each XY coordinate. Z-values do not support the concept of missing data,
-but if you omit the third Z-coordinate it will default to 0. Note that Z-type shapes also support measurement (M) values added
-as a fourth M-coordinate. This too is optional. 
-	
-	
-	>>> w = shapefile.Writer('shapefiles/test/linez')
-	>>> w.field('name', 'C')
-	
-	>>> w.linez([
-	...			[[1,5,18],[5,5,20],[5,1,22],[3,3],[1,1]], # line with some omitted Z-values
-	...			[[3,2],[2,6]], # line without any Z-values
-	...			[[3,2,15,0],[2,6,13,3],[1,9,14,2]] # line with both Z- and M-values
-	...			])
-	
-	>>> w.record('linez1')
-	
-	>>> w.close()
-	
-To examine a Z-type shapefile you can do:
 
-	>>> r = shapefile.Reader('shapefiles/test/linez')
-	
-	>>> r.zbox # the lower and upper bound of Z-values in the shapefile
-	[0.0, 22.0]
-	
-	>>> r.shape(0).z # flat list of Z-values
-	[18.0, 20.0, 22.0, 0.0, 0.0, 0.0, 0.0, 15.0, 13.0, 14.0]
-
-**3D MultiPatch Shapefiles**
-
-Multipatch shapes are useful for storing composite 3-Dimensional objects. 
-A MultiPatch shape represents a 3D object made up of one or more surface parts.
-Each surface in "parts" is defined by a list of XYZM values (Z and M values optional), and its corresponding type is
-given in the "partTypes" argument. The part type decides how the coordinate sequence is to be interpreted, and can be one 
-of the following module constants: TRIANGLE_STRIP, TRIANGLE_FAN, OUTER_RING, INNER_RING, FIRST_RING, or RING.
-For instance, a TRIANGLE_STRIP may be used to represent the walls of a building, combined with a TRIANGLE_FAN to represent 
-its roof: 
-
-	>>> from shapefile import TRIANGLE_STRIP, TRIANGLE_FAN
-	
-	>>> w = shapefile.Writer('shapefiles/test/multipatch')
-	>>> w.field('name', 'C')
-	
-	>>> w.multipatch([
-	...				 [[0,0,0],[0,0,3],[5,0,0],[5,0,3],[5,5,0],[5,5,3],[0,5,0],[0,5,3],[0,0,0],[0,0,3]], # TRIANGLE_STRIP for house walls
-	...				 [[2.5,2.5,5],[0,0,3],[5,0,3],[5,5,3],[0,5,3],[0,0,3]], # TRIANGLE_FAN for pointed house roof
-	...				 ],
-	...				 partTypes=[TRIANGLE_STRIP, TRIANGLE_FAN]) # one type for each part
-	
-	>>> w.record('house1')
-	
-	>>> w.close()
-	
-For an introduction to the various multipatch part types and examples of how to create 3D MultiPatch objects see [this
-ESRI White Paper](http://downloads.esri.com/support/whitepapers/ao_/J9749_MultiPatch_Geometry_Type.pdf). 
 
 ## Reading Large Shapefiles
 
@@ -1184,6 +1178,8 @@ Another common use-case is that we only want to read those records that are loca
 
 This functionality means that shapefiles can be used as a bare-bones spatially indexed database, with very fast bounding box queries for even the largest of shapefiles. Note that, as with all spatial indexing, this method does not guarantee that the *geometries* of the resulting matches overlap the queried region, only that their *bounding boxes* overlap. 
 
+
+
 ## Writing large shapefiles
 
 Similar to the Reader class, the shapefile Writer class uses a streaming approach to keep memory 
@@ -1199,43 +1195,105 @@ process and write any number of items, and even merge many different source file
 large shapefile. If you need to edit or undo any of your writing you would have to read the 
 file back in, one record at a time, make your changes, and write it back out. 
 
-## Unicode and Shapefile Encodings
-
-PyShp has full support for unicode and shapefile encodings, so you can always expect to be working
-with unicode strings in shapefiles that have text fields. 
-Most shapefiles are written in UTF-8 encoding, PyShp's default encoding, so in most cases you don't 
-have to specify the encoding. For reading shapefiles in any other encoding, such as Latin-1, just 
-supply the encoding option when creating the Reader class. 
 
 
-	>>> r = shapefile.Reader("shapefiles/test/latin1.shp", encoding="latin1")
-	>>> r.record(0) == [2, u'Ñandú']
-	True
+## 3D and Other Geometry Types
+
+Most shapefiles store conventional 2D points, lines, or polygons. But the shapefile format is also capable
+of storing various other types of geometries as well, including complex 3D surfaces and objects. 
+
+**Shapefiles with measurement (M) values**
+
+Measured shape types are shapes that include a measurement value at each vertex, for instance
+speed measurements from a GPS device. Shapes with measurement (M) values are added with the following
+methods: "pointm", "multipointm", "linem", and "polygonm". The M-values are specified by adding a
+third M value to each XY coordinate. Missing or unobserved M-values are specified with a None value,
+or by simply omitting the third M-coordinate.
+
+
+	>>> w = shapefile.Writer('shapefiles/test/linem')
+	>>> w.field('name', 'C')
 	
-Once you have loaded the shapefile, you may choose to save it using another more supportive encoding such 
-as UTF-8. Provided the new encoding supports the characters you are trying to write, reading it back in 
-should give you the same unicode string you started with. 
-
-
-	>>> w = shapefile.Writer("shapefiles/test/latin_as_utf8.shp", encoding="utf8")
-	>>> w.fields = r.fields[1:]
-	>>> w.record(*r.record(0))
-	>>> w.null()
+	>>> w.linem([
+	...			[[1,5,0],[5,5],[5,1,3],[3,3,None],[1,1,0]], # line with one omitted and one missing M-value
+	...			[[3,2],[2,6]] # line without any M-values
+	...			])
+	
+	>>> w.record('linem1')
+	
 	>>> w.close()
 	
-	>>> r = shapefile.Reader("shapefiles/test/latin_as_utf8.shp", encoding="utf8")
-	>>> r.record(0) == [2, u'Ñandú']
-	True
+Shapefiles containing M-values can be examined in several ways:
+
+	>>> r = shapefile.Reader('shapefiles/test/linem')
 	
-If you supply the wrong encoding and the string is unable to be decoded, PyShp will by default raise an
-exception. If however, on rare occasion, you are unable to find the correct encoding and want to ignore
-or replace encoding errors, you can specify the "encodingErrors" to be used by the decode method. This
-applies to both reading and writing. 
+	>>> r.mbox # the lower and upper bound of M-values in the shapefile
+	[0.0, 3.0]
+	
+	>>> r.shape(0).m # flat list of M-values
+	[0.0, None, 3.0, None, 0.0, None, None]
 
+	
+**Shapefiles with elevation (Z) values**
 
-	>>> r = shapefile.Reader("shapefiles/test/latin1.shp", encoding="ascii", encodingErrors="replace")
-	>>> r.record(0) == [2, u'�and�']
-	True
+Elevation shape types are shapes that include an elevation value at each vertex, for instance elevation from a GPS device. 
+Shapes with elevation (Z) values are added with the following methods: "pointz", "multipointz", "linez", and "polyz". 
+The Z-values are specified by adding a third Z value to each XY coordinate. Z-values do not support the concept of missing data,
+but if you omit the third Z-coordinate it will default to 0. Note that Z-type shapes also support measurement (M) values added
+as a fourth M-coordinate. This too is optional. 
+	
+	
+	>>> w = shapefile.Writer('shapefiles/test/linez')
+	>>> w.field('name', 'C')
+	
+	>>> w.linez([
+	...			[[1,5,18],[5,5,20],[5,1,22],[3,3],[1,1]], # line with some omitted Z-values
+	...			[[3,2],[2,6]], # line without any Z-values
+	...			[[3,2,15,0],[2,6,13,3],[1,9,14,2]] # line with both Z- and M-values
+	...			])
+	
+	>>> w.record('linez1')
+	
+	>>> w.close()
+	
+To examine a Z-type shapefile you can do:
+
+	>>> r = shapefile.Reader('shapefiles/test/linez')
+	
+	>>> r.zbox # the lower and upper bound of Z-values in the shapefile
+	[0.0, 22.0]
+	
+	>>> r.shape(0).z # flat list of Z-values
+	[18.0, 20.0, 22.0, 0.0, 0.0, 0.0, 0.0, 15.0, 13.0, 14.0]
+
+**3D MultiPatch Shapefiles**
+
+Multipatch shapes are useful for storing composite 3-Dimensional objects. 
+A MultiPatch shape represents a 3D object made up of one or more surface parts.
+Each surface in "parts" is defined by a list of XYZM values (Z and M values optional), and its corresponding type is
+given in the "partTypes" argument. The part type decides how the coordinate sequence is to be interpreted, and can be one 
+of the following module constants: TRIANGLE_STRIP, TRIANGLE_FAN, OUTER_RING, INNER_RING, FIRST_RING, or RING.
+For instance, a TRIANGLE_STRIP may be used to represent the walls of a building, combined with a TRIANGLE_FAN to represent 
+its roof: 
+
+	>>> from shapefile import TRIANGLE_STRIP, TRIANGLE_FAN
+	
+	>>> w = shapefile.Writer('shapefiles/test/multipatch')
+	>>> w.field('name', 'C')
+	
+	>>> w.multipatch([
+	...				 [[0,0,0],[0,0,3],[5,0,0],[5,0,3],[5,5,0],[5,5,3],[0,5,0],[0,5,3],[0,0,0],[0,0,3]], # TRIANGLE_STRIP for house walls
+	...				 [[2.5,2.5,5],[0,0,3],[5,0,3],[5,5,3],[0,5,3],[0,0,3]], # TRIANGLE_FAN for pointed house roof
+	...				 ],
+	...				 partTypes=[TRIANGLE_STRIP, TRIANGLE_FAN]) # one type for each part
+	
+	>>> w.record('house1')
+	
+	>>> w.close()
+	
+For an introduction to the various multipatch part types and examples of how to create 3D MultiPatch objects see [this
+ESRI White Paper](http://downloads.esri.com/support/whitepapers/ao_/J9749_MultiPatch_Geometry_Type.pdf). 
+
 
 	
 # Testing
