@@ -282,9 +282,9 @@ def test_reader_shapefile_type():
     is returned correctly.
     """
     with shapefile.Reader("shapefiles/blockgroups") as sf:
-        assert sf.shapeType is 5   # 5 means Polygon
+        assert sf.shapeType == 5   # 5 means Polygon
         assert sf.shapeType is shapefile.POLYGON
-        assert sf.shapeTypeName is "POLYGON"
+        assert sf.shapeTypeName == "POLYGON"
 
 
 def test_reader_shapefile_length():
@@ -300,9 +300,9 @@ def test_reader_shapefile_length():
 def test_shape_metadata():
     with shapefile.Reader("shapefiles/blockgroups") as sf:
         shape = sf.shape(0)
-        assert shape.shapeType is 5 # Polygon
+        assert shape.shapeType == 5 # Polygon
         assert shape.shapeType is shapefile.POLYGON
-        assert sf.shapeTypeName is "POLYGON"
+        assert sf.shapeTypeName == "POLYGON"
 
 
 def test_reader_fields():
@@ -359,7 +359,7 @@ def test_reader_filelike_shp_shx_only():
     with shapefile.Reader(shp=open("shapefiles/blockgroups.shp", "rb"), shx=open("shapefiles/blockgroups.shx", "rb")) as sf:
         assert len(sf) == 663
         shape = sf.shape(3)
-        assert len(shape.points) is 173
+        assert len(shape.points) == 173
 
 
 def test_reader_filelike_shx_optional():
@@ -371,7 +371,7 @@ def test_reader_filelike_shx_optional():
     with shapefile.Reader(shp=open("shapefiles/blockgroups.shp", "rb")) as sf:
         assert len(sf) == 663
         shape = sf.shape(3)
-        assert len(shape.points) is 173
+        assert len(shape.points) == 173
 
 
 def test_reader_shapefile_delayed_load():
@@ -497,7 +497,7 @@ def test_shaperecord_shape():
         shaperec = sf.shapeRecord(3)
         shape = shaperec.shape
         point = shape.points[0]
-        assert len(point) is 2
+        assert len(point) == 2
 
 
 def test_shaperecord_record():
