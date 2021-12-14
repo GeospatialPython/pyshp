@@ -321,7 +321,7 @@ def test_reader_zip():
 
 def test_reader_close():
     """
-    Assert that manually callcin Reader.close()
+    Assert that manually calling Reader.close()
     closes the shp, shx, and dbf files
     on exit.
     """

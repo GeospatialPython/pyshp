@@ -26,7 +26,12 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
   
 [How To's](#how-tos)
 - [3D and Other Geometry Types](#3d-and-other-geometry-types)
-- [Working with Large Shapefiles](#working-with-large-shapefiles)
+- [Reading Large Shapefiles](#reading-large-shapefiles)
+  - [Iterating through a shapefile](#iterating-through-a-shapefile)
+  - [Extracting attribute values](#extracting-attribute-values)
+  - [Attribute filtering](#attribute-filtering)
+  - [Spatial filtering](#spatial-filtering)
+- [Writing Large Shapefiles](#writing-large-shapefiles)
 - [Unicode and Shapefile Encodings](#unicode-and-shapefile-encodings)
 
 [Testing](#testing)
@@ -199,23 +204,36 @@ OR
 OR any of the other 5+ formats which are potentially part of a shapefile. The
 library does not care about file extensions.
 
-#### Reading Shapefiles Using the Context Manager
+#### Reading Shapefiles From Zip Files
 
-The "Reader" class can be used as a context manager, to ensure open file
-objects are properly closed when done reading the data:
+If your shapefile is wrapped inside a zip file, the library is able to handle that too, meaning you don't have to worry about unzipping the contents: 
 
-    >>> with shapefile.Reader("shapefiles/blockgroups.shp") as shp:
-    ...     print(shp)
-    shapefile Reader
-        663 shapes (type 'POLYGON')
-        663 records (44 fields)
+
+	>>> sf = shapefile.Reader("shapefiles/blockgroups.zip")
+
+If the zip file contains multiple shapefiles, just specify which shapefile to read by additionally specifying the relative path after the ".zip" part:
+
+
+	>>> sf = shapefile.Reader("shapfiles/blockgroups_multishapefile.zip/blockgroups2.shp")
+
+#### Reading Shapefiles From URLs
+
+Finally, you can use all of the above methods to read shapefiles directly from the internet, by giving their url instead of their local path, e.g.: 
+
+
+	>>> # from a zipped shapefile on website
+	>>> sf = shapefile.Reader("https://biogeo.ucdavis.edu/data/diva/rrd/NIC_rrd.zip")
+
+	>>> # from a shapefile collection of files in a github repository
+	>>> sf = shapefile.Reader("https://github.com/nvkelso/natural-earth-vector/blob/master/110m_cultural/ne_110m_admin_0_tiny_countries?raw=true")
+
+This will automatically download the file(s) to a temporary location before reading, saving you a lot of time and repetitive boilerplate code when you just want quick access to some external data.
 
 #### Reading Shapefiles from File-Like Objects
 
 You can also load shapefiles from any Python file-like object using keyword
 arguments to specify any of the three files. This feature is very powerful and
-allows you to load shapefiles from a url, a zip file, a serialized object,
-or in some cases a database.
+allows you to custom load shapefiles from arbitrary storage formats, such as a protected url or zip file, a serialized object, or in some cases a database.
 
 
 	>>> myshp = open("shapefiles/blockgroups.shp", "rb")
@@ -228,6 +246,17 @@ file. This file is optional for reading. If it's available PyShp will use the
 shx file to access shape records a little faster but will do just fine without
 it.
 
+#### Reading Shapefiles Using the Context Manager
+
+The "Reader" class can be used as a context manager, to ensure open file
+objects are properly closed when done reading the data:
+
+    >>> with shapefile.Reader("shapefiles/blockgroups.shp") as shp:
+    ...     print(shp)
+    shapefile Reader
+        663 shapes (type 'POLYGON')
+        663 records (44 fields)
+
 #### Reading Shapefile Meta-Data
 
 Shapefiles have a number of attributes for inspecting the file contents.
@@ -235,6 +264,7 @@ A shapefile is a container for a specific type of geometry, and this can be chec
 shapeType attribute. 
 
 
+	>>> sf = shapefile.Reader("shapefiles/blockgroups.dbf")
 	>>> sf.shapeType
 	5
 
@@ -1052,11 +1082,17 @@ its roof:
 For an introduction to the various multipatch part types and examples of how to create 3D MultiPatch objects see [this
 ESRI White Paper](http://downloads.esri.com/support/whitepapers/ao_/J9749_MultiPatch_Geometry_Type.pdf). 
 
-## Working with Large Shapefiles
+## Reading Large Shapefiles
 
-Despite being a lightweight library, PyShp is designed to be able to read and write 
-shapefiles of any size, allowing you to work with hundreds of thousands or even millions 
+Despite being a lightweight library, PyShp is designed to be able to read shapefiles of any size, allowing you to work with hundreds of thousands or even millions 
 of records and complex geometries. 
+
+### Iterating through a shapefile
+
+As an example, let's load this Natural Earth shapefile of more than 4000 global administrative boundary polygons:
+
+
+	>>> sf = shapefile.Reader("https://github.com/nvkelso/natural-earth-vector/blob/master/10m_cultural/ne_10m_admin_1_states_provinces?raw=true")
 
 When first creating the Reader class, the library only reads the header information
 and leaves the rest of the file contents alone. Once you call the records() and shapes() 
@@ -1082,9 +1118,48 @@ through them while keeping memory usage at a minimum.
 	>>> for shapeRec in sf: # same as iterShapeRecords()
 	...     # do something here
 	...     pass
-	
-The shapefile Writer class uses a similar streaming approach to keep memory 
-usage at a minimum. The library takes care of this under-the-hood by immediately 
+
+### Extracting attribute values
+
+By default when reading the attribute records of a shapefile, pyshp unpacks and returns the data for all of the dbf fields, regardless of whether you actually need that data or not. To limit which field data is unpacked when reading each record, you can specify the `fields` argument to any of the methods involving record data. For instance, if we are only interested in the country and name of each admin unit, the following is a much faster way of iterating the file:
+
+
+	>>> fields = ["geonunit", "name"]
+	>>> for rec in sf.iterRecords(fields=fields):
+	... 	# do something
+	... 	pass
+
+### Attribute filtering
+
+In many cases, we aren't interested in all entries of a shapefile, but rather only want to retrieve a small subset of records by filtering on some attribute. To avoid wasting time reading records and shapes that we don't need, we can start by iterating only the records and fields of interest, check if the record matches some condition as a way to filter the data, and finally load the full record and shape geometry for those that meet the condition:
+
+
+	>>> filter_field = "geonunit"
+	>>> filter_value = "Germany"
+	>>> for rec in sf.iterRecords(fields=[filter_field]):
+	...     if rec[filter_field] == filter_value:
+	... 		# load full record and shape
+    ... 		shapeRec = sf.shapeRecord(rec.oid)
+	... 		shapeRec.record["name"]
+
+Selectively reading only the necessary data in this way is particularly useful for efficiently processing a limited subset of data from very large files or when looping through a large number of files, especially if they contain large attribute tables or complex shape geometries. 
+
+### Spatial filtering
+
+Another common use-case is that we only want to read those records that are located in some region of interest. Because the shapefile stores the bounding box of each shape separately from the geometry data, it's possible to quickly retrieve all shapes that might overlap a given bounding box region without having to load the full shape geometry data for every shape. This can be done by specifying the `bbox` argument to any of the record or shape methods:
+
+
+	>>> bbox = []
+	>>> fields = ["geonunit","name"]
+	>>> for shapeRec in sf.iterShapeRecords(bbox=bbox, fields=fields):
+	... 	shapeRec.record
+
+This functionality means that shapefiles can be used as a bare-bones spatially indexed database, with very fast bounding box queries for even the largest of shapefiles. Note how, as with all spatial indexing, this method does not guarantee that the *geometries* of the resulting matches overlap the queried region, only that their *bounding boxes* overlap. 
+
+## Writing large shapefiles
+
+Similar to the Reader class, the shapefile Writer class uses a streaming approach to keep memory 
+usage at a minimum and allow writing shapefiles of arbitrarily large sizes. The library takes care of this under-the-hood by immediately 
 writing each geometry and record to disk the moment they 
 are added using shape() or record(). Once the writer is closed, exited, or garbage 
 collected, the final header information is calculated and written to the beginning of 
