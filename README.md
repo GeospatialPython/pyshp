@@ -19,13 +19,14 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 - [Version Changes](#version-changes)
 	- [2.2.0](#220)
 		- [New Features:](#new-features)
+		- [Improvements:](#improvements)
 		- [Bug fixes:](#bug-fixes)
 	- [2.1.3](#213)
 		- [Bug fixes:](#bug-fixes-1)
 	- [2.1.2](#212)
 		- [Bug fixes:](#bug-fixes-2)
 	- [2.1.1](#211)
-		- [Improvements:](#improvements)
+		- [Improvements:](#improvements-1)
 		- [Bug fixes:](#bug-fixes-3)
 	- [2.1.0](#210)
 		- [New Features:](#new-features-1)
@@ -121,7 +122,25 @@ part of your geospatial project.
 
 ### New Features:
 
+- Read shapefiles directly from zipfiles.
+- Read shapefiles directly from urls.
+- Allow fast extraction of only a subset of dbf fields through a `fields` arg.
+- Allow fast filtering which shapes to read from the file through a `bbox` arg.
+
+### Improvements:
+
+- More examples and restructuring of README. 
+- More informative Shape to geojson warnings (see #219).
+- Shape object information when calling repr().
+- Faster ring orientation checks, enforce geojson output ring orientation.
+
 ### Bug fixes:
+
+- Remove null-padding at end of some record character fields.
+- Fix dbf writing error when the number of record list or dict entries didn't match the number of fields.
+- Handle rare garbage collection issue after deepcopy (https://github.com/mattijn/topojson/issues/120)
+- Fix bug where records and shapes would be assigned incorrect record number (@karanrn)
+- Fix typos in docs (@timgates)
 
 ## 2.1.3
 
@@ -1192,7 +1211,9 @@ the file.
 This means that as long as you are able to iterate through a source file without having
 to load everything into memory, such as a large CSV table or a large shapefile, you can 
 process and write any number of items, and even merge many different source files into a single 
-large shapefile. If you need to edit or undo any of your writing you would have to read the 
+large shapefile. 
+
+If you need to edit or undo any of your writing you would have to read the 
 file back in, one record at a time, make your changes, and write it back out. 
 
 
@@ -1325,6 +1346,7 @@ Ignacio Martinez Vazquez
 Jason Moujaes
 Jonty Wareing
 Karim Bahgat
+karanrn
 Kyle Kelley
 Louis Tiao
 Marcin Cuprjak
@@ -1341,6 +1363,7 @@ Razzi Abuissa
 RosBer97
 Ross Rogers
 Ryan Brideau
+Tim Gates
 Tobias Megies
 Tommi Penttinen
 Uli Köhler

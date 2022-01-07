@@ -1,4 +1,26 @@
 
+VERSION 2.2.0
+
+2022-01-07
+	New Features:
+	* Read shapefiles directly from zipfiles.
+	* Read shapefiles directly from urls.
+	* Allow fast extraction of only a subset of dbf fields through a `fields` arg.
+	* Allow fast filtering which shapes to read from the file through a `bbox` arg.
+
+	Improvements:
+	* More examples and restructuring of README. 
+	* More informative Shape to geojson warnings (see #219).
+	* Shape object information when calling repr().
+	* Faster ring orientation checks, enforce geojson output ring orientation.
+
+	Bug fixes:
+	* Remove null-padding at end of some record character fields.
+	* Fix dbf writing error when the number of record list or dict entries didn't match the number of fields.
+	* Handle rare garbage collection issue after deepcopy (https://github.com/mattijn/topojson/issues/120)
+	* Fix bug where records and shapes would be assigned incorrect record number (@karanrn)
+	* Fix typos in docs (@timgates)
+
 VERSION 2.1.3
 
 2021-01-14
