@@ -63,6 +63,8 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 		- [Attribute filtering](#attribute-filtering)
 		- [Spatial filtering](#spatial-filtering)
 	- [Writing large shapefiles](#writing-large-shapefiles)
+		- [Merging multiple shapefiles](#merging-multiple-shapefiles)
+		- [Editing shapefiles](#editing-shapefiles)
 	- [3D and Other Geometry Types](#3d-and-other-geometry-types)
 - [Testing](#testing)
 - [Contributors](#contributors)
@@ -1208,15 +1210,61 @@ are added using shape() or record(). Once the writer is closed, exited, or garba
 collected, the final header information is calculated and written to the beginning of 
 the file. 
 
-This means that as long as you are able to iterate through a source file without having
-to load everything into memory, such as a large CSV table or a large shapefile, you can 
-process and write any number of items, and even merge many different source files into a single 
-large shapefile. 
+### Merging multiple shapefiles
 
-If you need to edit or undo any of your writing you would have to read the 
-file back in, one record at a time, make your changes, and write it back out. 
+This means that it's possible to merge hundreds or thousands of shapefiles, as 
+long as you iterate through the source files to avoid loading everything into 
+memory. The following example copies the contents of a shapefile to a new file 10 times:
 
+	>>> # create writer
+	>>> w = shapefile.Writer('shapefiles/test/merge')
 
+	>>> # copy over fields from the reader
+	>>> r = shapefile.Reader("shapefiles/blockgroups")
+	>>> for field in r.fields[1:]:
+	...     w.field(*field)
+
+	>>> # copy the shapefile to writer 10 times
+	>>> repeat = 10
+	>>> for i in range(repeat):
+	...     r = shapefile.Reader("shapefiles/blockgroups")
+	...     for shapeRec in r.iterShapeRecords():
+	...         w.record(*shapeRec.record)
+	...         w.shape(shapeRec.shape)
+
+	>>> # check that the written file is 10 times longer
+	>>> len(w) == len(r) * 10
+	True
+
+	>>> # close the writer
+	>>> w.close()
+
+In this trivial example, we knew that all files had the exact same field names, ordering, and types. In other scenarios, you will have to additionally make sure that all shapefiles have the exact same fields in the same order, and that they all contain the same geometry type. 
+
+### Editing shapefiles
+
+If you need to edit a shapefile you would have to read the 
+file one record at a time, modify or filter the contents, and write it back out. For instance, to only keep a subset of relevant fields: 
+
+	>>> # create writer
+	>>> w = shapefile.Writer('shapefiles/test/edit')
+
+	>>> # define which fields to keep
+	>>> keep_fields = ['BKG_KEY', 'MEDIANRENT']
+
+	>>> # copy over the relevant fields from the reader
+	>>> r = shapefile.Reader("shapefiles/blockgroups")
+	>>> for field in r.fields[1:]:
+	...     if field[0] in keep_fields:
+	...         w.field(*field)
+
+	>>> # write only the relevant attribute values
+	>>> for shapeRec in r.iterShapeRecords(fields=keep_fields):
+	...     w.record(*shapeRec.record)
+	...     w.shape(shapeRec.shape)
+
+	>>> # close writer
+	>>> w.close()
 
 ## 3D and Other Geometry Types
 
