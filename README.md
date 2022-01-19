@@ -8,32 +8,8 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 
 ## Contents
 
-[Overview](#overview)
-
-[Version Changes](#version-changes)
-
-[The Basics](#the-basics)
-- [PyShp](#pyshp)
-	- [Contents](#contents)
 - [Overview](#overview)
 - [Version Changes](#version-changes)
-	- [2.2.0](#220)
-		- [New Features:](#new-features)
-		- [Improvements:](#improvements)
-		- [Bug fixes:](#bug-fixes)
-	- [2.1.3](#213)
-		- [Bug fixes:](#bug-fixes-1)
-	- [2.1.2](#212)
-		- [Bug fixes:](#bug-fixes-2)
-	- [2.1.1](#211)
-		- [Improvements:](#improvements-1)
-		- [Bug fixes:](#bug-fixes-3)
-	- [2.1.0](#210)
-		- [New Features:](#new-features-1)
-		- [Bug fixes:](#bug-fixes-4)
-	- [2.0.0](#200)
-		- [Major Changes:](#major-changes)
-		- [Important Fixes:](#important-fixes)
 - [The Basics](#the-basics)
 	- [Reading Shapefiles](#reading-shapefiles)
 		- [The Reader Class](#the-reader-class)
@@ -68,18 +44,6 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 	- [3D and Other Geometry Types](#3d-and-other-geometry-types)
 - [Testing](#testing)
 - [Contributors](#contributors)
-  
-[Advanced Use](#advanced-use)
-- [Shapefile Language and Character Encoding](#shapefile-language-and-character-encoding)
-- [Reading Large Shapefiles](#reading-large-shapefiles)
-  - [Iterating through a shapefile](#iterating-through-a-shapefile)
-  - [Extracting attribute values](#extracting-attribute-values)
-  - [Attribute filtering](#attribute-filtering)
-  - [Spatial filtering](#spatial-filtering)
-- [Writing Large Shapefiles](#writing-large-shapefiles)
-- [3D and Other Geometry Types](#3d-and-other-geometry-types)
-
-[Testing](#testing)
 
 
 # Overview
