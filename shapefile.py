@@ -1424,6 +1424,7 @@ class Reader(object):
             raise ShapefileException("Shapefile Reader requires a shapefile or file-like object. (no dbf file found)")
         dbf = self.dbf
         # read relevant header parts
+        dbf.seek(0)
         self.numRecords, self.__dbfHdrLength, self.__recordLength = \
                 unpack("<xxxxLHH20x", dbf.read(32))
         # read fields
