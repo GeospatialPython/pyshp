@@ -930,9 +930,8 @@ class Reader(object):
         # See if a shapefile name was passed as the first argument
         if len(args) > 0:
             if is_string(args[0]):
-                # Shapefile given as a string path
                 path = args[0]
-
+                
                 if '.zip' in path:
                     # Shapefile is inside a zipfile
                     if path.count('.zip') > 1:
@@ -945,50 +944,57 @@ class Reader(object):
                     else:
                         zpath = path[:path.find('.zip')+4]
                         shapefile = path[path.find('.zip')+4+1:]
-                    # Handle url inputs
+                    # Create a zip file handle
                     if zpath.startswith('http'):
-                        # Shapefile is from a url
+                        # Zipfile is from a url
                         # Download to a temporary url and treat as normal zipfile
                         req = Request(zpath, headers={'User-agent':'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'})
                         resp = urlopen(req)
-                        zfile = os.path.basename(zpath)
-                        dpathdir = tempfile.gettempdir()
-                        dpath = os.path.join(dpathdir, zfile)
-                        with open(dpath, 'wb') as f:
-                            f.write(resp.read())
-                        zpath = dpath
+                        # write zipfile data to a read+write tempfile and use as source, gets deleted when garbage collected
+                        zipfileobj = tempfile.NamedTemporaryFile(mode='w+b', suffix='.zip', delete=True)
+                        zipfileobj.write(resp.read())
+                        zipfileobj.seek(0)
+                    else:
+                        # Zipfile is from a file
+                        zipfileobj = open(zpath, mode='rb')
                     # Open the zipfile archive
-                    archive = zipfile.ZipFile(zpath, 'r')
-                    if not shapefile:
-                        # Only the zipfile path is given
-                        # Inspect zipfile contents to find the full shapefile path
-                        shapefiles = [name
-                                    for name in archive.namelist()
-                                    if name.endswith('.shp')]
-                        # The zipfile must contain exactly one shapefile
-                        if len(shapefiles) == 0:
-                            raise ShapefileException('Zipfile does not contain any shapefiles')
-                        elif len(shapefiles) == 1:
-                            shapefile = shapefiles[0]
-                        else:
-                            raise ShapefileException('Zipfile contains more than one shapefile: %s. Please specify the full \
-                                path to the shapefile you would like to open.' % shapefiles )
-                    # Try to extract file-like objects from zipfile
-                    shapefile = os.path.splitext(shapefile)[0] # root shapefile name
-                    tempdir = tempfile.gettempdir()
-                    for ext in ['shp','shx','dbf']:
-                        try:
-                            # Note: archive.open() would be easier, but loads file into memory
-                            # and cannot always use .seek()
-                            temppath = archive.extract(shapefile+'.'+ext, tempdir)
-                            fileobj = open(temppath, 'rb')
-                            setattr(self, ext, fileobj)
-                        except:
-                            pass
+                    with zipfile.ZipFile(zipfileobj, 'r') as archive:
+                        if not shapefile:
+                            # Only the zipfile path is given
+                            # Inspect zipfile contents to find the full shapefile path
+                            shapefiles = [name
+                                        for name in archive.namelist()
+                                        if name.endswith('.shp')]
+                            # The zipfile must contain exactly one shapefile
+                            if len(shapefiles) == 0:
+                                raise ShapefileException('Zipfile does not contain any shapefiles')
+                            elif len(shapefiles) == 1:
+                                shapefile = shapefiles[0]
+                            else:
+                                raise ShapefileException('Zipfile contains more than one shapefile: %s. Please specify the full \
+                                    path to the shapefile you would like to open.' % shapefiles )
+                        # Try to extract file-like objects from zipfile
+                        shapefile = os.path.splitext(shapefile)[0] # root shapefile name
+                        for ext in ['shp','shx','dbf']:
+                            try:
+                                member = archive.open(shapefile+'.'+ext)
+                                # write zipfile member data to a read+write tempfile and use as source, gets deleted on close()
+                                fileobj = tempfile.NamedTemporaryFile(mode='w+b', delete=True)
+                                fileobj.write(member.read())
+                                fileobj.seek(0)
+                                setattr(self, ext, fileobj)
+                            except:
+                                pass
+                    # Close and delete the temporary zipfile
+                    try: zipfileobj.close()
+                    except: pass
+                    # Try to load shapefile
                     if (self.shp or self.dbf):
                         # Load and exit early
                         self.load()
                         return
+                    else:
+                        raise ShapefileException("No shp or dbf file found in zipfile: %s" % path)
 
                 elif path.startswith('http'):
                     # Shapefile is from a url
