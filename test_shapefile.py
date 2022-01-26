@@ -318,6 +318,11 @@ def test_reader_zip():
             pass
         assert len(sf) > 0
 
+    # test raising error when can't find shapefile inside zipfile
+    with pytest.raises(shapefile.ShapefileException):
+        with shapefile.Reader("shapefiles/empty_zipfile.zip") as sf:
+            pass
+
 
 def test_reader_close():
     """
@@ -537,7 +542,7 @@ def test_record_subfields_empty():
     """
     fields = []
     test_record_attributes(fields=fields)
-    # check that only 3 values
+    # check that only 0 values
     with shapefile.Reader("shapefiles/blockgroups") as sf:
         rec = sf.record(0, fields=fields)
         assert len(rec) == 0
