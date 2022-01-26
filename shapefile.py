@@ -1354,9 +1354,8 @@ class Reader(object):
                 self.numShapes = shxRecordLength // 8
             # Jump to the first record.
             shx.seek(100)
-            shxRecords = _Array('i')
-            # Each offset consists of two nrs, only the first one matters
-            shxRecords.fromfile(shx, 2 * self.numShapes)
+            # Each index record consists of two nrs, we only want the first one
+            shxRecords = _Array('i', shx.read(2 * self.numShapes * 4) )
             if sys.byteorder != 'big':
                  shxRecords.byteswap()
             self._offsets = [2 * el for el in shxRecords[::2]]
