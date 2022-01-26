@@ -19,8 +19,6 @@ import io
 from datetime import date
 import zipfile
 
-from cv2 import FAST_FEATURE_DETECTOR_FAST_N
-
 
 # Module settings
 VERBOSE = True
