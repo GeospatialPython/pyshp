@@ -35,7 +35,7 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 	- [Shapefile Language and Character Encoding](#shapefile-language-and-character-encoding)
 	- [Reading Large Shapefiles](#reading-large-shapefiles)
 		- [Iterating through a shapefile](#iterating-through-a-shapefile)
-		- [Extracting attribute values](#extracting-attribute-values)
+		- [Limiting which fields to read](#limiting-which-fields-to-read)
 		- [Attribute filtering](#attribute-filtering)
 		- [Spatial filtering](#spatial-filtering)
 	- [Writing large shapefiles](#writing-large-shapefiles)
@@ -1098,9 +1098,9 @@ through them while keeping memory usage at a minimum.
 	...     # do something here
 	...     pass
 
-### Extracting attribute values
+### Limiting which fields to read
 
-By default when reading the attribute records of a shapefile, pyshp unpacks and returns the data for all of the dbf fields, regardless of whether you actually need that data or not. To limit which field data is unpacked when reading each record, you can specify the `fields` argument to any of the methods involving record data. For instance, if we are only interested in the country and name of each admin unit, the following is a much faster way of iterating the file:
+By default when reading the attribute records of a shapefile, pyshp unpacks and returns the data for all of the dbf fields, regardless of whether you actually need that data or not. To limit which field data is unpacked when reading each record and speed up processing time, you can specify the `fields` argument to any of the methods involving record data. Note that the order of the specified fields does not matter, the resulting records will list the specified field values in the order that they appear in the original dbf file. For instance, if we are only interested in the country and name of each admin unit, the following is a more efficient way of iterating through the file:
 
 
 	>>> fields = ["geonunit", "name"]
@@ -1110,7 +1110,6 @@ By default when reading the attribute records of a shapefile, pyshp unpacks and 
 	>>> rec
 	Record #4595: ['Birgu', 'Malta']
 	
-
 ### Attribute filtering
 
 In many cases, we aren't interested in all entries of a shapefile, but rather only want to retrieve a small subset of records by filtering on some attribute. To avoid wasting time reading records and shapes that we don't need, we can start by iterating only the records and fields of interest, check if the record matches some condition as a way to filter the data, and finally load the full record and shape geometry for those that meet the condition:
@@ -1208,7 +1207,7 @@ In this trivial example, we knew that all files had the exact same field names, 
 ### Editing shapefiles
 
 If you need to edit a shapefile you would have to read the 
-file one record at a time, modify or filter the contents, and write it back out. For instance, to only keep a subset of relevant fields: 
+file one record at a time, modify or filter the contents, and write it back out. For instance, to create a copy of a shapefile that only keeps a subset of relevant fields: 
 
 	>>> # create writer
 	>>> w = shapefile.Writer('shapefiles/test/edit')
