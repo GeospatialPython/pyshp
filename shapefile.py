@@ -903,7 +903,9 @@ class Reader(object):
     The .shx index file is used if available for efficiency
     but is not required to read the geometry from the .shp
     file. The "shapefile" argument in the constructor is the
-    name of the file you want to open.
+    name of the file you want to open, and can be the path
+    to a shapefile on a local filesystem, inside a zipfile, 
+    or a url. 
 
     You can instantiate a Reader without specifying a shapefile
     and then specify one later with the load() method.
