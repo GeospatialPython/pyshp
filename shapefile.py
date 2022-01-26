@@ -19,6 +19,8 @@ import io
 from datetime import date
 import zipfile
 
+from cv2 import FAST_FEATURE_DETECTOR_FAST_N
+
 
 # Module settings
 VERBOSE = True
@@ -928,7 +930,9 @@ class Reader(object):
         # See if a shapefile name was passed as the first argument
         if len(args) > 0:
             if is_string(args[0]):
+                # Shapefile given as a string path
                 path = args[0]
+
                 if '.zip' in path:
                     # Shapefile is inside a zipfile
                     if path.count('.zip') > 1:
@@ -981,36 +985,45 @@ class Reader(object):
                             setattr(self, ext, fileobj)
                         except:
                             pass
+                    if (self.shp or self.dbf):
+                        # Load and exit early
+                        self.load()
+                        return
+
+                elif path.startswith('http'):
+                    # Shapefile is from a url
+                    # Download each file to temporary path and treat as normal shapefile path
+                    urlinfo = urlparse(path)
+                    urlpath = urlinfo[2]
+                    urlpath,_ = os.path.splitext(urlpath)
+                    shapefile = os.path.basename(urlpath)
+                    for ext in ['shp','shx','dbf']:
+                        try:
+                            _urlinfo = list(urlinfo)
+                            _urlinfo[2] = urlpath + '.' + ext
+                            _path = urlunparse(_urlinfo)
+                            req = Request(_path, headers={'User-agent':'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'})
+                            resp = urlopen(req)
+                            # write url data to a read+write tempfile and use as source, gets deleted on close()
+                            fileobj = tempfile.NamedTemporaryFile(mode='w+b', delete=True)
+                            fileobj.write(resp.read())
+                            fileobj.seek(0)
+                            setattr(self, ext, fileobj)
+                        except HTTPError:
+                            pass
+                    if (self.shp or self.dbf):
+                        # Load and exit early
+                        self.load()
+                        return
+                    else:
+                        raise ShapefileException("No shp or dbf file found at url: %s" % path)
+
                 else:
-                    # Direct path to a shapefile given
-                    if path.startswith('http'):
-                        # Shapefile is from a url
-                        # Download each file to temporary path and treat as normal shapefile path
-                        urlinfo = urlparse(path)
-                        urlpath = urlinfo[2]
-                        urlpath,_ = os.path.splitext(urlpath)
-                        shapefile = os.path.basename(urlpath)
-                        dpath = None
-                        for ext in ['.shp','.shx','.dbf']:
-                            try:
-                                _urlinfo = list(urlinfo)
-                                _urlinfo[2] = urlpath+ext
-                                _path = urlunparse(_urlinfo)
-                                req = Request(_path, headers={'User-agent':'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'})
-                                resp = urlopen(req)
-                                dpathdir = tempfile.gettempdir()
-                                dpath = os.path.join(dpathdir, shapefile+ext)
-                                with open(dpath, 'wb') as f:
-                                    f.write(resp.read())
-                            except HTTPError:
-                                pass
-                        if dpath:
-                            path = os.path.splitext(dpath)[0]
-                        else:
-                            raise ShapefileException("No shp, shx, or dbf file found at url: %s" % path)
+                    # Local file path to a shapefile
                     # Load and exit early
                     self.load(path)
                     return
+                    
         # Otherwise, load from separate shp/shx/dbf args (must be file-like)
         if "shp" in kwargs.keys():
             if hasattr(kwargs["shp"], "read"):
