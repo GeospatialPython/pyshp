@@ -1,7 +1,7 @@
 
 VERSION 2.2.0
 
-2022-01-07
+2022-02-02
 	New Features:
 	* Read shapefiles directly from zipfiles.
 	* Read shapefiles directly from urls.
