@@ -7,11 +7,11 @@ def read_file(file):
     return data.decode('utf-8')
 
 setup(name='pyshp',
-      version='2.2.0dev',
+      version='2.2.0',
       description='Pure Python read/write support for ESRI Shapefile format',
       long_description=read_file('README.md'),
       long_description_content_type='text/markdown',
-      author='Joel Lawhead',
+      author='Joel Lawhead, Karim Bahgat',
       author_email='jlawhead@geospatialpython.com',
       url='https://github.com/GeospatialPython/pyshp',
       py_modules=['shapefile'],
