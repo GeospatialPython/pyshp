@@ -260,6 +260,7 @@ def test_reader_context_manager():
     assert sf.shx.closed is True
 
 
+@pytest.mark.network
 def test_reader_url():
     """
     Assert that Reader can open shapefiles from a url.
