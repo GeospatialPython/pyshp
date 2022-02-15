@@ -161,6 +161,24 @@ else:
     def is_string(v):
         return isinstance(v, basestring)
 
+if sys.version_info[0:2] >= (3, 6):
+    def pathlike_obj(path):
+        if isinstance(path, os.PathLike):
+            return os.fsdecode(path)
+        else:
+            return path
+else:
+    def pathlike_obj(path):
+        if is_string(path):
+            return path
+        elif hasattr(path, "__fspath__"):
+            return path.__fspath__()
+        else:
+            try:
+                return str(path)
+            except:
+                return path
+
 
 # Begin
 
@@ -930,14 +948,14 @@ class Reader(object):
         self.encodingErrors = kwargs.pop('encodingErrors', 'strict')
         # See if a shapefile name was passed as the first argument
         if len(args) > 0:
-            if is_string(args[0]):
-                path = args[0]
-                
+            path = pathlike_obj(args[0])
+            if is_string(path):
+
                 if '.zip' in path:
                     # Shapefile is inside a zipfile
                     if path.count('.zip') > 1:
                         # Multiple nested zipfiles
-                        raise ShapefileException('Reading from multiple nested zipfiles is not supported: %s' % args[0])
+                        raise ShapefileException('Reading from multiple nested zipfiles is not supported: %s' % path)
                     # Split into zipfile and shapefile paths
                     if path.endswith('.zip'):
                         zpath = path
@@ -1708,8 +1726,9 @@ class Writer(object):
         self.shapeType = shapeType
         self.shp = self.shx = self.dbf = None
         if target:
+            target = pathlike_obj(target)
             if not is_string(target):
-                raise Exception('The target filepath {} must be of type str/unicode, not {}.'.format(repr(target), type(target)) )
+                raise Exception('The target filepath {} must be of type str/unicode or path-like, not {}.'.format(repr(target), type(target)) )
             self.shp = self.__getFileObj(os.path.splitext(target)[0] + '.shp')
             self.shx = self.__getFileObj(os.path.splitext(target)[0] + '.shx')
             self.dbf = self.__getFileObj(os.path.splitext(target)[0] + '.dbf')

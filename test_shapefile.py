@@ -3,14 +3,21 @@ This module tests the functionality of shapefile.py.
 """
 # std lib imports
 import os.path
+import sys
+if sys.version_info.major == 3:
+    from pathlib import Path
 
 # third party imports
 import pytest
 import json
 import datetime
+if sys.version_info.major == 2:
+    # required by pytest for python <36
+    from pathlib2 import Path
 
 # our imports
 import shapefile
+
 
 # define various test shape tuples of (type, points, parts indexes, and expected geo interface output)
 geo_interface_tests = [ (shapefile.POINT, # point
@@ -401,6 +408,15 @@ def test_reader_shapefile_extension_ignored():
 
     # assert test.abc does not exist
     assert not os.path.exists(filename)
+
+
+def test_reader_pathlike():
+    """
+    Assert that path-like objects can be read.
+    """
+    base = Path("shapefiles")
+    with shapefile.Reader(base / "blockgroups") as sf:
+        assert len(sf) == 663
 
 
 def test_reader_filelike_dbf_only():
@@ -886,6 +902,20 @@ def test_write_default_shp_shx_dbf(tmpdir):
     assert os.path.exists(filename + ".shp")
     assert os.path.exists(filename + ".shx")
     assert os.path.exists(filename + ".dbf")
+
+
+def test_write_pathlike(tmpdir):
+    """
+    Assert that path-like objects can be written.
+    Similar to test_write_default_shp_shx_dbf.
+    """
+    filename = tmpdir.join("test")
+    assert not isinstance(filename, str)
+    with shapefile.Writer(filename) as writer:
+        writer.field('field1', 'C')
+    assert (filename + ".shp").ensure()
+    assert (filename + ".shx").ensure()
+    assert (filename + ".dbf").ensure()
 
 
 def test_write_shapefile_extension_ignored(tmpdir):
