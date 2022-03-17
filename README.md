@@ -103,6 +103,7 @@ part of your geospatial project.
 
 - More examples and restructuring of README. 
 - More informative Shape to geojson warnings (see #219).
+- Add shapefile.VERBOSE flag to control warnings verbosity (default True).
 - Shape object information when calling repr().
 - Faster ring orientation checks, enforce geojson output ring orientation.
 
@@ -615,18 +616,14 @@ To get the 4th shape record from the blockgroups shapefile use the third index:
 
 
 	>>> shapeRec = sf.shapeRecord(3)
+	>>> shapeRec.record[1:3]
+	['060750601001', 4715]
 	
-Each individual shape record also supports the _\_geo_interface\_\_ to convert it to a GeoJSON:
+Each individual shape record also supports the _\_geo_interface\_\_ to convert it to a GeoJSON feature:
 
 
 	>>> shapeRec.__geo_interface__['type']
 	'Feature'
-
-The blockgroup key and population count:
-
-
-	>>> shapeRec.record[1:3]
-	['060750601001', 4715]
 	
 
 ## Writing Shapefiles

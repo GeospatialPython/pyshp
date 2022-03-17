@@ -1,4 +1,17 @@
 
+VERSION 2.X.X
+
+2022-XX-XX
+	New Features:
+	* Added support for pathlib and path-like shapefile filepaths (@mwtoews). 
+
+	Improvements:
+	* Simplified setup and deployment (@mwtoews)
+
+	Bug fixes:
+	* Revert previous decision to enforce geojson output ring orientation (detailed explanation at https://github.com/SciTools/cartopy/issues/2012)
+	* Fix test issues in environments without network access. 
+
 VERSION 2.2.0
 
 2022-02-02
@@ -11,6 +24,7 @@ VERSION 2.2.0
 	Improvements:
 	* More examples and restructuring of README. 
 	* More informative Shape to geojson warnings (see #219).
+	* Add shapefile.VERBOSE flag to control warnings verbosity (default True).
 	* Shape object information when calling repr().
 	* Faster ring orientation checks, enforce geojson output ring orientation.
 
