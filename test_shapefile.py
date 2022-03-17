@@ -49,7 +49,7 @@ geo_interface_tests = [ (shapefile.POINT, # point
                              ],
                             [0],
                             {'type':'Polygon','coordinates':[
-                                shapefile.rewind([(1,1),(1,9),(9,9),(9,1),(1,1)]),
+                                [(1,1),(1,9),(9,9),(9,1),(1,1)],
                                 ]}
                         ),
                        (shapefile.POLYGON, # single polygon, holes (ordered)
@@ -59,9 +59,9 @@ geo_interface_tests = [ (shapefile.POINT, # point
                              ],
                             [0,5,5+5],
                             {'type':'Polygon','coordinates':[
-                                shapefile.rewind([(1,1),(1,9),(9,9),(9,1),(1,1)]), # exterior
-                                shapefile.rewind([(2,2),(4,2),(4,4),(2,4),(2,2)]), # hole 1
-                                shapefile.rewind([(5,5),(7,5),(7,7),(5,7),(5,5)]), # hole 2
+                                [(1,1),(1,9),(9,9),(9,1),(1,1)], # exterior
+                                [(2,2),(4,2),(4,4),(2,4),(2,2)], # hole 1
+                                [(5,5),(7,5),(7,7),(5,7),(5,5)], # hole 2
                                 ]}
                         ),
                        (shapefile.POLYGON, # single polygon, holes (unordered)
@@ -72,9 +72,9 @@ geo_interface_tests = [ (shapefile.POINT, # point
                              ],
                             [0,5,5+5],
                             {'type':'Polygon','coordinates':[
-                                shapefile.rewind([(1,1),(1,9),(9,9),(9,1),(1,1)]), # exterior
-                                shapefile.rewind([(2,2),(4,2),(4,4),(2,4),(2,2)]), # hole 1
-                                shapefile.rewind([(5,5),(7,5),(7,7),(5,7),(5,5)]), # hole 2
+                                [(1,1),(1,9),(9,9),(9,1),(1,1)], # exterior
+                                [(2,2),(4,2),(4,4),(2,4),(2,2)], # hole 1
+                                [(5,5),(7,5),(7,7),(5,7),(5,5)], # hole 2
                                 ]}
                         ),
                        (shapefile.POLYGON, # multi polygon, no holes
@@ -84,10 +84,10 @@ geo_interface_tests = [ (shapefile.POINT, # point
                             [0,5],
                             {'type':'MultiPolygon','coordinates':[
                                 [ # poly 1
-                                    shapefile.rewind([(1,1),(1,9),(9,9),(9,1),(1,1)]),
+                                    [(1,1),(1,9),(9,9),(9,1),(1,1)],
                                 ],
                                 [ # poly 2
-                                    shapefile.rewind([(11,11),(11,19),(19,19),(19,11),(11,11)]),
+                                    [(11,11),(11,19),(19,19),(19,11),(11,11)],
                                 ],
                                 ]}
                         ),
@@ -102,14 +102,14 @@ geo_interface_tests = [ (shapefile.POINT, # point
                             [0,5,10,15,20,25],
                             {'type':'MultiPolygon','coordinates':[
                                 [ # poly 1
-                                    shapefile.rewind([(1,1),(1,9),(9,9),(9,1),(1,1)]), # exterior
-                                    shapefile.rewind([(2,2),(4,2),(4,4),(2,4),(2,2)]), # hole 1
-                                    shapefile.rewind([(5,5),(7,5),(7,7),(5,7),(5,5)]), # hole 2
+                                    [(1,1),(1,9),(9,9),(9,1),(1,1)], # exterior
+                                    [(2,2),(4,2),(4,4),(2,4),(2,2)], # hole 1
+                                    [(5,5),(7,5),(7,7),(5,7),(5,5)], # hole 2
                                 ],
                                 [ # poly 2
-                                    shapefile.rewind([(11,11),(11,19),(19,19),(19,11),(11,11)]), # exterior
-                                    shapefile.rewind([(12,12),(14,12),(14,14),(12,14),(12,12)]), # hole 1
-                                    shapefile.rewind([(15,15),(17,15),(17,17),(15,17),(15,15)]), # hole 2
+                                    [(11,11),(11,19),(19,19),(19,11),(11,11)], # exterior
+                                    [(12,12),(14,12),(14,14),(12,14),(12,12)], # hole 1
+                                    [(15,15),(17,15),(17,17),(15,17),(15,15)], # hole 2
                                 ],
                                 ]}
                         ),
@@ -123,15 +123,15 @@ geo_interface_tests = [ (shapefile.POINT, # point
                             [0,5,10,15,20],
                             {'type':'MultiPolygon','coordinates':[
                                 [ # poly 1
-                                    shapefile.rewind([(1,1),(1,9),(9,9),(9,1),(1,1)]), # exterior 1
-                                    shapefile.rewind([(2,2),(8,2),(8,8),(2,8),(2,2)]), # hole 1.1
+                                    [(1,1),(1,9),(9,9),(9,1),(1,1)], # exterior 1
+                                    [(2,2),(8,2),(8,8),(2,8),(2,2)], # hole 1.1
                                 ],
                                 [ # poly 2
-                                    shapefile.rewind([(3,3),(3,7),(7,7),(7,3),(3,3)]), # exterior 2
-                                    shapefile.rewind([(4,4),(6,4),(6,6),(4,6),(4,4)]), # hole 2.1
+                                    [(3,3),(3,7),(7,7),(7,3),(3,3)], # exterior 2
+                                    [(4,4),(6,4),(6,6),(4,6),(4,4)], # hole 2.1
                                 ],
                                 [ # poly 3
-                                    shapefile.rewind([(4.5,4.5),(4.5,5.5),(5.5,5.5),(5.5,4.5),(4.5,4.5)]), # exterior 3
+                                    [(4.5,4.5),(4.5,5.5),(5.5,5.5),(5.5,4.5),(4.5,4.5)], # exterior 3
                                 ],
                                 ]}
                         ),
@@ -145,15 +145,15 @@ geo_interface_tests = [ (shapefile.POINT, # point
                             [0,5,10,15,20+3],
                             {'type':'MultiPolygon','coordinates':[
                                 [ # poly 1
-                                    shapefile.rewind([(1,1),(1,9),(9,9),(9,1),(1,1)]), # exterior 1
-                                    shapefile.rewind([(2,2),(3,3),(4,2),(8,2),(8,8),(4,8),(2,8),(2,4),(2,2)]), # hole 1.1
+                                    [(1,1),(1,9),(9,9),(9,1),(1,1)], # exterior 1
+                                    [(2,2),(3,3),(4,2),(8,2),(8,8),(4,8),(2,8),(2,4),(2,2)], # hole 1.1
                                 ],
                                 [ # poly 2
-                                    shapefile.rewind([(3,3),(3,7),(7,7),(7,3),(3,3)]), # exterior 2
-                                    shapefile.rewind([(4,4),(4,4),(6,4),(6,4),(6,4),(6,6),(4,6),(4,4)]), # hole 2.1
+                                    [(3,3),(3,7),(7,7),(7,3),(3,3)], # exterior 2
+                                    [(4,4),(4,4),(6,4),(6,4),(6,4),(6,6),(4,6),(4,4)], # hole 2.1
                                 ],
                                 [ # poly 3
-                                    shapefile.rewind([(4.5,4.5),(4.5,5.5),(5.5,5.5),(5.5,4.5),(4.5,4.5)]), # exterior 3
+                                    [(4.5,4.5),(4.5,5.5),(5.5,5.5),(5.5,4.5),(4.5,4.5)], # exterior 3
                                 ],
                                 ]}
                         ),
@@ -169,17 +169,16 @@ geo_interface_tests = [ (shapefile.POINT, # point
                             [0,5,10,15,20,25,30],
                             {'type':'MultiPolygon','coordinates':[
                                 [ # poly 1
-                                    shapefile.rewind([(1,1),(1,9),(9,9),(9,1),(1,1)]), # exterior
-                                    shapefile.rewind([(2,2),(4,2),(4,4),(2,4),(2,2)]), # hole 1
-                                    shapefile.rewind([(5,5),(7,5),(7,7),(5,7),(5,5)]), # hole 2
+                                    [(1,1),(1,9),(9,9),(9,1),(1,1)], # exterior
+                                    [(2,2),(4,2),(4,4),(2,4),(2,2)], # hole 1
+                                    [(5,5),(7,5),(7,7),(5,7),(5,5)], # hole 2
                                 ],
                                 [ # poly 2
-                                    shapefile.rewind([(11,11),(11,19),(19,19),(19,11),(11,11)]), # exterior
-                                    shapefile.rewind([(12,12),(14,12),(14,14),(12,14),(12,12)]), # hole 1
-                                    shapefile.rewind([(15,15),(17,15),(17,17),(15,17),(15,15)]), # hole 2
+                                    [(11,11),(11,19),(19,19),(19,11),(11,11)], # exterior
+                                    [(12,12),(14,12),(14,14),(12,14),(12,12)], # hole 1
+                                    [(15,15),(17,15),(17,17),(15,17),(15,15)], # hole 2
                                 ],
-                                [ # poly 3 (orphaned hole) 
-                                  # Note: due to the hole-to-exterior conversion, should return the same ring orientation
+                                [ # poly 3 (orphaned hole)
                                     [(95,95),(97,95),(97,97),(95,97),(95,95)], # exterior
                                 ],
                                 ]}
@@ -191,11 +190,9 @@ geo_interface_tests = [ (shapefile.POINT, # point
                             [0,5],
                             {'type':'MultiPolygon','coordinates':[
                                 [ # poly 1
-                                  # Note: due to the hole-to-exterior conversion, should return the same ring orientation
                                     [(1,1),(9,1),(9,9),(1,9),(1,1)],
                                 ],
                                 [ # poly 2
-                                  # Note: due to the hole-to-exterior conversion, should return the same ring orientation
                                     [(11,11),(19,11),(19,19),(11,19),(11,11)],
                                 ],
                                 ]}

@@ -349,11 +349,9 @@ def organize_polygon_rings(rings, return_errors=None):
         # where exterior rings are clockwise, and holes counterclockwise
         if is_cw(ring):
             # ring is exterior
-            ring = rewind(ring) # GeoJSON and Shapefile exteriors have opposite orientation
             exteriors.append(ring)
         else:
             # ring is a hole
-            ring = rewind(ring) # GeoJSON and Shapefile holes have opposite orientation
             holes.append(ring)
                 
     # if only one exterior, then all holes belong to that exterior
@@ -389,8 +387,8 @@ def organize_polygon_rings(rings, return_errors=None):
             
             if len(exterior_candidates) > 1:
                 # get hole sample point
-                # Note: all rings now follow GeoJSON orientation, i.e. holes are clockwise
-                hole_sample = ring_sample(holes[hole_i], ccw=False)
+                ccw = not is_cw(holes[hole_i])
+                hole_sample = ring_sample(holes[hole_i], ccw=ccw)
                 # collect new exterior candidates
                 new_exterior_candidates = []
                 for ext_i in exterior_candidates:
@@ -434,8 +432,6 @@ def organize_polygon_rings(rings, return_errors=None):
         # add orphan holes as exteriors
         for hole_i in orphan_holes:
             ext = holes[hole_i]
-            # since this was previously a clockwise ordered hole, inverse the winding order
-            ext = rewind(ext)
             # add as single exterior without any holes
             poly = [ext]
             polys.append(poly)
@@ -450,8 +446,6 @@ def organize_polygon_rings(rings, return_errors=None):
         if return_errors is not None:
             return_errors['polygon_only_holes'] = len(holes)
         exteriors = holes
-        # since these were previously clockwise ordered holes, inverse the winding order
-        exteriors = [rewind(ext) for ext in exteriors]
         # add as single exterior without any holes
         polys = [[ext] for ext in exteriors]
         return polys
