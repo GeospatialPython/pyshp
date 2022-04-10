@@ -1118,21 +1118,36 @@ class Reader(object):
         elif self.shp:
             # Otherwise use shape count
             if self.shx:
-                # Use index file to get total count
                 if self.numShapes is None:
-                    # File length (16-bit word * 2 = bytes) - header length
-                    self.shx.seek(24)
-                    shxRecordLength = (unpack(">i", self.shx.read(4))[0] * 2) - 100
-                    self.numShapes = shxRecordLength // 8
-                    
+                    self.__shxHeader()
+
                 return self.numShapes
             
             else:
                 # Index file not available, iterate all shapes to get total count
                 if self.numShapes is None:
-                    for i,shape in enumerate(self.iterShapes()):
-                        pass
-                    self.numShapes = i + 1
+                    # Determine length of shp file
+                    shp = self.shp
+                    checkpoint = shp.tell()
+                    shp.seek(0,2)
+                    shpLength = shp.tell()
+                    shp.seek(100)
+                    # Do a fast shape iteration until end of file.
+                    unpack = Struct('>2i').unpack
+                    offsets = []
+                    pos = shp.tell()
+                    while pos < shpLength:
+                        offsets.append(pos)
+                        # Unpack the shape header only
+                        (recNum, recLength) = unpack(shp.read(8))
+                        # Jump to next shape position
+                        pos += 8 + (2 * recLength)
+                        shp.seek(pos)
+                    # Set numShapes and offset indices
+                    self.numShapes = len(offsets)
+                    self._offsets = offsets
+                    # Return to previous file position
+                    shp.seek(checkpoint)
                     
                 return self.numShapes
             
@@ -1172,6 +1187,8 @@ class Reader(object):
             self.__shpHeader()
         if self.dbf:
             self.__dbfHeader()
+        if self.shx:
+            self.__shxHeader()
 
     def load_shp(self, shapefile_name):
         """
@@ -1251,7 +1268,7 @@ class Reader(object):
         return i
 
     def __shpHeader(self):
-        """Reads the header information from a .shp or .shx file."""
+        """Reads the header information from a .shp file."""
         if not self.shp:
             raise ShapefileException("Shapefile Reader requires a shapefile or file-like object. (no shp file found")
         shp = self.shp
@@ -1353,27 +1370,40 @@ class Reader(object):
         f.seek(next)
         return record
 
+    def __shxHeader(self):
+        """Reads the header information from a .shx file."""
+        shx = self.shx
+        if not shx:
+            raise ShapefileException("Shapefile Reader requires a shapefile or file-like object. (no shx file found")
+        # File length (16-bit word * 2 = bytes) - header length
+        shx.seek(24)
+        shxRecordLength = (unpack(">i", shx.read(4))[0] * 2) - 100
+        self.numShapes = shxRecordLength // 8
+
+    def __shxOffsets(self):
+        '''Reads the shape offset positions from a .shx file'''
+        shx = self.shx
+        if not shx:
+            raise ShapefileException("Shapefile Reader requires a shapefile or file-like object. (no shx file found")
+        # Jump to the first record.
+        shx.seek(100)
+        # Each index record consists of two nrs, we only want the first one
+        shxRecords = _Array('i', shx.read(2 * self.numShapes * 4) )
+        if sys.byteorder != 'big':
+            shxRecords.byteswap()
+        self._offsets = [2 * el for el in shxRecords[::2]]
+
     def __shapeIndex(self, i=None):
         """Returns the offset in a .shp file for a shape based on information
         in the .shx index file."""
         shx = self.shx
-        if not shx:
+        # Return None if no shx or no index requested
+        if not shx or i == None:
             return None
+        # At this point, we know the shx file exists
         if not self._offsets:
-            if self.numShapes is None:
-                # File length (16-bit word * 2 = bytes) - header length
-                shx.seek(24)
-                shxRecordLength = (unpack(">i", shx.read(4))[0] * 2) - 100
-                self.numShapes = shxRecordLength // 8
-            # Jump to the first record.
-            shx.seek(100)
-            # Each index record consists of two nrs, we only want the first one
-            shxRecords = _Array('i', shx.read(2 * self.numShapes * 4) )
-            if sys.byteorder != 'big':
-                 shxRecords.byteswap()
-            self._offsets = [2 * el for el in shxRecords[::2]]
-        if not i == None:
-            return self._offsets[i]
+            self.__shxOffsets()
+        return self._offsets[i]
 
     def shape(self, i=0, bbox=None):
         """Returns a shape object for a shape in the geometry
@@ -1385,10 +1415,30 @@ class Reader(object):
         i = self.__restrictIndex(i)
         offset = self.__shapeIndex(i)
         if not offset:
-            # Shx index not available so iterate the full list.
-            for j,k in enumerate(self.iterShapes()):
-                if j == i:
-                    return k
+            # Shx index not available.
+            # Determine length of shp file
+            shp.seek(0,2)
+            shpLength = shp.tell()
+            shp.seek(100)
+            # Do a fast shape iteration until the requested index or end of file.
+            unpack = Struct('>2i').unpack
+            _i = 0
+            offset = shp.tell()
+            while offset < shpLength:
+                if _i == i:
+                    # Reached the requested index, exit loop with the offset value
+                    break
+                # Unpack the shape header only
+                (recNum, recLength) = unpack(shp.read(8))
+                # Jump to next shape position
+                offset += 8 + (2 * recLength)
+                shp.seek(offset)
+                _i += 1
+            # If the index was not found, it likely means the .shp file is incomplete
+            if _i != i:
+                raise ShapefileException('Shape index {} is out of bounds; the .shp file only contains {} shapes'.format(i, _i))
+
+        # Seek to the offset and read the shape
         shp.seek(offset)
         return self.__shape(oid=i, bbox=bbox)
 
@@ -1397,21 +1447,8 @@ class Reader(object):
         To only read shapes within a given spatial region, specify the 'bbox'
         arg as a list or tuple of xmin,ymin,xmax,ymax. 
         """
-        shp = self.__getFileObj(self.shp)
-        # Found shapefiles which report incorrect
-        # shp file length in the header. Can't trust
-        # that so we seek to the end of the file
-        # and figure it out.
-        shp.seek(0,2)
-        self.shpLength = shp.tell()
-        shp.seek(100)
         shapes = Shapes()
-        i = 0
-        while shp.tell() < self.shpLength:
-            shape = self.__shape(oid=i, bbox=bbox)
-            if shape:
-                shapes.append(shape)
-            i += 1
+        shapes.extend(self.iterShapes(bbox=bbox))
         return shapes
 
     def iterShapes(self, bbox=None):
@@ -1421,15 +1458,40 @@ class Reader(object):
         arg as a list or tuple of xmin,ymin,xmax,ymax. 
         """
         shp = self.__getFileObj(self.shp)
+        # Found shapefiles which report incorrect
+        # shp file length in the header. Can't trust
+        # that so we seek to the end of the file
+        # and figure it out.
         shp.seek(0,2)
-        self.shpLength = shp.tell()
+        shpLength = shp.tell()
         shp.seek(100)
-        i = 0
-        while shp.tell() < self.shpLength:
-            shape = self.__shape(oid=i, bbox=bbox)
-            if shape:
-                yield shape
-            i += 1
+
+        if self.numShapes:
+            # Iterate exactly the number of shapes from shx header
+            for i in xrange(self.numShapes):
+                # MAYBE: check if more left of file or exit early? 
+                shape = self.__shape(oid=i, bbox=bbox)
+                if shape:
+                    yield shape
+        else:
+            # No shx file, unknown nr of shapes
+            # Instead iterate until reach end of file
+            # Collect the offset indices during iteration
+            i = 0
+            offsets = []
+            pos = shp.tell()
+            while pos < shpLength:
+                offsets.append(pos)
+                shape = self.__shape(oid=i, bbox=bbox)
+                pos = shp.tell()
+                if shape:
+                    yield shape
+                i += 1
+            # Entire shp file consumed
+            # Update the number of shapes and list of offsets
+            assert i == len(offsets)
+            self.numShapes = i 
+            self._offsets = offsets
 
     def __dbfHeader(self):
         """Reads a dbf header. Xbase-related code borrows heavily from ActiveState Python Cookbook Recipe 362715 by Raymond Hettinger"""

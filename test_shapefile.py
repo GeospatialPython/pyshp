@@ -616,6 +616,156 @@ def test_shape_oid():
             assert shaperec.shape.oid == i
 
 
+def test_shape_oid_no_shx():
+    """
+    Assert that the shape's oid attribute returns
+    its index in the shapefile, when shx file is missing.
+    """
+    basename = "shapefiles/blockgroups"
+    shp = open(basename + ".shp", 'rb')
+    dbf = open(basename + ".dbf", 'rb')
+    with shapefile.Reader(shp=shp, dbf=dbf) as sf, \
+        shapefile.Reader(basename) as sf_expected:
+        for i in range(len(sf)):
+            shape = sf.shape(i)
+            assert shape.oid == i
+            shape_expected = sf_expected.shape(i)
+            assert shape.__geo_interface__ == shape_expected.__geo_interface__
+
+        for i,shape in enumerate(sf.shapes()):
+            assert shape.oid == i
+            shape_expected = sf_expected.shape(i)
+            assert shape.__geo_interface__ == shape_expected.__geo_interface__
+
+        for i,shape in enumerate(sf.iterShapes()):
+            assert shape.oid == i
+            shape_expected = sf_expected.shape(i)
+            assert shape.__geo_interface__ == shape_expected.__geo_interface__
+
+        for i,shaperec in enumerate(sf.iterShapeRecords()):
+            assert shaperec.shape.oid == i
+            shape_expected = sf_expected.shape(i)
+            assert shaperec.shape.__geo_interface__ == shape_expected.__geo_interface__
+
+
+def test_reader_offsets():
+    """
+    Assert that reader will not read the shx offsets unless necessary, 
+    i.e. requesting a shape index. 
+    """
+    basename = "shapefiles/blockgroups"
+    with shapefile.Reader(basename) as sf:
+        # shx offsets should not be read during loading
+        assert not sf._offsets
+        # reading a shape index should trigger reading offsets from shx file
+        shape = sf.shape(3)
+        assert len(sf._offsets) == len(sf.shapes())
+
+
+def test_reader_offsets_no_shx():
+    """
+    Assert that reading a shapefile without a shx file will not build 
+    the offsets unless necessary, i.e. reading all the shapes. 
+    """
+    basename = "shapefiles/blockgroups"
+    shp = open(basename + ".shp", 'rb')
+    dbf = open(basename + ".dbf", 'rb')
+    with shapefile.Reader(shp=shp, dbf=dbf) as sf:
+        # offsets should not be built during loading
+        assert not sf._offsets
+        # reading a shape index should iterate to the shape
+        # but the list of offsets should remain empty
+        shape = sf.shape(3)
+        assert not sf._offsets
+        # reading all the shapes should build the list of offsets
+        shapes = sf.shapes()
+        assert len(sf._offsets) == len(shapes)
+
+
+
+def test_reader_numshapes():
+    """
+    Assert that reader reads the numShapes attribute from the
+    shx file header during loading. 
+    """
+    basename = "shapefiles/blockgroups"
+    with shapefile.Reader(basename) as sf:
+        # numShapes should be set during loading
+        assert sf.numShapes != None
+        # numShapes should equal the number of shapes
+        assert sf.numShapes == len(sf.shapes())
+
+
+def test_reader_numshapes_no_shx():
+    """
+    Assert that reading a shapefile without a shx file will have
+    an unknown value for the numShapes attribute (None), and that
+    reading all the shapes will set the numShapes attribute.
+    """
+    basename = "shapefiles/blockgroups"
+    shp = open(basename + ".shp", 'rb')
+    dbf = open(basename + ".dbf", 'rb')
+    with shapefile.Reader(shp=shp, dbf=dbf) as sf:
+        # numShapes should be unknown due to missing shx file
+        assert sf.numShapes == None
+        # numShapes should be set after reading all the shapes
+        shapes = sf.shapes()
+        assert sf.numShapes == len(shapes)
+
+
+def test_reader_len():
+    """
+    Assert that calling len() on reader is equal to length of 
+    all shapes and records. 
+    """
+    basename = "shapefiles/blockgroups"
+    with shapefile.Reader(basename) as sf:
+        assert len(sf) == len(sf.records()) == len(sf.shapes())
+
+
+def test_reader_len_not_loaded():
+    """
+    Assert that calling len() on reader that hasn't loaded a shapefile
+    yet is equal to 0. 
+    """
+    with shapefile.Reader() as sf:
+        assert len(sf) == 0
+
+
+def test_reader_len_dbf_only():
+    """
+    Assert that calling len() on reader when reading a dbf file only,
+    is equal to length of all records. 
+    """
+    basename = "shapefiles/blockgroups"
+    dbf = open(basename + ".dbf", 'rb')
+    with shapefile.Reader(dbf=dbf) as sf:
+        assert len(sf) == len(sf.records())
+
+
+def test_reader_len_no_dbf():
+    """
+    Assert that calling len() on reader when dbf file is missing,
+    is equal to length of all shapes. 
+    """
+    basename = "shapefiles/blockgroups"
+    shp = open(basename + ".shp", 'rb')
+    shx = open(basename + ".shx", 'rb')
+    with shapefile.Reader(shp=shp, shx=shx) as sf:
+        assert len(sf) == len(sf.shapes())
+
+
+def test_reader_len_no_dbf_shx():
+    """
+    Assert that calling len() on reader when dbf and shx file is missing,
+    is equal to length of all shapes. 
+    """
+    basename = "shapefiles/blockgroups"
+    shp = open(basename + ".shp", 'rb')
+    with shapefile.Reader(shp=shp) as sf:
+        assert len(sf) == len(sf.shapes())
+
+
 def test_bboxfilter_shape():
     """
     Assert that applying the bbox filter to shape() correctly ignores the shape
