@@ -766,6 +766,44 @@ def test_reader_len_no_dbf_shx():
         assert len(sf) == len(sf.shapes())
 
 
+def test_reader_corrupt_files():
+    """
+    Assert that reader is able to handle corrupt files by
+    strictly going off the header information. 
+    """
+    basename = "shapefiles/test/corrupt_too_long"
+
+    # write a shapefile with junk byte data at end of files
+    with shapefile.Writer(basename) as w:
+        w.field("test", "C", 50)
+        # add 10 line geoms
+        for _ in range(10):
+            w.record("value")
+            w.line([[(1,1),(1,2),(2,2)]])
+        # add junk byte data to end of dbf and shp files
+        w.dbf.write(b'12345')
+        w.shp.write(b'12345')
+
+    # read the corrupt shapefile and assert that it reads correctly
+    with shapefile.Reader(basename) as sf:
+        # assert correct shapefile length metadata
+        assert len(sf) == sf.numRecords == sf.numShapes == 10
+        # assert that records are read without error
+        assert len(sf.records()) == 10
+        # assert that didn't read the extra junk data
+        stopped = sf.dbf.tell()
+        sf.dbf.seek(0, 2)
+        end = sf.dbf.tell()
+        assert (end - stopped) == 5
+        # assert that shapes are read without error
+        assert len(sf.shapes()) == 10
+        # assert that didn't read the extra junk data
+        stopped = sf.shp.tell()
+        sf.shp.seek(0, 2)
+        end = sf.shp.tell()
+        assert (end - stopped) == 5
+
+
 def test_bboxfilter_shape():
     """
     Assert that applying the bbox filter to shape() correctly ignores the shape
