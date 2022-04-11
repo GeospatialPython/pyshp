@@ -1043,7 +1043,7 @@ class Reader(object):
                     self.load(path)
                     return
                     
-        # Otherwise, load from separate shp/shx/dbf args (must be file-like)
+        # Otherwise, load from separate shp/shx/dbf args (must be path or file-like)
         if "shp" in kwargs.keys():
             if hasattr(kwargs["shp"], "read"):
                 self.shp = kwargs["shp"]
@@ -1053,7 +1053,8 @@ class Reader(object):
                 except (NameError, io.UnsupportedOperation):
                     self.shp = io.BytesIO(self.shp.read())
             else:
-                raise ShapefileException('The shp arg must be file-like.')
+                (baseName, ext) = os.path.splitext(kwargs["shp"])
+                self.load_shp(baseName)
             
             if "shx" in kwargs.keys():
                 if hasattr(kwargs["shx"], "read"):
@@ -1064,7 +1065,8 @@ class Reader(object):
                     except (NameError, io.UnsupportedOperation):
                         self.shx = io.BytesIO(self.shx.read())
                 else:
-                    raise ShapefileException('The shx arg must be file-like.')
+                    (baseName, ext) = os.path.splitext(kwargs["shx"])
+                    self.load_shx(baseName)
                 
         if "dbf" in kwargs.keys():
             if hasattr(kwargs["dbf"], "read"):
@@ -1075,7 +1077,8 @@ class Reader(object):
                 except (NameError, io.UnsupportedOperation):
                     self.dbf = io.BytesIO(self.dbf.read())
             else:
-                raise ShapefileException('The dbf arg must be file-like.')
+                (baseName, ext) = os.path.splitext(kwargs["dbf"])
+                self.load_dbf(baseName)
             
         # Load the files
         if self.shp or self.dbf:

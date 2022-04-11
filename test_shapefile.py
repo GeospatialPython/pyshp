@@ -416,6 +416,56 @@ def test_reader_pathlike():
         assert len(sf) == 663
 
 
+def test_reader_dbf_only():
+    """
+    Assert that specifying just the
+    dbf argument to the shapefile reader
+    reads just the dbf file.
+    """
+    with shapefile.Reader(dbf="shapefiles/blockgroups.dbf") as sf:
+        assert len(sf) == 663
+        record = sf.record(3)
+        assert record[1:3] == ['060750601001', 4715]
+
+
+def test_reader_shp_shx_only():
+    """
+    Assert that specifying just the
+    shp and shx argument to the shapefile reader
+    reads just the shp and shx file.
+    """
+    with shapefile.Reader(shp="shapefiles/blockgroups.shp", shx="shapefiles/blockgroups.shx") as sf:
+        assert len(sf) == 663
+        shape = sf.shape(3)
+        assert len(shape.points) is 173
+
+    
+def test_reader_shp_dbf_only():
+    """
+    Assert that specifying just the
+    shp and shx argument to the shapefile reader
+    reads just the shp and dbf file.
+    """
+    with shapefile.Reader(shp="shapefiles/blockgroups.shp", dbf="shapefiles/blockgroups.dbf") as sf:
+        assert len(sf) == 663
+        shape = sf.shape(3)
+        assert len(shape.points) is 173
+        record = sf.record(3)
+        assert record[1:3] == ['060750601001', 4715]
+
+
+def test_reader_shp_only():
+    """
+    Assert that specifying just the
+    shp argument to the shapefile reader
+    reads just the shp file (shx optional).
+    """
+    with shapefile.Reader(shp="shapefiles/blockgroups.shp") as sf:
+        assert len(sf) == 663
+        shape = sf.shape(3)
+        assert len(shape.points) is 173
+
+
 def test_reader_filelike_dbf_only():
     """
     Assert that specifying just the
@@ -440,7 +490,21 @@ def test_reader_filelike_shp_shx_only():
         assert len(shape.points) is 173
 
 
-def test_reader_filelike_shx_optional():
+def test_reader_filelike_shp_dbf_only():
+    """
+    Assert that specifying just the
+    shp and shx argument to the shapefile reader
+    reads just the shp and dbf file.
+    """
+    with shapefile.Reader(shp=open("shapefiles/blockgroups.shp", "rb"), dbf=open("shapefiles/blockgroups.dbf", "rb")) as sf:
+        assert len(sf) == 663
+        shape = sf.shape(3)
+        assert len(shape.points) is 173
+        record = sf.record(3)
+        assert record[1:3] == ['060750601001', 4715]
+
+
+def test_reader_filelike_shp_only():
     """
     Assert that specifying just the
     shp argument to the shapefile reader

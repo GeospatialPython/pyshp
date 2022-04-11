@@ -244,7 +244,11 @@ OR
 	>>> sf = shapefile.Reader("shapefiles/blockgroups.dbf")
 
 OR any of the other 5+ formats which are potentially part of a shapefile. The
-library does not care about file extensions.
+library does not care about file extensions. You can also specify that you only 
+want to read some of the file extensions through the use of keyword arguments:
+
+
+	>>> sf = shapefile.Reader(dbf="shapefiles/blockgroups.dbf")
 
 #### Reading Shapefiles from Zip Files
 
