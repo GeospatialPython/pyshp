@@ -1019,38 +1019,93 @@ def test_write_shp_only(tmpdir):
     shp argument to the shapefile writer
     creates just a shp file.
     """
-    filename = tmpdir.join("test.shp").strpath
-    with shapefile.Writer(shp=filename) as writer:
-        pass
+    filename = tmpdir.join("test").strpath
+    with shapefile.Writer(shp=open(filename+'.shp','wb')) as writer:
+        writer.point(1, 1)
+    assert writer.shp and not writer.shx and not writer.dbf
+    assert writer.shpNum == 1
+    assert len(writer) == 1
+    assert writer.shp.closed == True
 
     # assert test.shp exists
-    assert os.path.exists(filename)
+    assert os.path.exists(filename+'.shp')
+    
+    # test that can read shapes
+    with shapefile.Reader(shp=open(filename+'.shp','rb')) as reader:
+        assert reader.shp and not reader.shx and not reader.dbf
+        assert (reader.numRecords, reader.numShapes) == (None, None) # numShapes is unknown in the absence of shx file
+        assert len(reader.shapes()) == 1
 
     # assert test.shx does not exist
-    assert not os.path.exists(tmpdir.join("test.shx").strpath)
+    assert not os.path.exists(filename+'.shx')
 
     # assert test.dbf does not exist
-    assert not os.path.exists(tmpdir.join("test.dbf").strpath)
+    assert not os.path.exists(filename+'.dbf')
 
 
-def test_write_shx_only(tmpdir):
+def test_write_shp_shx_only(tmpdir):
     """
-    Assert that specifying just the
+    Assert that specifying just the shp and
     shx argument to the shapefile writer
-    creates just a shx file.
+    creates just a shp and shx file.
     """
-    filename = tmpdir.join("test.shx").strpath
-    with shapefile.Writer(shx=filename) as writer:
-        pass
+    filename = tmpdir.join("test").strpath
+    with shapefile.Writer(shp=open(filename+'.shp','wb'), shx=open(filename+'.shx','wb')) as writer:
+        writer.point(1, 1)
+    assert writer.shp and writer.shx and not writer.dbf
+    assert writer.shpNum == 1
+    assert len(writer) == 1
+    assert writer.shp.closed == writer.shx.closed == True
+
+    # assert test.shp exists
+    assert os.path.exists(filename+'.shp')
 
     # assert test.shx exists
-    assert os.path.exists(filename)
+    assert os.path.exists(filename+'.shx')
 
-    # assert test.shp does not exist
-    assert not os.path.exists(tmpdir.join("test.shp").strpath)
+    # test that can read shapes and offsets
+    with shapefile.Reader(shp=open(filename+'.shp','rb'), shx=open(filename+'.shx','rb')) as reader:
+        assert reader.shp and reader.shx and not reader.dbf
+        assert (reader.numRecords, reader.numShapes) == (None, 1)
+        reader.shape(0) # trigger reading of shx offsets
+        assert len(reader._offsets) == 1
+        assert len(reader.shapes()) == 1
 
     # assert test.dbf does not exist
-    assert not os.path.exists(tmpdir.join("test.dbf").strpath)
+    assert not os.path.exists(filename+'.dbf')
+
+
+def test_write_shp_dbf_only(tmpdir):
+    """
+    Assert that specifying just the
+    shp and dbf argument to the shapefile writer
+    creates just a shp and dbf file.
+    """
+    filename = tmpdir.join("test").strpath
+    with shapefile.Writer(shp=open(filename+'.shp','wb'), dbf=open(filename+'.dbf','wb')) as writer:
+        writer.field('field1', 'C') # required to create a valid dbf file
+        writer.record('value')
+        writer.point(1, 1)
+    assert writer.shp and not writer.shx and writer.dbf
+    assert writer.shpNum == writer.recNum == 1
+    assert len(writer) == 1
+    assert writer.shp.closed == writer.dbf.closed == True
+
+    # assert test.shp exists
+    assert os.path.exists(filename+'.shp')
+
+    # assert test.dbf exists
+    assert os.path.exists(filename+'.dbf')
+    
+    # test that can read records and shapes
+    with shapefile.Reader(shp=open(filename+'.shp','rb'), dbf=open(filename+'.dbf','rb')) as reader:
+        assert reader.shp and not reader.shx and reader.dbf
+        assert (reader.numRecords, reader.numShapes) == (1, None) # numShapes is unknown in the absence of shx file
+        assert len(reader.records()) == 1
+        assert len(reader.shapes()) == 1
+
+    # assert test.shx does not exist
+    assert not os.path.exists(filename+'.shx')
 
 
 def test_write_dbf_only(tmpdir):
@@ -1059,18 +1114,29 @@ def test_write_dbf_only(tmpdir):
     dbf argument to the shapefile writer
     creates just a dbf file.
     """
-    filename = tmpdir.join("test.dbf").strpath
-    with shapefile.Writer(dbf=filename) as writer:
+    filename = tmpdir.join("test").strpath
+    with shapefile.Writer(dbf=open(filename+'.dbf','wb')) as writer:
         writer.field('field1', 'C') # required to create a valid dbf file
+        writer.record('value')
+    assert not writer.shp and not writer.shx and writer.dbf
+    assert writer.recNum == 1
+    assert len(writer) == 1
+    assert writer.dbf.closed == True
 
     # assert test.dbf exists
-    assert os.path.exists(filename)
+    assert os.path.exists(filename+'.dbf')
+
+    # test that can read records
+    with shapefile.Reader(dbf=open(filename+'.dbf','rb')) as reader:
+        assert not writer.shp and not writer.shx and writer.dbf
+        assert (reader.numRecords, reader.numShapes) == (1, None)
+        assert len(reader.records()) == 1
 
     # assert test.shp does not exist
-    assert not os.path.exists(tmpdir.join("test.shp").strpath)
+    assert not os.path.exists(filename+'.shp')
 
     # assert test.shx does not exist
-    assert not os.path.exists(tmpdir.join("test.shx").strpath)
+    assert not os.path.exists(filename+'.shx')
 
 
 def test_write_default_shp_shx_dbf(tmpdir):
@@ -1133,10 +1199,10 @@ def test_write_record(tmpdir):
     with shapefile.Writer(filename) as writer:
         writer.autoBalance = True
 
-        writer.field('one', 'C') # many under length limit
-        writer.field('two', 'C') # 1 under length limit
-        writer.field('three', 'C') # at length limit
-        writer.field('four', 'C') # 1 over length limit
+        writer.field('one', 'C') 
+        writer.field('two', 'C') 
+        writer.field('three', 'C') 
+        writer.field('four', 'C') 
         
         values = ['one','two','three','four']
         writer.record(*values)
@@ -1160,10 +1226,10 @@ def test_write_partial_record(tmpdir):
     with shapefile.Writer(filename) as writer:
         writer.autoBalance = True
         
-        writer.field('one', 'C') # many under length limit
-        writer.field('two', 'C') # 1 under length limit
-        writer.field('three', 'C') # at length limit
-        writer.field('four', 'C') # 1 over length limit
+        writer.field('one', 'C') 
+        writer.field('two', 'C') 
+        writer.field('three', 'C') 
+        writer.field('four', 'C') 
         
         values = ['one','two']
         writer.record(*values)
@@ -1220,4 +1286,11 @@ def test_write_empty_shapefile(tmpdir, shape_type):
         w.field('field1', 'C') # required to create a valid dbf file
 
     with shapefile.Reader(filename) as r:
+        # test correct shape type
         assert r.shapeType == shape_type
+        # test length 0
+        assert len(r) == r.numRecords == r.numShapes == 0
+        # test records are empty
+        assert len(r.records()) == 0
+        # test shapes are empty
+        assert len(r.shapes()) == 0

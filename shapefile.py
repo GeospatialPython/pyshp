@@ -1861,14 +1861,13 @@ class Writer(object):
         if self.dbf and dbf_open:
             self.__dbfHeader()
 
-        # Close files, if target is a filepath
-        if self.target:
-            for attribute in (self.shp, self.shx, self.dbf):
-                if hasattr(attribute, 'close'):
-                    try:
-                        attribute.close()
-                    except IOError:
-                        pass
+        # Close files
+        for attribute in (self.shp, self.shx, self.dbf):
+            if hasattr(attribute, 'close'):
+                try:
+                    attribute.close()
+                except IOError:
+                    pass
 
     def __getFileObj(self, f):
         """Safety handler to verify file-like objects"""
@@ -2088,7 +2087,8 @@ class Writer(object):
                                 "not: %r" % s)
         # Write to file
         offset,length = self.__shpRecord(s)
-        self.__shxRecord(offset, length)
+        if self.shx:
+            self.__shxRecord(offset, length)
 
     def __shpRecord(self, s):
         f = self.__getFileObj(self.shp)
