@@ -4,11 +4,15 @@ VERSION 2.X.X
 2022-XX-XX
 	New Features:
 	* Added support for pathlib and path-like shapefile filepaths (@mwtoews). 
+	* Allow reading individual file extensions via filepaths.
 
 	Improvements:
 	* Simplified setup and deployment (@mwtoews)
+	* Faster shape access when missing shx file
 
 	Bug fixes:
+	* More robust handling of corrupt shapefiles (fixes #235)
+	* Fix errors when writing to individual file-handles (fixes #237)
 	* Revert previous decision to enforce geojson output ring orientation (detailed explanation at https://github.com/SciTools/cartopy/issues/2012)
 	* Fix test issues in environments without network access. 
 
