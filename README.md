@@ -38,7 +38,9 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 		- [Adding Geometry](#adding-geometry)
 		- [Geometry and Record Balancing](#geometry-and-record-balancing)
 - [Advanced Use](#advanced-use)
-	- [Shapefile Language and Character Encoding](#shapefile-language-and-character-encoding)
+    - [Common Errors and Fixes](#common-errors-and-fixes)
+        - [Warnings and Logging](#warnings-and-logging)
+        - [Shapefile Encoding Errors](#shapefile-encoding-errors)
 	- [Reading Large Shapefiles](#reading-large-shapefiles)
 		- [Iterating through a shapefile](#iterating-through-a-shapefile)
 		- [Limiting which fields to read](#limiting-which-fields-to-read)
@@ -1029,11 +1031,30 @@ most shapefile software.
 
 # Advanced Use
 
-## Shapefile Language and Character Encoding
+## Common Errors and Fixes
+
+Below we list some commonly encountered errors and ways to fix them. 
+
+### Warnings and Logging
+
+By default, PyShp chooses to be transparent and provide the user with logging information and warnings about non-critical issues when reading or writing shapefiles. This behavior is controlled by the module constant `VERBOSE` (which defaults to True). If you would rather suppress this information, you can simply set this to False: 
+
+
+	>>> shapefile.VERBOSE = False
+
+All logging happens under the namespace `shapefile`. So another way to suppress all PyShp warnings would be to alter the logging behavior for that namespace:
+
+
+	>>> import logging
+	>>> logging.getLogger('shapefile').setLevel(logging.ERROR)
+
+### Shapefile Encoding Errors
 
 PyShp supports reading and writing shapefiles in any language or character encoding, and provides several options for decoding and encoding text. 
-Most shapefiles are written in UTF-8 encoding, PyShp's default encoding, so in most cases you don't 
-have to specify the encoding. For reading shapefiles in any other encoding, such as Latin-1, just 
+Most shapefiles are written in UTF-8 encoding, PyShp's default encoding, so in most cases you don't have to specify the encoding. 
+If you encounter an encoding error when reading a shapefile, this means the shapefile was likely written in a non-utf8 encoding. 
+For instance, when working with English language shapefiles, a common reason for encoding errors is that the shapefile was written in Latin-1 encoding.
+For reading shapefiles in any non-utf8 encoding, such as Latin-1, just 
 supply the encoding option when creating the Reader class. 
 
 
