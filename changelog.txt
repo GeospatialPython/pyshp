@@ -9,6 +9,7 @@ VERSION 2.X.X
 	Improvements:
 	* Simplified setup and deployment (@mwtoews)
 	* Faster shape access when missing shx file
+	* Switch to named logger (see #240)
 
 	Bug fixes:
 	* More robust handling of corrupt shapefiles (fixes #235)

@@ -20,6 +20,9 @@ import io
 from datetime import date
 import zipfile
 
+# Create named logger
+logger = logging.getLogger(__name__)
+
 
 # Module settings
 VERBOSE = True
@@ -568,13 +571,13 @@ class Shape(object):
 but the Shape contained interior holes (defined by counter-clockwise orientation in the shapefile format) that were \
 orphaned, i.e. not contained by any exterior rings. The rings were still included but were \
 encoded as GeoJSON exterior rings instead of holes.'
-                        logging.warning(msg)
+                        logger.warning(msg)
                     only_holes = self._errors.get('polygon_only_holes', None)
                     if only_holes:
                         msg = header + 'Shapefile format requires that polygons contain at least one exterior ring, \
 but the Shape was entirely made up of interior holes (defined by counter-clockwise orientation in the shapefile format). The rings were \
 still included but were encoded as GeoJSON exterior rings instead of holes.'
-                        logging.warning(msg)
+                        logger.warning(msg)
 
                 # return as geojson
                 if len(polys) == 1:
@@ -904,7 +907,7 @@ class ShapefileException(Exception):
 #         if len(messages) > 1:
 #             # more than just the "Summary of..." header
 #             msg = '\n'.join(messages)
-#             logging.warning(msg)
+#             logger.warning(msg)
 
 class Reader(object):
     """Reads the three files of a shapefile as a unit or
