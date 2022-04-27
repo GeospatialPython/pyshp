@@ -542,6 +542,16 @@ attribute:
 	... ["UNITS3_9", "N", 8, 0], ["UNITS10_49", "N", 8, 0],
 	... ["UNITS50_UP", "N", 8, 0], ["MOBILEHOME", "N", 7, 0]]
 
+The first field of a dbf file is always a 1-byte field called "DeletionFlag", 
+which indicates records that have been deleted but not removed. However, 
+since this flag is very rarely used, PyShp currently will return all records  
+regardless of their deletion flag, and the flag is also not included in the list of 
+record values. In other words, the DeletionFlag field has no real purpose, and 
+should in most cases be ignored. For instance, to get a list of all fieldnames:
+
+
+	>>> fieldnames = [f[0] for f in sf.fields[1:]]
+
 You can get a list of the shapefile's records by calling the records() method:
 
 
@@ -556,7 +566,7 @@ To read a single record call the record() method with the record's index:
 	>>> rec = sf.record(3)
 	
 Each record is a list-like Record object containing the values corresponding to each field in
-the field list. A record's values can be accessed by positional indexing or slicing.
+the field list (except the DeletionFlag). A record's values can be accessed by positional indexing or slicing.
 For example in the blockgroups shapefile the 2nd and 3rd fields are the blockgroup id 
 and the 1990 population count of that San Francisco blockgroup:
 
