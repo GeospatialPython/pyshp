@@ -1,0 +1,13 @@
+name: Question
+description: You have a question about PyShp or how to use it.
+title: "Title goes here..."
+labels: ["question"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: What's your question? 
+      description: Please describe what you would like to know about PyShp, e.g. how to do something.
+      placeholder: ...
+    validations:
+      required: true

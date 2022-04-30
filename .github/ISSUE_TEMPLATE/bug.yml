@@ -1,0 +1,47 @@
+name: Bug Report
+description: Something in PyShp crashed and raised an exception.
+title: "Title goes here..."
+labels: ["bug"]
+body:
+  - type: input
+    id: pyshp-version
+    attributes:
+      label: PyShp Version
+      description: Please input the version of PyShp you used. If unsure, call `shapefile.__version__`. 
+      placeholder: ...
+    validations:
+      required: true
+  - type: input
+    id: python-version
+    attributes:
+      label: Python Version
+      description: Please input the version of the Python executable. 
+      placeholder: ...
+    validations:
+      required: true
+  - type: textarea
+    id: your-code
+    attributes:
+      label: Your code
+      description: Please copy-paste the relevant parts of your code or script that triggered the error. 
+      placeholder: ...
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: stacktrace
+    attributes:
+      label: Full stacktrace
+      description: Please copy-paste the full stack trace of the exception that was raised.
+      placeholder: ...
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Other notes
+      description: Please input any other notes that may be relevant, e.g. do you have any thoughts on what might be wrong? 
+      placeholder: ...
+    validations:
+      required: false

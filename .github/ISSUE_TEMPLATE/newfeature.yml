@@ -1,0 +1,21 @@
+name: Feature Request
+description: You would like to request a new feature.
+title: "Title goes here..."
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: functionality
+    attributes:
+      label: Describe the feature request
+      description: Please describe the functionality you would like added to PyShp.
+      placeholder: ...
+    validations:
+      required: true
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Willing to contribute? 
+      description: Would you be interested to contribute code that adds this functionality through a Pull Request? We gladly accept PRs - it's much faster and you'll be added a contributor. 
+      options:
+        - label: I would like to add the described feature request through a PR.
+          required: false
