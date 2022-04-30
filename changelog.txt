@@ -1,7 +1,7 @@
 
-VERSION 2.X.X
+VERSION 2.3.0
 
-2022-XX-XX
+2022-04-30
 	New Features:
 	* Added support for pathlib and path-like shapefile filepaths (@mwtoews). 
 	* Allow reading individual file extensions via filepaths.
@@ -15,7 +15,7 @@ VERSION 2.X.X
 	* More robust handling of corrupt shapefiles (fixes #235)
 	* Fix errors when writing to individual file-handles (fixes #237)
 	* Revert previous decision to enforce geojson output ring orientation (detailed explanation at https://github.com/SciTools/cartopy/issues/2012)
-	* Fix test issues in environments without network access. 
+	* Fix test issues in environments without network access (@sebastic, @musicinmybrain). 
 
 VERSION 2.2.0
 

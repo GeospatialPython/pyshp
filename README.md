@@ -8,8 +8,8 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 
 - **Author**: [Joel Lawhead](https://github.com/GeospatialPython)
 - **Maintainers**: [Karim Bahgat](https://github.com/karimbahgat)
-- **Version**: 2.2.0
-- **Date**: 2 February, 2022
+- **Version**: 2.3.0
+- **Date**: 30 April, 2022
 - **License**: [MIT](https://github.com/GeospatialPython/pyshp/blob/master/LICENSE.TXT)
 
 ## Contents
@@ -50,6 +50,9 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 		- [Merging multiple shapefiles](#merging-multiple-shapefiles)
 		- [Editing shapefiles](#editing-shapefiles)
 	- [3D and Other Geometry Types](#3d-and-other-geometry-types)
+    	- [Shapefiles with measurement (M) values](#shapefiles-with-measurement-m-values)
+		- [Shapefiles with elevation (Z) values](#shapefiles-with-elevation-z-values)
+		- [3D MultiPatch Shapefiles](#3d-multipatch-shapefiles)
 - [Testing](#testing)
 - [Contributors](#contributors)
 
@@ -91,6 +94,26 @@ part of your geospatial project.
 
 
 # Version Changes
+
+## 2.3.0
+
+### New Features:
+
+- Added support for pathlib and path-like shapefile filepaths (@mwtoews). 
+- Allow reading individual file extensions via filepaths.
+
+### Improvements:
+
+- Simplified setup and deployment (@mwtoews)
+- Faster shape access when missing shx file
+- Switch to named logger (see #240)
+
+### Bug fixes:
+
+- More robust handling of corrupt shapefiles (fixes #235)
+- Fix errors when writing to individual file-handles (fixes #237)
+- Revert previous decision to enforce geojson output ring orientation (detailed explanation at https://github.com/SciTools/cartopy/issues/2012)
+- Fix test issues in environments without network access (@sebastic, @musicinmybrain). 
 
 ## 2.2.0
 
@@ -1272,7 +1295,7 @@ file one record at a time, modify or filter the contents, and write it back out.
 Most shapefiles store conventional 2D points, lines, or polygons. But the shapefile format is also capable
 of storing various other types of geometries as well, including complex 3D surfaces and objects. 
 
-**Shapefiles with measurement (M) values**
+### Shapefiles with measurement (M) values
 
 Measured shape types are shapes that include a measurement value at each vertex, for instance
 speed measurements from a GPS device. Shapes with measurement (M) values are added with the following
@@ -1304,7 +1327,7 @@ Shapefiles containing M-values can be examined in several ways:
 	[0.0, None, 3.0, None, 0.0, None, None]
 
 	
-**Shapefiles with elevation (Z) values**
+### Shapefiles with elevation (Z) values
 
 Elevation shape types are shapes that include an elevation value at each vertex, for instance elevation from a GPS device. 
 Shapes with elevation (Z) values are added with the following methods: "pointz", "multipointz", "linez", and "polyz". 
@@ -1336,7 +1359,7 @@ To examine a Z-type shapefile you can do:
 	>>> r.shape(0).z # flat list of Z-values
 	[18.0, 20.0, 22.0, 0.0, 0.0, 0.0, 0.0, 15.0, 13.0, 14.0]
 
-**3D MultiPatch Shapefiles**
+### 3D MultiPatch Shapefiles
 
 Multipatch shapes are useful for storing composite 3-Dimensional objects. 
 A MultiPatch shape represents a 3D object made up of one or more surface parts.
@@ -1382,6 +1405,7 @@ correct line endings in README.md.
 ```
 Atle Frenvik Sveen
 Bas Couwenberg
+Ben Beasley
 Casey Meisenzahl
 Charles Arnold
 David A. Riggs
