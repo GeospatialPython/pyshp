@@ -1391,14 +1391,25 @@ ESRI White Paper](http://downloads.esri.com/support/whitepapers/ao_/J9749_MultiP
 	
 # Testing
 
-The testing framework is doctest, which are located in this file README.md.
+The testing framework is pytest, and the tests are located in test_shapefile.py. 
+This includes an extensive set of unit tests of the various pyshp features, 
+and tests against various input data. Some of the tests that require 
+internet connectivity will be skipped in offline testing environments. 
+In the same folder as README.md and shapefile.py, from the command line run 
+```
+$ python -m pytest
+``` 
+
+Additionally, all the code and examples located in this file, README.md, 
+is tested and verified with the builtin doctest framework.
+A special routine for invoking the doctest is run when calling directly on shapefile.py.
 In the same folder as README.md and shapefile.py, from the command line run 
 ```
 $ python shapefile.py
 ``` 
 
 Linux/Mac and similar platforms will need to run `$ dos2unix README.md` in order
-correct line endings in README.md.
+to correct line endings in README.md.
 
 # Contributors
 
