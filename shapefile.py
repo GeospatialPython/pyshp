@@ -932,6 +932,7 @@ class Reader(object):
         self.shp = None
         self.shx = None
         self.dbf = None
+        self._files_to_close = []
         self.shapeName = "Not specified"
         self._offsets = []
         self.shpLength = None
@@ -998,6 +999,7 @@ class Reader(object):
                                 fileobj.write(member.read())
                                 fileobj.seek(0)
                                 setattr(self, ext, fileobj)
+                                self._files_to_close.append(fileobj)
                             except:
                                 pass
                     # Close and delete the temporary zipfile
@@ -1030,6 +1032,7 @@ class Reader(object):
                             fileobj.write(resp.read())
                             fileobj.seek(0)
                             setattr(self, ext, fileobj)
+                            self._files_to_close.append(fileobj)
                         except HTTPError:
                             pass
                     if (self.shp or self.dbf):
@@ -1202,9 +1205,11 @@ class Reader(object):
         shp_ext = 'shp'
         try:
             self.shp = open("%s.%s" % (shapefile_name, shp_ext), "rb")
+            self._files_to_close.append(self.shp)
         except IOError:
             try:
                 self.shp = open("%s.%s" % (shapefile_name, shp_ext.upper()), "rb")
+                self._files_to_close.append(self.shp)
             except IOError:
                 pass
 
@@ -1215,9 +1220,11 @@ class Reader(object):
         shx_ext = 'shx'
         try:
             self.shx = open("%s.%s" % (shapefile_name, shx_ext), "rb")
+            self._files_to_close.append(self.shx)
         except IOError:
             try:
                 self.shx = open("%s.%s" % (shapefile_name, shx_ext.upper()), "rb")
+                self._files_to_close.append(self.shx)
             except IOError:
                 pass
 
@@ -1228,9 +1235,11 @@ class Reader(object):
         dbf_ext = 'dbf'
         try:
             self.dbf = open("%s.%s" % (shapefile_name, dbf_ext), "rb")
+            self._files_to_close.append(self.dbf)
         except IOError:
             try:
                 self.dbf = open("%s.%s" % (shapefile_name, dbf_ext.upper()), "rb")
+                self._files_to_close.append(self.dbf)
             except IOError:
                 pass
 
@@ -1238,18 +1247,14 @@ class Reader(object):
         self.close()
 
     def close(self):
-        for attribute in ('shp','shx','dbf'):
-            try:
-                obj = getattr(self, attribute)
-            except AttributeError:
-                # deepcopies fail to copy these attributes and raises exception during
-                # garbage collection - https://github.com/mattijn/topojson/issues/120
-                obj = None
-            if obj and hasattr(obj, 'close'):
+        # Close any files that the reader opened (but not those given by user)
+        for attribute in self._files_to_close:
+            if hasattr(attribute, 'close'):
                 try:
-                    obj.close()
+                    attribute.close()
                 except IOError:
                     pass
+        self._files_to_close = []
 
     def __getFileObj(self, f):
         """Checks to see if the requested shapefile file object is
@@ -1786,6 +1791,7 @@ class Writer(object):
         self.fields = []
         self.shapeType = shapeType
         self.shp = self.shx = self.dbf = None
+        self._files_to_close = []
         if target:
             target = pathlike_obj(target)
             if not is_string(target):
@@ -1866,13 +1872,22 @@ class Writer(object):
         if self.dbf and dbf_open:
             self.__dbfHeader()
 
-        # Close files
+        # Flush files
         for attribute in (self.shp, self.shx, self.dbf):
+            if hasattr(attribute, 'flush') and not (hasattr(attribute, 'closed') and attribute.closed):
+                try:
+                    attribute.flush()
+                except IOError:
+                    pass
+
+        # Close any files that the writer opened (but not those given by user)
+        for attribute in self._files_to_close:
             if hasattr(attribute, 'close'):
                 try:
                     attribute.close()
                 except IOError:
                     pass
+        self._files_to_close = []
 
     def __getFileObj(self, f):
         """Safety handler to verify file-like objects"""
@@ -1884,7 +1899,9 @@ class Writer(object):
             pth = os.path.split(f)[0]
             if pth and not os.path.exists(pth):
                 os.makedirs(pth)
-            return open(f, "wb+")
+            fp = open(f, "wb+")
+            self._files_to_close.append(fp)
+            return fp
 
     def __shpFileLength(self):
         """Calculates the file length of the shp file."""

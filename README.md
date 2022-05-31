@@ -722,7 +722,18 @@ write to them:
 	>>> w.record()
 	>>> w.null()
 	>>> w.close()
+
 	>>> # To read back the files you could call the "StringIO.getvalue()" method later.
+	>>> assert shp.getvalue()
+	>>> assert shx.getvalue()
+	>>> assert dbf.getvalue()
+
+	>>> # In fact, you can read directly from them using the Reader
+	>>> r = shapefile.Reader(shp=shp, shx=shx, dbf=dbf)
+	>>> len(r)
+	1
+	
+	
 
 #### Writing Shapefiles Using the Context Manager
 

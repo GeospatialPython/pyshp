@@ -248,22 +248,6 @@ def test_shaperecord_geo_interface():
             assert json.dumps(shaperec.__geo_interface__)
 
 
-def test_reader_context_manager():
-    """
-    Assert that the Reader context manager
-    closes the shp, shx, and dbf files
-    on exit.
-    """
-    # note uses an actual shapefile from
-    # the projects "shapefiles" directory
-    with shapefile.Reader("shapefiles/blockgroups") as sf:
-        pass
-
-    assert sf.shp.closed is True
-    assert sf.dbf.closed is True
-    assert sf.shx.closed is True
-
-
 @pytest.mark.network
 def test_reader_url():
     """
@@ -274,6 +258,7 @@ def test_reader_url():
     with shapefile.Reader(url) as sf:
         for recShape in sf.iterShapeRecords():
             pass
+    assert sf.shp.closed == sf.shx.closed == sf.dbf.closed == True
 
     # test without extension
     url = "https://github.com/nvkelso/natural-earth-vector/blob/master/110m_cultural/ne_110m_admin_0_tiny_countries?raw=true"
@@ -281,6 +266,7 @@ def test_reader_url():
         for recShape in sf.iterShapeRecords():
             pass
         assert len(sf) > 0
+    assert sf.shp.closed == sf.shx.closed == sf.dbf.closed == True
 
     # test no files found
     url = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/README.md"
@@ -294,6 +280,7 @@ def test_reader_url():
         for recShape in sf.iterShapeRecords():
             pass
         assert len(sf) > 0
+    assert sf.shp.closed == sf.shx.closed == sf.dbf.closed == True
 
 
 def test_reader_zip():
@@ -305,6 +292,7 @@ def test_reader_zip():
         for recShape in sf.iterShapeRecords():
             pass
         assert len(sf) > 0
+    assert sf.shp.closed == sf.shx.closed == sf.dbf.closed == True
     
     # test require specific path when reading multi-shapefile zipfile
     with pytest.raises(shapefile.ShapefileException):
@@ -316,12 +304,14 @@ def test_reader_zip():
         for recShape in sf.iterShapeRecords():
             pass
         assert len(sf) > 0
+    assert sf.shp.closed == sf.shx.closed == sf.dbf.closed == True
 
     # test specifying the path when reading multi-shapefile zipfile (without extension)
     with shapefile.Reader("shapefiles/blockgroups_multishapefile.zip/blockgroups2") as sf:
         for recShape in sf.iterShapeRecords():
             pass
         assert len(sf) > 0
+    assert sf.shp.closed == sf.shx.closed == sf.dbf.closed == True
 
     # test raising error when can't find shapefile inside zipfile
     with pytest.raises(shapefile.ShapefileException):
@@ -329,11 +319,54 @@ def test_reader_zip():
             pass
 
 
-def test_reader_close():
+def test_reader_close_path():
     """
     Assert that manually calling Reader.close()
     closes the shp, shx, and dbf files
-    on exit.
+    on exit, if given paths.
+    """
+    # note uses an actual shapefile from
+    # the projects "shapefiles" directory
+    sf = shapefile.Reader("shapefiles/blockgroups.shp")
+    sf.close()
+
+    assert sf.shp.closed is True
+    assert sf.dbf.closed is True
+    assert sf.shx.closed is True
+
+    # check that can read again
+    sf = shapefile.Reader("shapefiles/blockgroups.shp")
+    sf.close()
+
+
+def test_reader_close_filelike():
+    """
+    Assert that manually calling Reader.close()
+    leaves the shp, shx, and dbf files open
+    on exit, if given filelike objects.
+    """
+    # note uses an actual shapefile from
+    # the projects "shapefiles" directory
+    shp = open("shapefiles/blockgroups.shp", mode='rb')
+    shx = open("shapefiles/blockgroups.shx", mode='rb')
+    dbf = open("shapefiles/blockgroups.dbf", mode='rb')
+    sf = shapefile.Reader(shp=shp, shx=shx, dbf=dbf)
+    sf.close()
+
+    assert sf.shp.closed is False
+    assert sf.dbf.closed is False
+    assert sf.shx.closed is False
+
+    # check that can read again
+    sf = shapefile.Reader(shp=shp, shx=shx, dbf=dbf)
+    sf.close()
+
+
+def test_reader_context_path():
+    """
+    Assert that using the context manager
+    closes the shp, shx, and dbf files
+    on exit, if given paths.
     """
     # note uses an actual shapefile from
     # the projects "shapefiles" directory
@@ -343,6 +376,33 @@ def test_reader_close():
     assert sf.shp.closed is True
     assert sf.dbf.closed is True
     assert sf.shx.closed is True
+
+    # check that can read again
+    with shapefile.Reader("shapefiles/blockgroups") as sf:
+        pass
+
+
+def test_reader_context_filelike():
+    """
+    Assert that using the context manager
+    leaves the shp, shx, and dbf files open
+    on exit, if given filelike objects.
+    """
+    # note uses an actual shapefile from
+    # the projects "shapefiles" directory
+    shp = open("shapefiles/blockgroups.shp", mode='rb')
+    shx = open("shapefiles/blockgroups.shx", mode='rb')
+    dbf = open("shapefiles/blockgroups.dbf", mode='rb')
+    with shapefile.Reader(shp=shp, shx=shx, dbf=dbf) as sf:
+        pass
+
+    assert sf.shp.closed is False
+    assert sf.dbf.closed is False
+    assert sf.shx.closed is False
+
+    # check that can read again
+    with shapefile.Reader(shp=shp, shx=shx, dbf=dbf) as sf:
+        pass
 
 
 def test_reader_shapefile_type():
@@ -1084,7 +1144,7 @@ def test_write_shp_only(tmpdir):
     creates just a shp file.
     """
     filename = tmpdir.join("test").strpath
-    with shapefile.Writer(shp=open(filename+'.shp','wb')) as writer:
+    with shapefile.Writer(shp=filename+'.shp') as writer:
         writer.point(1, 1)
     assert writer.shp and not writer.shx and not writer.dbf
     assert writer.shpNum == 1
@@ -1095,7 +1155,7 @@ def test_write_shp_only(tmpdir):
     assert os.path.exists(filename+'.shp')
     
     # test that can read shapes
-    with shapefile.Reader(shp=open(filename+'.shp','rb')) as reader:
+    with shapefile.Reader(shp=filename+'.shp') as reader:
         assert reader.shp and not reader.shx and not reader.dbf
         assert (reader.numRecords, reader.numShapes) == (None, None) # numShapes is unknown in the absence of shx file
         assert len(reader.shapes()) == 1
@@ -1114,7 +1174,7 @@ def test_write_shp_shx_only(tmpdir):
     creates just a shp and shx file.
     """
     filename = tmpdir.join("test").strpath
-    with shapefile.Writer(shp=open(filename+'.shp','wb'), shx=open(filename+'.shx','wb')) as writer:
+    with shapefile.Writer(shp=filename+'.shp', shx=filename+'.shx') as writer:
         writer.point(1, 1)
     assert writer.shp and writer.shx and not writer.dbf
     assert writer.shpNum == 1
@@ -1128,7 +1188,7 @@ def test_write_shp_shx_only(tmpdir):
     assert os.path.exists(filename+'.shx')
 
     # test that can read shapes and offsets
-    with shapefile.Reader(shp=open(filename+'.shp','rb'), shx=open(filename+'.shx','rb')) as reader:
+    with shapefile.Reader(shp=filename+'.shp', shx=filename+'.shx') as reader:
         assert reader.shp and reader.shx and not reader.dbf
         assert (reader.numRecords, reader.numShapes) == (None, 1)
         reader.shape(0) # trigger reading of shx offsets
@@ -1146,7 +1206,7 @@ def test_write_shp_dbf_only(tmpdir):
     creates just a shp and dbf file.
     """
     filename = tmpdir.join("test").strpath
-    with shapefile.Writer(shp=open(filename+'.shp','wb'), dbf=open(filename+'.dbf','wb')) as writer:
+    with shapefile.Writer(shp=filename+'.shp', dbf=filename+'.dbf') as writer:
         writer.field('field1', 'C') # required to create a valid dbf file
         writer.record('value')
         writer.point(1, 1)
@@ -1162,7 +1222,7 @@ def test_write_shp_dbf_only(tmpdir):
     assert os.path.exists(filename+'.dbf')
     
     # test that can read records and shapes
-    with shapefile.Reader(shp=open(filename+'.shp','rb'), dbf=open(filename+'.dbf','rb')) as reader:
+    with shapefile.Reader(shp=filename+'.shp', dbf=filename+'.dbf') as reader:
         assert reader.shp and not reader.shx and reader.dbf
         assert (reader.numRecords, reader.numShapes) == (1, None) # numShapes is unknown in the absence of shx file
         assert len(reader.records()) == 1
@@ -1179,7 +1239,7 @@ def test_write_dbf_only(tmpdir):
     creates just a dbf file.
     """
     filename = tmpdir.join("test").strpath
-    with shapefile.Writer(dbf=open(filename+'.dbf','wb')) as writer:
+    with shapefile.Writer(dbf=filename+'.dbf') as writer:
         writer.field('field1', 'C') # required to create a valid dbf file
         writer.record('value')
     assert not writer.shp and not writer.shx and writer.dbf
@@ -1191,7 +1251,7 @@ def test_write_dbf_only(tmpdir):
     assert os.path.exists(filename+'.dbf')
 
     # test that can read records
-    with shapefile.Reader(dbf=open(filename+'.dbf','rb')) as reader:
+    with shapefile.Reader(dbf=filename+'.dbf') as reader:
         assert not writer.shp and not writer.shx and writer.dbf
         assert (reader.numRecords, reader.numShapes) == (1, None)
         assert len(reader.records()) == 1
@@ -1212,6 +1272,8 @@ def test_write_default_shp_shx_dbf(tmpdir):
     filename = tmpdir.join("test").strpath
     with shapefile.Writer(filename) as writer:
         writer.field('field1', 'C') # required to create a valid dbf file
+        writer.record('value')
+        writer.null()
 
     # assert shp, shx, dbf files exist
     assert os.path.exists(filename + ".shp")
@@ -1228,9 +1290,121 @@ def test_write_pathlike(tmpdir):
     assert not isinstance(filename, str)
     with shapefile.Writer(filename) as writer:
         writer.field('field1', 'C')
+        writer.record('value')
+        writer.null()
     assert (filename + ".shp").ensure()
     assert (filename + ".shx").ensure()
     assert (filename + ".dbf").ensure()
+
+
+def test_write_filelike(tmpdir):
+    """
+    Assert that file-like objects are written correctly.
+    """
+    shp = open(tmpdir.join("test.shp"), mode='wb+')
+    shx = open(tmpdir.join("test.shx"), mode='wb+')
+    dbf = open(tmpdir.join("test.dbf"), mode='wb+')
+    with shapefile.Writer(shx=shx, dbf=dbf, shp=shp) as writer:
+        writer.field('field1', 'C') # required to create a valid dbf file
+        writer.record('value')
+        writer.null()
+        
+    # test that filelike objects were written correctly
+    with shapefile.Reader(shp=shp, shx=shx, dbf=dbf) as reader:
+        assert len(reader) == 1
+        assert reader.shape(0).shapeType == shapefile.NULL
+
+
+def test_write_close_path(tmpdir):
+    """
+    Assert that the Writer close() method
+    closes the shp, shx, and dbf files
+    on exit, if given paths.
+    """
+    sf = shapefile.Writer(tmpdir.join('test'))
+    sf.field('field1', 'C') # required to create a valid dbf file
+    sf.record('value')
+    sf.null()
+    sf.close()
+
+    assert sf.shp.closed is True
+    assert sf.dbf.closed is True
+    assert sf.shx.closed is True
+
+    # test that opens and reads correctly after
+    with shapefile.Reader(tmpdir.join('test')) as reader:
+        assert len(reader) == 1
+        assert reader.shape(0).shapeType == shapefile.NULL
+
+
+def test_write_close_filelike(tmpdir):
+    """
+    Assert that the Writer close() method
+    leaves the shp, shx, and dbf files open
+    on exit, if given filelike objects.
+    """
+    shp = open(tmpdir.join("test.shp"), mode='wb+')
+    shx = open(tmpdir.join("test.shx"), mode='wb+')
+    dbf = open(tmpdir.join("test.dbf"), mode='wb+')
+    sf = shapefile.Writer(shx=shx, dbf=dbf, shp=shp)
+    sf.field('field1', 'C') # required to create a valid dbf file
+    sf.record('value')
+    sf.null()
+    sf.close()
+
+    assert sf.shp.closed is False
+    assert sf.dbf.closed is False
+    assert sf.shx.closed is False
+
+    # test that opens and reads correctly after
+    with shapefile.Reader(shx=shx, dbf=dbf, shp=shp) as reader:
+        assert len(reader) == 1
+        assert reader.shape(0).shapeType == shapefile.NULL
+
+
+def test_write_context_path(tmpdir):
+    """
+    Assert that the Writer context manager
+    closes the shp, shx, and dbf files
+    on exit, if given paths.
+    """
+    with shapefile.Writer(tmpdir.join('test')) as sf:
+        sf.field('field1', 'C') # required to create a valid dbf file
+        sf.record('value')
+        sf.null()
+
+    assert sf.shp.closed is True
+    assert sf.dbf.closed is True
+    assert sf.shx.closed is True
+
+    # test that opens and reads correctly after
+    with shapefile.Reader(tmpdir.join('test')) as reader:
+        assert len(reader) == 1
+        assert reader.shape(0).shapeType == shapefile.NULL
+
+
+def test_write_context_filelike(tmpdir):
+    """
+    Assert that the Writer context manager
+    leaves the shp, shx, and dbf files open
+    on exit, if given filelike objects.
+    """
+    shp = open(tmpdir.join("test.shp"), mode='wb+')
+    shx = open(tmpdir.join("test.shx"), mode='wb+')
+    dbf = open(tmpdir.join("test.dbf"), mode='wb+')
+    with shapefile.Writer(shx=shx, dbf=dbf, shp=shp) as sf:
+        sf.field('field1', 'C') # required to create a valid dbf file
+        sf.record('value')
+        sf.null()
+
+    assert sf.shp.closed is False
+    assert sf.dbf.closed is False
+    assert sf.shx.closed is False
+
+    # test that opens and reads correctly after
+    with shapefile.Reader(shx=shx, dbf=dbf, shp=shp) as reader:
+        assert len(reader) == 1
+        assert reader.shape(0).shapeType == shapefile.NULL
 
 
 def test_write_shapefile_extension_ignored(tmpdir):
@@ -1338,7 +1512,9 @@ def test_write_geojson(tmpdir):
         assert json.dumps(r.shapeRecords().__geo_interface__)
         assert json.dumps(r.__geo_interface__)
 
+
 shape_types = [k for k in shapefile.SHAPETYPE_LOOKUP.keys() if k != 31] # exclude multipatch
+
 
 @pytest.mark.parametrize("shape_type", shape_types)
 def test_write_empty_shapefile(tmpdir, shape_type):
