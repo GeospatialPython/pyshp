@@ -1301,9 +1301,9 @@ def test_write_filelike(tmpdir):
     """
     Assert that file-like objects are written correctly.
     """
-    shp = open(tmpdir.join("test.shp"), mode='wb+')
-    shx = open(tmpdir.join("test.shx"), mode='wb+')
-    dbf = open(tmpdir.join("test.dbf"), mode='wb+')
+    shp = open(tmpdir.join("test.shp").strpath, mode='wb+')
+    shx = open(tmpdir.join("test.shx").strpath, mode='wb+')
+    dbf = open(tmpdir.join("test.dbf").strpath, mode='wb+')
     with shapefile.Writer(shx=shx, dbf=dbf, shp=shp) as writer:
         writer.field('field1', 'C') # required to create a valid dbf file
         writer.record('value')
@@ -1343,9 +1343,9 @@ def test_write_close_filelike(tmpdir):
     leaves the shp, shx, and dbf files open
     on exit, if given filelike objects.
     """
-    shp = open(tmpdir.join("test.shp"), mode='wb+')
-    shx = open(tmpdir.join("test.shx"), mode='wb+')
-    dbf = open(tmpdir.join("test.dbf"), mode='wb+')
+    shp = open(tmpdir.join("test.shp").strpath, mode='wb+')
+    shx = open(tmpdir.join("test.shx").strpath, mode='wb+')
+    dbf = open(tmpdir.join("test.dbf").strpath, mode='wb+')
     sf = shapefile.Writer(shx=shx, dbf=dbf, shp=shp)
     sf.field('field1', 'C') # required to create a valid dbf file
     sf.record('value')
@@ -1389,9 +1389,9 @@ def test_write_context_filelike(tmpdir):
     leaves the shp, shx, and dbf files open
     on exit, if given filelike objects.
     """
-    shp = open(tmpdir.join("test.shp"), mode='wb+')
-    shx = open(tmpdir.join("test.shx"), mode='wb+')
-    dbf = open(tmpdir.join("test.dbf"), mode='wb+')
+    shp = open(tmpdir.join("test.shp").strpath, mode='wb+')
+    shx = open(tmpdir.join("test.shx").strpath, mode='wb+')
+    dbf = open(tmpdir.join("test.dbf").strpath, mode='wb+')
     with shapefile.Writer(shx=shx, dbf=dbf, shp=shp) as sf:
         sf.field('field1', 'C') # required to create a valid dbf file
         sf.record('value')
