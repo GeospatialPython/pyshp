@@ -1,4 +1,10 @@
 
+VERSION 2.3.1
+
+2022-07-28
+	Bug fixes:
+	* Fix recently introduced issue where Reader/Writer closes file-like objects provided by user (#244)
+
 VERSION 2.3.0
 
 2022-04-30

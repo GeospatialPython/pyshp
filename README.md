@@ -95,6 +95,12 @@ part of your geospatial project.
 
 # Version Changes
 
+## 2.3.1
+
+### Bug fixes:
+
+- Fix recently introduced issue where Reader/Writer closes file-like objects provided by user (#244)
+
 ## 2.3.0
 
 ### New Features:

@@ -6,7 +6,7 @@ maintainer: karim.bahgat.norway<at>gmail.com
 Compatible with Python versions 2.7-3.x
 """
 
-__version__ = "2.3.0"
+__version__ = "2.3.1"
 
 from struct import pack, unpack, calcsize, error, Struct
 import os
