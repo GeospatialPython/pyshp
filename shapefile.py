@@ -460,7 +460,8 @@ def triangle_strip_to_polygons(points, start, end):
     offsetSecond = 1
     #iterate over triangles in a strip and add each as individual polygon
     for j in xrange(start, end-2):
-        polygons.append([tuple(points[j]), tuple(points[j+offsetFirst]), tuple(points[j+offsetSecond])])
+        #Add a single triangle as a polygon
+        polygons.append([[tuple(points[j]), tuple(points[j+offsetFirst]), tuple(points[j+offsetSecond])]])
         offsetFirst, offsetSecond = offsetSecond, offsetFirst
     return polygons
 
@@ -468,7 +469,8 @@ def triangle_fan_to_polygons(points, start, end):
     polygons = []
     #iterate over triangles in a fan and add each as individual polygon
     for j in xrange(start, end-2):
-        polygons.append([tuple(points[j]), tuple(points[j+2]), tuple(points[j+1])])
+        #Add a single triangle as a polygon
+        polygons.append([[tuple(points[j]), tuple(points[j+2]), tuple(points[j+1])]])
     return polygons
 
 
@@ -508,9 +510,10 @@ class Shape(object):
 
     @property
     def __geo_interface__(self):
+        points =self._points_z
         if self.shapeType in [POINT, POINTM, POINTZ]:
             # point
-            if len(self.points) == 0:
+            if len(points) == 0:
                 # the shape has no coordinate information, i.e. is 'empty'
                 # the geojson spec does not define a proper null-geometry type
                 # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
@@ -518,10 +521,10 @@ class Shape(object):
             else:
                 return {
                 'type': 'Point',
-                'coordinates': tuple(self.points[0])
+                'coordinates': tuple(points[0])
                 }
         elif self.shapeType in [MULTIPOINT, MULTIPOINTM, MULTIPOINTZ]:
-            if len(self.points) == 0:
+            if len(points) == 0:
                 # the shape has no coordinate information, i.e. is 'empty'
                 # the geojson spec does not define a proper null-geometry type
                 # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
@@ -530,7 +533,7 @@ class Shape(object):
                 # multipoint
                 return {
                 'type': 'MultiPoint',
-                'coordinates': [tuple(p) for p in self.points]
+                'coordinates': [tuple(p) for p in points]
                 }
         elif self.shapeType in [POLYLINE, POLYLINEM, POLYLINEZ]:
             if len(self.parts) == 0:
@@ -542,7 +545,7 @@ class Shape(object):
                 # linestring
                 return {
                 'type': 'LineString',
-                'coordinates': [tuple(p) for p in self.points]
+                'coordinates': [tuple(p) for p in points]
                 }
             else:
                 # multilinestring
@@ -553,10 +556,10 @@ class Shape(object):
                         ps = part
                         continue
                     else:
-                        coordinates.append([tuple(p) for p in self.points[ps:part]])
+                        coordinates.append([tuple(p) for p in points[ps:part]])
                         ps = part
                 else:
-                    coordinates.append([tuple(p) for p in self.points[part:]])
+                    coordinates.append([tuple(p) for p in points[part:]])
                 return {
                 'type': 'MultiLineString',
                 'coordinates': coordinates
@@ -576,10 +579,10 @@ class Shape(object):
                     try:
                         end = self.parts[i+1]
                     except IndexError:
-                        end = len(self.points)
+                        end = len(points)
 
                     # extract the points that make up the ring
-                    ring = [tuple(p) for p in self.points[start:end]]
+                    ring = [tuple(p) for p in points[start:end]]
                     rings.append(ring)
 
                 # organize rings into list of polygons, where each polygon is defined as list of rings.
@@ -604,34 +607,33 @@ class Shape(object):
             polys = []
             stagedPolygonRings = []
 
-            # Tirangle strip
             for i, partType in enumerate(self.partTypes):
                 start = self.parts[i]
-                end = self.parts[i+1] if i < len(self.parts) - 1 else len(self.points)
+                end = self.parts[i+1] if i < len(self.parts) - 1 else len(points)
                 
                 if partType == 0: #triangle strip
                     end_staged_polygon(stagedPolygonRings, polys, self._errors)
                     stagedPolygonRings = []
-                    polys.extend(triangle_strip_to_polygons(self.points, start, end))
+                    polys.extend(triangle_strip_to_polygons(points, start, end))
                 elif partType == 1: #triangle fan
                     end_staged_polygon(stagedPolygonRings, polys, self._errors)
                     stagedPolygonRings = []
-                    polys.extend(triangle_fan_to_polygons(self.points, start, end))
+                    polys.extend(triangle_fan_to_polygons(points, start, end))
                 elif partType == 2: #outer ring
                     end_staged_polygon(stagedPolygonRings, polys, self._errors)
                     stagedPolygonRings = []
-                    ring = [tuple(p) for p in self.points[start:end]]
+                    ring = [tuple(p) for p in points[start:end]]
                     stagedPolygonRings.append(ring)
                 elif partType == 3: #inner ring
-                    ring = [tuple(p) for p in self.points[start:end]]
+                    ring = [tuple(p) for p in points[start:end]]
                     stagedPolygonRings.append(ring)                 
                 elif partType == 4: #first ring
                     end_staged_polygon(stagedPolygonRings, polys, self._errors)
                     stagedPolygonRings = []
-                    ring = [tuple(p) for p in self.points[start:end]]
+                    ring = [tuple(p) for p in points[start:end]]
                     stagedPolygonRings.append(ring)     
                 elif partType == 5: #ring
-                    ring = [tuple(p) for p in self.points[start:end]]
+                    ring = [tuple(p) for p in points[start:end]]
                     stagedPolygonRings.append(ring) 
                 else:
                     raise NotImplementedError('Multipatch part type {} not implemented'.format(part))
@@ -671,7 +673,12 @@ but the Shape was entirely made up of interior holes (defined by counter-clockwi
 still included but were encoded as GeoJSON exterior rings instead of holes.'
                 logger.warning(msg)
 
-
+    @property
+    def _points_z(self):
+        points_copy = self.points[:]
+        if hasattr(self, 'z'):
+            points_copy = [(*coord, z) for coord, z in zip(points_copy, self.z)]
+        return points_copy
 
     @staticmethod
     def _from_geojson(geoj):
