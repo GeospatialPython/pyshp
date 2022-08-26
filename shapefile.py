@@ -452,6 +452,32 @@ def organize_polygon_rings(rings, return_errors=None):
         polys = [[ext] for ext in exteriors]
         return polys
 
+
+#### MULTIPATCH to geo interface functions
+def triangle_strip_to_polygons(points, start, end):
+    polygons = []
+    offsetFirst = 2
+    offsetSecond = 1
+    #iterate over triangles in a strip and add each as individual polygon
+    for j in xrange(start, end-2):
+        polygons.append([tuple(points[j]), tuple(points[j+offsetFirst]), tuple(points[j+offsetSecond])])
+        offsetFirst, offsetSecond = offsetSecond, offsetFirst
+    return polygons
+
+def triangle_fan_to_polygons(points, start, end):
+    polygons = []
+    #iterate over triangles in a fan and add each as individual polygon
+    for j in xrange(start, end-2):
+        polygons.append([tuple(points[j]), tuple(points[j+2]), tuple(points[j+1])])
+    return polygons
+
+
+def end_staged_polygon(stagedPolygonRings, polys, _errors):
+    if len(stagedPolygonRings) > 0:
+        polys.extend(organize_polygon_rings(stagedPolygonRings, _errors))
+
+
+
 class Shape(object):
     def __init__(self, shapeType=NULL, points=None, parts=None, partTypes=None, oid=None):
         """Stores the geometry of the different shape types
@@ -559,25 +585,7 @@ class Shape(object):
                 # organize rings into list of polygons, where each polygon is defined as list of rings.
                 # the first ring is the exterior and any remaining rings are holes (same as GeoJSON). 
                 polys = organize_polygon_rings(rings, self._errors)
-                
-                # if VERBOSE is True, issue detailed warning about any shape errors
-                # encountered during the Shapefile to GeoJSON conversion
-                if VERBOSE and self._errors: 
-                    header = 'Possible issue encountered when converting Shape #{} to GeoJSON: '.format(self.oid)
-                    orphans = self._errors.get('polygon_orphaned_holes', None)
-                    if orphans:
-                        msg = header + 'Shapefile format requires that all polygon interior holes be contained by an exterior ring, \
-but the Shape contained interior holes (defined by counter-clockwise orientation in the shapefile format) that were \
-orphaned, i.e. not contained by any exterior rings. The rings were still included but were \
-encoded as GeoJSON exterior rings instead of holes.'
-                        logger.warning(msg)
-                    only_holes = self._errors.get('polygon_only_holes', None)
-                    if only_holes:
-                        msg = header + 'Shapefile format requires that polygons contain at least one exterior ring, \
-but the Shape was entirely made up of interior holes (defined by counter-clockwise orientation in the shapefile format). The rings were \
-still included but were encoded as GeoJSON exterior rings instead of holes.'
-                        logger.warning(msg)
-
+                self._post_error_msg_print()
                 # return as geojson
                 if len(polys) == 1:
                     return {
@@ -589,9 +597,81 @@ still included but were encoded as GeoJSON exterior rings instead of holes.'
                     'type': 'MultiPolygon',
                     'coordinates': polys
                     }
+        elif self.shapeType in [MULTIPATCH]:
+            if len(self.parts) == 0:
+                return {'type':'Polygon', 'coordinates':[]}
 
+            polys = []
+            stagedPolygonRings = []
+
+            # Tirangle strip
+            for i, partType in enumerate(self.partTypes):
+                start = self.parts[i]
+                end = self.parts[i+1] if i < len(self.parts) - 1 else len(self.points)
+                
+                if partType == 0: #triangle strip
+                    end_staged_polygon(stagedPolygonRings, polys, self._errors)
+                    stagedPolygonRings = []
+                    polys.extend(triangle_strip_to_polygons(self.points, start, end))
+                elif partType == 1: #triangle fan
+                    end_staged_polygon(stagedPolygonRings, polys, self._errors)
+                    stagedPolygonRings = []
+                    polys.extend(triangle_fan_to_polygons(self.points, start, end))
+                elif partType == 2: #outer ring
+                    end_staged_polygon(stagedPolygonRings, polys, self._errors)
+                    stagedPolygonRings = []
+                    ring = [tuple(p) for p in self.points[start:end]]
+                    stagedPolygonRings.append(ring)
+                elif partType == 3: #inner ring
+                    ring = [tuple(p) for p in self.points[start:end]]
+                    stagedPolygonRings.append(ring)                 
+                elif partType == 4: #first ring
+                    end_staged_polygon(stagedPolygonRings, polys, self._errors)
+                    stagedPolygonRings = []
+                    ring = [tuple(p) for p in self.points[start:end]]
+                    stagedPolygonRings.append(ring)     
+                elif partType == 5: #ring
+                    ring = [tuple(p) for p in self.points[start:end]]
+                    stagedPolygonRings.append(ring) 
+                else:
+                    raise NotImplementedError('Multipatch part type {} not implemented'.format(part))
+
+            end_staged_polygon(stagedPolygonRings, polys, self._errors)
+            self._post_error_msg_print()
+            # return as geojson
+            if len(polys) == 1:
+                return {
+                'type': 'Polygon',
+                'coordinates': polys[0]
+                }
+            else:
+                return {
+                'type': 'MultiPolygon',
+                'coordinates': polys
+                }
         else:
             raise Exception('Shape type "%s" cannot be represented as GeoJSON.' % SHAPETYPE_LOOKUP[self.shapeType])
+
+    def _post_error_msg_print(self):
+        # if VERBOSE is True, issue detailed warning about any shape errors
+        # encountered during the Shapefile to GeoJSON conversion
+        if VERBOSE and self._errors: 
+            header = 'Possible issue encountered when converting Shape #{} to GeoJSON: '.format(self.oid)
+            orphans = self._errors.get('polygon_orphaned_holes', None)
+            if orphans:
+                msg = header + 'Shapefile format requires that all polygon interior holes be contained by an exterior ring, \
+but the Shape contained interior holes (defined by counter-clockwise orientation in the shapefile format) that were \
+orphaned, i.e. not contained by any exterior rings. The rings were still included but were \
+encoded as GeoJSON exterior rings instead of holes.'
+                logger.warning(msg)
+            only_holes = self._errors.get('polygon_only_holes', None)
+            if only_holes:
+                msg = header + 'Shapefile format requires that polygons contain at least one exterior ring, \
+but the Shape was entirely made up of interior holes (defined by counter-clockwise orientation in the shapefile format). The rings were \
+still included but were encoded as GeoJSON exterior rings instead of holes.'
+                logger.warning(msg)
+
+
 
     @staticmethod
     def _from_geojson(geoj):
