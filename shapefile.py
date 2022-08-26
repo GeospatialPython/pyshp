@@ -510,7 +510,7 @@ class Shape(object):
 
     @property
     def __geo_interface__(self):
-        points =self._points_z
+        points = self._points_z
         if self.shapeType in [POINT, POINTM, POINTZ]:
             # point
             if len(points) == 0:
