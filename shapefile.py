@@ -595,7 +595,6 @@ class Shape(object):
 
                 # organize rings into list of polygons, where each polygon is defined as list of rings.
                 # the first ring is the exterior and any remaining rings are holes (same as GeoJSON). 
-                print(rings)
                 polys = organize_polygon_rings(rings, self._errors)
                 self._post_error_msg_print()
                 # return as geojson
@@ -632,7 +631,6 @@ class Shape(object):
 
                 # organize rings into list of polygons, where each polygon is defined as list of rings.
                 # the first ring is the exterior and any remaining rings are holes (same as GeoJSON). 
-                print(rings)
                 polys = organize_polygonz_rings(rings, self._errors)
                 self._post_error_msg_print()
                 # return as geojson
