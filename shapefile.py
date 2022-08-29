@@ -336,7 +336,11 @@ def ring_contains_ring(coords1, coords2):
 
 def organize_polygonz_rings(rings, return_errors=None):
     #FIXME: so far, we treat everything as an outer ring
-    return rings
+    polygons = []
+    for ring in rings:
+        polygon = [ring]
+        polygons.append(polygon)
+    return polygons
 
 
 def organize_polygon_rings(rings, return_errors=None):
