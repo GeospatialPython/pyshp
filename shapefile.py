@@ -18,6 +18,7 @@ import logging
 import io
 from datetime import date
 import zipfile
+import platform
 
 # Create named logger
 logger = logging.getLogger(__name__)
@@ -145,6 +146,10 @@ else:
         else:
             # Force string representation.
             return unicode(v).encode(encoding, encodingErrors)
+
+    if platform.python_implementation() == 'IronPython':
+        cPython_2_b = b
+        b = lambda *args, **kwargs : bytes(cPython_2_b(*args, **kwargs))
 
     def u(v, encoding='utf-8', encodingErrors='strict'):
         if isinstance(v, bytes):
