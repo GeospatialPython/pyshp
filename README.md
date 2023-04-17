@@ -1,10 +1,27 @@
+# IronPyShp
+
+Composes b with bytes on Iron Python 2
+
+When writing non-ascii unicode to shapefiles (even with utf8), thanks to a frustrating implementation detail, on Iron Python 2.7 not only is `bytes` not `str`, but
+`u'\u00EC'.encode('utf8', 'strict')` is a `str` (i.e. `unicode`), not `bytes`.  This causes line 2367 to flag a false positive, and attempt an ascii encoding, of already encoded data:
+```
+            if not isinstance(value, bytes):
+                # just in case some of the numeric format() and date strftime() results are still in unicode (Python 3 only)
+                value = b(value, 'ascii', self.encodingErrors) # should be default ascii encoding
+```
+
+An alternative fix would simply be to test for Python 3 in that if statement.  But `b` is widely used in the module, so ensuring it returns `bytes` might prevent other issues, and does not change the logic.  IronPyShp is otherwise identical to PyShp.  
+
+https://nedbatchelder.com/blog/201703/ironpython_is_weird.html
+
 # PyShp
+
 
 The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Python.
 
 ![pyshp logo](http://4.bp.blogspot.com/_SBi37QEsCvg/TPQuOhlHQxI/AAAAAAAAAE0/QjFlWfMx0tQ/S350/GSP_Logo.png "PyShp")
 
-![build status](https://github.com/GeospatialPython/pyshp/actions/workflows/build.yml/badge.svg)
+![build status]:DIY.  
 
 - **Author**: [Joel Lawhead](https://github.com/GeospatialPython)
 - **Maintainers**: [Karim Bahgat](https://github.com/karimbahgat)

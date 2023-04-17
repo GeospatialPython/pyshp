@@ -1,9 +1,14 @@
 """
+IronPyShp
+
 shapefile.py
 Provides read and write support for ESRI Shapefiles.
 authors: jlawhead<at>geospatialpython.com
 maintainer: karim.bahgat.norway<at>gmail.com
-Compatible with Python versions 2.7-3.x
+reluctant Iron Python 2 user: james.parrott<at>proton.me
+Compatible with CPython versions 2.7-3.x
+and Iron Python 2.7 (IronPyShp fixes a unicode bug, but 
+has not otherwise been tested).
 """
 
 __version__ = "2.3.1"
@@ -19,6 +24,7 @@ import io
 from datetime import date
 import zipfile
 import collections
+import platform
 
 # Create named logger
 logger = logging.getLogger(__name__)
@@ -146,6 +152,10 @@ else:
         else:
             # Force string representation.
             return unicode(v).encode(encoding, encodingErrors)
+
+    if platform.python_implementation() == 'IronPython':
+        cPython_2_b = b
+        b = lambda *args, **kwargs : bytes(cPython_2_b(*args, **kwargs))
 
     def u(v, encoding='utf-8', encodingErrors='strict'):
         if isinstance(v, bytes):
