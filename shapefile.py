@@ -18,6 +18,7 @@ import logging
 import io
 from datetime import date
 import zipfile
+import collections
 
 # Create named logger
 logger = logging.getLogger(__name__)
@@ -180,6 +181,13 @@ else:
                 return str(path)
             except:
                 return path
+    
+    # Coincidentally, Python 3.5 and earlier are also the versions in which
+    # dicts are not already ordered.
+    # "Changed in version 3.7: Dictionary order is guaranteed to be insertion 
+    # order. This behavior was an implementation detail of CPython from 3.6"
+    # https://docs.python.org/3/library/stdtypes.html#dict
+    dict = collections.OrderedDict
 
 
 # Begin
