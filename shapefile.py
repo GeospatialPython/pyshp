@@ -220,7 +220,7 @@ def rewind(coords):
 def ring_bbox(coords):
     """Calculates and returns the bounding box of a ring.
     """
-    xs,ys = zip(*coords)
+    xs, ys = zip(*coords)
     bbox = min(xs),min(ys),max(xs),max(ys)
     return bbox
 
@@ -296,6 +296,8 @@ def ring_sample(coords, ccw=False):
             yield p
         # finally, yield the second coordinate to the end to allow checking the last triplet
         yield coords[1]
+
+
         
     for p in itercoords(): 
         # add point to triplet (but not if duplicate)
@@ -330,6 +332,16 @@ def ring_contains_ring(coords1, coords2):
     '''Returns True if all vertexes in coords2 are fully inside coords1.
     '''
     return all((ring_contains_point(coords1, p2) for p2 in coords2))
+
+
+def organize_polygonz_rings(rings, return_errors=None):
+    #FIXME: so far, we treat everything as an outer ring
+    polygons = []
+    for ring in rings:
+        polygon = [ring]
+        polygons.append(polygon)
+    return polygons
+
 
 def organize_polygon_rings(rings, return_errors=None):
     '''Organize a list of coordinate rings into one or more polygons with holes.
@@ -452,6 +464,34 @@ def organize_polygon_rings(rings, return_errors=None):
         polys = [[ext] for ext in exteriors]
         return polys
 
+
+#### MULTIPATCH to geo interface functions
+def triangle_strip_to_polygons(points, start, end):
+    polygons = []
+    offsetFirst = 2
+    offsetSecond = 1
+    #iterate over triangles in a strip and add each as individual polygon
+    for j in xrange(start, end-2):
+        #Add a single triangle as a polygon
+        polygons.append([[tuple(points[j]), tuple(points[j+offsetFirst]), tuple(points[j+offsetSecond])]])
+        offsetFirst, offsetSecond = offsetSecond, offsetFirst
+    return polygons
+
+def triangle_fan_to_polygons(points, start, end):
+    polygons = []
+    #iterate over triangles in a fan and add each as individual polygon
+    for j in xrange(start, end-2):
+        #Add a single triangle as a polygon
+        polygons.append([[tuple(points[j]), tuple(points[j+2]), tuple(points[j+1])]])
+    return polygons
+
+
+def end_staged_polygon(stagedPolygonRings, polys, _errors):
+    if len(stagedPolygonRings) > 0:
+        polys.extend(organize_polygon_rings(stagedPolygonRings, _errors))
+
+
+
 class Shape(object):
     def __init__(self, shapeType=NULL, points=None, parts=None, partTypes=None, oid=None):
         """Stores the geometry of the different shape types
@@ -482,9 +522,10 @@ class Shape(object):
 
     @property
     def __geo_interface__(self):
+        points = self._points_z
         if self.shapeType in [POINT, POINTM, POINTZ]:
             # point
-            if len(self.points) == 0:
+            if len(points) == 0:
                 # the shape has no coordinate information, i.e. is 'empty'
                 # the geojson spec does not define a proper null-geometry type
                 # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
@@ -492,10 +533,10 @@ class Shape(object):
             else:
                 return {
                 'type': 'Point',
-                'coordinates': tuple(self.points[0])
+                'coordinates': tuple(points[0])
                 }
         elif self.shapeType in [MULTIPOINT, MULTIPOINTM, MULTIPOINTZ]:
-            if len(self.points) == 0:
+            if len(points) == 0:
                 # the shape has no coordinate information, i.e. is 'empty'
                 # the geojson spec does not define a proper null-geometry type
                 # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
@@ -504,7 +545,7 @@ class Shape(object):
                 # multipoint
                 return {
                 'type': 'MultiPoint',
-                'coordinates': [tuple(p) for p in self.points]
+                'coordinates': [tuple(p) for p in points]
                 }
         elif self.shapeType in [POLYLINE, POLYLINEM, POLYLINEZ]:
             if len(self.parts) == 0:
@@ -516,7 +557,7 @@ class Shape(object):
                 # linestring
                 return {
                 'type': 'LineString',
-                'coordinates': [tuple(p) for p in self.points]
+                'coordinates': [tuple(p) for p in points]
                 }
             else:
                 # multilinestring
@@ -527,15 +568,15 @@ class Shape(object):
                         ps = part
                         continue
                     else:
-                        coordinates.append([tuple(p) for p in self.points[ps:part]])
+                        coordinates.append([tuple(p) for p in points[ps:part]])
                         ps = part
                 else:
-                    coordinates.append([tuple(p) for p in self.points[part:]])
+                    coordinates.append([tuple(p) for p in points[part:]])
                 return {
                 'type': 'MultiLineString',
                 'coordinates': coordinates
                 }
-        elif self.shapeType in [POLYGON, POLYGONM, POLYGONZ]:
+        elif self.shapeType in [POLYGON, POLYGONM]:
             if len(self.parts) == 0:
                 # the shape has no coordinate information, i.e. is 'empty'
                 # the geojson spec does not define a proper null-geometry type
@@ -550,34 +591,16 @@ class Shape(object):
                     try:
                         end = self.parts[i+1]
                     except IndexError:
-                        end = len(self.points)
+                        end = len(points)
 
                     # extract the points that make up the ring
-                    ring = [tuple(p) for p in self.points[start:end]]
+                    ring = [tuple(p) for p in points[start:end]]
                     rings.append(ring)
 
                 # organize rings into list of polygons, where each polygon is defined as list of rings.
                 # the first ring is the exterior and any remaining rings are holes (same as GeoJSON). 
                 polys = organize_polygon_rings(rings, self._errors)
-                
-                # if VERBOSE is True, issue detailed warning about any shape errors
-                # encountered during the Shapefile to GeoJSON conversion
-                if VERBOSE and self._errors: 
-                    header = 'Possible issue encountered when converting Shape #{} to GeoJSON: '.format(self.oid)
-                    orphans = self._errors.get('polygon_orphaned_holes', None)
-                    if orphans:
-                        msg = header + 'Shapefile format requires that all polygon interior holes be contained by an exterior ring, \
-but the Shape contained interior holes (defined by counter-clockwise orientation in the shapefile format) that were \
-orphaned, i.e. not contained by any exterior rings. The rings were still included but were \
-encoded as GeoJSON exterior rings instead of holes.'
-                        logger.warning(msg)
-                    only_holes = self._errors.get('polygon_only_holes', None)
-                    if only_holes:
-                        msg = header + 'Shapefile format requires that polygons contain at least one exterior ring, \
-but the Shape was entirely made up of interior holes (defined by counter-clockwise orientation in the shapefile format). The rings were \
-still included but were encoded as GeoJSON exterior rings instead of holes.'
-                        logger.warning(msg)
-
+                self._post_error_msg_print()
                 # return as geojson
                 if len(polys) == 1:
                     return {
@@ -589,9 +612,121 @@ still included but were encoded as GeoJSON exterior rings instead of holes.'
                     'type': 'MultiPolygon',
                     'coordinates': polys
                     }
+        elif self.shapeType in [POLYGONZ]:
+            if len(self.parts) == 0:
+                # the shape has no coordinate information, i.e. is 'empty'
+                # the geojson spec does not define a proper null-geometry type
+                # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
+                return {'type':'Polygon', 'coordinates':[]}
+            else:
+                # get all polygon rings
+                rings = []
+                for i in xrange(len(self.parts)):
+                    # get indexes of start and end points of the ring
+                    start = self.parts[i]
+                    try:
+                        end = self.parts[i+1]
+                    except IndexError:
+                        end = len(points)
 
+                    # extract the points that make up the ring
+                    ring = [tuple(p) for p in points[start:end]]
+                    rings.append(ring)
+
+                # organize rings into list of polygons, where each polygon is defined as list of rings.
+                # the first ring is the exterior and any remaining rings are holes (same as GeoJSON). 
+                polys = organize_polygonz_rings(rings, self._errors)
+                self._post_error_msg_print()
+                # return as geojson
+                if len(polys) == 1:
+                    return {
+                    'type': 'Polygon',
+                    'coordinates': polys[0]
+                    }
+                else:
+                    return {
+                    'type': 'MultiPolygon',
+                    'coordinates': polys
+                    }
+        elif self.shapeType in [MULTIPATCH]:
+            if len(self.parts) == 0:
+                return {'type':'Polygon', 'coordinates':[]}
+
+            polys = []
+            stagedPolygonRings = []
+
+            for i, partType in enumerate(self.partTypes):
+                start = self.parts[i]
+                end = self.parts[i+1] if i < len(self.parts) - 1 else len(points)
+                
+                if partType == 0: #triangle strip
+                    end_staged_polygon(stagedPolygonRings, polys, self._errors)
+                    stagedPolygonRings = []
+                    polys.extend(triangle_strip_to_polygons(points, start, end))
+                elif partType == 1: #triangle fan
+                    end_staged_polygon(stagedPolygonRings, polys, self._errors)
+                    stagedPolygonRings = []
+                    polys.extend(triangle_fan_to_polygons(points, start, end))
+                elif partType == 2: #outer ring
+                    end_staged_polygon(stagedPolygonRings, polys, self._errors)
+                    stagedPolygonRings = []
+                    ring = [tuple(p) for p in points[start:end]]
+                    stagedPolygonRings.append(ring)
+                elif partType == 3: #inner ring
+                    ring = [tuple(p) for p in points[start:end]]
+                    stagedPolygonRings.append(ring)                 
+                elif partType == 4: #first ring
+                    end_staged_polygon(stagedPolygonRings, polys, self._errors)
+                    stagedPolygonRings = []
+                    ring = [tuple(p) for p in points[start:end]]
+                    stagedPolygonRings.append(ring)     
+                elif partType == 5: #ring
+                    ring = [tuple(p) for p in points[start:end]]
+                    stagedPolygonRings.append(ring) 
+                else:
+                    raise NotImplementedError('Multipatch part type {} not implemented'.format(part))
+
+            end_staged_polygon(stagedPolygonRings, polys, self._errors)
+            self._post_error_msg_print()
+            # return as geojson
+            if len(polys) == 1:
+                return {
+                'type': 'Polygon',
+                'coordinates': polys[0]
+                }
+            else:
+                return {
+                'type': 'MultiPolygon',
+                'coordinates': polys
+                }
         else:
             raise Exception('Shape type "%s" cannot be represented as GeoJSON.' % SHAPETYPE_LOOKUP[self.shapeType])
+
+    def _post_error_msg_print(self):
+        # if VERBOSE is True, issue detailed warning about any shape errors
+        # encountered during the Shapefile to GeoJSON conversion
+        if VERBOSE and self._errors: 
+            header = 'Possible issue encountered when converting Shape #{} to GeoJSON: '.format(self.oid)
+            orphans = self._errors.get('polygon_orphaned_holes', None)
+            if orphans:
+                msg = header + 'Shapefile format requires that all polygon interior holes be contained by an exterior ring, \
+but the Shape contained interior holes (defined by counter-clockwise orientation in the shapefile format) that were \
+orphaned, i.e. not contained by any exterior rings. The rings were still included but were \
+encoded as GeoJSON exterior rings instead of holes.'
+                logger.warning(msg)
+            only_holes = self._errors.get('polygon_only_holes', None)
+            if only_holes:
+                msg = header + 'Shapefile format requires that polygons contain at least one exterior ring, \
+but the Shape was entirely made up of interior holes (defined by counter-clockwise orientation in the shapefile format). The rings were \
+still included but were encoded as GeoJSON exterior rings instead of holes.'
+                logger.warning(msg)
+
+    @property
+    def _points_z(self):
+        points_copy = self.points[:]
+        if hasattr(self, 'z'):
+            points_copy = [(*coord, z) for coord, z in zip(points_copy, self.z)]
+        return points_copy
 
     @staticmethod
     def _from_geojson(geoj):
