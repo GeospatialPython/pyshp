@@ -730,6 +730,8 @@ class _Record(list):
                 corresponding value in the Record does not exist
         """
         try:
+            if item == "__setstate__": # Prevent infinite loop from copy.deepcopy()
+                raise AttributeError('_Record does not implement __setstate__')
             index = self.__field_positions[item]
             return list.__getitem__(self, index)
         except KeyError:
