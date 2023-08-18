@@ -1077,7 +1077,20 @@ If you do not use the autoBalance() or balance() method and forget to manually
 balance the geometry and attributes the shapefile will be viewed as corrupt by
 most shapefile software.
 	
+### Writing .prj files
+A .prj file, or projection file, is a simple text file that stores a shapefile's map projection and coordinate reference system to help mapping software properly locate the geometry on a map. If you don't have one, you may get confusing errors when you try and use the shapefile you created. The GIS software may complain that it doesn't know the shapefile's projection and refuse to accept it, it may assume the shapefile is the same projection as the rest of your GIS project and put it in the wrong place, or it might assume the coordinates are an offset in meters from latitude and longitude 0,0 which will put your data in the middle of the ocean near Africa. The text in the .prj file is a [Well-Known-Text (WKT) projection string](https://en.wikipedia.org/wiki/Well-known_text_representation_of_coordinate_reference_systems). Projection strings can be quite long so they are often referenced using numeric codes call EPSG codes. The .prj file must have the same base name as your shapefile. So for example if you have a shapefile named "myPoints.shp", the .prj file must be named "myPoints.prj". 
 
+If you're using the same projection over and over, the following is a simple way to create the .prj file assuming your base filename is stored in a variable called "filename":
+
+	>>> with open("{}.prj".format(filename), "w") as prj:
+	>>>     wkt = 'GEOGCS["WGS 84",'
+	>>>     wkt += 'DATUM["WGS_1984",'
+	>>>     wkt += 'SPHEROID["WGS 84",6378137,298.257223563]]'
+	>>>     wkt += ',PRIMEM["Greenwich",0],'
+	>>>     wkt += 'UNIT["degree",0.0174532925199433]]'
+	>>>     prj.write(wkt)
+
+If you need to dynamically fetch WKT projection strings, you can use the pure Python [PyCRS](https://github.com/karimbahgat/PyCRS) module which has a number of useful features. 
 
 # Advanced Use
 
