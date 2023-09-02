@@ -1,9 +1,14 @@
 """
+IronPyShp
+
 shapefile.py
 Provides read and write support for ESRI Shapefiles.
 authors: jlawhead<at>geospatialpython.com
 maintainer: karim.bahgat.norway<at>gmail.com
-Compatible with Python versions 2.7-3.x
+reluctant Iron Python 2 user: james.parrott<at>proton.me
+Compatible with CPython versions 2.7-3.x
+and Iron Python 2.7 (IronPyShp fixes a unicode bug, but 
+has not otherwise been tested).
 """
 
 __version__ = "2.3.1"
@@ -18,6 +23,8 @@ import logging
 import io
 from datetime import date
 import zipfile
+import collections
+import platform
 
 # Create named logger
 logger = logging.getLogger(__name__)
@@ -146,6 +153,10 @@ else:
             # Force string representation.
             return unicode(v).encode(encoding, encodingErrors)
 
+    if platform.python_implementation() == 'IronPython':
+        cPython_2_b = b
+        b = lambda *args, **kwargs : bytes(cPython_2_b(*args, **kwargs))
+
     def u(v, encoding='utf-8', encodingErrors='strict'):
         if isinstance(v, bytes):
             # For python 2 decode bytes to unicode.
@@ -180,6 +191,13 @@ else:
                 return str(path)
             except:
                 return path
+    
+    # Coincidentally, Python 3.5 and earlier are also the versions in which
+    # dicts are not already ordered.
+    # "Changed in version 3.7: Dictionary order is guaranteed to be insertion 
+    # order. This behavior was an implementation detail of CPython from 3.6"
+    # https://docs.python.org/3/library/stdtypes.html#dict
+    dict = collections.OrderedDict
 
 
 # Begin
