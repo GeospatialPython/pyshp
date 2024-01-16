@@ -5,9 +5,9 @@ name: build
 
 on:
   push:
-    branches: [ "PyShp-test-on-Pythons-3.10-3.13" ]
+    branches: [ master ]
   pull_request:
-    branches: [ "PyShp-test-on-Pythons-3.10-3.13" ]
+    branches: [ master ]
 
 jobs:
   build:
