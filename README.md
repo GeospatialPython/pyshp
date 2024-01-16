@@ -1097,7 +1097,7 @@ If you need to dynamically fetch WKT projection strings, you can use the pure Py
 # Advanced Use
 
 ## Common Errors and Fixes
-
+ 
 Below we list some commonly encountered errors and ways to fix them. 
 
 ### Warnings and Logging
