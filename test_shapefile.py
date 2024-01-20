@@ -11,6 +11,8 @@ if sys.version_info.major == 3:
 import pytest
 import json
 import datetime
+from shapely.geometry import Point
+from shapely.geometry.polygon import Polygon
 if sys.version_info.major == 2:
     # required by pytest for python <36
     from pathlib2 import Path
@@ -1070,6 +1072,25 @@ def test_bboxfilter_itershaperecords():
             assert shaperec.record.oid == man.record.oid
             assert shaperec.record == man.record
 
+def test_point_in_poly():
+    """
+    
+    """
+    pnt = [-122.4, 37.8]
+    with shapefile.Reader("shapefiles/blockgroups") as sf:
+        # apply pnt filter
+        shapes = list(sf.iterShapes(pnt=pnt))
+        # manually check pnts
+        manual = shapefile.Shapes()
+        for shape in sf.iterShapes():
+            if Polygon(shape.points).contains(Point(pnt)):
+                manual.append(shape)
+        # compare
+        assert len(shapes) == len(manual)
+        # check that they line up
+        for shape,man in zip(shapes,manual):
+            assert shape.oid == man.oid
+            assert shape.__geo_interface__ == man.__geo_interface__
 
 def test_shaperecords_shaperecord():
     """
