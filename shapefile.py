@@ -1360,6 +1360,13 @@ class Reader(object):
         # Read a single point
         if shapeType in (1,11,21):
             record.points = [_Array('d', unpack("<2d", f.read(16)))]
+            if bbox is not None:
+                # create bounding box for Point by duplicating coordinates
+                point_bbox = list(record.points[0] + record.points[0])
+                # skip shape if no overlap with bounding box
+                if not bbox_overlap(bbox, point_bbox):
+                    f.seek(next)
+                    return None
         # Read a single Z value
         if shapeType == 11:
             record.z = list(unpack("<d", f.read(8)))

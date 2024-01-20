@@ -1226,7 +1226,7 @@ Selectively reading only the necessary data in this way is particularly useful f
 
 ### Spatial filtering
 
-Another common use-case is that we only want to read those records that are located in some region of interest. Because the shapefile stores the bounding box of each shape separately from the geometry data, it's possible to quickly retrieve all shapes that might overlap a given bounding box region without having to load the full shape geometry data for every shape. This can be done by specifying the `bbox` argument to any of the record or shape methods:
+Another common use-case is that we only want to read those records that are located in some region of interest. Because the shapefile stores the bounding box of each shape separately from the geometry data, it's possible to quickly retrieve all shapes that might overlap a given bounding box region without having to load the full shape geometry data for every shape. This can be done by specifying the `bbox` argument to the shapes, iterShapes, or iterShapeRecords methods:
 
 
 	>>> bbox = [36.423, 12.360, 43.123, 18.004] # ca bbox of Eritrea
