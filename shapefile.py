@@ -982,7 +982,7 @@ class Reader(object):
                             # Inspect zipfile contents to find the full shapefile path
                             shapefiles = [name
                                         for name in archive.namelist()
-                                        if name.endswith('.shp')]
+                                        if (name.endswith('.SHP') or name.endswith('.shp'))]
                             # The zipfile must contain exactly one shapefile
                             if len(shapefiles) == 0:
                                 raise ShapefileException('Zipfile does not contain any shapefiles')
@@ -993,14 +993,14 @@ class Reader(object):
                                     path to the shapefile you would like to open.' % shapefiles )
                         # Try to extract file-like objects from zipfile
                         shapefile = os.path.splitext(shapefile)[0] # root shapefile name
-                        for ext in ['shp','shx','dbf']:
+                        for ext in ['SHP','SHX','DBF','shp','shx','dbf']:
                             try:
                                 member = archive.open(shapefile+'.'+ext)
                                 # write zipfile member data to a read+write tempfile and use as source, gets deleted on close()
                                 fileobj = tempfile.NamedTemporaryFile(mode='w+b', delete=True)
                                 fileobj.write(member.read())
                                 fileobj.seek(0)
-                                setattr(self, ext, fileobj)
+                                setattr(self, ext.lower(), fileobj)
                                 self._files_to_close.append(fileobj)
                             except:
                                 pass
