@@ -1082,13 +1082,15 @@ A .prj file, or projection file, is a simple text file that stores a shapefile's
 
 If you're using the same projection over and over, the following is a simple way to create the .prj file assuming your base filename is stored in a variable called "filename":
 
-	>>> with open("{}.prj".format(filename), "w") as prj:
-	>>>     wkt = 'GEOGCS["WGS 84",'
-	>>>     wkt += 'DATUM["WGS_1984",'
-	>>>     wkt += 'SPHEROID["WGS 84",6378137,298.257223563]]'
-	>>>     wkt += ',PRIMEM["Greenwich",0],'
-	>>>     wkt += 'UNIT["degree",0.0174532925199433]]'
-	>>>     prj.write(wkt)
+```
+	with open("{}.prj".format(filename), "w") as prj:
+	    wkt = 'GEOGCS["WGS 84",'
+	    wkt += 'DATUM["WGS_1984",'
+	    wkt += 'SPHEROID["WGS 84",6378137,298.257223563]]'
+	    wkt += ',PRIMEM["Greenwich",0],'
+	    wkt += 'UNIT["degree",0.0174532925199433]]'
+	    prj.write(wkt)
+```
 
 If you need to dynamically fetch WKT projection strings, you can use the pure Python [PyCRS](https://github.com/karimbahgat/PyCRS) module which has a number of useful features. 
 
