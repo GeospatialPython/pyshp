@@ -411,9 +411,9 @@ def test_reader_shapefile_type():
     is returned correctly.
     """
     with shapefile.Reader("shapefiles/blockgroups") as sf:
-        assert sf.shapeType is 5   # 5 means Polygon
-        assert sf.shapeType is shapefile.POLYGON
-        assert sf.shapeTypeName is "POLYGON"
+        assert sf.shapeType == 5   # 5 means Polygon
+        assert sf.shapeType == shapefile.POLYGON
+        assert sf.shapeTypeName == "POLYGON"
 
 
 def test_reader_shapefile_length():
@@ -429,9 +429,9 @@ def test_reader_shapefile_length():
 def test_shape_metadata():
     with shapefile.Reader("shapefiles/blockgroups") as sf:
         shape = sf.shape(0)
-        assert shape.shapeType is 5 # Polygon
-        assert shape.shapeType is shapefile.POLYGON
-        assert sf.shapeTypeName is "POLYGON"
+        assert shape.shapeType == 5 # Polygon
+        assert shape.shapeType == shapefile.POLYGON
+        assert sf.shapeTypeName == "POLYGON"
 
 
 def test_reader_fields():
@@ -497,9 +497,9 @@ def test_reader_shp_shx_only():
     with shapefile.Reader(shp="shapefiles/blockgroups.shp", shx="shapefiles/blockgroups.shx") as sf:
         assert len(sf) == 663
         shape = sf.shape(3)
-        assert len(shape.points) is 173
+        assert len(shape.points) == 173
 
-    
+
 def test_reader_shp_dbf_only():
     """
     Assert that specifying just the
@@ -509,7 +509,7 @@ def test_reader_shp_dbf_only():
     with shapefile.Reader(shp="shapefiles/blockgroups.shp", dbf="shapefiles/blockgroups.dbf") as sf:
         assert len(sf) == 663
         shape = sf.shape(3)
-        assert len(shape.points) is 173
+        assert len(shape.points) == 173
         record = sf.record(3)
         assert record[1:3] == ['060750601001', 4715]
 
@@ -523,7 +523,7 @@ def test_reader_shp_only():
     with shapefile.Reader(shp="shapefiles/blockgroups.shp") as sf:
         assert len(sf) == 663
         shape = sf.shape(3)
-        assert len(shape.points) is 173
+        assert len(shape.points) == 173
 
 
 def test_reader_filelike_dbf_only():
@@ -547,7 +547,7 @@ def test_reader_filelike_shp_shx_only():
     with shapefile.Reader(shp=open("shapefiles/blockgroups.shp", "rb"), shx=open("shapefiles/blockgroups.shx", "rb")) as sf:
         assert len(sf) == 663
         shape = sf.shape(3)
-        assert len(shape.points) is 173
+        assert len(shape.points) == 173
 
 
 def test_reader_filelike_shp_dbf_only():
@@ -559,7 +559,7 @@ def test_reader_filelike_shp_dbf_only():
     with shapefile.Reader(shp=open("shapefiles/blockgroups.shp", "rb"), dbf=open("shapefiles/blockgroups.dbf", "rb")) as sf:
         assert len(sf) == 663
         shape = sf.shape(3)
-        assert len(shape.points) is 173
+        assert len(shape.points) == 173
         record = sf.record(3)
         assert record[1:3] == ['060750601001', 4715]
 
@@ -573,7 +573,7 @@ def test_reader_filelike_shp_only():
     with shapefile.Reader(shp=open("shapefiles/blockgroups.shp", "rb")) as sf:
         assert len(sf) == 663
         shape = sf.shape(3)
-        assert len(shape.points) is 173
+        assert len(shape.points) == 173
 
 
 def test_reader_shapefile_delayed_load():
@@ -1101,7 +1101,7 @@ def test_shaperecord_shape():
         shaperec = sf.shapeRecord(3)
         shape = shaperec.shape
         point = shape.points[0]
-        assert len(point) is 2
+        assert len(point) == 2
 
 
 def test_shaperecord_record():
