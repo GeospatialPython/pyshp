@@ -275,7 +275,7 @@ def test_reader_url():
             pass
 
     # test reading zipfile from url
-    url = "https://biogeo.ucdavis.edu/data/diva/rrd/NIC_rrd.zip"
+    url = "https://github.com/JamesParrott/PyShp_test_shapefile/raw/main/gis_osm_natural_a_free_1.zip"
     with shapefile.Reader(url) as sf:
         for recShape in sf.iterShapeRecords():
             pass
