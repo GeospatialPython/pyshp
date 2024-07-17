@@ -299,7 +299,7 @@ Finally, you can use all of the above methods to read shapefiles directly from t
 
 
 	>>> # from a zipped shapefile on website
-	>>> sf = shapefile.Reader("https://biogeo.ucdavis.edu/data/diva/rrd/NIC_rrd.zip")
+	>>> sf = shapefile.Reader("https://github.com/JamesParrott/PyShp_test_shapefile/raw/main/gis_osm_natural_a_free_1.zip")
 
 	>>> # from a shapefile collection of files in a github repository
 	>>> sf = shapefile.Reader("https://github.com/nvkelso/natural-earth-vector/blob/master/110m_cultural/ne_110m_admin_0_tiny_countries.shp?raw=true")
