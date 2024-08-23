@@ -9,7 +9,7 @@ VERSION 2.3.0
 
 2022-04-30
 	New Features:
-	* Added support for pathlib and path-like shapefile filepaths (@mwtoews). 
+	* Added support for pathlib and path-like shapefile filepaths (@mwtoews).
 	* Allow reading individual file extensions via filepaths.
 
 	Improvements:
@@ -21,7 +21,7 @@ VERSION 2.3.0
 	* More robust handling of corrupt shapefiles (fixes #235)
 	* Fix errors when writing to individual file-handles (fixes #237)
 	* Revert previous decision to enforce geojson output ring orientation (detailed explanation at https://github.com/SciTools/cartopy/issues/2012)
-	* Fix test issues in environments without network access (@sebastic, @musicinmybrain). 
+	* Fix test issues in environments without network access (@sebastic, @musicinmybrain).
 
 VERSION 2.2.0
 
@@ -33,7 +33,7 @@ VERSION 2.2.0
 	* Allow fast filtering which shapes to read from the file through a `bbox` arg.
 
 	Improvements:
-	* More examples and restructuring of README. 
+	* More examples and restructuring of README.
 	* More informative Shape to geojson warnings (see #219).
 	* Add shapefile.VERBOSE flag to control warnings verbosity (default True).
 	* Shape object information when calling repr().
@@ -88,7 +88,7 @@ VERSION 2.1.0
 
 2019-02-15
 	New Features:
-	* Added back read/write support for unicode field names. 
+	* Added back read/write support for unicode field names.
 	* Improved Record representation
 	* More support for geojson on Reader, ShapeRecord, ShapeRecords, and shapes()
 
@@ -100,54 +100,54 @@ VERSION 2.1.0
 VERSION 2.0.1
 
 2018-11-05
-	* Fix pip install setup.py README decoding error. 
+	* Fix pip install setup.py README decoding error.
 
 VERSION 2.0.0
 
 2018-09-01
 	(Note: Some contributor attributions may be missing.)
 	New Features:
-	* Full support for unicode text, with custom encoding, and exception handling. 
-	  - Means that the Reader returns unicode, and the Writer accepts unicode. 
-	* PyShp has been simplified to a pure input-output library using the Reader and Writer classes, dropping the Editor class. 
+	* Full support for unicode text, with custom encoding, and exception handling.
+	  - Means that the Reader returns unicode, and the Writer accepts unicode.
+	* PyShp has been simplified to a pure input-output library using the Reader and Writer classes, dropping the Editor class.
 	* Switched to a new streaming approach when writing files, keeping memory-usage at a minimum:
-	  - Specify filepath/destination and text encoding when creating the Writer. 
-	  - The file is written incrementally with each call to shape/record. 
-	  - Adding shapes is now done using dedicated methods for each shapetype. 
+	  - Specify filepath/destination and text encoding when creating the Writer.
+	  - The file is written incrementally with each call to shape/record.
+	  - Adding shapes is now done using dedicated methods for each shapetype.
 	* Reading shapefiles is now more convenient:
-	  - Shapefiles can be opened using the context manager, and files are properly closed. 
-	  - Shapefiles can be iterated, have a length, and supports the geo interface. 
+	  - Shapefiles can be opened using the context manager, and files are properly closed.
+	  - Shapefiles can be iterated, have a length, and supports the geo interface.
 	  - New ways of inspecing shapefile metadata by printing. [@megies]
 	  - More convenient accessing of Record values as attributes. [@philippkraft]
-	  - More convenient shape type name checking. [@megies] 
-	* Add more support and documentation for MultiPatch 3D shapes. 
-	* The Reader "elevation" and "measure" attributes now renamed "zbox" and "mbox", to make it clear they refer to the min/max values. 
-	* Better documentation of previously unclear aspects, such as field types. 
+	  - More convenient shape type name checking. [@megies]
+	* Add more support and documentation for MultiPatch 3D shapes.
+	* The Reader "elevation" and "measure" attributes now renamed "zbox" and "mbox", to make it clear they refer to the min/max values.
+	* Better documentation of previously unclear aspects, such as field types.
 
 	Bug Fixes:
 	* More reliable/robust:
 	  - Fixed shapefile bbox error for empty or point type shapefiles. [@mcuprjak]
 	  - Reading and writing Z and M type shapes is now more robust, fixing many errors, and has been added to the documentation. [@ShinNoNoir]
-	  - Improved parsing of field value types, fixed errors and made more flexible. 
+	  - Improved parsing of field value types, fixed errors and made more flexible.
 	  - Fixed bug when writing shapefiles with datefield and date values earlier than 1900 [@megies]
 	* Fix some geo interface errors, including checking polygon directions.
 	* Bug fixes for reading from case sensitive file names, individual files separately, and from file-like objects. [@gastoneb, @kb003308, @erickskb]
 	* Enforce maximum field limit. [@mwtoews]
-	
+
 VERSION 1.2.12
 	* ?
-	
+
 VERSION 1.2.11
 
 2017-04-29 Karim Bahgat <karim.bahgat.norway@gmail.com>
-	* Fixed bugs when reading and writing empty shapefiles. 
+	* Fixed bugs when reading and writing empty shapefiles.
 	* Fixed bug when writing null geometry.
 	* Fixed misc data type errors.
 	* Fixed error when reading files with wrong record length.
-	* Use max field precision when saving decimal numbers. 
-	* Improved shapetype detection. 
-	* Expanded docs on data types. 
-	* General doc additions and travis icon. 
+	* Use max field precision when saving decimal numbers.
+	* Improved shapetype detection.
+	* Expanded docs on data types.
+	* General doc additions and travis icon.
 
 VERSION 1.2.10
 
@@ -162,7 +162,7 @@ VERSION 1.2.9
 VERSION 1.2.8
 
 2016-08-17 Joel Lawhead <jlawhead@geospatialpython.com>
-	* Configured Travis-CI 
+	* Configured Travis-CI
 
 VERSION 1.2.5
 
@@ -171,7 +171,7 @@ VERSION 1.2.5
 	* Merge README text into markdown file. Remove text version.
 	* Fixed parsing of number of points for some shapes (MULTIPOINTM, MULTIPOINTZ)
 
-VERSON 1.2.3
+VERSION 1.2.3
 
 2015-06-21 Joel Lawhead <jlawhead@geospatialpython.com>
 	*shapefile.py (u) Bugfix for Python3 with Reader.iterShapeRecords()
@@ -211,9 +211,9 @@ VERSION 1.2.0
 	*README.txt add example/test for writing a 3D polygon
 
 VERSION 1.1.9
-	
+
 2013-07-27 Joel Lawhead <jlawhead@geospatialpython.com>
-	*shapefile.py (Writer.__shpRecords) fixed inconsistency between Reader and Writer 
+	*shapefile.py (Writer.__shpRecords) fixed inconsistency between Reader and Writer
 	when referencing "z" and "m" values.  This bug caused errors only when editing
 	3D shapefiles.
 
@@ -233,39 +233,39 @@ VERSION 1.1.7
 
 2013-06-22 Joel Lawhead <jlawhead@geospatialpython.com>
 
-	*shapefile.py (_Shape.__geo_interface__) Added Python __geo_interface__ convention 
+	*shapefile.py (_Shape.__geo_interface__) Added Python __geo_interface__ convention
 	to export shapefiles as GeoJSON.
-	
-	*shapefile.py (Reader.__init__) Used is_string() method to detect filenames passed 
+
+	*shapefile.py (Reader.__init__) Used is_string() method to detect filenames passed
 	as unicode strings.
-	
-	*shapefile.py (Reader.iterShapes) Added iterShapes() method to iterate through 
+
+	*shapefile.py (Reader.iterShapes) Added iterShapes() method to iterate through
 	geometry records for parsing large files efficiently.
-	
-	*shapefile.py (Reader.iterRecords) Added iterRecords() method to iterate through 
+
+	*shapefile.py (Reader.iterRecords) Added iterRecords() method to iterate through
 	dbf records efficiently in large files.
-	
-	*shapefile.py (Reader.shape) Modified shape() method to use iterShapes() if shx 
+
+	*shapefile.py (Reader.shape) Modified shape() method to use iterShapes() if shx
 	file is not available.
-	
+
 	*shapefile.py (main) Added __version__ attribute.
-	
-	*shapefile.py (Writer.record) Fixed bug which prevents writing the number 0 to 
+
+	*shapefile.py (Writer.record) Fixed bug which prevents writing the number 0 to
 	dbf fields.
 
 	*shapefile.py (Reader.__shape) Updated to calculate and seek the start of the next record. The
 	shapefile spec does not require the content of a geometry record to be as long as the content
-	length defined in the header.  The result is you can delete features without modifying the 
+	length defined in the header.  The result is you can delete features without modifying the
 	record header allowing for empty space in records.
-	
+
 	*shapefile.py (Writer.poly) Added enforcement of closed polygons
-	
+
 	*shapefile.py (Writer.save) Added unique file name generator to use if no file names are passed
 	to a writer instance when saving (ex. w.save()).  The unique file name is returned as a string.
-	
+
 	*README.txt (main) Added tests for iterShapes(), iterRecords(), __geo_interface__()
-	
+
 	*README.txt (main) Updated "bbox" property documentation to match Esri specification.
 
-	
-	
+
+
