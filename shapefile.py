@@ -3,21 +3,25 @@ shapefile.py
 Provides read and write support for ESRI Shapefiles.
 authors: jlawhead<at>geospatialpython.com
 maintainer: karim.bahgat.norway<at>gmail.com
-Compatible with Python versions 2.7-3.x
+Compatible with Python versions >= 3.8
 """
 
 __version__ = "2.3.1"
 
-from struct import pack, unpack, calcsize, error, Struct
-import os
-import sys
-import time
 import array
-import tempfile
-import logging
-import io
 from datetime import date
+import io
+import logging
+import os
+from struct import pack, unpack, calcsize, error, Struct
+import sys
+import tempfile
+import time
 import zipfile
+
+from urllib.error import HTTPError
+from urllib.parse import urlparse, urlunparse
+from urllib.request import urlopen, Request
 
 # Create named logger
 logger = logging.getLogger(__name__)
@@ -74,112 +78,51 @@ PARTTYPE_LOOKUP = {
     5: 'RING'}
 
 
-# Python 2-3 handling
-
-PYTHON3 = sys.version_info[0] == 3
-
-if PYTHON3:
-    xrange = range
-    izip = zip
-
-    from urllib.parse import urlparse, urlunparse
-    from urllib.error import HTTPError
-    from urllib.request import urlopen, Request
-
-else:
-    from itertools import izip
-
-    from urlparse import urlparse, urlunparse
-    from urllib2 import HTTPError
-    from urllib2 import urlopen, Request
-
-
+xrange = range
+izip = zip
+    
 # Helpers
 
 MISSING = [None,'']
 NODATA = -10e38 # as per the ESRI shapefile spec, only used for m-values.
 
-if PYTHON3:
-    def b(v, encoding='utf-8', encodingErrors='strict'):
-        if isinstance(v, str):
-            # For python 3 encode str to bytes.
-            return v.encode(encoding, encodingErrors)
-        elif isinstance(v, bytes):
-            # Already bytes.
-            return v
-        elif v is None:
-            # Since we're dealing with text, interpret None as ""
-            return b""
-        else:
-            # Force string representation.
-            return str(v).encode(encoding, encodingErrors)
+def b(v, encoding='utf-8', encodingErrors='strict'):
+    if isinstance(v, str):
+        # For python 3 encode str to bytes.
+        return v.encode(encoding, encodingErrors)
+    elif isinstance(v, bytes):
+        # Already bytes.
+        return v
+    elif v is None:
+        # Since we're dealing with text, interpret None as ""
+        return b""
+    else:
+        # Force string representation.
+        return str(v).encode(encoding, encodingErrors)
 
-    def u(v, encoding='utf-8', encodingErrors='strict'):
-        if isinstance(v, bytes):
-            # For python 3 decode bytes to str.
-            return v.decode(encoding, encodingErrors)
-        elif isinstance(v, str):
-            # Already str.
-            return v
-        elif v is None:
-            # Since we're dealing with text, interpret None as ""
-            return ""
-        else:
-            # Force string representation.
-            return bytes(v).decode(encoding, encodingErrors)
+def u(v, encoding='utf-8', encodingErrors='strict'):
+    if isinstance(v, bytes):
+        # For python 3 decode bytes to str.
+        return v.decode(encoding, encodingErrors)
+    elif isinstance(v, str):
+        # Already str.
+        return v
+    elif v is None:
+        # Since we're dealing with text, interpret None as ""
+        return ""
+    else:
+        # Force string representation.
+        return bytes(v).decode(encoding, encodingErrors)
 
-    def is_string(v):
-        return isinstance(v, str)
+def is_string(v):
+    return isinstance(v, str)
 
-else:
-    def b(v, encoding='utf-8', encodingErrors='strict'):
-        if isinstance(v, unicode):
-            # For python 2 encode unicode to bytes.
-            return v.encode(encoding, encodingErrors)
-        elif isinstance(v, bytes):
-            # Already bytes.
-            return v
-        elif v is None:
-            # Since we're dealing with text, interpret None as ""
-            return ""
-        else:
-            # Force string representation.
-            return unicode(v).encode(encoding, encodingErrors)
 
-    def u(v, encoding='utf-8', encodingErrors='strict'):
-        if isinstance(v, bytes):
-            # For python 2 decode bytes to unicode.
-            return v.decode(encoding, encodingErrors)
-        elif isinstance(v, unicode):
-            # Already unicode.
-            return v
-        elif v is None:
-            # Since we're dealing with text, interpret None as ""
-            return u""
-        else:
-            # Force string representation.
-            return bytes(v).decode(encoding, encodingErrors)
-
-    def is_string(v):
-        return isinstance(v, basestring)
-
-if sys.version_info[0:2] >= (3, 6):
-    def pathlike_obj(path):
-        if isinstance(path, os.PathLike):
-            return os.fsdecode(path)
-        else:
-            return path
-else:
-    def pathlike_obj(path):
-        if is_string(path):
-            return path
-        elif hasattr(path, "__fspath__"):
-            return path.__fspath__()
-        else:
-            try:
-                return str(path)
-            except:
-                return path
+def pathlike_obj(path):
+    if isinstance(path, os.PathLike):
+        return os.fsdecode(path)
+    else:
+        return path
 
 
 # Begin
@@ -452,7 +395,7 @@ def organize_polygon_rings(rings, return_errors=None):
         polys = [[ext] for ext in exteriors]
         return polys
 
-class Shape(object):
+class Shape:
     def __init__(self, shapeType=NULL, points=None, parts=None, partTypes=None, oid=None):
         """Stores the geometry of the different shape types
         specified in the Shapefile spec. Shape types are
@@ -823,9 +766,9 @@ class _Record(list):
         """
         default = list(dir(type(self))) # default list methods and attributes of this class
         fnames = list(self.__field_positions.keys()) # plus field names (random order if Python version < 3.6)
-        return default + fnames
-
-class ShapeRecord(object):
+        return default + fnames 
+        
+class ShapeRecord:
     """A ShapeRecord object containing a shape along with its attributes.
     Provides the GeoJSON __geo_interface__ to return a Feature dictionary."""
     def __init__(self, shape=None, record=None):
@@ -874,7 +817,7 @@ class ShapefileException(Exception):
     """An exception to handle shapefile specific problems."""
     pass
 
-class Reader(object):
+class Reader:
     """Reads the three files of a shapefile as a unit or
     separately.  If one of the three files (.shp, .shx,
     .dbf) is missing no exception is thrown until you try
@@ -1756,7 +1699,7 @@ class Reader(object):
                     yield ShapeRecord(shape=shape, record=record)
 
 
-class Writer(object):
+class Writer:
     """Provides write support for ESRI Shapefiles."""
     def __init__(self, target=None, shapeType=None, autoBalance=False, **kwargs):
         self.target = target
