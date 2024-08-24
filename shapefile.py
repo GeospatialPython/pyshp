@@ -3,21 +3,25 @@ shapefile.py
 Provides read and write support for ESRI Shapefiles.
 authors: jlawhead<at>geospatialpython.com
 maintainer: karim.bahgat.norway<at>gmail.com
-Compatible with Python versions 2.7-3.x
+Compatible with Python versions >= 3.8
 """
 
 __version__ = "2.3.1"
 
-from struct import pack, unpack, calcsize, error, Struct
-import os
-import sys
-import time
 import array
-import tempfile
-import logging
-import io
 from datetime import date
+import io
+import logging
+import os
+from struct import pack, unpack, calcsize, error, Struct
+import sys
+import tempfile
+import time
 import zipfile
+
+from urllib.error import HTTPError
+from urllib.parse import urlparse, urlunparse
+from urllib.request import urlopen, Request
 
 # Create named logger
 logger = logging.getLogger(__name__)
@@ -76,10 +80,6 @@ PARTTYPE_LOOKUP = {
 
 xrange = range
 izip = zip
-
-from urllib.parse import urlparse, urlunparse
-from urllib.error import HTTPError
-from urllib.request import urlopen, Request
     
 # Helpers
 
