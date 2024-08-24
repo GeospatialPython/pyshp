@@ -395,7 +395,7 @@ def organize_polygon_rings(rings, return_errors=None):
         polys = [[ext] for ext in exteriors]
         return polys
 
-class Shape(object):
+class Shape:
     def __init__(self, shapeType=NULL, points=None, parts=None, partTypes=None, oid=None):
         """Stores the geometry of the different shape types
         specified in the Shapefile spec. Shape types are
@@ -768,7 +768,7 @@ class _Record(list):
         fnames = list(self.__field_positions.keys()) # plus field names (random order if Python version < 3.6)
         return default + fnames 
         
-class ShapeRecord(object):
+class ShapeRecord:
     """A ShapeRecord object containing a shape along with its attributes.
     Provides the GeoJSON __geo_interface__ to return a Feature dictionary."""
     def __init__(self, shape=None, record=None):
@@ -853,7 +853,7 @@ class ShapefileException(Exception):
 #             msg = '\n'.join(messages)
 #             logger.warning(msg)
 
-class Reader(object):
+class Reader:
     """Reads the three files of a shapefile as a unit or
     separately.  If one of the three files (.shp, .shx,
     .dbf) is missing no exception is thrown until you try
@@ -1735,7 +1735,7 @@ class Reader(object):
                     yield ShapeRecord(shape=shape, record=record)
 
 
-class Writer(object):
+class Writer:
     """Provides write support for ESRI Shapefiles."""
     def __init__(self, target=None, shapeType=None, autoBalance=False, **kwargs):
         self.target = target
