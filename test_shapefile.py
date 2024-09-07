@@ -293,7 +293,7 @@ def test_reader_zip():
             pass
         assert len(sf) > 0
     assert sf.shp.closed == sf.shx.closed == sf.dbf.closed == True
-    
+
     # test require specific path when reading multi-shapefile zipfile
     with pytest.raises(shapefile.ShapefileException):
         with shapefile.Reader("shapefiles/blockgroups_multishapefile.zip") as sf:
@@ -584,7 +584,7 @@ def test_reader_shapefile_delayed_load():
     with shapefile.Reader() as sf:
         # assert that data request raises exception, since no file has been provided yet
         with pytest.raises(shapefile.ShapefileException):
-            sf.shape(0) 
+            sf.shape(0)
         # assert that works after loading file manually
         sf.load("shapefiles/blockgroups")
         assert len(sf) == 663
@@ -603,7 +603,7 @@ def test_records_match_shapes():
 
 def test_record_attributes(fields=None):
     """
-    Assert that record retrieves all relevant values and can 
+    Assert that record retrieves all relevant values and can
     be accessed as attributes and dictionary items.
     """
     # note
@@ -634,7 +634,7 @@ def test_record_attributes(fields=None):
 
 def test_record_subfields():
     """
-    Assert that reader correctly retrieves only a subset 
+    Assert that reader correctly retrieves only a subset
     of fields when specified.
     """
     fields = ["AREA","POP1990","MALES","FEMALES","MOBILEHOME"]
@@ -643,9 +643,9 @@ def test_record_subfields():
 
 def test_record_subfields_unordered():
     """
-    Assert that reader correctly retrieves only a subset 
-    of fields when specified, given in random order but 
-    retrieved in the order of the shapefile fields. 
+    Assert that reader correctly retrieves only a subset
+    of fields when specified, given in random order but
+    retrieved in the order of the shapefile fields.
     """
     fields = sorted(["AREA","POP1990","MALES","FEMALES","MOBILEHOME"])
     test_record_attributes(fields=fields)
@@ -663,7 +663,7 @@ def test_record_subfields_delflag_notvalid():
 def test_record_subfields_duplicates():
     """
     Assert that reader correctly retrieves only a subset
-    of fields when specified, handling duplicate input fields. 
+    of fields when specified, handling duplicate input fields.
     """
     fields = ["AREA","AREA","AREA","MALES","MALES","MOBILEHOME"]
     test_record_attributes(fields=fields)
@@ -676,7 +676,7 @@ def test_record_subfields_duplicates():
 def test_record_subfields_empty():
     """
     Assert that reader does not retrieve any fields when given
-    an empty list. 
+    an empty list.
     """
     fields = []
     test_record_attributes(fields=fields)
@@ -774,8 +774,8 @@ def test_shape_oid_no_shx():
 
 def test_reader_offsets():
     """
-    Assert that reader will not read the shx offsets unless necessary, 
-    i.e. requesting a shape index. 
+    Assert that reader will not read the shx offsets unless necessary,
+    i.e. requesting a shape index.
     """
     basename = "shapefiles/blockgroups"
     with shapefile.Reader(basename) as sf:
@@ -788,8 +788,8 @@ def test_reader_offsets():
 
 def test_reader_offsets_no_shx():
     """
-    Assert that reading a shapefile without a shx file will not build 
-    the offsets unless necessary, i.e. reading all the shapes. 
+    Assert that reading a shapefile without a shx file will not build
+    the offsets unless necessary, i.e. reading all the shapes.
     """
     basename = "shapefiles/blockgroups"
     shp = open(basename + ".shp", 'rb')
@@ -810,7 +810,7 @@ def test_reader_offsets_no_shx():
 def test_reader_numshapes():
     """
     Assert that reader reads the numShapes attribute from the
-    shx file header during loading. 
+    shx file header during loading.
     """
     basename = "shapefiles/blockgroups"
     with shapefile.Reader(basename) as sf:
@@ -839,8 +839,8 @@ def test_reader_numshapes_no_shx():
 
 def test_reader_len():
     """
-    Assert that calling len() on reader is equal to length of 
-    all shapes and records. 
+    Assert that calling len() on reader is equal to length of
+    all shapes and records.
     """
     basename = "shapefiles/blockgroups"
     with shapefile.Reader(basename) as sf:
@@ -850,7 +850,7 @@ def test_reader_len():
 def test_reader_len_not_loaded():
     """
     Assert that calling len() on reader that hasn't loaded a shapefile
-    yet is equal to 0. 
+    yet is equal to 0.
     """
     with shapefile.Reader() as sf:
         assert len(sf) == 0
@@ -859,7 +859,7 @@ def test_reader_len_not_loaded():
 def test_reader_len_dbf_only():
     """
     Assert that calling len() on reader when reading a dbf file only,
-    is equal to length of all records. 
+    is equal to length of all records.
     """
     basename = "shapefiles/blockgroups"
     dbf = open(basename + ".dbf", 'rb')
@@ -870,7 +870,7 @@ def test_reader_len_dbf_only():
 def test_reader_len_no_dbf():
     """
     Assert that calling len() on reader when dbf file is missing,
-    is equal to length of all shapes. 
+    is equal to length of all shapes.
     """
     basename = "shapefiles/blockgroups"
     shp = open(basename + ".shp", 'rb')
@@ -882,7 +882,7 @@ def test_reader_len_no_dbf():
 def test_reader_len_no_dbf_shx():
     """
     Assert that calling len() on reader when dbf and shx file is missing,
-    is equal to length of all shapes. 
+    is equal to length of all shapes.
     """
     basename = "shapefiles/blockgroups"
     shp = open(basename + ".shp", 'rb')
@@ -893,7 +893,7 @@ def test_reader_len_no_dbf_shx():
 def test_reader_corrupt_files():
     """
     Assert that reader is able to handle corrupt files by
-    strictly going off the header information. 
+    strictly going off the header information.
     """
     basename = "shapefiles/test/corrupt_too_long"
 
@@ -931,7 +931,7 @@ def test_reader_corrupt_files():
 def test_bboxfilter_shape():
     """
     Assert that applying the bbox filter to shape() correctly ignores the shape
-    if it falls outside, and returns it if inside. 
+    if it falls outside, and returns it if inside.
     """
     inside = [-122.4, 37.8, -122.35, 37.82]
     outside = list(inside)
@@ -945,7 +945,7 @@ def test_bboxfilter_shape():
 def test_bboxfilter_shapes():
     """
     Assert that applying the bbox filter to shapes() correctly ignores shapes
-    that fall outside, and returns those that fall inside. 
+    that fall outside, and returns those that fall inside.
     """
     bbox = [-122.4, 37.8, -122.35, 37.82]
     with shapefile.Reader("shapefiles/blockgroups") as sf:
@@ -967,7 +967,7 @@ def test_bboxfilter_shapes():
 def test_bboxfilter_shapes_outside():
     """
     Assert that applying the bbox filter to shapes() correctly returns
-    no shapes when the bbox is outside the entire shapefile. 
+    no shapes when the bbox is outside the entire shapefile.
     """
     bbox = [-180, 89, -179, 90]
     with shapefile.Reader("shapefiles/blockgroups") as sf:
@@ -978,7 +978,7 @@ def test_bboxfilter_shapes_outside():
 def test_bboxfilter_itershapes():
     """
     Assert that applying the bbox filter to iterShapes() correctly ignores shapes
-    that fall outside, and returns those that fall inside. 
+    that fall outside, and returns those that fall inside.
     """
     bbox = [-122.4, 37.8, -122.35, 37.82]
     with shapefile.Reader("shapefiles/blockgroups") as sf:
@@ -1000,7 +1000,7 @@ def test_bboxfilter_itershapes():
 def test_bboxfilter_shaperecord():
     """
     Assert that applying the bbox filter to shapeRecord() correctly ignores the shape
-    if it falls outside, and returns it if inside. 
+    if it falls outside, and returns it if inside.
     """
     inside = [-122.4, 37.8, -122.35, 37.82]
     outside = list(inside)
@@ -1018,7 +1018,7 @@ def test_bboxfilter_shaperecord():
 def test_bboxfilter_shaperecords():
     """
     Assert that applying the bbox filter to shapeRecords() correctly ignores shapes
-    that fall outside, and returns those that fall inside. 
+    that fall outside, and returns those that fall inside.
     """
     bbox = [-122.4, 37.8, -122.35, 37.82]
     with shapefile.Reader("shapefiles/blockgroups") as sf:
@@ -1046,7 +1046,7 @@ def test_bboxfilter_shaperecords():
 def test_bboxfilter_itershaperecords():
     """
     Assert that applying the bbox filter to iterShapeRecords() correctly ignores shapes
-    that fall outside, and returns those that fall inside. 
+    that fall outside, and returns those that fall inside.
     """
     bbox = [-122.4, 37.8, -122.35, 37.82]
     with shapefile.Reader("shapefiles/blockgroups") as sf:
@@ -1153,7 +1153,7 @@ def test_write_shp_only(tmpdir):
 
     # assert test.shp exists
     assert os.path.exists(filename+'.shp')
-    
+
     # test that can read shapes
     with shapefile.Reader(shp=filename+'.shp') as reader:
         assert reader.shp and not reader.shx and not reader.dbf
@@ -1220,7 +1220,7 @@ def test_write_shp_dbf_only(tmpdir):
 
     # assert test.dbf exists
     assert os.path.exists(filename+'.dbf')
-    
+
     # test that can read records and shapes
     with shapefile.Reader(shp=filename+'.shp', dbf=filename+'.dbf') as reader:
         assert reader.shp and not reader.shx and reader.dbf
@@ -1308,7 +1308,7 @@ def test_write_filelike(tmpdir):
         writer.field('field1', 'C') # required to create a valid dbf file
         writer.record('value')
         writer.null()
-        
+
     # test that filelike objects were written correctly
     with shapefile.Reader(shp=shp, shx=shx, dbf=dbf) as reader:
         assert len(reader) == 1
@@ -1431,17 +1431,17 @@ def test_write_shapefile_extension_ignored(tmpdir):
 def test_write_record(tmpdir):
     """
     Test that .record() correctly writes a record using either a list of *args
-    or a dict of **kwargs. 
+    or a dict of **kwargs.
     """
     filename = tmpdir.join("test.shp").strpath
     with shapefile.Writer(filename) as writer:
         writer.autoBalance = True
 
-        writer.field('one', 'C') 
-        writer.field('two', 'C') 
-        writer.field('three', 'C') 
-        writer.field('four', 'C') 
-        
+        writer.field('one', 'C')
+        writer.field('two', 'C')
+        writer.field('three', 'C')
+        writer.field('four', 'C')
+
         values = ['one','two','three','four']
         writer.record(*values)
         writer.record(*values)
@@ -1458,17 +1458,17 @@ def test_write_record(tmpdir):
 def test_write_partial_record(tmpdir):
     """
     Test that .record() correctly writes a partial record (given only some of the values)
-    using either a list of *args or a dict of **kwargs. Should fill in the gaps. 
+    using either a list of *args or a dict of **kwargs. Should fill in the gaps.
     """
     filename = tmpdir.join("test.shp").strpath
     with shapefile.Writer(filename) as writer:
         writer.autoBalance = True
-        
-        writer.field('one', 'C') 
-        writer.field('two', 'C') 
-        writer.field('three', 'C') 
-        writer.field('four', 'C') 
-        
+
+        writer.field('one', 'C')
+        writer.field('two', 'C')
+        writer.field('three', 'C')
+        writer.field('four', 'C')
+
         values = ['one','two']
         writer.record(*values)
         writer.record(*values)
@@ -1519,7 +1519,7 @@ shape_types = [k for k in shapefile.SHAPETYPE_LOOKUP.keys() if k != 31] # exclud
 @pytest.mark.parametrize("shape_type", shape_types)
 def test_write_empty_shapefile(tmpdir, shape_type):
     """
-    Assert that can write an empty shapefile, for all different shape types. 
+    Assert that can write an empty shapefile, for all different shape types.
     """
     filename = tmpdir.join("test").strpath
     with shapefile.Writer(filename, shapeType=shape_type) as w:
