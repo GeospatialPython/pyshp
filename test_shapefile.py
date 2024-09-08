@@ -2,18 +2,13 @@
 This module tests the functionality of shapefile.py.
 """
 # std lib imports
+import datetime
+import json
 import os.path
-import sys
-if sys.version_info.major == 3:
-    from pathlib import Path
+from pathlib import Path
 
 # third party imports
 import pytest
-import json
-import datetime
-if sys.version_info.major == 2:
-    # required by pytest for python <36
-    from pathlib2 import Path
 
 # our imports
 import shapefile
