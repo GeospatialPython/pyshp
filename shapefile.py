@@ -874,42 +874,6 @@ class ShapefileException(Exception):
     """An exception to handle shapefile specific problems."""
     pass
 
-# def warn_geojson_collection(shapes):
-#     # collect information about any potential errors with the GeoJSON
-#     errors = {}
-#     for i,shape in enumerate(shapes):
-#         shape_errors = shape._errors
-#         if shape_errors:
-#             for error in shape_errors.keys():
-#                 errors[error] = errors[error] + [i] if error in errors else []
-
-#     # warn if any errors were found
-#     if errors:
-#         messages = ['Summary of possibles issues encountered during shapefile to GeoJSON conversion:']
-
-#         # polygon orphan holes
-#         orphans = errors.get('polygon_orphaned_holes', None)
-#         if orphans:
-#             msg = 'GeoJSON format requires that all interior holes be contained by an exterior ring, \
-# but the Shapefile contained {} records of polygons where some of its interior holes were \
-# orphaned (not contained by any other rings). The rings were still included but were \
-# encoded as GeoJSON exterior rings instead of holes. Shape ids: {}'.format(len(orphans), orphans)
-#             messages.append(msg)
-
-#         # polygon only holes/wrong orientation
-#         only_holes = errors.get('polygon_only_holes', None)
-#         if only_holes:
-#             msg = 'GeoJSON format requires that polygons contain at least one exterior ring, but \
-# the Shapefile contained {} records of polygons where all of its component rings were stored as interior \
-# holes. The rings were still included but were encoded as GeoJSON exterior rings instead of holes. \
-# Shape ids: {}'.format(len(only_holes), only_holes)
-#             messages.append(msg)
-
-#         if len(messages) > 1:
-#             # more than just the "Summary of..." header
-#             msg = '\n'.join(messages)
-#             logger.warning(msg)
-
 class Reader(object):
     """Reads the three files of a shapefile as a unit or
     separately.  If one of the three files (.shp, .shx,
@@ -2556,83 +2520,6 @@ class Writer(object):
                 "Shapefile Writer reached maximum number of fields: 2046.")
         self.fields.append((name, fieldType, size, decimal))
 
-##    def saveShp(self, target):
-##        """Save an shp file."""
-##        if not hasattr(target, "write"):
-##            target = os.path.splitext(target)[0] + '.shp'
-##        self.shp = self.__getFileObj(target)
-##        self.__shapefileHeader(self.shp, headerType='shp')
-##        self.shp.seek(100)
-##        self._shp.seek(0)
-##        chunk = True
-##        while chunk:
-##            chunk = self._shp.read(self.bufsize)
-##            self.shp.write(chunk)
-##
-##    def saveShx(self, target):
-##        """Save an shx file."""
-##        if not hasattr(target, "write"):
-##            target = os.path.splitext(target)[0] + '.shx'
-##        self.shx = self.__getFileObj(target)
-##        self.__shapefileHeader(self.shx, headerType='shx')
-##        self.shx.seek(100)
-##        self._shx.seek(0)
-##        chunk = True
-##        while chunk:
-##            chunk = self._shx.read(self.bufsize)
-##            self.shx.write(chunk)
-##
-##    def saveDbf(self, target):
-##        """Save a dbf file."""
-##        if not hasattr(target, "write"):
-##            target = os.path.splitext(target)[0] + '.dbf'
-##        self.dbf = self.__getFileObj(target)
-##        self.__dbfHeader() # writes to .dbf
-##        self._dbf.seek(0)
-##        chunk = True
-##        while chunk:
-##            chunk = self._dbf.read(self.bufsize)
-##            self.dbf.write(chunk)
-
-##    def save(self, target=None, shp=None, shx=None, dbf=None):
-##        """Save the shapefile data to three files or
-##        three file-like objects. SHP and DBF files can also
-##        be written exclusively using saveShp, saveShx, and saveDbf respectively.
-##        If target is specified but not shp, shx, or dbf then the target path and
-##        file name are used.  If no options or specified, a unique base file name
-##        is generated to save the files and the base file name is returned as a
-##        string.
-##        """
-##        # Balance if already not balanced
-##        if shp and dbf:
-##            if self.autoBalance:
-##                self.balance()
-##            if self.recNum != self.shpNum:
-##                raise ShapefileException("When saving both the dbf and shp file, "
-##                                         "the number of records (%s) must correspond "
-##                                         "with the number of shapes (%s)" % (self.recNum, self.shpNum))
-##        # Save
-##        if shp:
-##            self.saveShp(shp)
-##        if shx:
-##            self.saveShx(shx)
-##        if dbf:
-##            self.saveDbf(dbf)
-##        # Create a unique file name if one is not defined
-##        if not shp and not shx and not dbf:
-##            generated = False
-##            if not target:
-##                temp = tempfile.NamedTemporaryFile(prefix="shapefile_",dir=os.getcwd())
-##                target = temp.name
-##                generated = True
-##            self.saveShp(target)
-##            self.shp.close()
-##            self.saveShx(target)
-##            self.shx.close()
-##            self.saveDbf(target)
-##            self.dbf.close()
-##            if generated:
-##                return target
 
 # Begin Testing
 def test(**kwargs):
