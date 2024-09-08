@@ -966,9 +966,6 @@ class Reader:
                         for ext in ["SHP", "SHX", "DBF", "shp", "shx", "dbf"]:
                             try:
                                 member = archive.open(shapefile + "." + ext)
-                            except zipfile.BadZipFile:
-                                pass
-                            else:
                                 # write zipfile member data to a read+write tempfile and use as source, gets deleted on close()
                                 fileobj = tempfile.NamedTemporaryFile(
                                     mode="w+b", delete=True
@@ -977,6 +974,9 @@ class Reader:
                                 fileobj.seek(0)
                                 setattr(self, ext.lower(), fileobj)
                                 self._files_to_close.append(fileobj)
+
+                            except BaseException:
+                                pass
                     # Close and delete the temporary zipfile
                     try:
                         zipfileobj.close()
