@@ -171,7 +171,7 @@ VERSION 1.2.5
 	* Merge README text into markdown file. Remove text version.
 	* Fixed parsing of number of points for some shapes (MULTIPOINTM, MULTIPOINTZ)
 
-VERSON 1.2.3
+VERSION 1.2.3
 
 2015-06-21 Joel Lawhead <jlawhead@geospatialpython.com>
 	*shapefile.py (u) Bugfix for Python3 with Reader.iterShapeRecords()

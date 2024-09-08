@@ -876,7 +876,7 @@ None is interpreted as missing.
 	>>> w.record(False)
 	>>> w.record(0)
 	>>> w.record(None)
-	>>> w.record("Nonesense")
+	>>> w.record("Nonsense")
 	>>> w.close()
 	
 	>>> r = shapefile.Reader('shapefiles/test/dtype')
