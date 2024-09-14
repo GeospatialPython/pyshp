@@ -23,6 +23,9 @@ from urllib.error import HTTPError
 from urllib.parse import urlparse, urlunparse
 from urllib.request import urlopen, Request
 
+from typing import Any, Union, Iterable, ByteString
+from collections.abc import Sequence
+
 # Create named logger
 logger = logging.getLogger(__name__)
 
@@ -89,7 +92,7 @@ MISSING = [None, ""]
 NODATA = -10e38  # as per the ESRI shapefile spec, only used for m-values.
 
 
-def b(v, encoding="utf-8", encodingErrors="strict"):
+def b(v: Any, encoding="utf-8", encodingErrors="strict") -> bytes:
     if isinstance(v, str):
         # For python 3 encode str to bytes.
         return v.encode(encoding, encodingErrors)
@@ -104,7 +107,9 @@ def b(v, encoding="utf-8", encodingErrors="strict"):
         return str(v).encode(encoding, encodingErrors)
 
 
-def u(v, encoding="utf-8", encodingErrors="strict"):
+def u(
+    v: Union[bytes, str, None, int, ByteString], encoding="utf-8", encodingErrors="strict"
+) -> str:
     if isinstance(v, bytes):
         # For python 3 decode bytes to str.
         return v.decode(encoding, encodingErrors)
@@ -119,11 +124,11 @@ def u(v, encoding="utf-8", encodingErrors="strict"):
         return bytes(v).decode(encoding, encodingErrors)
 
 
-def is_string(v):
+def is_string(v: Any) -> bool:
     return isinstance(v, str)
 
 
-def pathlike_obj(path):
+def pathlike_obj(path: Any) -> Any:
     if isinstance(path, os.PathLike):
         return os.fsdecode(path)
     else:
@@ -140,8 +145,11 @@ class _Array(array.array):
     def __repr__(self):
         return str(self.tolist())
 
+Point_T = Sequence[float]
+Coords_T = Sequence[Point_T]
+BBox_T = tuple[float, float, float, float]
 
-def signed_area(coords, fast=False):
+def signed_area(coords: Coords_T, fast: bool = False) -> float:
     """Return the signed area enclosed by a ring using the linear time
     algorithm. A value >= 0 indicates a counter-clockwise oriented ring.
     A faster version is possible by setting 'fast' to True, which returns
@@ -157,7 +165,7 @@ def signed_area(coords, fast=False):
         return area2 / 2.0
 
 
-def is_cw(coords):
+def is_cw(coords: Coords_T) -> bool:
     """Returns True if a polygon ring has clockwise orientation, determined
     by a negatively signed area.
     """
@@ -165,19 +173,21 @@ def is_cw(coords):
     return area2 < 0
 
 
-def rewind(coords):
+def rewind(coords: Coords_T) -> list[Point_T]:
     """Returns the input coords in reversed order."""
     return list(reversed(coords))
 
 
-def ring_bbox(coords):
+def ring_bbox(coords: Coords_T) -> BBox_T:
     """Calculates and returns the bounding box of a ring."""
     xs, ys = zip(*coords)
     bbox = min(xs), min(ys), max(xs), max(ys)
     return bbox
 
 
-def bbox_overlap(bbox1, bbox2):
+def bbox_overlap(
+    bbox1: BBox_T, bbox2: BBox_T
+) -> bool:
     """Tests whether two bounding boxes overlap, returning a boolean"""
     xmin1, ymin1, xmax1, ymax1 = bbox1
     xmin2, ymin2, xmax2, ymax2 = bbox2
@@ -185,7 +195,9 @@ def bbox_overlap(bbox1, bbox2):
     return overlap
 
 
-def bbox_contains(bbox1, bbox2):
+def bbox_contains(
+    bbox1: BBox_T, bbox2: BBox_T
+) -> bool:
     """Tests whether bbox1 fully contains bbox2, returning a boolean"""
     xmin1, ymin1, xmax1, ymax1 = bbox1
     xmin2, ymin2, xmax2, ymax2 = bbox2
@@ -193,7 +205,7 @@ def bbox_contains(bbox1, bbox2):
     return contains
 
 
-def ring_contains_point(coords, p):
+def ring_contains_point(coords: Coords_T, p: Point_T) -> bool:
     """Fast point-in-polygon crossings algorithm, MacMartin optimization.
 
     Adapted from code by Eric Haynes
@@ -238,7 +250,9 @@ def ring_contains_point(coords, p):
     return inside_flag
 
 
-def ring_sample(coords, ccw=False):
+def ring_sample(
+    coords: Coords_T, ccw: bool = False
+) -> Point_T:
     """Return a sample point guaranteed to be within a ring, by efficiently
     finding the first centroid of a coordinate triplet whose orientation
     matches the orientation of the ring and passes the point-in-ring test.
@@ -286,7 +300,7 @@ def ring_sample(coords, ccw=False):
         raise Exception("Unexpected error: Unable to find a ring sample point.")
 
 
-def ring_contains_ring(coords1, coords2):
+def ring_contains_ring(coords1, coords2) -> bool:
     """Returns True if all vertexes in coords2 are fully inside coords1."""
     return all((ring_contains_point(coords1, p2) for p2 in coords2))
 

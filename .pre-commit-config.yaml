@@ -15,5 +15,10 @@ repos:
     rev: v1.11.2
     hooks:
     -   id: mypy
-        args: [--strict, --ignore-missing-imports, "."]
+        name: mypy
+        entry: dmypy
+        files: \.py$
+        language: python
+        require_serial: true
+        args: ["run", "--", "--implicit-reexport", "--warn-unused-ignores", "--cache-fine-grained", "--ignore-missing-imports"]
         additional_dependencies: [tokenize-rt==6.0.0]
