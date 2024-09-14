@@ -23,7 +23,7 @@ from urllib.error import HTTPError
 from urllib.parse import urlparse, urlunparse
 from urllib.request import urlopen, Request
 
-from typing import Any, Union, Iterable, ByteString
+from typing import Any, Union, ByteString
 from collections.abc import Sequence
 
 # Create named logger
@@ -108,7 +108,9 @@ def b(v: Any, encoding="utf-8", encodingErrors="strict") -> bytes:
 
 
 def u(
-    v: Union[bytes, str, None, int, ByteString], encoding="utf-8", encodingErrors="strict"
+    v: Union[bytes, str, None, int, ByteString],
+    encoding="utf-8",
+    encodingErrors="strict",
 ) -> str:
     if isinstance(v, bytes):
         # For python 3 decode bytes to str.
@@ -145,9 +147,11 @@ class _Array(array.array):
     def __repr__(self):
         return str(self.tolist())
 
+
 Point_T = Sequence[float]
 Coords_T = Sequence[Point_T]
 BBox_T = tuple[float, float, float, float]
+
 
 def signed_area(coords: Coords_T, fast: bool = False) -> float:
     """Return the signed area enclosed by a ring using the linear time
@@ -185,9 +189,7 @@ def ring_bbox(coords: Coords_T) -> BBox_T:
     return bbox
 
 
-def bbox_overlap(
-    bbox1: BBox_T, bbox2: BBox_T
-) -> bool:
+def bbox_overlap(bbox1: BBox_T, bbox2: BBox_T) -> bool:
     """Tests whether two bounding boxes overlap, returning a boolean"""
     xmin1, ymin1, xmax1, ymax1 = bbox1
     xmin2, ymin2, xmax2, ymax2 = bbox2
@@ -195,9 +197,7 @@ def bbox_overlap(
     return overlap
 
 
-def bbox_contains(
-    bbox1: BBox_T, bbox2: BBox_T
-) -> bool:
+def bbox_contains(bbox1: BBox_T, bbox2: BBox_T) -> bool:
     """Tests whether bbox1 fully contains bbox2, returning a boolean"""
     xmin1, ymin1, xmax1, ymax1 = bbox1
     xmin2, ymin2, xmax2, ymax2 = bbox2
@@ -250,9 +250,7 @@ def ring_contains_point(coords: Coords_T, p: Point_T) -> bool:
     return inside_flag
 
 
-def ring_sample(
-    coords: Coords_T, ccw: bool = False
-) -> Point_T:
+def ring_sample(coords: Coords_T, ccw: bool = False) -> Point_T:
     """Return a sample point guaranteed to be within a ring, by efficiently
     finding the first centroid of a coordinate triplet whose orientation
     matches the orientation of the ring and passes the point-in-ring test.
