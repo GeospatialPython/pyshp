@@ -17,7 +17,7 @@ repos:
         name: mypy
         entry: |
           dmypy start
-          dmypy
+          dmypy check
         files: \.py$
         language: python
         require_serial: true
