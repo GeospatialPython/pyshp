@@ -15,9 +15,7 @@ repos:
     hooks:
     -   id: mypy
         name: mypy
-        entry: |
-          dmypy start
-          dmypy check
+        entry: dmypy
         files: \.py$
         language: python
         require_serial: true
