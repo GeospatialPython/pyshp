@@ -95,6 +95,15 @@ part of your geospatial project.
 
 # Version Changes
 
+## 3.0.0-alpha
+### Breaking changes
+- Dropped Pythons <= 3.8 inclding Python 2
+### Dev tooling
+- Add pre-commit framework, and run in CI
+- Runs mypy (via dmypy) in CI
+- Runs Ruff and Ruff-format in CI
+
+
 ## 2.3.1
 
 ### Bug fixes:
@@ -1419,7 +1428,11 @@ its roof:
 For an introduction to the various multipatch part types and examples of how to create 3D MultiPatch objects see [this
 ESRI White Paper](http://downloads.esri.com/support/whitepapers/ao_/J9749_MultiPatch_Geometry_Type.pdf).
 
+# Development environment
 
+Pre-commit is used in CI to run mypy, Ruff and Ruff-format hooks.  To run these hooks locally
+as part of your Git workflow, install pre-commit (via pip or globally via pipx), clone PyShp,
+and run `pre-commit install` in the repo's root dir.
 
 # Testing
 
@@ -1459,10 +1472,12 @@ fiveham
 geospatialpython
 Hannes
 Ignacio Martinez Vazquez
+James Parrott
 Jason Moujaes
 Jonty Wareing
 Karim Bahgat
 karanrn
+Kurt Schwehr
 Kyle Kelley
 Louis Tiao
 Marcin Cuprjak

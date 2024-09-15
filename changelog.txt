@@ -1,4 +1,12 @@
 
+VERSION 3.0.0-alpha
+
+2024-09-15
+  * Dropped Pythons <= 3.8 inclding Python 2
+  * Add pre-commit framework, and run in CI
+  * Run mypy (via dmypy) in CI
+  * Run Ruff and Ruff-format in CI
+
 VERSION 2.3.1
 
 2022-07-28

@@ -6,7 +6,7 @@ maintainer: karim.bahgat.norway<at>gmail.com
 Compatible with Python versions >= 3.9
 """
 
-__version__ = "2.3.1"
+__version__ = "3.0.0-alpha"
 
 import array
 from datetime import date
