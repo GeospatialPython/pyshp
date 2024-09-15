@@ -29,6 +29,12 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Install Git
+      run: |
+        apt-get update
+        apt-get install -y --no-install-recommends git
+        apt-get purge -y --auto-remove
+        rm -rf /var/lib/apt/lists/*
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
