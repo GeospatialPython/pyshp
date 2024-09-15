@@ -15,7 +15,7 @@ body:
     id: contribute
     attributes:
       label: Contributions
-      description: Would you be interested to contribute code that adds this functionality through a Pull Request? We gladly accept PRs - it's much faster and you'll be added a contributor. 
+      description: Would you be interested to contribute code that adds this functionality through a Pull Request? We gladly accept PRs - it's much faster and you'll be added a contributor.
       options:
         - label: I am interested in implementing the described feature request and submit as a PR.
           required: false

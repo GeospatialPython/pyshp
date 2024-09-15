@@ -3,7 +3,6 @@ repos:
     rev: v2.3.0
     hooks:
     -   id: check-yaml
-    -   id: end-of-file-fixer
     -   id: trailing-whitespace
 - repo: https://github.com/astral-sh/ruff-pre-commit
   rev: v0.6.4
