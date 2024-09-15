@@ -1,2 +1,2 @@
 * text eol=lf
-shapefiles binary
+shapefiles/**/* binary
