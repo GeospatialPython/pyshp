@@ -4,20 +4,13 @@ name:
 description:
   Run pytest, and run the doctest runner (shapefile.py as a script).
 
-inputs:
-  python_version:
-    required: false
-    default: "3.13"
-    description: 'The Python version to run the tests on. '
 
 
 runs:
   using: "composite"
   steps:
     # The Repo is required to already be checked out, e.g. by the calling workflow
-    - uses: LizardByte/setup-python-action@master
-      with:
-        python-version: ${{ inputs.python_version }}
+    # The Python to be tested with is required to already be setup, with "python" and "pip" on the system Path
 
     - name: Doctests
       run: python shapefile.py

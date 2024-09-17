@@ -42,8 +42,6 @@ jobs:
 
     - name: Run tests
       uses: ./.github/actions/test
-      with:
-        python_version: ${{ matrix.python_version }}
 
 
   test_on_MacOS_and_Windows:
@@ -70,7 +68,8 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python_version }}
     - name: Run tests
       uses: ./.github/actions/test
-      with:
-        python_version: ${{ matrix.python_version }}
