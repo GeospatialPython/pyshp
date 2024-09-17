@@ -17,7 +17,7 @@ jobs:
     - uses: actions/setup-python@v5
     - uses: pre-commit/action@v3.0.1
 
-  run_tests_in_containers:
+  test_on_old_Pythons:
     strategy:
       fail-fast: false
       matrix:
@@ -27,11 +27,6 @@ jobs:
             "3.6",
             "3.7",
             "3.8",
-            "3.9",
-            "3.10",
-            "3.11",
-            "3.12",
-            "3.13.0a2",
         ]
 
     runs-on: ubuntu-latest
@@ -55,13 +50,17 @@ jobs:
           "3.11",
           "3.12",
           "3.13.0-rc.2",
-          "3.14.0-alpha.0"
         ]
         os: [
-          "macos-12",
+          "macos-latest",
+          "macos-latest-large",
+          "ubuntu-latest",
           "ubuntu-24.04",
-          "windows-2022",
+          "windows-latest",
         ]
+        include:
+          - os: ubuntu-24.04
+            python-version: "3.14.0-alpha.0"
 
     runs-on: ${{ matrix.os }}
     steps:
