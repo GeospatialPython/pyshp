@@ -1,12 +1,12 @@
-# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
-# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+# This workflow will run the pre-commit hooks (including linters), and the tests with a variety of Python versions
 
-name: build
+name: Run pre-commit hooks and tests
 
 on:
   push:
   pull_request:
     branches: [ master ]
+  workflow_call:
   workflow_dispatch:
 
 jobs:
@@ -16,8 +16,8 @@ jobs:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
     - uses: pre-commit/action@v3.0.1
-  test:
 
+  run_tests_in_containers:
     strategy:
       fail-fast: false
       matrix:
@@ -40,14 +40,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install pytest
-        if [ -f requirements.test.txt ]; then pip install -r requirements.test.txt; fi
-    - name: Test with doctest
-      run: |
-        python shapefile.py
-    - name: Test with pytest
-      run: |
-        pytest
+
+    - name: Run tests
+      uses: ./.github/actions/test
+

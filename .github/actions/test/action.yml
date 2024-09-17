@@ -1,0 +1,33 @@
+name:
+  Test
+
+description:
+  Run pytest, and run the doctest runner (shapefile.py as a script).
+
+runs:
+  using: "composite"
+  steps:
+    # The Repo is required to already be checked out, e.g. by the calling workflow
+
+    # The Python to be tested with is required to already be setup, with "python" and "pip" on the system Path
+
+    - name: Doctests
+      shell: bash
+      run: python shapefile.py
+
+    - name: Install test dependencies.
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.test.txt
+
+    - name: Pytest
+      shell: bash
+      run: |
+        pytest
+
+    - name: Show versions for logs.
+      shell: bash
+      run: |
+        python --version
+        python -m pytest --version
