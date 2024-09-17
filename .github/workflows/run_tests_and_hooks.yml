@@ -1,0 +1,51 @@
+# This workflow will run the pre-commit hooks (including linters), and the tests with a variety of Python versions
+
+name: Run pre-commit hooks and tests
+
+on:
+  push:
+  pull_request:
+    branches: [ master ]
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+    - uses: pre-commit/action@v3.0.1
+
+
+  run_tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [
+          "3.9",
+          "3.10",
+          "3.11",
+          "3.12",
+          "3.13.0-rc.2",
+        ]
+        os: [
+          "macos-latest",
+          "ubuntu-latest",
+          "ubuntu-24.04",
+          "windows-latest",
+        ]
+        include:
+          - os: ubuntu-24.04
+            python-version: "3.14.0-alpha.0"
+
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Run tests
+      uses: ./.github/actions/test
