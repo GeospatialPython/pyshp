@@ -12,6 +12,7 @@ runs:
     # The Python to be tested with is required to already be setup, with "python" and "pip" on the system Path
 
     - name: Doctests
+      shell: bash
       run: python shapefile.py
 
     - name: Install test dependencies.
