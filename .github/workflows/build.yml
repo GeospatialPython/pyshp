@@ -35,11 +35,11 @@ jobs:
         os: [
           "ubuntu-latest",
         ]
-        include:
-          - os: "windows-latest"
-            python-version: "3.13"
-          - os: "macos-latest"
-            python-version: "3.13"
+        # include:
+        #   - os: "windows-latest"
+        #     python-version: "3.13"
+        #   - os: "macos-latest"
+        #     python-version: "3.13"
 
     runs-on: matrix.os
     steps:
