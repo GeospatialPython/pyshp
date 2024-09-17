@@ -8,20 +8,19 @@ Compatible with Python versions 2.7-3.x
 
 __version__ = "2.3.1"
 
-from struct import pack, unpack, calcsize, error, Struct
-import os
-import sys
-import time
 import array
-import tempfile
-import logging
-import io
 from datetime import date
+import io
+import logging
+import os
+from struct import pack, unpack, calcsize, error, Struct
+import sys
+import tempfile
+import time
 import zipfile
 
 # Create named logger
 logger = logging.getLogger(__name__)
-
 
 # Module settings
 VERBOSE = True
