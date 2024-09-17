@@ -16,7 +16,7 @@ jobs:
     - uses: actions/setup-python@v5
     - uses: pre-commit/action@v3.0.1
 
-  test:
+  test_in_slim_Python_containers:
     strategy:
       fail-fast: false
       matrix:
@@ -32,14 +32,39 @@ jobs:
             "3.12",
             "3.13.0a2",
         ]
-        os: [
-          "ubuntu-latest",
+
+    runs-on: ubuntu-latest
+    container:
+      image: python:${{ matrix.python-version }}-slim
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Run tests
+      uses: ./.github/actions/test
+      with:
+        python_version: ${{ matrix.python_version }}
+
+
+  test_on_MacOS_and_Windows:
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [
+          "3.12",
         ]
+        os: [
+          "macos-latest",
+          "windows-latest",
+        ]
+
         # include:
         #   - os: "windows-latest"
         #     python-version: "3.13"
         #   - os: "macos-latest"
         #     python-version: "3.13"
+
 
     runs-on: matrix.os
     steps:
