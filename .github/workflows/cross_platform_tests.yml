@@ -18,9 +18,9 @@ jobs:
           "3.12",
         ]
         os: [
-          # "macos-12",
+          "macos-12",
           "ubuntu-24.04",
-          # "windows-2022",
+          "windows-2022",
         ]
 
     runs-on: ${{ matrix.os }}
