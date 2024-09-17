@@ -40,27 +40,11 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-
-    - name: Doctests
-      run: python shapefile.py
-
-    - name: Install test dependencies.
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.test.txt
-
-    - name: Pytest
-      run: |
-        pytest
-
-    - name: Show versions for logs.
-      run: |
-        python --version
-        python -m pytest --version
+    - name: Run tests
+      uses: ./.github/actions/test
 
 
   test_on_MacOS_and_Windows:
-
     strategy:
       fail-fast: false
       matrix:
@@ -71,13 +55,11 @@ jobs:
           "macos-latest",
           "windows-latest",
         ]
-
         # include:
         #   - os: "windows-latest"
         #     python-version: "3.13"
         #   - os: "macos-latest"
         #     python-version: "3.13"
-
 
     runs-on: matrix.os
     steps:
@@ -87,19 +69,5 @@ jobs:
       with:
         python-version: ${{ inputs.python_version }}
 
-    - name: Doctests
-      run: python shapefile.py
-
-    - name: Install test dependencies.
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.test.txt
-
-    - name: Pytest
-      run: |
-        pytest
-
-    - name: Show versions for logs.
-      run: |
-        python --version
-        python -m pytest --version
+    - name: Run tests
+      uses: ./.github/actions/test
