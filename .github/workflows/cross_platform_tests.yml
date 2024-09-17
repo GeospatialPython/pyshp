@@ -1,6 +1,6 @@
 # This workflow will run the tests on a variety of operating systems and architectures.
 
-name: Run tests on low availability Github osted runners
+name: Run tests on low availability Github hosted runners
 
 on:
   # Optionally run only, until the availability of the required Github hosted
