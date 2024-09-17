@@ -24,7 +24,6 @@ from urllib.error import HTTPError
 from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
 
-
 # Create named logger
 logger = logging.getLogger(__name__)
 
