@@ -17,7 +17,7 @@ jobs:
 
     # In general, tests should be run after building a distribution, to test that distribution.
     # However as long as PyShp is a pure Python library, with pure Python deps (or no deps)
-    # then this would only test the packaging process, not so much the code as there are 
+    # then this would only test the packaging process, not so much the code as there are
     # no binaries.
     runs-on: ubuntu-latest
 

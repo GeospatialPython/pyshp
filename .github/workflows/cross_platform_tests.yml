@@ -3,7 +3,7 @@
 name: Run tests on low availability Github osted runners
 
 on:
-  # Optionally run only, until the availability of the required Github hosted 
+  # Optionally run only, until the availability of the required Github hosted
   # runners does not slow down CI.
   workflow_call:
   workflow_dispatch:
