@@ -31,43 +31,8 @@ runs:
       run: |
         pytest
 
-    - name: Show versions.
-      shell: ${{ inputs.shell }}
-      working-directory: '.\sDNA\sdna_vs2008\tests\pytest'
+    - name: Show versions for logs.
       run: |
         python --version
-        python -c "import numpy; print(numpy.__version__)"
         python -m pytest --version
 
-
-    # - name: Run debug_test.py directly.
-    #   shell: cmd
-    #   working-directory: '.\sDNA\sdna_vs2008\tests'
-    #   # run: python -u debug_test.py
-    #   run: set "sdnadll=c:\Program Files (x86)\sDNA\x64\sdna_vs2008.dll" & python -u debug_test.py
-
-    # - name: Run diff test number 0 directly via
-    #   test_gathering_windows_command_line_tests.py, by test index
-    #   working-directory: '.\sDNA\sdna_vs2008\tests\pytest'
-    #   run: python test_gathering_windows_command_line_tests.py 0
-
-    - name: Run all the diff tests with Pytest.
-      shell: ${{ inputs.shell }}
-      working-directory: .\sDNA\sdna_vs2008\tests\pytest
-      env:
-        DONT_TEST_N_LINK_SUBSYSTEMS_ORDER: ${{ inputs.DONT_TEST_N_LINK_SUBSYSTEMS_ORDER }}
-        ALLOW_NEGATIVE_FORMULA_ERROR_ON_ANY_LINK_PRESENT: ${{ inputs.ALLOW_NEGATIVE_FORMULA_ERROR_ON_ANY_LINK_PRESENT }}
-        sdnadll: ${{ inputs.sdnadll }}
-        sdna_bin_dir: ${{ inputs.sdna_bin_dir }}
-        sdna_debug: ${{ inputs.sdna_debug }}
-      run: pytest -rA
-      # -rA shows summary of tests, one per line, even when they all pass.
-      #
-      # To run the same tests locally, the command is something like:
-      # run: >
-      #   set "sdnadll=c:\Program Files (x86)\sDNA\x64\sdna_vs2008.dll" &
-      #   set "sdna_bin_dir=c:\Program Files (x86)\sDNA\bin" &
-      #   set sdna_debug=False &
-      #   set DONT_TEST_N_LINK_SUBSYSTEMS_ORDER=1 &
-      #   set ALLOW_NEGATIVE_FORMULA_ERROR_ON_ANY_LINK_PRESENT=1 &
-      #   pytest -rA
