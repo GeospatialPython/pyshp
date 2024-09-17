@@ -1,11 +1,12 @@
 # This workflow will run the pre-commit hooks (including linters), and the tests with a variety of Python versions
 
-name: build
+name: Run pre-commit hooks and tests
 
 on:
   push:
   pull_request:
     branches: [ master ]
+  workflow_call:
   workflow_dispatch:
 
 jobs:
@@ -45,6 +46,7 @@ jobs:
 
 
   test_on_MacOS_and_Windows:
+    if: github.repository == 'GeospatialPython/pyshp'
     strategy:
       fail-fast: false
       matrix:
