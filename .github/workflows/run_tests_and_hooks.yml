@@ -55,6 +55,7 @@ jobs:
         ]
         os: [
           # "macos-12",
+          "ubuntu-24.04"
           "windows-2022",
         ]
         # include:
