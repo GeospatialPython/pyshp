@@ -17,7 +17,7 @@ jobs:
     - uses: actions/setup-python@v5
     - uses: pre-commit/action@v3.0.1
 
-  test_in_slim_Python_containers:
+  run_tests_in_containers:
     strategy:
       fail-fast: false
       matrix:
@@ -44,33 +44,3 @@ jobs:
     - name: Run tests
       uses: ./.github/actions/test
 
-
-  test_on_MacOS_and_Windows:
-    if: github.repository == 'GeospatialPython/pyshp'
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: [
-          "3.12",
-        ]
-        os: [
-          # "macos-12",
-          "ubuntu-24.04",
-          "windows-2022",
-        ]
-        # include:
-        #   - os: "windows-latest"
-        #     python-version: "3.13"
-        #   - os: "macos-latest"
-        #     python-version: "3.13"
-
-    runs-on: matrix.os
-    steps:
-    - uses: actions/checkout@v4
-
-    - uses: actions/setup-python@v5
-      with:
-        python-version: ${{ inputs.python_version }}
-
-    - name: Run tests
-      uses: ./.github/actions/test

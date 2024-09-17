@@ -1,0 +1,35 @@
+# This workflow will run the tests on a variety of operating systems and architectures.
+
+name: Run tests on low availability Github osted runners
+
+on:
+  # Optionally run only, until the availability of the required Github hosted 
+  # runners does not slow down CI.
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+   run_tests:
+    if: github.repository == 'GeospatialPython/pyshp'
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [
+          "3.12",
+        ]
+        os: [
+          # "macos-12",
+          "ubuntu-24.04",
+          # "windows-2022",
+        ]
+
+    runs-on: matrix.os
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python_version }}
+
+    - name: Run tests
+      uses: ./.github/actions/test
