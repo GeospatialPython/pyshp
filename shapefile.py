@@ -19,10 +19,11 @@ import zipfile
 from collections.abc import Sequence
 from datetime import date
 from struct import Struct, calcsize, error, pack, unpack
-from typing import Any, ByteString, Union
+from typing import Any, Union
 from urllib.error import HTTPError
 from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
+
 
 # Create named logger
 logger = logging.getLogger(__name__)
@@ -106,7 +107,7 @@ def b(v: Any, encoding="utf-8", encodingErrors="strict") -> bytes:
 
 
 def u(
-    v: Union[bytes, str, None, int, ByteString],
+    v: Union[bytes, str, None, int],
     encoding="utf-8",
     encodingErrors="strict",
 ) -> str:
