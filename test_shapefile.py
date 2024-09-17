@@ -14,7 +14,6 @@ import pytest
 # our imports
 import shapefile
 
-
 # define various test shape tuples of (type, points, parts indexes, and expected geo interface output)
 geo_interface_tests = [
     (

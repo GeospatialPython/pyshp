@@ -9,22 +9,20 @@ Compatible with Python versions >= 3.9
 __version__ = "3.0.0-alpha"
 
 import array
-from datetime import date
 import io
 import logging
 import os
-from struct import pack, unpack, calcsize, error, Struct
 import sys
 import tempfile
 import time
 import zipfile
-
+from collections.abc import Sequence
+from datetime import date
+from struct import Struct, calcsize, error, pack, unpack
+from typing import Any, ByteString, Union
 from urllib.error import HTTPError
 from urllib.parse import urlparse, urlunparse
-from urllib.request import urlopen, Request
-
-from typing import Any, Union, ByteString
-from collections.abc import Sequence
+from urllib.request import Request, urlopen
 
 # Create named logger
 logger = logging.getLogger(__name__)
