@@ -60,6 +60,8 @@ jobs:
         include:
           - os: ubuntu-24.04
             python-version: "3.14.0-alpha.0"
+          - os: ubuntu-22.04
+            python-version: "3.14.0-alpha.0"
 
     runs-on: ${{ matrix.os }}
     steps:
