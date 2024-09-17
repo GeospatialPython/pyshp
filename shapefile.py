@@ -9,15 +9,15 @@ Compatible with Python versions 2.7-3.x
 __version__ = "2.3.1"
 
 import array
-from datetime import date
 import io
 import logging
 import os
-from struct import pack, unpack, calcsize, error, Struct
 import sys
 import tempfile
 import time
 import zipfile
+from datetime import date
+from struct import Struct, calcsize, error, pack, unpack
 
 # Create named logger
 logger = logging.getLogger(__name__)
@@ -81,16 +81,15 @@ if PYTHON3:
     xrange = range
     izip = zip
 
-    from urllib.parse import urlparse, urlunparse
     from urllib.error import HTTPError
-    from urllib.request import urlopen, Request
+    from urllib.parse import urlparse, urlunparse
+    from urllib.request import Request, urlopen
 
 else:
     from itertools import izip
 
+    from urllib2 import HTTPError, Request, urlopen
     from urlparse import urlparse, urlunparse
-    from urllib2 import HTTPError
-    from urllib2 import urlopen, Request
 
 
 # Helpers
