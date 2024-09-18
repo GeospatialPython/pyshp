@@ -208,7 +208,7 @@ def test_empty_shape_geo_interface():
     """
     shape = shapefile.Shape()
     with pytest.raises(Exception):
-        shape.__geo_interface__
+        shape.__geo_interface__  # pylint: disable=pointless-statement
 
 @pytest.mark.parametrize("typ,points,parts,expected", geo_interface_tests)
 def test_expected_shape_geo_interface(typ, points, parts, expected):
@@ -258,14 +258,14 @@ def test_reader_url():
     url = "https://github.com/nvkelso/natural-earth-vector/blob/master/110m_cultural/ne_110m_admin_0_tiny_countries.shp?raw=true"
     with shapefile.Reader(url) as sf:
         for recShape in sf.iterShapeRecords():
-            pass
+            del recShape  # Unused variable.
     assert sf.shp.closed == sf.shx.closed == sf.dbf.closed == True
 
     # test without extension
     url = "https://github.com/nvkelso/natural-earth-vector/blob/master/110m_cultural/ne_110m_admin_0_tiny_countries?raw=true"
     with shapefile.Reader(url) as sf:
         for recShape in sf.iterShapeRecords():
-            pass
+            del recShape  # Unused variable.
         assert len(sf) > 0
     assert sf.shp.closed == sf.shx.closed == sf.dbf.closed == True
 
@@ -273,13 +273,13 @@ def test_reader_url():
     url = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/README.md"
     with pytest.raises(shapefile.ShapefileException):
         with shapefile.Reader(url) as sf:
-            pass
+            del sf  # Unused variable.
 
     # test reading zipfile from url
     url = "https://github.com/JamesParrott/PyShp_test_shapefile/raw/main/gis_osm_natural_a_free_1.zip"
     with shapefile.Reader(url) as sf:
         for recShape in sf.iterShapeRecords():
-            pass
+            del recShape  # Unused variable.
         assert len(sf) > 0
     assert sf.shp.closed == sf.shx.closed == sf.dbf.closed == True
 
@@ -291,14 +291,14 @@ def test_reader_zip():
     # test reading zipfile only
     with shapefile.Reader("shapefiles/blockgroups.zip") as sf:
         for recShape in sf.iterShapeRecords():
-            pass
+            del recShape  # Unused variable.
         assert len(sf) > 0
     assert sf.shp.closed == sf.shx.closed == sf.dbf.closed == True
 
     # test require specific path when reading multi-shapefile zipfile
     with pytest.raises(shapefile.ShapefileException):
         with shapefile.Reader("shapefiles/blockgroups_multishapefile.zip") as sf:
-            pass
+            del sf  # Unused variable.
 
     # test specifying the path when reading multi-shapefile zipfile (with extension)
     with shapefile.Reader("shapefiles/blockgroups_multishapefile.zip/blockgroups2.shp") as sf:
@@ -310,14 +310,14 @@ def test_reader_zip():
     # test specifying the path when reading multi-shapefile zipfile (without extension)
     with shapefile.Reader("shapefiles/blockgroups_multishapefile.zip/blockgroups2") as sf:
         for recShape in sf.iterShapeRecords():
-            pass
+            del recShape  # Unused variable.
         assert len(sf) > 0
     assert sf.shp.closed == sf.shx.closed == sf.dbf.closed == True
 
     # test raising error when can't find shapefile inside zipfile
     with pytest.raises(shapefile.ShapefileException):
         with shapefile.Reader("shapefiles/empty_zipfile.zip") as sf:
-            pass
+            del sf  # Unused variable.
 
 
 def test_reader_close_path():
@@ -781,9 +781,12 @@ def test_reader_offsets():
     basename = "shapefiles/blockgroups"
     with shapefile.Reader(basename) as sf:
         # shx offsets should not be read during loading
+        # pylint: disable-next=protected-access
         assert not sf._offsets
         # reading a shape index should trigger reading offsets from shx file
         shape = sf.shape(3)
+        del shape  # Unused variable.
+        # pylint: disable-next=protected-access
         assert len(sf._offsets) == len(sf.shapes())
 
 
@@ -797,13 +800,17 @@ def test_reader_offsets_no_shx():
     dbf = open(basename + ".dbf", 'rb')
     with shapefile.Reader(shp=shp, dbf=dbf) as sf:
         # offsets should not be built during loading
+        # pylint: disable-next=protected-access
         assert not sf._offsets
         # reading a shape index should iterate to the shape
         # but the list of offsets should remain empty
         shape = sf.shape(3)
+        del shape  # Unused variable.
+        # pylint: disable-next=protected-access
         assert not sf._offsets
         # reading all the shapes should build the list of offsets
         shapes = sf.shapes()
+        # pylint: disable-next=protected-access
         assert len(sf._offsets) == len(shapes)
 
 
@@ -1193,6 +1200,7 @@ def test_write_shp_shx_only(tmpdir):
         assert reader.shp and reader.shx and not reader.dbf
         assert (reader.numRecords, reader.numShapes) == (None, 1)
         reader.shape(0) # trigger reading of shx offsets
+        # pylint: disable-next=protected-access
         assert len(reader._offsets) == 1
         assert len(reader.shapes()) == 1
 
