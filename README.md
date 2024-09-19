@@ -1440,8 +1440,9 @@ In the same folder as README.md and shapefile.py, from the command line run
 $ python shapefile.py
 ```
 
-Linux/Mac and similar platforms will need to run `$ dos2unix README.md` in order
-to correct line endings in README.md.
+Linux/Mac and similar platforms may need to run `$ dos2unix README.md` in order
+to correct line endings in README.md, if Git has not automatically changed them.
+
 
 # Contributors
 
@@ -1459,10 +1460,12 @@ fiveham
 geospatialpython
 Hannes
 Ignacio Martinez Vazquez
+James Parrott
 Jason Moujaes
 Jonty Wareing
 Karim Bahgat
 karanrn
+Kurt Schwehr
 Kyle Kelley
 Louis Tiao
 Marcin Cuprjak
