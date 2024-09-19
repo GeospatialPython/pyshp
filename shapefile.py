@@ -543,7 +543,7 @@ class Shape(object):
                 ps = None
                 coordinates = []
                 for part in self.parts:
-                    if ps == None:
+                    if ps is None:
                         ps = part
                         continue
                     else:
@@ -1474,7 +1474,7 @@ class Reader(object):
         in the .shx index file."""
         shx = self.shx
         # Return None if no shx or no index requested
-        if not shx or i == None:
+        if not shx or i is None:
             return None
         # At this point, we know the shx file exists
         if not self._offsets:

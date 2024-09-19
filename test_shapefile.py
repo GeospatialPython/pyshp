@@ -1068,7 +1068,7 @@ def test_reader_numshapes():
     basename = "shapefiles/blockgroups"
     with shapefile.Reader(basename) as sf:
         # numShapes should be set during loading
-        assert sf.numShapes != None
+        assert sf.numShapes is not None
         # numShapes should equal the number of shapes
         assert sf.numShapes == len(sf.shapes())
 
@@ -1084,7 +1084,7 @@ def test_reader_numshapes_no_shx():
     dbf = open(basename + ".dbf", "rb")
     with shapefile.Reader(shp=shp, dbf=dbf) as sf:
         # numShapes should be unknown due to missing shx file
-        assert sf.numShapes == None
+        assert sf.numShapes is None
         # numShapes should be set after reading all the shapes
         shapes = sf.shapes()
         assert sf.numShapes == len(shapes)
