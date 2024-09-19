@@ -1000,30 +1000,28 @@ def test_shape_oid_no_shx():
     basename = "shapefiles/blockgroups"
     shp = open(basename + ".shp", "rb")
     dbf = open(basename + ".dbf", "rb")
-    with (
-        shapefile.Reader(shp=shp, dbf=dbf) as sf,
-        shapefile.Reader(basename) as sf_expected,
-    ):
-        for i in range(len(sf)):
-            shape = sf.shape(i)
-            assert shape.oid == i
-            shape_expected = sf_expected.shape(i)
-            assert shape.__geo_interface__ == shape_expected.__geo_interface__
+    with shapefile.Reader(shp=shp, dbf=dbf) as sf:
+        with shapefile.Reader(basename) as sf_expected:
+            for i in range(len(sf)):
+                shape = sf.shape(i)
+                assert shape.oid == i
+                shape_expected = sf_expected.shape(i)
+                assert shape.__geo_interface__ == shape_expected.__geo_interface__
 
-        for i, shape in enumerate(sf.shapes()):
-            assert shape.oid == i
-            shape_expected = sf_expected.shape(i)
-            assert shape.__geo_interface__ == shape_expected.__geo_interface__
+            for i, shape in enumerate(sf.shapes()):
+                assert shape.oid == i
+                shape_expected = sf_expected.shape(i)
+                assert shape.__geo_interface__ == shape_expected.__geo_interface__
 
-        for i, shape in enumerate(sf.iterShapes()):
-            assert shape.oid == i
-            shape_expected = sf_expected.shape(i)
-            assert shape.__geo_interface__ == shape_expected.__geo_interface__
+            for i, shape in enumerate(sf.iterShapes()):
+                assert shape.oid == i
+                shape_expected = sf_expected.shape(i)
+                assert shape.__geo_interface__ == shape_expected.__geo_interface__
 
-        for i, shaperec in enumerate(sf.iterShapeRecords()):
-            assert shaperec.shape.oid == i
-            shape_expected = sf_expected.shape(i)
-            assert shaperec.shape.__geo_interface__ == shape_expected.__geo_interface__
+            for i, shaperec in enumerate(sf.iterShapeRecords()):
+                assert shaperec.shape.oid == i
+                shape_expected = sf_expected.shape(i)
+                assert shaperec.shape.__geo_interface__ == shape_expected.__geo_interface__
 
 
 def test_reader_offsets():
