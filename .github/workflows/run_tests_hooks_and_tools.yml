@@ -17,6 +17,19 @@ jobs:
     - uses: actions/setup-python@v5
     - uses: pre-commit/action@v3.0.1
 
+  pylint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+    - name: install Pylint and plugin
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pylint pylint-per-file-ignores
+    - name: run Pylint for errors and warnings only, on test_shapefile.py
+      run: |
+        pylint --disable=R,C test_shapefile.py
+
   test_on_old_Pythons:
     strategy:
       fail-fast: false
@@ -59,6 +72,8 @@ jobs:
         ]
         include:
           - os: ubuntu-24.04
+            python-version: "3.14.0-alpha.0"
+          - os: ubuntu-22.04
             python-version: "3.14.0-alpha.0"
 
     runs-on: ${{ matrix.os }}

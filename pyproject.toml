@@ -1,3 +1,23 @@
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
+
+[tool.pylint.MASTER]
+load-plugins=[
+    "pylint_per_file_ignores",
+]
+
+[tool.pylint.'MESSAGES CONTROL']
+# Silence warning: shapefile.py:2076:20: W0212: Access to a protected
+#                  member _from_geojson of a client class (protected-access)
+#
+# Silence warnings: test_shapefile.py:{783,786,799,803,06,1195}:19:
+#                   W0212: Access to a protected member _offsets of a
+#                   client class (protected-access)
+#
+# Toml multi-line string used instead of array due to:
+# https://github.com/christopherpickering/pylint-per-file-ignores/issues/160
+per-file-ignores = """
+    shapefile.py:W0212
+    test_shapefile.py:W0212
+"""
