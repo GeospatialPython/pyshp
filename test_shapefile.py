@@ -436,7 +436,7 @@ def test_empty_shape_geo_interface():
     """
     shape = shapefile.Shape()
     with pytest.raises(Exception):
-        shape.__geo_interface__
+        getattr(shape, "__geo_interface__")
 
 
 @pytest.mark.parametrize("typ,points,parts,expected", geo_interface_tests)
@@ -486,14 +486,14 @@ def test_reader_url():
     # test with extension
     url = "https://github.com/nvkelso/natural-earth-vector/blob/master/110m_cultural/ne_110m_admin_0_tiny_countries.shp?raw=true"
     with shapefile.Reader(url) as sf:
-        for recShape in sf.iterShapeRecords():
+        for __recShape in sf.iterShapeRecords():
             pass
     assert sf.shp.closed is sf.shx.closed is sf.dbf.closed is True
 
     # test without extension
     url = "https://github.com/nvkelso/natural-earth-vector/blob/master/110m_cultural/ne_110m_admin_0_tiny_countries?raw=true"
     with shapefile.Reader(url) as sf:
-        for recShape in sf.iterShapeRecords():
+        for __recShape in sf.iterShapeRecords():
             pass
         assert len(sf) > 0
     assert sf.shp.closed is sf.shx.closed is sf.dbf.closed is True
@@ -507,7 +507,7 @@ def test_reader_url():
     # test reading zipfile from url
     url = "https://github.com/JamesParrott/PyShp_test_shapefile/raw/main/gis_osm_natural_a_free_1.zip"
     with shapefile.Reader(url) as sf:
-        for recShape in sf.iterShapeRecords():
+        for __recShape in sf.iterShapeRecords():
             pass
         assert len(sf) > 0
     assert sf.shp.closed is sf.shx.closed is sf.dbf.closed is True
@@ -519,7 +519,7 @@ def test_reader_zip():
     """
     # test reading zipfile only
     with shapefile.Reader("shapefiles/blockgroups.zip") as sf:
-        for recShape in sf.iterShapeRecords():
+        for __recShape in sf.iterShapeRecords():
             pass
         assert len(sf) > 0
     assert sf.shp.closed is sf.shx.closed is sf.dbf.closed is True
@@ -533,7 +533,7 @@ def test_reader_zip():
     with shapefile.Reader(
         "shapefiles/blockgroups_multishapefile.zip/blockgroups2.shp"
     ) as sf:
-        for recShape in sf.iterShapeRecords():
+        for __recShape in sf.iterShapeRecords():
             pass
         assert len(sf) > 0
     assert sf.shp.closed is sf.shx.closed is sf.dbf.closed is True
@@ -542,7 +542,7 @@ def test_reader_zip():
     with shapefile.Reader(
         "shapefiles/blockgroups_multishapefile.zip/blockgroups2"
     ) as sf:
-        for recShape in sf.iterShapeRecords():
+        for __recShape in sf.iterShapeRecords():
             pass
         assert len(sf) > 0
     assert sf.shp.closed is sf.shx.closed is sf.dbf.closed is True
@@ -1032,7 +1032,7 @@ def test_reader_offsets():
         # shx offsets should not be read during loading
         assert not sf._offsets
         # reading a shape index should trigger reading offsets from shx file
-        __shape = sf.shape(3)
+        sf.shape(3)
         assert len(sf._offsets) == len(sf.shapes())
 
 
@@ -1049,7 +1049,7 @@ def test_reader_offsets_no_shx():
         assert not sf._offsets
         # reading a shape index should iterate to the shape
         # but the list of offsets should remain empty
-        __shape = sf.shape(3)
+        sf.shape(3)
         assert not sf._offsets
         # reading all the shapes should build the list of offsets
         shapes = sf.shapes()
