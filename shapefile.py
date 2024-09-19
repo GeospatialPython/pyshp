@@ -2338,7 +2338,7 @@ class Writer(object):
                     f.write(
                         pack(
                             "<%sd" % len(s.m),
-                            *[m if m is not None else NODATA for m in s.m]
+                            *[m if m is not None else NODATA for m in s.m],
                         )
                     )
                 else:
