@@ -2335,12 +2335,14 @@ class Writer(object):
             try:
                 if hasattr(s, "m"):
                     # if m values are stored in attribute
+                    # fmt: off
                     f.write(
                         pack(
                             "<%sd" % len(s.m),
                             *[m if m is not None else NODATA for m in s.m]
                         )
                     )
+                    # fmt: on
                 else:
                     # if m values are stored as 3rd/4th dimension
                     # 0-index position of m value is 3 if z type (x,y,z,m), or 2 if m type (x,y,m)

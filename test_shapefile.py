@@ -1021,7 +1021,9 @@ def test_shape_oid_no_shx():
             for i, shaperec in enumerate(sf.iterShapeRecords()):
                 assert shaperec.shape.oid == i
                 shape_expected = sf_expected.shape(i)
-                assert shaperec.shape.__geo_interface__ == shape_expected.__geo_interface__
+                assert (
+                    shaperec.shape.__geo_interface__ == shape_expected.__geo_interface__
+                )
 
 
 def test_reader_offsets():
