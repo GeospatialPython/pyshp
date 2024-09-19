@@ -20,3 +20,4 @@ dist/
 *.egg-info/
 *.py[cod]
 .vscode
+.dmypy.json

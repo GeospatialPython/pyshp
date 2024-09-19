@@ -259,7 +259,7 @@ def test_reader_url():
     with shapefile.Reader(url) as sf:
         for recShape in sf.iterShapeRecords():
             pass
-    assert sf.shp.closed == sf.shx.closed == sf.dbf.closed == True
+    assert sf.shp.closed == sf.shx.closed == sf.dbf.closed is True
 
     # test without extension
     url = "https://github.com/nvkelso/natural-earth-vector/blob/master/110m_cultural/ne_110m_admin_0_tiny_countries?raw=true"
@@ -267,7 +267,7 @@ def test_reader_url():
         for recShape in sf.iterShapeRecords():
             pass
         assert len(sf) > 0
-    assert sf.shp.closed == sf.shx.closed == sf.dbf.closed == True
+    assert sf.shp.closed == sf.shx.closed == sf.dbf.closed is True
 
     # test no files found
     url = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/README.md"
@@ -281,7 +281,7 @@ def test_reader_url():
         for recShape in sf.iterShapeRecords():
             pass
         assert len(sf) > 0
-    assert sf.shp.closed == sf.shx.closed == sf.dbf.closed == True
+    assert sf.shp.closed == sf.shx.closed == sf.dbf.closed is True
 
 
 def test_reader_zip():
@@ -293,7 +293,7 @@ def test_reader_zip():
         for recShape in sf.iterShapeRecords():
             pass
         assert len(sf) > 0
-    assert sf.shp.closed == sf.shx.closed == sf.dbf.closed == True
+    assert sf.shp.closed == sf.shx.closed == sf.dbf.closed is True
 
     # test require specific path when reading multi-shapefile zipfile
     with pytest.raises(shapefile.ShapefileException):
@@ -305,14 +305,14 @@ def test_reader_zip():
         for recShape in sf.iterShapeRecords():
             pass
         assert len(sf) > 0
-    assert sf.shp.closed == sf.shx.closed == sf.dbf.closed == True
+    assert sf.shp.closed == sf.shx.closed == sf.dbf.closed is True
 
     # test specifying the path when reading multi-shapefile zipfile (without extension)
     with shapefile.Reader("shapefiles/blockgroups_multishapefile.zip/blockgroups2") as sf:
         for recShape in sf.iterShapeRecords():
             pass
         assert len(sf) > 0
-    assert sf.shp.closed == sf.shx.closed == sf.dbf.closed == True
+    assert sf.shp.closed == sf.shx.closed == sf.dbf.closed is True
 
     # test raising error when can't find shapefile inside zipfile
     with pytest.raises(shapefile.ShapefileException):
@@ -1150,7 +1150,7 @@ def test_write_shp_only(tmpdir):
     assert writer.shp and not writer.shx and not writer.dbf
     assert writer.shpNum == 1
     assert len(writer) == 1
-    assert writer.shp.closed == True
+    assert writer.shp.closed is True
 
     # assert test.shp exists
     assert os.path.exists(filename+'.shp')
@@ -1180,7 +1180,7 @@ def test_write_shp_shx_only(tmpdir):
     assert writer.shp and writer.shx and not writer.dbf
     assert writer.shpNum == 1
     assert len(writer) == 1
-    assert writer.shp.closed == writer.shx.closed == True
+    assert writer.shp.closed == writer.shx.closed is True
 
     # assert test.shp exists
     assert os.path.exists(filename+'.shp')
@@ -1214,7 +1214,7 @@ def test_write_shp_dbf_only(tmpdir):
     assert writer.shp and not writer.shx and writer.dbf
     assert writer.shpNum == writer.recNum == 1
     assert len(writer) == 1
-    assert writer.shp.closed == writer.dbf.closed == True
+    assert writer.shp.closed == writer.dbf.closed is True
 
     # assert test.shp exists
     assert os.path.exists(filename+'.shp')
@@ -1246,7 +1246,7 @@ def test_write_dbf_only(tmpdir):
     assert not writer.shp and not writer.shx and writer.dbf
     assert writer.recNum == 1
     assert len(writer) == 1
-    assert writer.dbf.closed == True
+    assert writer.dbf.closed is True
 
     # assert test.dbf exists
     assert os.path.exists(filename+'.dbf')
