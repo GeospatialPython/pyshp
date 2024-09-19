@@ -28,7 +28,7 @@ jobs:
         pip install pytest pylint pylint-per-file-ignores
     - name: run Pylint for errors and warnings only, on test_shapefile.py
       run: |
-        pylint --disable=R,C,W *shapefile.py
+        pylint --disable=R,C,E *shapefile.py
 
   test_on_old_Pythons:
     strategy:
