@@ -111,12 +111,14 @@ if sys.version_info < (3, 9):
         Many thanks,
         """)
     logger.warning(message)
-    warnings.showwarning(
-        message,
-        category=UserWarning,
-        filename=__name__,
-        lineno=115,
-    )
+    warning = UserWarning(message)
+    warnings.warn(warning)
+    # warnings.showwarning(
+    #     message,
+    #     category=UserWarning,
+    #     filename=__name__,
+    #     lineno=115,
+    # )
 
 
 # Helpers
