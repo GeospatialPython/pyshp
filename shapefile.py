@@ -96,24 +96,26 @@ else:
     from urlparse import urlparse, urlunparse
 
 if sys.version_info < (3, 9):
-    warnings.showwarning(
-        textwrap.dedent("""\
+    message = textwrap.dedent("""\
         Warning!
 
-        The PyShp developers propose to drop support for Pythons 3.8 and earlier, including Python 2.
+        It is proposed to drop support for Pythons 3.8 and earlier, including Python 2.
         Thereafter, Python version support will follow the official Python release
-        cycle: https://devguide.python.org/versions/.  This will make Python 3.9 the earliest
-        supported version until October 2025.
+        cycle: https://devguide.python.org/versions/.  This will make Python 3.9 the
+        earliest supported version until October 2025.
 
-        The reasoning behind this is available in the following discussion:
+        For more information, and to send the developers your feedback please
+        see the following discussion:
         https://github.com/GeospatialPython/pyshp/discussions/290
-        Please post any feedback there.
 
         Many thanks,
-        """),
+        """)
+    logger.warning(message)
+    warnings.showwarning(
+        message,
         category=UserWarning,
         filename=__name__,
-        lineno=99,
+        lineno=115,
     )
 
 
