@@ -1827,6 +1827,32 @@ class Reader(object):
             if r:
                 yield r
 
+    def iterRecords_range(self, start, stop, fields=None):
+        """Returns a generator of records in a dbf file, for a range
+        of oid.  Useful for large shapefiles or dbf files.  To only
+        read some of the fields, specify the 'fields' arg as a list of
+        one or more fieldnames.
+
+        """
+        if self.numRecords is None:
+            self.__dbfHeader()
+        f = self.__getFileObj(self.dbf)
+        start = self.__restrictIndex(start)
+        if abs(stop) > self.numRecords:
+            raise IndexError("Record index out of range.")
+        if stop < 0:
+            stop = range(self.numRecords)[stop]
+        recSize = self.__recordLength
+        f.seek(0)
+        f.seek(self.__dbfHdrLength + (start * recSize))
+        fieldTuples, recLookup, recStruct = self.__recordFields(fields)
+        for i in xrange(start, stop):
+            r = self.__record(
+                oid=i, fieldTuples=fieldTuples, recLookup=recLookup, recStruct=recStruct
+            )
+            if r:
+                yield r
+
     def shapeRecord(self, i=0, fields=None, bbox=None):
         """Returns a combination geometry and attribute record for the
         supplied record index.
