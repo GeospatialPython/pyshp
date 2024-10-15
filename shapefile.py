@@ -1809,7 +1809,7 @@ class Reader(object):
                 records.append(r)
         return records
 
-    def iterRecords(self, fields=None, my_range=None):
+    def iterRecords(self, fields=None):
         """Returns a generator of records in a dbf file.
         Useful for large shapefiles or dbf files.
         To only read some of the fields, specify the 'fields' arg as a
@@ -1820,9 +1820,7 @@ class Reader(object):
         f = self.__getFileObj(self.dbf)
         f.seek(self.__dbfHdrLength)
         fieldTuples, recLookup, recStruct = self.__recordFields(fields)
-        if my_range is None:
-            my_range = xrange(self.numRecords)
-        for i in my_range:
+        for i in xrange(self.numRecords):
             r = self.__record(
                 oid=i, fieldTuples=fieldTuples, recLookup=recLookup, recStruct=recStruct
             )
