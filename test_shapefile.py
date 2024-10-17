@@ -3,7 +3,6 @@ This module tests the functionality of shapefile.py.
 """
 
 import datetime
-import itertools
 import json
 import os.path
 
