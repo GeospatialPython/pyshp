@@ -983,8 +983,9 @@ def test_iterRecords_start_stop():
     with shapefile.Reader("shapefiles/blockgroups") as sf:
         N = len(sf)
 
-        # Arbitrary selection of start values
-        for start in [
+        # Arbitrary selection of record indices
+        # (there are 663 records in blockgroups.dbf).
+        for i in [
             0,
             1,
             2,
@@ -1003,11 +1004,17 @@ def test_iterRecords_start_stop():
             N - 2,
             N - 1,
         ]:
-            for stop in range(start, len(sf)):
+            for record in sf.iterRecords(start=i):
+                assert record == sf.record(record.oid)
+
+            for record in sf.iterRecords(stop=i):
+                assert record == sf.record(record.oid)
+
+            for stop in range(i, len(sf)):
                 # test negative indexing from end, as well as
                 # positive values of stop, and its default
-                for stop_arg in (stop, stop - len(sf), None):
-                    for record in sf.iterRecords(start=start, stop=stop):
+                for stop_arg in (stop, stop - len(sf)):
+                    for record in sf.iterRecords(start=i, stop=stop_arg):
                         assert record == sf.record(record.oid)
 
 
