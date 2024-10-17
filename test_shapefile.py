@@ -969,7 +969,6 @@ def test_record_oid():
         for i, record in enumerate(sf.iterRecords()):
             assert record.oid == i
 
-
         for i, shaperec in enumerate(sf.iterShapeRecords()):
             assert shaperec.record.oid == i
 
@@ -981,18 +980,34 @@ def test_iterRecords_start_stop():
     by Reader..
     """
 
-
     with shapefile.Reader("shapefiles/blockgroups") as sf:
-
         N = len(sf)
 
         # Arbitrary selection of start values
-        for start in [0, 1, 2, 3, 5, 11, 17, 33, 51, 103, 170, 234, 435, 543, N-3, N-2, N-1]:
+        for start in [
+            0,
+            1,
+            2,
+            3,
+            5,
+            11,
+            17,
+            33,
+            51,
+            103,
+            170,
+            234,
+            435,
+            543,
+            N - 3,
+            N - 2,
+            N - 1,
+        ]:
             for stop in range(start, len(sf)):
                 # test negative indexing from end, as well as
                 # positive values of stop, and its default
                 for stop_arg in (stop, stop - len(sf), None):
-                    for record in sf.iterRecords(start = start, stop = stop):
+                    for record in sf.iterRecords(start=start, stop=stop):
                         assert record == sf.record(record.oid)
 
 
