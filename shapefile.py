@@ -1325,7 +1325,9 @@ class Reader(object):
         if self.numRecords:
             rmax = self.numRecords - 1
             if abs(i) > rmax:
-                raise IndexError("Shape or Record index out of range.")
+                raise IndexError(
+                    "Shape or Record index: %s out of range.  Max index: %s" % (i, rmax)
+                )
             if i < 0:
                 i = range(self.numRecords)[i]
         return i
@@ -1809,41 +1811,32 @@ class Reader(object):
                 records.append(r)
         return records
 
-    def iterRecords(self, fields=None):
+    def iterRecords(self, fields=None, start=0, stop=None):
         """Returns a generator of records in a dbf file.
         Useful for large shapefiles or dbf files.
         To only read some of the fields, specify the 'fields' arg as a
         list of one or more fieldnames.
-        """
-        if self.numRecords is None:
-            self.__dbfHeader()
-        f = self.__getFileObj(self.dbf)
-        f.seek(self.__dbfHdrLength)
-        fieldTuples, recLookup, recStruct = self.__recordFields(fields)
-        for i in xrange(self.numRecords):
-            r = self.__record(
-                oid=i, fieldTuples=fieldTuples, recLookup=recLookup, recStruct=recStruct
-            )
-            if r:
-                yield r
-
-    def iterRecords_range(self, start, stop, fields=None):
-        """Returns a generator of records in a dbf file, for a range
-        of oid.  Useful for large shapefiles or dbf files.  To only
-        read some of the fields, specify the 'fields' arg as a list of
-        one or more fieldnames.
-
+        By default yields all records.  Otherwise, specify start
+        (default: 0) or stop (default: number_of_records)
+        to only yield record numbers i, where
+        start <= i < stop, (or
+        start <= i < number_of_records + stop
+        if stop < 0).
         """
         if self.numRecords is None:
             self.__dbfHeader()
         f = self.__getFileObj(self.dbf)
         start = self.__restrictIndex(start)
-        if abs(stop) > self.numRecords:
-            raise IndexError("Record index out of range.")
-        if stop < 0:
+        if stop is None:
+            stop = self.numRecords
+        elif abs(stop) > self.numRecords:
+            raise IndexError(
+                "abs(stop): %s exceeds number of records: %s."
+                % (abs(stop), self.numRecords)
+            )
+        elif stop < 0:
             stop = range(self.numRecords)[stop]
         recSize = self.__recordLength
-        f.seek(0)
         f.seek(self.__dbfHdrLength + (start * recSize))
         fieldTuples, recLookup, recStruct = self.__recordFields(fields)
         for i in xrange(start, stop):
