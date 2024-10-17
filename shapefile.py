@@ -855,15 +855,13 @@ class _Record(list):
         return default + fnames
 
     def __eq__(self, other):
-        return (isinstance(other, self.__class__) and
-                self.__field_positions == other.__field_positions and
-                self.oid == other.oid and
-                len(self) == len(other) and
-                all(val_self == val_other
-                    for val_self, val_other in izip(self, other)
-                   )
-               )
-
+        return (
+            isinstance(other, self.__class__)
+            and self.__field_positions == other.__field_positions
+            and self.oid == other.oid
+            and len(self) == len(other)
+            and all(val_self == val_other for val_self, val_other in izip(self, other))
+        )
 
 
 class ShapeRecord(object):
