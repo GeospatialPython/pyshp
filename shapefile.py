@@ -860,6 +860,7 @@ class _Record(list):
                 return False
         return list.__eq__(self, other)
 
+
 class ShapeRecord(object):
     """A ShapeRecord object containing a shape along with its attributes.
     Provides the GeoJSON __geo_interface__ to return a Feature dictionary."""
