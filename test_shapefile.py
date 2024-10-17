@@ -976,7 +976,7 @@ def test_iterRecords_start_stop():
     """
     Assert that Reader.iterRecords(start, stop)
     returns the correct records, as if searched for
-    by Reader..
+    by index with Reader.record
     """
 
     with shapefile.Reader("shapefiles/blockgroups") as sf:
