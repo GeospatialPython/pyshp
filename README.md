@@ -95,6 +95,15 @@ part of your geospatial project.
 
 # Version Changes
 
+## 2.3.x
+
+### New Features:
+- Reader.iterRecords now allows start and stop to be specified, to lookup smaller ranges of records.
+- Equality comparisons between Records now also require the fields to be the same (and in the same order).
+
+### Development:
+- Code quality tools run on PyShp
+
 ## 2.3.1
 
 ### Bug fixes:
@@ -1467,6 +1476,7 @@ Karim Bahgat
 karanrn
 Kurt Schwehr
 Kyle Kelley
+Lionel Guez
 Louis Tiao
 Marcin Cuprjak
 mcuprjak

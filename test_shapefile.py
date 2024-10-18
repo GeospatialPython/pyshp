@@ -972,6 +972,51 @@ def test_record_oid():
             assert shaperec.record.oid == i
 
 
+def test_iterRecords_start_stop():
+    """
+    Assert that Reader.iterRecords(start, stop)
+    returns the correct records, as if searched for
+    by index with Reader.record
+    """
+
+    with shapefile.Reader("shapefiles/blockgroups") as sf:
+        N = len(sf)
+
+        # Arbitrary selection of record indices
+        # (there are 663 records in blockgroups.dbf).
+        for i in [
+            0,
+            1,
+            2,
+            3,
+            5,
+            11,
+            17,
+            33,
+            51,
+            103,
+            170,
+            234,
+            435,
+            543,
+            N - 3,
+            N - 2,
+            N - 1,
+        ]:
+            for record in sf.iterRecords(start=i):
+                assert record == sf.record(record.oid)
+
+            for record in sf.iterRecords(stop=i):
+                assert record == sf.record(record.oid)
+
+            for stop in range(i, len(sf)):
+                # test negative indexing from end, as well as
+                # positive values of stop, and its default
+                for stop_arg in (stop, stop - len(sf)):
+                    for record in sf.iterRecords(start=i, stop=stop_arg):
+                        assert record == sf.record(record.oid)
+
+
 def test_shape_oid():
     """
     Assert that the shape's oid attribute returns
