@@ -6,11 +6,7 @@ import datetime
 import json
 import os.path
 
-try:
-    from pathlib import Path
-except ImportError:
-    # pathlib2 is a dependency of pytest >= 3.7
-    from pathlib2 import Path
+from pathlib import Path
 
 # third party imports
 import pytest
