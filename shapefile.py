@@ -1338,7 +1338,7 @@ class Reader:
         # Read points - produces a list of [x,y] values
         if nPoints:
             flat = unpack("<%sd" % (2 * nPoints), f.read(16 * nPoints))
-            record.points = list(izip(*(iter(flat),) * 2))
+            record.points = list(zip(*(iter(flat),) * 2))
         # Read z extremes and values
         if shapeType in (13, 15, 18, 31):
             (zmin, zmax) = unpack("<2d", f.read(16))
