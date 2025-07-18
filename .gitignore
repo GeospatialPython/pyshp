@@ -21,3 +21,5 @@ dist/
 *.py[cod]
 .vscode
 .dmypy.json
+.venv
+venv
