@@ -9,7 +9,6 @@ Compatible with Python versions 2.7-3.x
 __version__ = "2.3.1"
 
 import array
-import collections
 import io
 import logging
 import os
@@ -394,11 +393,12 @@ def organize_polygon_rings(rings, return_errors=None):
             return polys
 
         # first determine each hole's candidate exteriors based on simple bbox contains test
-        hole_exteriors = collections.defaultdict(list)
-        for hole_i in xrange(len(holes)):
+        hole_exteriors = dict([(hole_i, []) for hole_i in xrange(len(holes))])
+        exterior_bboxes = [ring_bbox(ring) for ring in exteriors]
+        for hole_i in hole_exteriors.keys():
             hole_bbox = ring_bbox(holes[hole_i])
-            for ext_i, ring in enumerate(exteriors):
-                if bbox_contains(ring_bbox(ring), hole_bbox):
+            for ext_i, ext_bbox in enumerate(exterior_bboxes):
+                if bbox_contains(ext_bbox, hole_bbox):
                     hole_exteriors[hole_i].append(ext_i)
 
         # then, for holes with still more than one possible exterior, do more detailed hole-in-ring test
