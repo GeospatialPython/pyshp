@@ -1099,7 +1099,7 @@ class Reader(object):
                     return
 
         # Otherwise, load from separate shp/shx/dbf args (must be path or file-like)
-        if "shp" in kwargs.keys():
+        if "shp" in kwargs:
             if hasattr(kwargs["shp"], "read"):
                 self.shp = kwargs["shp"]
                 # Copy if required
@@ -1111,7 +1111,7 @@ class Reader(object):
                 (baseName, ext) = os.path.splitext(kwargs["shp"])
                 self.load_shp(baseName)
 
-            if "shx" in kwargs.keys():
+            if "shx" in kwargs:
                 if hasattr(kwargs["shx"], "read"):
                     self.shx = kwargs["shx"]
                     # Copy if required
@@ -1123,7 +1123,7 @@ class Reader(object):
                     (baseName, ext) = os.path.splitext(kwargs["shx"])
                     self.load_shx(baseName)
 
-        if "dbf" in kwargs.keys():
+        if "dbf" in kwargs:
             if hasattr(kwargs["dbf"], "read"):
                 self.dbf = kwargs["dbf"]
                 # Copy if required
