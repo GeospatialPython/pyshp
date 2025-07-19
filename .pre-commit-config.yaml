@@ -1,15 +1,15 @@
 repos:
-- repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v2.3.0
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.6.4
   hooks:
-    - id: check-yaml
-    - id: trailing-whitespace
+    - id: ruff-format
 - repo: https://github.com/pycqa/isort
   rev: 5.13.2
   hooks:
     - id: isort
       name: isort (python)
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.6.4
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v2.3.0
   hooks:
-    - id: ruff-format
+    - id: check-yaml
+    - id: trailing-whitespace
