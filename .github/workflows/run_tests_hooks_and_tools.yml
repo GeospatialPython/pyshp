@@ -5,7 +5,7 @@ name: Run pre-commit hooks and tests
 on:
   push:
   pull_request:
-    branches: [ master ]
+    branches: [ master, run_network_tests_on_localhost ]
   workflow_call:
   workflow_dispatch:
 
