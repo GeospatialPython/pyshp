@@ -4,6 +4,11 @@ name:
 description:
   Run pytest, and run the doctest runner (shapefile.py as a script).
 
+inputs:
+  extra_args:
+    type: string
+    default: '-m "not network"'
+
 runs:
   using: "composite"
   steps:
@@ -13,7 +18,7 @@ runs:
 
     - name: Doctests
       shell: bash
-      run: python shapefile.py
+      run: python shapefile.py ${{ inputs.extra_args }}
 
     - name: Install test dependencies.
       shell: bash
@@ -24,7 +29,7 @@ runs:
     - name: Pytest
       shell: bash
       run: |
-        pytest
+        pytest ${{ inputs.extra_args }}
 
     - name: Show versions for logs.
       shell: bash

@@ -2776,13 +2776,56 @@ class Writer(object):
 
 
 # Begin Testing
-def test(**kwargs):
+def _get_doctests():
     import doctest
 
     doctest.NORMALIZE_WHITESPACE = 1
-    verbosity = kwargs.get("verbose", 0)
+
+    # run tests
+    with open("README.md", "rb") as fobj:
+        tests = doctest.DocTestParser().get_doctest(
+            string=fobj.read().decode("utf8").replace("\r\n", "\n"),
+            globs={},
+            name="README",
+            filename="README.md",
+            lineno=0,
+        )
+
+    return tests
+
+
+def _get_no_network_doctests(examples):
+    globals_from_network_doctests = set()
+    for example in examples:
+        if 'sf = shapefile.Reader("https://' in example.source:
+            globals_from_network_doctests.add("sf")
+            continue
+        lhs = example.source.partition("=")[0]
+
+        for target in lhs.split(","):
+            target = target.strip()
+            if target in globals_from_network_doctests:
+                globals_from_network_doctests.remove(target)
+
+        if globals_from_network_doctests:
+            continue
+
+        yield example
+
+
+def _test(verbosity=0):
     if verbosity == 0:
-        print("Running doctests...")
+        print("Getting doctests...")
+    tests = _get_doctests()
+
+    if len(sys.argv) >= 3 and sys.argv[1:3] == ["-m", "not network"]:
+        if verbosity == 0:
+            print("Removing doctests requiring internet access...")
+        tests.examples = list(_get_no_network_doctests(tests.examples))
+
+    import doctest
+
+    doctest.NORMALIZE_WHITESPACE = 1
 
     # ignore py2-3 unicode differences
     import re
@@ -2798,17 +2841,11 @@ def test(**kwargs):
         def summarize(self):
             doctest.OutputChecker.summarize(True)
 
-    # run tests
     runner = doctest.DocTestRunner(checker=Py23DocChecker(), verbose=verbosity)
-    with open("README.md", "rb") as fobj:
-        test = doctest.DocTestParser().get_doctest(
-            string=fobj.read().decode("utf8").replace("\r\n", "\n"),
-            globs={},
-            name="README",
-            filename="README.md",
-            lineno=0,
-        )
-    failure_count, test_count = runner.run(test)
+
+    if verbosity == 0:
+        print("Running %s doctests..." % len(tests.examples))
+    failure_count, test_count = runner.run(tests)
 
     # print results
     if verbosity:
@@ -2827,5 +2864,5 @@ if __name__ == "__main__":
     Doctests are contained in the file 'README.md', and are tested using the built-in
     testing libraries.
     """
-    failure_count = test()
+    failure_count = _test()
     sys.exit(failure_count)
