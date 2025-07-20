@@ -25,6 +25,11 @@ logger = logging.getLogger(__name__)
 # Module settings
 VERBOSE = True
 
+# Test config (for the Doctest runner and test_shapefile.py)
+REPLACE_REMOTE_URLS_WITH_LOCALHOST = (
+    os.getenv("REPLACE_REMOTE_URLS_WITH_LOCALHOST", "").lower() == "yes"
+)
+
 # Constants for shape types
 NULL = 0
 POINT = 1
@@ -2794,12 +2799,27 @@ def _get_doctests():
     return tests
 
 
-def _get_no_network_doctests(examples):
+def _filter_network_doctests(examples, include_network=False, include_non_network=True):
     globals_from_network_doctests = set()
-    for example in examples:
+
+    if not (include_network or include_non_network):
+        return
+
+    examples_it = iter(examples)
+
+    yield next(examples_it)
+
+    for example in examples_it:
+        # Track variables in doctest shell sessions defined from commands
+        # that poll remote URLs, to skip subsequent commands until all
+        # such dependent variables are reassigned.
+
         if 'sf = shapefile.Reader("https://' in example.source:
             globals_from_network_doctests.add("sf")
+            if include_network:
+                yield example
             continue
+
         lhs = example.source.partition("=")[0]
 
         for target in lhs.split(","):
@@ -2807,28 +2827,85 @@ def _get_no_network_doctests(examples):
             if target in globals_from_network_doctests:
                 globals_from_network_doctests.remove(target)
 
+        # Non-network tests dependent on the network tests.
         if globals_from_network_doctests:
+            if include_network:
+                yield example
+            continue
+
+        if not include_non_network:
             continue
 
         yield example
 
 
-def _test(verbosity=0):
+def _replace_remote_url(
+    old_url,
+    # Default port of Python http.server and Python 2's SimpleHttpServer
+    port=8000,
+    scheme="http",
+    netloc="localhost",
+    path=None,
+    params="",
+    query="",
+    fragment="",
+):
+    old_parsed = urlparse(old_url)
+
+    # Strip subpaths, so an artefacts
+    # repo or file tree can be simpler and flat
+    if path is None:
+        path = old_parsed.path.rpartition("/")[2]
+
+    if port not in (None, ""):
+        netloc = "%s:%s" % (netloc, port)
+
+    new_parsed = old_parsed._replace(
+        scheme=scheme,
+        netloc=netloc,
+        path=path,
+        params=params,
+        query=query,
+        fragment=fragment,
+    )
+
+    new_url = urlunparse(new_parsed) if PYTHON3 else urlunparse(list(new_parsed))
+    return new_url
+
+
+def _test(args=sys.argv[1:], verbosity=0):
     if verbosity == 0:
         print("Getting doctests...")
-    tests = _get_doctests()
-
-    if len(sys.argv) >= 3 and sys.argv[1:3] == ["-m", "not network"]:
-        if verbosity == 0:
-            print("Removing doctests requiring internet access...")
-        tests.examples = list(_get_no_network_doctests(tests.examples))
 
     import doctest
+    import re
 
     doctest.NORMALIZE_WHITESPACE = 1
 
-    # ignore py2-3 unicode differences
-    import re
+    tests = _get_doctests()
+
+    if len(args) >= 2 and args[0] == "-m":
+        if verbosity == 0:
+            print("Filtering doctests...")
+        tests.examples = list(
+            _filter_network_doctests(
+                tests.examples,
+                include_network=args[1] == "network",
+                include_non_network=args[1] == "not network",
+            )
+        )
+
+    if REPLACE_REMOTE_URLS_WITH_LOCALHOST:
+        if verbosity == 0:
+            print("Replacing remote urls with http://localhost in doctests...")
+
+        for example in tests.examples:
+            match_url_str_literal = re.search(r'"(https://.*)"', example.source)
+            if not match_url_str_literal:
+                continue
+            old_url = match_url_str_literal.group(1)
+            new_url = _replace_remote_url(old_url)
+            example.source = example.source.replace(old_url, new_url)
 
     class Py23DocChecker(doctest.OutputChecker):
         def check_output(self, want, got, optionflags):

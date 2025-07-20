@@ -487,16 +487,31 @@ def test_reader_url():
     """
     Assert that Reader can open shapefiles from a url.
     """
+
+    # Allow testing loading of shapefiles from a url on localhost (to avoid
+    # overloading external servers, and associated spurious test failures).
+    # A suitable repo of test files, and a localhost server setup is
+    # defined in ./.github/actions/test/actions.yml
+    if shapefile.REPLACE_REMOTE_URLS_WITH_LOCALHOST:
+
+        def Reader(url):
+            new_url = shapefile._replace_remote_url(url)
+            print("repr(new_url): %s" % repr(new_url))
+            return shapefile.Reader(new_url)
+    else:
+        print("Using plain Reader")
+        Reader = shapefile.Reader
+
     # test with extension
     url = "https://github.com/nvkelso/natural-earth-vector/blob/master/110m_cultural/ne_110m_admin_0_tiny_countries.shp?raw=true"
-    with shapefile.Reader(url) as sf:
+    with Reader(url) as sf:
         for __recShape in sf.iterShapeRecords():
             pass
     assert sf.shp.closed is sf.shx.closed is sf.dbf.closed is True
 
     # test without extension
     url = "https://github.com/nvkelso/natural-earth-vector/blob/master/110m_cultural/ne_110m_admin_0_tiny_countries?raw=true"
-    with shapefile.Reader(url) as sf:
+    with Reader(url) as sf:
         for __recShape in sf.iterShapeRecords():
             pass
         assert len(sf) > 0
@@ -505,12 +520,12 @@ def test_reader_url():
     # test no files found
     url = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/README.md"
     with pytest.raises(shapefile.ShapefileException):
-        with shapefile.Reader(url) as sf:
+        with Reader(url) as sf:
             pass
 
     # test reading zipfile from url
     url = "https://github.com/JamesParrott/PyShp_test_shapefile/raw/main/gis_osm_natural_a_free_1.zip"
-    with shapefile.Reader(url) as sf:
+    with Reader(url) as sf:
         for __recShape in sf.iterShapeRecords():
             pass
         assert len(sf) > 0

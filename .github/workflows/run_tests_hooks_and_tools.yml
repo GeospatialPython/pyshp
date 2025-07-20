@@ -5,7 +5,7 @@ name: Run pre-commit hooks and tests
 on:
   push:
   pull_request:
-    branches: [ master ]
+    branches: [ master, ]
   workflow_call:
   workflow_dispatch:
 
@@ -30,7 +30,7 @@ jobs:
       run: |
         pylint --disable=R,C test_shapefile.py
 
-  test_on_old_Pythons:
+  test_on_EOL_Pythons:
     strategy:
       fail-fast: false
       matrix:
@@ -44,16 +44,28 @@ jobs:
 
     runs-on: ubuntu-latest
     container:
-      image: python:${{ matrix.python-version }}-slim
+      image: python:${{ matrix.python-version }}
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        path: ./Pyshp
 
-    - name: Run tests
-      uses: ./.github/actions/test
+    - name: Non-network tests
+      uses: ./Pyshp/.github/actions/test
+      with:
+        pyshp_repo_directory: ./Pyshp
+        python-version: ${{ matrix.python-version }}
 
+    - name: Network tests
+      uses: ./Pyshp/.github/actions/test
+      with:
+        extra_args: '-m network'
+        replace_remote_urls_with_localhost: 'yes'
+        pyshp_repo_directory: ./Pyshp
+        python-version: ${{ matrix.python-version }}
 
-  run_tests:
+  test_on_supported_Pythons:
     strategy:
       fail-fast: false
       matrix:
@@ -74,11 +86,24 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v4
-
     - uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Run tests
-      uses: ./.github/actions/test
+    - uses: actions/checkout@v4
+      with:
+        path: ./Pyshp
+
+    - name: Non-network tests
+      uses: ./Pyshp/.github/actions/test
+      with:
+        pyshp_repo_directory: ./Pyshp
+        python-version: ${{ matrix.python-version }}
+
+    - name: Network tests
+      uses: ./Pyshp/.github/actions/test
+      with:
+        extra_args: '-m network'
+        replace_remote_urls_with_localhost: 'yes'
+        pyshp_repo_directory: ./Pyshp
+        python-version: ${{ matrix.python-version }}
