@@ -951,7 +951,8 @@ class Reader:
 
     def __init__(
         self,
-        *args,
+        shapefile_path: str = "",
+        *,
         encoding="utf-8",
         encodingErrors="strict",
         shp=_NoShpSentinel,
@@ -959,23 +960,23 @@ class Reader:
         dbf=None,
         **kwargs,
     ):
-        # self.shp = None
-        # self.shx = None
-        # self.dbf = None
+        self.shp = None
+        self.shx = None
+        self.dbf = None
         self._files_to_close = []
         self.shapeName = "Not specified"
-        self._offsets = []
+        self._offsets: list[int] = []
         self.shpLength = None
         self.numRecords = None
         self.numShapes = None
-        self.fields = []
+        self.fields: list[list[str]] = []
         self.__dbfHdrLength = 0
-        self.__fieldLookup = {}
+        self.__fieldLookup: dict[str, int] = {}
         self.encoding = encoding
         self.encodingErrors = encodingErrors
         # See if a shapefile name was passed as the first argument
-        if len(args) > 0:
-            path = pathlike_obj(args[0])
+        if shapefile_path:
+            path = pathlike_obj(shapefile_path)
             if is_string(path):
                 if ".zip" in path:
                     # Shapefile is inside a zipfile
@@ -992,6 +993,8 @@ class Reader:
                     else:
                         zpath = path[: path.find(".zip") + 4]
                         shapefile = path[path.find(".zip") + 4 + 1 :]
+
+                    zipfileobj: Union[tempfile._TemporaryFileWrapper, io.BufferedReader]
                     # Create a zip file handle
                     if zpath.startswith("http"):
                         # Zipfile is from a url
