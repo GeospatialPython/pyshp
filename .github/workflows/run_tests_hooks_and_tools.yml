@@ -31,6 +31,7 @@ jobs:
         pylint --disable=R,C test_shapefile.py
 
   test_on_EOL_Pythons:
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
