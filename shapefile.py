@@ -19,7 +19,7 @@ import time
 import zipfile
 from datetime import date
 from struct import Struct, calcsize, error, pack, unpack
-from typing import Iterable, Iterator, Optional
+from typing import Any, Iterable, Iterator, Optional, Union
 from urllib.error import HTTPError
 from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
@@ -92,7 +92,9 @@ MISSING = [None, ""]
 NODATA = -10e38  # as per the ESRI shapefile spec, only used for m-values.
 
 
-def b(v, encoding="utf-8", encodingErrors="strict"):
+def b(
+    v: Union[str, bytes], encoding: str = "utf-8", encodingErrors: str = "strict"
+) -> bytes:
     if isinstance(v, str):
         # For python 3 encode str to bytes.
         return v.encode(encoding, encodingErrors)
@@ -107,7 +109,9 @@ def b(v, encoding="utf-8", encodingErrors="strict"):
         return str(v).encode(encoding, encodingErrors)
 
 
-def u(v, encoding="utf-8", encodingErrors="strict"):
+def u(
+    v: Union[str, bytes], encoding: str = "utf-8", encodingErrors: str = "strict"
+) -> str:
     if isinstance(v, bytes):
         # For python 3 decode bytes to str.
         return v.decode(encoding, encodingErrors)
@@ -122,11 +126,11 @@ def u(v, encoding="utf-8", encodingErrors="strict"):
         return bytes(v).decode(encoding, encodingErrors)
 
 
-def is_string(v):
+def is_string(v: Any) -> bool:
     return isinstance(v, str)
 
 
-def pathlike_obj(path):
+def pathlike_obj(path: Any) -> Any:
     if isinstance(path, os.PathLike):
         return os.fsdecode(path)
     else:
