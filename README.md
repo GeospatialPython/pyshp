@@ -102,7 +102,9 @@ part of your geospatial project.
 - Equality comparisons between Records now also require the fields to be the same (and in the same order).
 
 ### Development:
-- Code quality tools run on PyShp
+- Code quality tools (Ruff format) run on PyShp
+- Network, non-network, or all doctests selectable via command line args 
+- Network tests made runnable on localhost.
 
 ## 2.3.1
 
@@ -1434,23 +1436,60 @@ ESRI White Paper](http://downloads.esri.com/support/whitepapers/ao_/J9749_MultiP
 
 The testing framework is pytest, and the tests are located in test_shapefile.py.
 This includes an extensive set of unit tests of the various pyshp features,
-and tests against various input data. Some of the tests that require
-internet connectivity will be skipped in offline testing environments.
+and tests against various input data. 
 In the same folder as README.md and shapefile.py, from the command line run
-```
-$ python -m pytest
+
+```shell
+python -m pytest
 ```
 
 Additionally, all the code and examples located in this file, README.md,
 is tested and verified with the builtin doctest framework.
 A special routine for invoking the doctest is run when calling directly on shapefile.py.
 In the same folder as README.md and shapefile.py, from the command line run
-```
-$ python shapefile.py
+
+```shell
+python shapefile.py
 ```
 
 Linux/Mac and similar platforms may need to run `$ dos2unix README.md` in order
 to correct line endings in README.md, if Git has not automatically changed them.
+
+## Network tests
+
+Some of the tests and doctests, are intended to test reading shapefiles from
+remote servers, which requires internet connectivity.  The pytest tests are marked "network".
+For rapid iteration, in CI, or when developing in offline testing environments, these 
+tests can be dealt with in two ways:
+ i) by skipping the network tests via :
+```shell
+pytest -m "not network"
+```
+or the doctests via:
+```shell
+python shapefile.py -m "not network"
+```
+or ii) by cloning a repo of the files they download, serving these on localhost in a separate process,
+and running the network tests with the environment variable REPLACE_REMOTE_URLS_WITH_LOCALHOST to `yes`:
+Setup a local file server (*):
+```
+git clone http://github.com/JamesParrott/PyShp_test_shapefile
+cd PyShp_test_shapefile
+python -m http.server 8000
+```
+and then:
+```bash
+REPLACE_REMOTE_URLS_WITH_LOCALHOST=yes && pytest
+```
+or the doctests via:
+```bash
+REPLACE_REMOTE_URLS_WITH_LOCALHOST=yes && python shapefile.py
+```
+The network tests alone can also be run (without also running all the tests that don't 
+make network requests) using: `pytest -m network` (or the doctests using: `python shapefile.py -m network`).
+
+(*) The steps to host the files using Caddy for PYthon 2 are in ./actions/test/action.yml.  For reasons as 
+yet unknown, shapefile.py's Reader class in Python 2 Pytest, can't connect to a Python 2 SimpleHTTPServer.
 
 
 # Contributors

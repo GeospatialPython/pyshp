@@ -95,7 +95,7 @@ runs:
       env:
         REPLACE_REMOTE_URLS_WITH_LOCALHOST: ${{ inputs.replace_remote_urls_with_localhost }}
       run: |
-        pytest  -rA --tb=short ${{ inputs.extra_args }}
+        pytest -rA --tb=short ${{ inputs.extra_args }}
 
     - name: Show versions for logs.
       shell: bash
