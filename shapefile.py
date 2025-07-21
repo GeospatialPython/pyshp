@@ -913,6 +913,12 @@ class ShapefileException(Exception):
 
 
 class _NoShpSentinel(object):
+    """For use as a default value for shp to preserve the
+    behaviour (from when all keyword args were gathered
+    in the **kwargs dict) in case someone explictly
+    called Reader(shp=None) to load self.shx.
+    """
+
     pass
 
 
@@ -1106,14 +1112,13 @@ class Reader:
                     self.load(path)
                     return
 
+        self.shp = self._seek_0_on_file_obj_wrap_or_open_from_name("shp", shp)
+        self.dbf = self._seek_0_on_file_obj_wrap_or_open_from_name("dbf", dbf)
+
         if shp is _NoShpSentinel:
-            self.shp = None
             self.shx = None
         else:
-            self.shp = self._seek_0_on_file_obj_wrap_or_open_from_name("shp", shp)
             self.shx = self._seek_0_on_file_obj_wrap_or_open_from_name("shx", shx)
-
-        self.dbf = self._seek_0_on_file_obj_wrap_or_open_from_name("dbf", dbf)
 
         # Load the files
         if self.shp or self.dbf:
