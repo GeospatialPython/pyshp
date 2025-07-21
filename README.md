@@ -95,7 +95,7 @@ part of your geospatial project.
 
 # Version Changes
 
-## 2.3.x
+## 2.4.0
 
 ### New Features:
 - Reader.iterRecords now allows start and stop to be specified, to lookup smaller ranges of records.
