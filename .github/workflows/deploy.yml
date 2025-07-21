@@ -29,7 +29,7 @@ jobs:
         python-version: '3.x'
 
     - name: Run tests and hooks
-      uses: ./.github/workflows/run_tests_and_hooks.yml
+      uses: ./.github/workflows/run_tests_hooks_and_tools.yml
 
   deploy:
     # Prevent deployment of releases that fail any hooks (e.g. linting) or that fail any tests.
