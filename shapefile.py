@@ -443,7 +443,12 @@ def organize_polygon_rings(
 
 class Shape:
     def __init__(
-        self, shapeType=NULL, points=None, parts=None, partTypes=None, oid=None
+        self,
+        shapeType: int = NULL,
+        points: Optional[Coords] = None,
+        parts: Optional[list[int]] = None,
+        partTypes: Optional[list[int]] = None,
+        oid: Optional[int] = None,
     ):
         """Stores the geometry of the different shape types
         specified in the Shapefile spec. Shape types are
@@ -463,7 +468,7 @@ class Shape:
             self.partTypes = partTypes
 
         # and a dict to silently record any errors encountered
-        self._errors = {}
+        self._errors: dict[str, int] = {}
 
         # add oid
         if oid is not None:
@@ -666,12 +671,12 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
         return shape
 
     @property
-    def oid(self):
+    def oid(self) -> int:
         """The index position of the shape in the original shapefile"""
         return self.__oid
 
     @property
-    def shapeTypeName(self):
+    def shapeTypeName(self) -> str:
         return SHAPETYPE_LOOKUP[self.shapeType]
 
     def __repr__(self):
