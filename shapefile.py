@@ -260,7 +260,7 @@ def ring_contains_point(coords: list[Coord], p: Point2D) -> bool:
     return inside_flag
 
 
-def ring_sample(coords: list[Coord], ccw: bool = False) -> Coord:
+def ring_sample(coords: list[Coord], ccw: bool = False) -> Point2D:
     """Return a sample point guaranteed to be within a ring, by efficiently
     finding the first centroid of a coordinate triplet whose orientation
     matches the orientation of the ring and passes the point-in-ring test.
@@ -312,7 +312,9 @@ def ring_contains_ring(coords1: list[Coord], coords2: list[Point2D]) -> bool:
     return all(ring_contains_point(coords1, p2) for p2 in coords2)
 
 
-def organize_polygon_rings(rings, return_errors=None):
+def organize_polygon_rings(
+    rings: Iterable[list[Coord]], return_errors: Optional[dict[str, int]] = None
+) -> list[list[list[Coord]]]:
     """Organize a list of coordinate rings into one or more polygons with holes.
     Returns a list of polygons, where each polygon is composed of a single exterior
     ring, and one or more interior holes. If a return_errors dict is provided (optional),
@@ -357,7 +359,9 @@ def organize_polygon_rings(rings, return_errors=None):
             return polys
 
         # first determine each hole's candidate exteriors based on simple bbox contains test
-        hole_exteriors = {hole_i: [] for hole_i in range(len(holes))}
+        hole_exteriors: dict[int, list[int]] = {
+            hole_i: [] for hole_i in range(len(holes))
+        }
         exterior_bboxes = [ring_bbox(ring) for ring in exteriors]
         for hole_i in hole_exteriors.keys():
             hole_bbox = ring_bbox(holes[hole_i])
