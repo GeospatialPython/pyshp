@@ -6,6 +6,8 @@ maintainer: karim.bahgat.norway<at>gmail.com
 Compatible with Python versions >=3.9
 """
 
+from __future__ import annotations
+
 __version__ = "2.4.0"
 
 import array
