@@ -74,8 +74,6 @@ Both the Esri and XBase file-formats are very simple in design and memory
 efficient which is part of the reason the shapefile format remains popular
 despite the numerous ways to store and exchange GIS data available today.
 
-Pyshp is compatible with Python 2.7-3.x.
-
 This document provides examples for using PyShp to read and write shapefiles. However
 many more examples are continually added to the blog [http://GeospatialPython.com](http://GeospatialPython.com),
 and by searching for PyShp on [https://gis.stackexchange.com](https://gis.stackexchange.com).

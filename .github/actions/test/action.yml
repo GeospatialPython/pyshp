@@ -87,7 +87,7 @@ runs:
       working-directory: ${{ inputs.pyshp_repo_directory }}
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.test.txt
+        pip install -e .[test]
 
     - name: Pytest
       shell: bash
