@@ -963,7 +963,7 @@ class Reader:
         self.shp = None
         self.shx = None
         self.dbf = None
-        self._files_to_close = []
+        self._files_to_close: list[IO[bytes]] = []
         self.shapeName = "Not specified"
         self._offsets: list[int] = []
         self.shpLength = None
@@ -1269,7 +1269,11 @@ class Reader:
         if self.shx:
             self.__shxHeader()
 
-    def _try_get_open_constituent_file(self, shapefile_name: str, ext: str):
+    def _try_get_open_constituent_file(
+        self,
+        shapefile_name: str,
+        ext: str,
+    ) -> Union[IO[bytes], None]:
         """
         Attempts to open a .shp, .dbf or .shx file,
         with both lower case and upper case file extensions,
@@ -1277,7 +1281,9 @@ class Reader:
         """
         # typing.LiteralString is only available from PYthon 3.11 onwards.
         # https://docs.python.org/3/library/typing.html#typing.LiteralString
+        # assert ext in {'shp', 'dbf', 'shx'}
         self._assert_ext_is_supported(ext)
+
         try:
             return open(f"{shapefile_name}.{ext}", "rb")
         except OSError:
@@ -1286,7 +1292,11 @@ class Reader:
             except OSError:
                 return None
 
-    def _load_constituent_file(self, shapefile_name: str, ext: str):
+    def _load_constituent_file(
+        self,
+        shapefile_name: str,
+        ext: str,
+    ) -> Union[IO[bytes], None]:
         """
         Attempts to open a .shp, .dbf or .shx file, with the extension
         as both lower and upper case, and if successful append it to
@@ -1341,7 +1351,7 @@ class Reader:
             self.load()
         return f
 
-    def __restrictIndex(self, i):
+    def __restrictIndex(self, i: int) -> int:
         """Provides list-like handling of a record index with a clearer
         error message if the index is out of bounds."""
         if self.numRecords:
@@ -1929,6 +1939,10 @@ class Writer:
         autoBalance=False,
         encoding="utf-8",
         encodingErrors="strict",
+        *,
+        shp=None,
+        shx=None,
+        dbf=None,
         **kwargs,
     ):
         self.target = target
@@ -1948,8 +1962,7 @@ class Writer:
             self.shp = self.__getFileObj(os.path.splitext(target)[0] + ".shp")
             self.shx = self.__getFileObj(os.path.splitext(target)[0] + ".shx")
             self.dbf = self.__getFileObj(os.path.splitext(target)[0] + ".dbf")
-        elif kwargs.get("shp") or kwargs.get("shx") or kwargs.get("dbf"):
-            shp, shx, dbf = kwargs.get("shp"), kwargs.get("shx"), kwargs.get("dbf")
+        elif shp or shx or dbf:
             if shp:
                 self.shp = self.__getFileObj(shp)
             if shx:
@@ -2046,19 +2059,21 @@ class Writer:
                     pass
         self._files_to_close = []
 
-    def __getFileObj(self, f):
+    def __getFileObj(self, f: Union[IO[bytes], str]) -> IO[bytes]:
         """Safety handler to verify file-like objects"""
         if not f:
             raise ShapefileException("No file-like object available.")
-        elif hasattr(f, "write"):
-            return f
-        else:
+        if isinstance(f, str):
             pth = os.path.split(f)[0]
             if pth and not os.path.exists(pth):
                 os.makedirs(pth)
             fp = open(f, "wb+")
             self._files_to_close.append(fp)
             return fp
+
+        if hasattr(f, "write"):
+            return f
+        raise Exception(f"Unsupported file-like: {f}")
 
     def __shpFileLength(self):
         """Calculates the file length of the shp file."""
