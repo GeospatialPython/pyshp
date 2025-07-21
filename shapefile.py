@@ -9,6 +9,7 @@ Compatible with Python versions >=3.9
 __version__ = "2.4.0"
 
 import array
+import doctest
 import io
 import logging
 import os
@@ -18,12 +19,15 @@ import time
 import zipfile
 from datetime import date
 from struct import Struct, calcsize, error, pack, unpack
+from typing import Iterable, Iterator
 from urllib.error import HTTPError
 from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
 
 # Create named logger
 logger = logging.getLogger(__name__)
+
+doctest.NORMALIZE_WHITESPACE = 1
 
 # Module settings
 VERBOSE = True
@@ -2714,11 +2718,7 @@ class Writer:
 
 
 # Begin Testing
-def _get_doctests():
-    import doctest
-
-    doctest.NORMALIZE_WHITESPACE = 1
-
+def _get_doctests() -> doctest.DocTest:
     # run tests
     with open("README.md", "rb") as fobj:
         tests = doctest.DocTestParser().get_doctest(
@@ -2732,7 +2732,11 @@ def _get_doctests():
     return tests
 
 
-def _filter_network_doctests(examples, include_network=False, include_non_network=True):
+def _filter_network_doctests(
+    examples: Iterable[doctest.Example],
+    include_network: bool = False,
+    include_non_network: bool = True,
+) -> Iterator[doctest.Example]:
     globals_from_network_doctests = set()
 
     if not (include_network or include_non_network):
@@ -2773,16 +2777,16 @@ def _filter_network_doctests(examples, include_network=False, include_non_networ
 
 
 def _replace_remote_url(
-    old_url,
+    old_url: str,
     # Default port of Python http.server and Python 2's SimpleHttpServer
-    port=8000,
-    scheme="http",
-    netloc="localhost",
-    path=None,
-    params="",
-    query="",
-    fragment="",
-):
+    port: int = 8000,
+    scheme: str = "http",
+    netloc: str = "localhost",
+    path: str | None = None,
+    params: str = "",
+    query: str = "",
+    fragment: str = "",
+) -> str:
     old_parsed = urlparse(old_url)
 
     # Strip subpaths, so an artefacts
@@ -2806,14 +2810,11 @@ def _replace_remote_url(
     return new_url
 
 
-def _test(args=sys.argv[1:], verbosity=0):
+def _test(args: list[str] = sys.argv[1:], verbosity: bool = False) -> int:
     if verbosity == 0:
         print("Getting doctests...")
 
-    import doctest
     import re
-
-    doctest.NORMALIZE_WHITESPACE = 1
 
     tests = _get_doctests()
 
