@@ -17,6 +17,7 @@ import sys
 import tempfile
 import time
 import zipfile
+from collections.abc import Collection
 from datetime import date
 from struct import Struct, calcsize, error, pack, unpack
 from typing import Any, Iterable, Iterator, Optional, Union
@@ -148,7 +149,16 @@ class _Array(array.array):
         return str(self.tolist())
 
 
-def signed_area(coords, fast=False):
+def signed_area(
+    coords: Collection[
+        Union[
+            tuple[float, float],
+            tuple[float, float, float],
+            tuple[float, float, float, float],
+        ]
+    ],
+    fast: bool = False,
+) -> float:
     """Return the signed area enclosed by a ring using the linear time
     algorithm. A value >= 0 indicates a counter-clockwise oriented ring.
     A faster version is possible by setting 'fast' to True, which returns
