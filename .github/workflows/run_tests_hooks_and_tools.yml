@@ -30,40 +30,6 @@ jobs:
       run: |
         pylint --disable=R,C test_shapefile.py
 
-  test_on_EOL_Pythons:
-    continue-on-error: true
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: [
-            "3.6",
-            "3.7",
-            "3.8",
-        ]
-
-    runs-on: ubuntu-latest
-    container:
-      image: python:${{ matrix.python-version }}
-
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        path: ./Pyshp
-
-    - name: Non-network tests
-      uses: ./Pyshp/.github/actions/test
-      with:
-        pyshp_repo_directory: ./Pyshp
-        python-version: ${{ matrix.python-version }}
-
-    - name: Network tests
-      uses: ./Pyshp/.github/actions/test
-      with:
-        extra_args: '-m network'
-        replace_remote_urls_with_localhost: 'yes'
-        pyshp_repo_directory: ./Pyshp
-        python-version: ${{ matrix.python-version }}
-
   test_on_supported_Pythons:
     strategy:
       fail-fast: false
