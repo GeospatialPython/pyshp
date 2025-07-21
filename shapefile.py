@@ -20,7 +20,7 @@ import zipfile
 from collections.abc import Collection
 from datetime import date
 from struct import Struct, calcsize, error, pack, unpack
-from typing import Any, Iterable, Iterator, Optional, Reversible, Union
+from typing import Any, Iterable, Iterator, Optional, Reversible, TypedDict, Union
 from urllib.error import HTTPError
 from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
@@ -87,6 +87,25 @@ PARTTYPE_LOOKUP = {
     5: "RING",
 }
 
+# Custom type variables
+
+Point2D = tuple[float, float]
+PointZ = tuple[float, float, float]
+PointZM = tuple[float, float, float, float]
+
+Coord = Union[Point2D, PointZ, PointZM]
+Coords = list[Coord]
+
+BBox = tuple[float, float, float, float]
+
+
+class GeoJSONT(TypedDict):
+    type: str
+    coordinates: Union[
+        tuple[()], Point2D, PointZ, PointZM, Coords, list[Coords], list[list[Coords]]
+    ]
+
+
 # Helpers
 
 MISSING = [None, ""]
@@ -149,14 +168,6 @@ class _Array(array.array):
         return str(self.tolist())
 
 
-Point2D = tuple[float, float]
-PointZ = tuple[float, float, float]
-PointZM = tuple[float, float, float, float]
-
-Coord = Union[Point2D, PointZ, PointZM]
-Coords = Collection[Coord]
-
-
 def signed_area(
     coords: Coords,
     fast: bool = False,
@@ -187,9 +198,6 @@ def is_cw(coords: Coords) -> bool:
 def rewind(coords: Reversible[Coord]) -> list[Coord]:
     """Returns the input coords in reversed order."""
     return list(reversed(coords))
-
-
-BBox = tuple[float, float, float, float]
 
 
 def ring_bbox(coords: Coords) -> BBox:
@@ -445,7 +453,7 @@ class Shape:
     def __init__(
         self,
         shapeType: int = NULL,
-        points: Optional[Coords] = None,
+        points: Optional[list[Coord]] = None,
         parts: Optional[list[int]] = None,
         partTypes: Optional[list[int]] = None,
         oid: Optional[int] = None,
@@ -477,16 +485,18 @@ class Shape:
             self.__oid = -1
 
     @property
-    def __geo_interface__(self):
+    def __geo_interface__(self) -> GeoJSONT:
         if self.shapeType in [POINT, POINTM, POINTZ]:
             # point
             if len(self.points) == 0:
                 # the shape has no coordinate information, i.e. is 'empty'
                 # the geojson spec does not define a proper null-geometry type
                 # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
-                return {"type": "Point", "coordinates": tuple()}
+                return {"type": "Point", "coordinates": ()}
+                # return {"type": "Point", "coordinates": tuple()} #type: ignore
             else:
-                return {"type": "Point", "coordinates": tuple(self.points[0])}
+                return {"type": "Point", "coordinates": self.points[0]}
+                # return {"type": "Point", "coordinates": tuple(self.points[0])}  # type: ignore
         elif self.shapeType in [MULTIPOINT, MULTIPOINTM, MULTIPOINTZ]:
             if len(self.points) == 0:
                 # the shape has no coordinate information, i.e. is 'empty'
@@ -497,7 +507,8 @@ class Shape:
                 # multipoint
                 return {
                     "type": "MultiPoint",
-                    "coordinates": [tuple(p) for p in self.points],
+                    "coordinates": self.points,
+                    # "coordinates": [tuple(p) for p in self.points],  #type: ignore
                 }
         elif self.shapeType in [POLYLINE, POLYLINEM, POLYLINEZ]:
             if len(self.parts) == 0:
@@ -509,7 +520,8 @@ class Shape:
                 # linestring
                 return {
                     "type": "LineString",
-                    "coordinates": [tuple(p) for p in self.points],
+                    "coordinates": self.points,
+                    # "coordinates": [tuple(p) for p in self.points],  #type: ignore
                 }
             else:
                 # multilinestring
@@ -520,10 +532,12 @@ class Shape:
                         ps = part
                         continue
                     else:
-                        coordinates.append([tuple(p) for p in self.points[ps:part]])
+                        # coordinates.append([tuple(p) for p in self.points[ps:part]])
+                        coordinates.append([p for p in self.points[ps:part]])
                         ps = part
                 else:
-                    coordinates.append([tuple(p) for p in self.points[part:]])
+                    # coordinates.append([tuple(p) for p in self.points[part:]])
+                    coordinates.append([p for p in self.points[part:]])
                 return {"type": "MultiLineString", "coordinates": coordinates}
         elif self.shapeType in [POLYGON, POLYGONM, POLYGONZ]:
             if len(self.parts) == 0:
@@ -543,7 +557,8 @@ class Shape:
                         end = len(self.points)
 
                     # extract the points that make up the ring
-                    ring = [tuple(p) for p in self.points[start:end]]
+                    # ring = [tuple(p) for p in self.points[start:end]]
+                    ring = [p for p in self.points[start:end]]
                     rings.append(ring)
 
                 # organize rings into list of polygons, where each polygon is defined as list of rings.
@@ -918,7 +933,7 @@ class Reader:
     but they can be.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, encoding="utf-8", encodingErrors="strict", **kwargs):
         self.shp = None
         self.shx = None
         self.dbf = None
@@ -931,8 +946,8 @@ class Reader:
         self.fields = []
         self.__dbfHdrLength = 0
         self.__fieldLookup = {}
-        self.encoding = kwargs.pop("encoding", "utf-8")
-        self.encodingErrors = kwargs.pop("encodingErrors", "strict")
+        self.encoding = encoding
+        self.encodingErrors = encodingErrors
         # See if a shapefile name was passed as the first argument
         if len(args) > 0:
             path = pathlike_obj(args[0])
@@ -1876,7 +1891,15 @@ class Reader:
 class Writer:
     """Provides write support for ESRI Shapefiles."""
 
-    def __init__(self, target=None, shapeType=None, autoBalance=False, **kwargs):
+    def __init__(
+        self,
+        target=None,
+        shapeType=None,
+        autoBalance=False,
+        encoding="utf-8",
+        encodingErrors="strict",
+        **kwargs,
+    ):
         self.target = target
         self.autoBalance = autoBalance
         self.fields = []
@@ -1920,8 +1943,8 @@ class Writer:
         # Use deletion flags in dbf? Default is false (0). Note: Currently has no effect, records should NOT contain deletion flags.
         self.deletionFlag = 0
         # Encoding
-        self.encoding = kwargs.pop("encoding", "utf-8")
-        self.encodingErrors = kwargs.pop("encodingErrors", "strict")
+        self.encoding = encoding
+        self.encodingErrors = encodingErrors
 
     def __len__(self):
         """Returns the current number of features written to the shapefile.
