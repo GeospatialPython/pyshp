@@ -19,7 +19,7 @@ import time
 import zipfile
 from datetime import date
 from struct import Struct, calcsize, error, pack, unpack
-from typing import Iterable, Iterator
+from typing import Iterable, Iterator, Optional
 from urllib.error import HTTPError
 from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
@@ -2782,7 +2782,7 @@ def _replace_remote_url(
     port: int = 8000,
     scheme: str = "http",
     netloc: str = "localhost",
-    path: str | None = None,
+    path: Optional[str] = None,
     params: str = "",
     query: str = "",
     fragment: str = "",
