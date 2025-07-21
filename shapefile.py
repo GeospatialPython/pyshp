@@ -604,7 +604,7 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
             )
 
     @staticmethod
-    def _from_geojson(geoj):
+    def _from_geojson(geoj) -> Shape:
         # create empty shape
         shape = Shape()
         # set shapeType
@@ -634,7 +634,7 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
         elif geojType in ("MultiPoint", "LineString"):
             shape.points = geoj["coordinates"]
             shape.parts = [0]
-        elif geojType in ("Polygon"):
+        elif geojType in ("Polygon",):
             points = []
             parts = []
             index = 0
@@ -653,7 +653,7 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
                 index += len(ext_or_hole)
             shape.points = points
             shape.parts = parts
-        elif geojType in ("MultiLineString"):
+        elif geojType in ("MultiLineString",):
             points = []
             parts = []
             index = 0
@@ -663,7 +663,7 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
                 index += len(linestring)
             shape.points = points
             shape.parts = parts
-        elif geojType in ("MultiPolygon"):
+        elif geojType in ("MultiPolygon",):
             points = []
             parts = []
             index = 0
