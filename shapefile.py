@@ -2802,7 +2802,7 @@ def _replace_remote_url(
         fragment=fragment,
     )
 
-    new_url = urlunparse(new_parsed) if PYTHON3 else urlunparse(list(new_parsed))
+    new_url = urlunparse(new_parsed)
     return new_url
 
 
