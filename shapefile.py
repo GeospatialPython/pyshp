@@ -20,7 +20,7 @@ import zipfile
 from collections.abc import Collection
 from datetime import date
 from struct import Struct, calcsize, error, pack, unpack
-from typing import Any, Iterable, Iterator, Optional, Union
+from typing import Any, Iterable, Iterator, Optional, Reversible, Union
 from urllib.error import HTTPError
 from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
@@ -149,14 +149,16 @@ class _Array(array.array):
         return str(self.tolist())
 
 
+Point2D = tuple[float, float]
+PointZ = tuple[float, float, float]
+PointZM = tuple[float, float, float, float]
+
+Coord = Union[Point2D, PointZ, PointZM]
+Coords = Collection[Coord]
+
+
 def signed_area(
-    coords: Collection[
-        Union[
-            tuple[float, float],
-            tuple[float, float, float],
-            tuple[float, float, float, float],
-        ]
-    ],
+    coords: Coords,
     fast: bool = False,
 ) -> float:
     """Return the signed area enclosed by a ring using the linear time
@@ -174,7 +176,7 @@ def signed_area(
         return area2 / 2.0
 
 
-def is_cw(coords):
+def is_cw(coords: Coords) -> bool:
     """Returns True if a polygon ring has clockwise orientation, determined
     by a negatively signed area.
     """
@@ -182,35 +184,38 @@ def is_cw(coords):
     return area2 < 0
 
 
-def rewind(coords):
+def rewind(coords: Reversible[Coord]) -> list[Coord]:
     """Returns the input coords in reversed order."""
     return list(reversed(coords))
 
 
-def ring_bbox(coords):
+BBox = tuple[float, float, float, float]
+
+
+def ring_bbox(coords: Coords) -> BBox:
     """Calculates and returns the bounding box of a ring."""
     xs, ys = zip(*coords)
     bbox = min(xs), min(ys), max(xs), max(ys)
     return bbox
 
 
-def bbox_overlap(bbox1, bbox2):
-    """Tests whether two bounding boxes overlap, returning a boolean"""
+def bbox_overlap(bbox1: BBox, bbox2: BBox) -> bool:
+    """Tests whether two bounding boxes overlap."""
     xmin1, ymin1, xmax1, ymax1 = bbox1
     xmin2, ymin2, xmax2, ymax2 = bbox2
     overlap = xmin1 <= xmax2 and xmax1 >= xmin2 and ymin1 <= ymax2 and ymax1 >= ymin2
     return overlap
 
 
-def bbox_contains(bbox1, bbox2):
-    """Tests whether bbox1 fully contains bbox2, returning a boolean"""
+def bbox_contains(bbox1: BBox, bbox2: BBox) -> bool:
+    """Tests whether bbox1 fully contains bbox2."""
     xmin1, ymin1, xmax1, ymax1 = bbox1
     xmin2, ymin2, xmax2, ymax2 = bbox2
     contains = xmin1 < xmin2 and xmax1 > xmax2 and ymin1 < ymin2 and ymax1 > ymax2
     return contains
 
 
-def ring_contains_point(coords, p):
+def ring_contains_point(coords: list[Coord], p: Point2D) -> bool:
     """Fast point-in-polygon crossings algorithm, MacMartin optimization.
 
     Adapted from code by Eric Haynes
@@ -255,7 +260,7 @@ def ring_contains_point(coords, p):
     return inside_flag
 
 
-def ring_sample(coords, ccw=False):
+def ring_sample(coords: list[Coord], ccw: bool = False) -> Coord:
     """Return a sample point guaranteed to be within a ring, by efficiently
     finding the first centroid of a coordinate triplet whose orientation
     matches the orientation of the ring and passes the point-in-ring test.
@@ -302,7 +307,7 @@ def ring_sample(coords, ccw=False):
         raise Exception("Unexpected error: Unable to find a ring sample point.")
 
 
-def ring_contains_ring(coords1, coords2):
+def ring_contains_ring(coords1: list[Coord], coords2: list[Point2D]) -> bool:
     """Returns True if all vertexes in coords2 are fully inside coords1."""
     return all(ring_contains_point(coords1, p2) for p2 in coords2)
 
