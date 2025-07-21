@@ -9,16 +9,15 @@ Compatible with Python versions >=3.9
 __version__ = "2.4.0"
 
 import array
-from datetime import date
 import io
 import logging
 import os
 import sys
 import tempfile
 import time
-from struct import Struct, calcsize, error, pack, unpack
 import zipfile
-
+from datetime import date
+from struct import Struct, calcsize, error, pack, unpack
 from urllib.error import HTTPError
 from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
@@ -103,6 +102,7 @@ def b(v, encoding="utf-8", encodingErrors="strict"):
         # Force string representation.
         return str(v).encode(encoding, encodingErrors)
 
+
 def u(v, encoding="utf-8", encodingErrors="strict"):
     if isinstance(v, bytes):
         # For python 3 decode bytes to str.
@@ -117,14 +117,17 @@ def u(v, encoding="utf-8", encodingErrors="strict"):
         # Force string representation.
         return bytes(v).decode(encoding, encodingErrors)
 
+
 def is_string(v):
     return isinstance(v, str)
+
 
 def pathlike_obj(path):
     if isinstance(path, os.PathLike):
         return os.fsdecode(path)
     else:
         return path
+
 
 # Begin
 
@@ -1089,9 +1092,7 @@ class Reader:
                 )
             )
         if self.dbf:
-            info.append(
-                f"    {len(self)} records ({len(self.fields)} fields)"
-            )
+            info.append(f"    {len(self)} records ({len(self.fields)} fields)")
         return "\n".join(info)
 
     def __enter__(self):
