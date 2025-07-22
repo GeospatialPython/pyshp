@@ -954,6 +954,7 @@ class Reader:
     def __init__(
         self,
         shapefile_path: str = "",
+        /,
         *,
         encoding="utf-8",
         encodingErrors="strict",
