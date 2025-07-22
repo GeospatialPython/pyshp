@@ -918,7 +918,7 @@ class ShapefileException(Exception):
     pass
 
 
-class __NoShpSentinel(object):
+class _NoShpSentinel(object):
     """For use as a default value for shp to preserve the
     behaviour (from when all keyword args were gathered
     in the **kwargs dict) in case someone explictly
@@ -962,7 +962,7 @@ class Reader:
         *,
         encoding: str = "utf-8",
         encodingErrors: str = "strict",
-        shp: Union[__NoShpSentinel, Optional[BinaryFileT]] = __NoShpSentinel(),
+        shp: Union[_NoShpSentinel, Optional[BinaryFileT]] = _NoShpSentinel(),
         shx: Optional[BinaryFileT] = None,
         dbf: Optional[BinaryFileT] = None,
         **kwargs,
@@ -1122,7 +1122,7 @@ class Reader:
                     self.load(path)
                     return
 
-        if not isinstance(shp, __NoShpSentinel):
+        if not isinstance(shp, _NoShpSentinel):
             self.shp = self.__seek_0_on_file_obj_wrap_or_open_from_name("shp", shp)
             self.shx = self.__seek_0_on_file_obj_wrap_or_open_from_name("shx", shx)
 
