@@ -100,8 +100,12 @@ Coords = list[Coord]
 
 BBox = tuple[float, float, float, float]
 
+# File name, file object or anything with a read() method that returns bytes.
+# TODO: Create simple Protocol with a read() method
+BinaryFileT = Union[str, IO[bytes]]
 
-class GeoJSONT(TypedDict):
+
+class GeoJsonShapeT(TypedDict):
     type: str
     coordinates: Union[
         tuple[()], Point2D, PointZ, PointZM, Coords, list[Coords], list[list[Coords]]
@@ -487,7 +491,7 @@ class Shape:
             self.__oid = -1
 
     @property
-    def __geo_interface__(self) -> GeoJSONT:
+    def __geo_interface__(self) -> GeoJsonShapeT:
         if self.shapeType in [POINT, POINTM, POINTZ]:
             # point
             if len(self.points) == 0:
@@ -914,7 +918,7 @@ class ShapefileException(Exception):
     pass
 
 
-class _NoShpSentinel(object):
+class __NoShpSentinel(object):
     """For use as a default value for shp to preserve the
     behaviour (from when all keyword args were gathered
     in the **kwargs dict) in case someone explictly
@@ -956,11 +960,11 @@ class Reader:
         shapefile_path: str = "",
         /,
         *,
-        encoding="utf-8",
-        encodingErrors="strict",
-        shp=_NoShpSentinel,
-        shx=None,
-        dbf=None,
+        encoding: str = "utf-8",
+        encodingErrors: str = "strict",
+        shp: Union[__NoShpSentinel, Optional[BinaryFileT]] = __NoShpSentinel(),
+        shx: Optional[BinaryFileT] = None,
+        dbf: Optional[BinaryFileT] = None,
         **kwargs,
     ):
         self.shp = None
@@ -1118,22 +1122,20 @@ class Reader:
                     self.load(path)
                     return
 
-        if shp is not _NoShpSentinel:
-            self.shp = self._seek_0_on_file_obj_wrap_or_open_from_name("shp", shp)
-            self.shx = self._seek_0_on_file_obj_wrap_or_open_from_name("shx", shx)
+        if not isinstance(shp, __NoShpSentinel):
+            self.shp = self.__seek_0_on_file_obj_wrap_or_open_from_name("shp", shp)
+            self.shx = self.__seek_0_on_file_obj_wrap_or_open_from_name("shx", shx)
 
-        self.dbf = self._seek_0_on_file_obj_wrap_or_open_from_name("dbf", dbf)
+        self.dbf = self.__seek_0_on_file_obj_wrap_or_open_from_name("dbf", dbf)
 
         # Load the files
         if self.shp or self.dbf:
             self._try_to_set_constituent_file_headers()
 
-    def _seek_0_on_file_obj_wrap_or_open_from_name(
+    def __seek_0_on_file_obj_wrap_or_open_from_name(
         self,
         ext: str,
-        # File name, file object or anything with a read() method that returns bytes.
-        # TODO: Create simple Protocol with a read() method
-        file_: Optional[Union[str, IO[bytes]]],
+        file_: Optional[BinaryFileT],
     ) -> Union[None, io.BytesIO, IO[bytes]]:
         # assert ext in {'shp', 'dbf', 'shx'}
         self._assert_ext_is_supported(ext)
@@ -1245,7 +1247,7 @@ class Reader:
         return fcollection
 
     @property
-    def shapeTypeName(self):
+    def shapeTypeName(self) -> str:
         return SHAPETYPE_LOOKUP[self.shapeType]
 
     def load(self, shapefile=None):
