@@ -13,16 +13,13 @@ on:
     types: [published]
 
 jobs:
-  test:
-    # In general, tests should be run after building a distribution, to test that distribution.
-    # However as long as PyShp is a pure Python library, with pure Python deps (or no deps)
-    # then this would only test the packaging process, not so much the code as there are
-    # no binaries.
-    uses: ./.github/workflows/run_tests_hooks_and_tools.yml
+  format_type_check_lint_build_and_test:
+    # Builds and uploads wheel and sdist
+    uses: ./.github/workflows/run_checks_build_and_test.yml
 
   deploy:
-    # Prevent deployment of releases that fail any hooks (e.g. linting) or that fail any tests.
-    needs: test
+    # Prevent deployment of releases that fail any tests or checks (e.g. linting).
+    needs: format_type_check_lint_build_and_test
     runs-on: ubuntu-latest
 
     steps:
@@ -33,13 +30,13 @@ jobs:
         python-version: '3.x'
 
 
+    - name: Download wheel and sdist (built in previous job)
+      uses: actions/download-artifact@v4
+      with:
+        name: PyShp_wheel_and_sdist
+        path: dist
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install build
-    - name: Build package
-      run: python -m build
+
 
     - name: Publish package
       if: github.repository == 'GeospatialPython/pyshp'
@@ -47,3 +44,4 @@ jobs:
       with:
         user: __token__
         password: ${{ secrets.PYPI_INTEGRATION }}
+        packages-dir: dist/
