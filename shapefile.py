@@ -1856,7 +1856,7 @@ class Reader:
 
     def iterRecords(
         self,
-        fields=Optional[list[str]],
+        fields: Optional[list[str]] = None,
         start: int = 0,
         stop: Optional[int] = None,
     ) -> Iterator[Optional[_Record]]:
