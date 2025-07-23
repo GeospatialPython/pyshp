@@ -24,12 +24,20 @@ runs:
   using: "composite"
   steps:
     # The PyShp repo is required to already be checked out into pyshp_repo_directory,
+    # and the wheel to be tested in ./dist within it.
     # e.g. by the calling workflow using:
     # steps:
     # - uses: actions/checkout@v4
     #   with:
     #     path: ./Pyshp
+    #
+    # - name: Build distribution artefacts (wheel and sdist)
+    #   uses: ./Pyshp/.github/actions/build_wheel_and_sdist
+    #   with:
+    #     pyshp_repo_directory: ./Pyshp
+    #
     # and then calling this Action with:
+    #
     # - name: Run tests
     #   uses: ./Pyshp/.github/actions/test
     #   with:
@@ -37,7 +45,12 @@ runs:
     #     replace_remote_urls_with_localhost: 'yes'
     #     pyshp_repo_directory: ./Pyshp
 
-    # The Python to be tested with is required to already be setup, with "python" and "pip" on the system Path
+    # The Python to be tested with is required to already be setup,
+    # with "python" and "pip" on the system Path
+    # (so that this custom Action can be used with both reproducible
+    #  Pythons from Python docker images, and more frequently deprecated Pythons
+    #  from - uses: actions/setup-python@v5)
+
 
     - name: Checkout shapefiles and zip file artefacts repo
       if: ${{ inputs.replace_remote_urls_with_localhost == 'yes' }}
@@ -62,26 +75,36 @@ runs:
         REPLACE_REMOTE_URLS_WITH_LOCALHOST: ${{ inputs.replace_remote_urls_with_localhost }}
       run: python shapefile.py ${{ inputs.extra_args }}
 
-    - name: Install test dependencies.
-      shell: bash
-      working-directory: ${{ inputs.pyshp_repo_directory }}
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e .[test]
 
-    - name: Pytest
+    - name: Download wheel and sdist (built in previous jobs)
+      uses: actions/download-artifact@v4
+      with:
+        name: python_wheel_gcc_linux
+        path: dist
+
+    - name: Install PyShp from the wheel (built in prev step)
+      shell: bash
+      working-directory: ${{ inputs.pyshp_repo_directory }}/dist
+      run: |
+        WHEEL_NAME=$(ls pyshp-*-py3-none-any.whl)
+        python -m pip install $WHEEL_NAME[test]
+
+    - name: Show Python and Pytest versions for logs.
+      shell: bash
+      run: |
+        python --version
+        python -m pytest --version
+
+    - name: Run Pytest
       shell: bash
       working-directory: ${{ inputs.pyshp_repo_directory }}
       env:
         REPLACE_REMOTE_URLS_WITH_LOCALHOST: ${{ inputs.replace_remote_urls_with_localhost }}
       run: |
+        echo "Ensure the tests import the installed wheel"
+        mv shapefile.py shapefile_repo.py
         pytest -rA --tb=short ${{ inputs.extra_args }}
 
-    - name: Show versions for logs.
-      shell: bash
-      run: |
-        python --version
-        python -m pytest --version
 
 
     # - name: Test http server

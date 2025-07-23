@@ -30,7 +30,14 @@ jobs:
       run: |
         pylint --disable=R,C test_shapefile.py
 
+  build_wheel_and_sdist:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Build wheel from the project repo
+      uses: ./Pyshp/.github/actions/build_wheel_and_sdist
+
   test_on_supported_Pythons:
+    needs: build_wheel_and_sdist
     strategy:
       fail-fast: false
       matrix:
