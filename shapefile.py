@@ -2613,11 +2613,9 @@ class Writer:
             elif fieldType == "D":
                 # date: 8 bytes - date stored as a string in the format YYYYMMDD.
                 if isinstance(value, date):
-                    value = "{:04d}{:02d}{:02d}".format(
-                        value.year, value.month, value.day
-                    )
+                    value = f"{value.year:04d}{value.month:02d}{value.day:02d}"
                 elif isinstance(value, list) and len(value) == 3:
-                    value = "{:04d}{:02d}{:02d}".format(*value)
+                    value = f"{value[0]:04d}{value[1]:02d}{value[2]:02d}"
                 elif value in MISSING:
                     value = b"0" * 8  # QGIS NULL for date type
                 elif is_string(value) and len(value) == 8:
