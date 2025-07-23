@@ -33,6 +33,8 @@ jobs:
   build_wheel_and_sdist:
     runs-on: ubuntu-latest
     steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
     - name: Build wheel from the project repo
       uses: ./Pyshp/.github/actions/build_wheel_and_sdist
 
@@ -77,4 +79,5 @@ jobs:
       with:
         extra_args: '-m network'
         replace_remote_urls_with_localhost: 'yes'
+        # Checkout to ./PyShp, as the test job also needs to check out the artefact repo
         pyshp_repo_directory: ./Pyshp

@@ -33,8 +33,6 @@ runs:
     #
     # - name: Build distribution artefacts (wheel and sdist)
     #   uses: ./Pyshp/.github/actions/build_wheel_and_sdist
-    #   with:
-    #     pyshp_repo_directory: ./Pyshp
     #
     # and then calling this Action with:
     #
@@ -84,7 +82,7 @@ runs:
 
     - name: Install PyShp from the wheel (built in prev step)
       shell: bash
-      working-directory: ${{ inputs.pyshp_repo_directory }}/dist
+      working-directory: dist/
       run: |
         WHEEL_NAME=$(ls pyshp-*-py3-none-any.whl)
         python -m pip install $WHEEL_NAME[test]
