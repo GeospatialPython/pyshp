@@ -36,7 +36,7 @@ jobs:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
     - name: Build wheel from the project repo
-      uses: .github/actions/build_wheel_and_sdist
+      uses: ./.github/actions/build_wheel_and_sdist
 
   test_on_supported_Pythons:
     needs: build_wheel_and_sdist
