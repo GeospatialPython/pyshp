@@ -100,8 +100,15 @@ Coords = list[Coord]
 
 BBox = tuple[float, float, float, float]
 
+# File name, file object or anything with a read() method that returns bytes.
+# TODO: Create simple Protocol with a read() method
+BinaryFileT = Union[str, IO[bytes]]
+BinaryFileStreamT = Union[IO[bytes], io.BytesIO]
 
-class GeoJSONT(TypedDict):
+RecordValue = Union[float, str, date]
+
+
+class GeoJsonShapeT(TypedDict):
     type: str
     coordinates: Union[
         tuple[()], Point2D, PointZ, PointZM, Coords, list[Coords], list[list[Coords]]
@@ -487,7 +494,7 @@ class Shape:
             self.__oid = -1
 
     @property
-    def __geo_interface__(self) -> GeoJSONT:
+    def __geo_interface__(self) -> GeoJsonShapeT:
         if self.shapeType in [POINT, POINTM, POINTZ]:
             # point
             if len(self.points) == 0:
@@ -570,9 +577,7 @@ class Shape:
                 # if VERBOSE is True, issue detailed warning about any shape errors
                 # encountered during the Shapefile to GeoJSON conversion
                 if VERBOSE and self._errors:
-                    header = "Possible issue encountered when converting Shape #{} to GeoJSON: ".format(
-                        self.oid
-                    )
+                    header = f"Possible issue encountered when converting Shape #{self.oid} to GeoJSON: "
                     orphans = self._errors.get("polygon_orphaned_holes", None)
                     if orphans:
                         msg = (
@@ -601,8 +606,7 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
 
         else:
             raise Exception(
-                'Shape type "%s" cannot be represented as GeoJSON.'
-                % SHAPETYPE_LOOKUP[self.shapeType]
+                f'Shape type "{SHAPETYPE_LOOKUP[self.shapeType]}" cannot be represented as GeoJSON.'
             )
 
     @staticmethod
@@ -626,7 +630,7 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
         elif geojType == "MultiPolygon":
             shapeType = POLYGON
         else:
-            raise Exception("Cannot create Shape from GeoJSON type '%s'" % geojType)
+            raise Exception(f"Cannot create Shape from GeoJSON type '{geojType}'")
         shape.shapeType = shapeType
 
         # set points and parts
@@ -716,7 +720,12 @@ class _Record(list):
     >>> print(r.ID)
     """
 
-    def __init__(self, field_positions, values, oid=None):
+    def __init__(
+        self,
+        field_positions: dict[str, int],
+        values: Iterable[RecordValue],
+        oid: Optional[int] = None,
+    ):
         """
         A Record should be created by the Reader class
 
@@ -731,7 +740,7 @@ class _Record(list):
             self.__oid = -1
         list.__init__(self, values)
 
-    def __getattr__(self, item):
+    def __getattr__(self, item: str) -> RecordValue:
         """
         __getattr__ is called if an attribute is used that does
         not exist in the normal sense. For example r=Record(...), r.ID
@@ -754,7 +763,7 @@ class _Record(list):
                 f"{item} found as a field but not enough values available."
             )
 
-    def __setattr__(self, key, value):
+    def __setattr__(self, key: str, value: RecordValue):
         """
         Sets a value of a field attribute
         :param key: The field name
@@ -810,11 +819,11 @@ class _Record(list):
                 raise IndexError(f"{key} is not a field name and not an int")
 
     @property
-    def oid(self):
+    def oid(self) -> int:
         """The index position of the record in the original shapefile"""
         return self.__oid
 
-    def as_dict(self, date_strings=False):
+    def as_dict(self, date_strings: bool = False) -> dict[str, RecordValue]:
         """
         Returns this Record as a dictionary using the field names as keys
         :return: dict
@@ -829,7 +838,7 @@ class _Record(list):
     def __repr__(self):
         return f"Record #{self.__oid}: {list(self)}"
 
-    def __dir__(self):
+    def __dir__(self) -> list[str]:
         """
         Helps to show the field names in an interactive environment like IPython.
         See: http://ipython.readthedocs.io/en/stable/config/integrating.html
@@ -855,7 +864,7 @@ class ShapeRecord:
     """A ShapeRecord object containing a shape along with its attributes.
     Provides the GeoJSON __geo_interface__ to return a Feature dictionary."""
 
-    def __init__(self, shape=None, record=None):
+    def __init__(self, shape: Optional[Shape] = None, record: Optional[_Record] = None):
         self.shape = shape
         self.record = record
 
@@ -954,23 +963,24 @@ class Reader:
     def __init__(
         self,
         shapefile_path: str = "",
+        /,
         *,
-        encoding="utf-8",
-        encodingErrors="strict",
-        shp=_NoShpSentinel,
-        shx=None,
-        dbf=None,
+        encoding: str = "utf-8",
+        encodingErrors: str = "strict",
+        shp: Union[_NoShpSentinel, Optional[BinaryFileT]] = _NoShpSentinel(),
+        shx: Optional[BinaryFileT] = None,
+        dbf: Optional[BinaryFileT] = None,
         **kwargs,
     ):
         self.shp = None
         self.shx = None
         self.dbf = None
-        self._files_to_close: list[IO[bytes]] = []
+        self._files_to_close: list[BinaryFileStreamT] = []
         self.shapeName = "Not specified"
         self._offsets: list[int] = []
-        self.shpLength = None
-        self.numRecords = None
-        self.numShapes = None
+        self.shpLength: Optional[int] = None
+        self.numRecords: Optional[int] = None
+        self.numShapes: Optional[int] = None
         self.fields: list[list[str]] = []
         self.__dbfHdrLength = 0
         self.__fieldLookup: dict[str, int] = {}
@@ -985,8 +995,7 @@ class Reader:
                     if path.count(".zip") > 1:
                         # Multiple nested zipfiles
                         raise ShapefileException(
-                            "Reading from multiple nested zipfiles is not supported: %s"
-                            % path
+                            f"Reading from multiple nested zipfiles is not supported: {path}"
                         )
                     # Split into zipfile and shapefile paths
                     if path.endswith(".zip"):
@@ -1036,9 +1045,8 @@ class Reader:
                                 shapefile = shapefiles[0]
                             else:
                                 raise ShapefileException(
-                                    "Zipfile contains more than one shapefile: %s. Please specify the full \
-                                    path to the shapefile you would like to open."
-                                    % shapefiles
+                                    f"Zipfile contains more than one shapefile: {shapefiles}. "
+                                    "Please specify the full path to the shapefile you would like to open."
                                 )
                         # Try to extract file-like objects from zipfile
                         shapefile = os.path.splitext(shapefile)[
@@ -1070,7 +1078,7 @@ class Reader:
                         return
                     else:
                         raise ShapefileException(
-                            "No shp or dbf file found in zipfile: %s" % path
+                            f"No shp or dbf file found in zipfile: {path}"
                         )
 
                 elif path.startswith("http"):
@@ -1108,7 +1116,7 @@ class Reader:
                         return
                     else:
                         raise ShapefileException(
-                            "No shp or dbf file found at url: %s" % path
+                            f"No shp or dbf file found at url: {path}"
                         )
 
                 else:
@@ -1117,23 +1125,21 @@ class Reader:
                     self.load(path)
                     return
 
-        if shp is not _NoShpSentinel:
-            self.shp = self._seek_0_on_file_obj_wrap_or_open_from_name("shp", shp)
-            self.shx = self._seek_0_on_file_obj_wrap_or_open_from_name("shx", shx)
+        if not isinstance(shp, _NoShpSentinel):
+            self.shp = self.__seek_0_on_file_obj_wrap_or_open_from_name("shp", shp)
+            self.shx = self.__seek_0_on_file_obj_wrap_or_open_from_name("shx", shx)
 
-        self.dbf = self._seek_0_on_file_obj_wrap_or_open_from_name("dbf", dbf)
+        self.dbf = self.__seek_0_on_file_obj_wrap_or_open_from_name("dbf", dbf)
 
         # Load the files
         if self.shp or self.dbf:
             self._try_to_set_constituent_file_headers()
 
-    def _seek_0_on_file_obj_wrap_or_open_from_name(
+    def __seek_0_on_file_obj_wrap_or_open_from_name(
         self,
         ext: str,
-        # File name, file object or anything with a read() method that returns bytes.
-        # TODO: Create simple Protocol with a read() method
-        file_: Optional[Union[str, IO[bytes]]],
-    ) -> Union[None, io.BytesIO, IO[bytes]]:
+        file_: Optional[BinaryFileT],
+    ) -> Union[None, IO[bytes]]:
         # assert ext in {'shp', 'dbf', 'shx'}
         self._assert_ext_is_supported(ext)
 
@@ -1163,9 +1169,7 @@ class Reader:
         info = ["shapefile Reader"]
         if self.shp:
             info.append(
-                "    {} shapes (type '{}')".format(
-                    len(self), SHAPETYPE_LOOKUP[self.shapeType]
-                )
+                f"    {len(self)} shapes (type '{SHAPETYPE_LOOKUP[self.shapeType]}')"
             )
         if self.dbf:
             info.append(f"    {len(self)} records ({len(self.fields)} fields)")
@@ -1244,7 +1248,7 @@ class Reader:
         return fcollection
 
     @property
-    def shapeTypeName(self):
+    def shapeTypeName(self) -> str:
         return SHAPETYPE_LOOKUP[self.shapeType]
 
     def load(self, shapefile=None):
@@ -1422,18 +1426,18 @@ class Reader:
             nPoints = unpack("<i", f.read(4))[0]
         # Read parts
         if nParts:
-            record.parts = _Array("i", unpack("<%si" % nParts, f.read(nParts * 4)))
+            record.parts = _Array("i", unpack(f"<{nParts}i", f.read(nParts * 4)))
         # Read part types for Multipatch - 31
         if shapeType == 31:
-            record.partTypes = _Array("i", unpack("<%si" % nParts, f.read(nParts * 4)))
+            record.partTypes = _Array("i", unpack(f"<{nParts}i", f.read(nParts * 4)))
         # Read points - produces a list of [x,y] values
         if nPoints:
-            flat = unpack("<%sd" % (2 * nPoints), f.read(16 * nPoints))
+            flat = unpack(f"<{2 * nPoints}d", f.read(16 * nPoints))
             record.points = list(zip(*(iter(flat),) * 2))
         # Read z extremes and values
         if shapeType in (13, 15, 18, 31):
             (zmin, zmax) = unpack("<2d", f.read(16))
-            record.z = _Array("d", unpack("<%sd" % nPoints, f.read(nPoints * 8)))
+            record.z = _Array("d", unpack(f"<{nPoints}d", f.read(nPoints * 8)))
         # Read m extremes and values
         if shapeType in (13, 15, 18, 23, 25, 28, 31):
             if next - f.tell() >= 16:
@@ -1441,7 +1445,7 @@ class Reader:
             # Measure values less than -10e38 are nodata values according to the spec
             if next - f.tell() >= nPoints * 8:
                 record.m = []
-                for m in _Array("d", unpack("<%sd" % nPoints, f.read(nPoints * 8))):
+                for m in _Array("d", unpack(f"<{nPoints}d", f.read(nPoints * 8))):
                     if m > NODATA:
                         record.m.append(m)
                     else:
@@ -1549,9 +1553,7 @@ class Reader:
             # If the index was not found, it likely means the .shp file is incomplete
             if _i != i:
                 raise ShapefileException(
-                    "Shape index {} is out of bounds; the .shp file only contains {} shapes".format(
-                        i, _i
-                    )
+                    f"Shape index {i} is out of bounds; the .shp file only contains {_i} shapes"
                 )
 
         # Seek to the offset and read the shape
@@ -1621,6 +1623,7 @@ class Reader:
         self.numRecords, self.__dbfHdrLength, self.__recordLength = unpack(
             "<xxxxLHH20x", dbf.read(32)
         )
+
         # read fields
         numFields = (self.__dbfHdrLength - 33) // 32
         for field in range(numFields):
@@ -1663,14 +1666,14 @@ class Reader:
         """
         if self.numRecords is None:
             self.__dbfHeader()
-        structcodes = ["%ds" % fieldinfo[2] for fieldinfo in self.fields]
+        structcodes = [f"{fieldinfo[2]}s" for fieldinfo in self.fields]
         if fields is not None:
             # only unpack specified fields, ignore others using padbytes (x)
             structcodes = [
                 code
                 if fieldinfo[0] in fields
                 or fieldinfo[0] == "DeletionFlag"  # always unpack delflag
-                else "%dx" % fieldinfo[2]
+                else f"{fieldinfo[2]}x"
                 for fieldinfo, code in zip(self.fields, structcodes)
             ]
         fmt = "".join(structcodes)
@@ -1715,7 +1718,13 @@ class Reader:
             recLookup = self.__fullRecLookup
         return fieldTuples, recLookup, recStruct
 
-    def __record(self, fieldTuples, recLookup, recStruct, oid=None):
+    def __record(
+        self,
+        fieldTuples: list[tuple[str, str, int, bool]],
+        recLookup: dict[str, int],
+        recStruct: Struct,
+        oid: Optional[int] = None,
+    ) -> Optional[_Record]:
         """Reads and returns a dbf record row as a list of values. Requires specifying
         a list of field info tuples 'fieldTuples', a record name-index dict 'recLookup',
         and a Struct instance 'recStruct' for unpacking these fields.
@@ -1735,10 +1744,8 @@ class Reader:
         # check that values match fields
         if len(fieldTuples) != len(recordContents):
             raise ShapefileException(
-                "Number of record values ({}) is different from the requested \
-                            number of fields ({})".format(
-                    len(recordContents), len(fieldTuples)
-                )
+                f"Number of record values ({len(recordContents)}) is different from the requested "
+                f"number of fields ({len(fieldTuples)})"
             )
 
         # parse each value
@@ -1809,7 +1816,9 @@ class Reader:
 
         return _Record(recLookup, record, oid)
 
-    def record(self, i=0, fields=None):
+    def record(
+        self, i: int = 0, fields: Optional[list[str]] = None
+    ) -> Optional[_Record]:
         """Returns a specific dbf record based on the supplied index.
         To only read some of the fields, specify the 'fields' arg as a
         list of one or more fieldnames.
@@ -1826,7 +1835,7 @@ class Reader:
             oid=i, fieldTuples=fieldTuples, recLookup=recLookup, recStruct=recStruct
         )
 
-    def records(self, fields=None):
+    def records(self, fields: Optional[list[str]] = None) -> list[_Record]:
         """Returns all records in a dbf file.
         To only read some of the fields, specify the 'fields' arg as a
         list of one or more fieldnames.
@@ -1837,7 +1846,7 @@ class Reader:
         f = self.__getFileObj(self.dbf)
         f.seek(self.__dbfHdrLength)
         fieldTuples, recLookup, recStruct = self.__recordFields(fields)
-        for i in range(self.numRecords):
+        for i in range(self.numRecords):  # type: ignore
             r = self.__record(
                 oid=i, fieldTuples=fieldTuples, recLookup=recLookup, recStruct=recStruct
             )
@@ -1845,7 +1854,12 @@ class Reader:
                 records.append(r)
         return records
 
-    def iterRecords(self, fields=None, start=0, stop=None):
+    def iterRecords(
+        self,
+        fields: Optional[list[str]] = None,
+        start: int = 0,
+        stop: Optional[int] = None,
+    ) -> Iterator[Optional[_Record]]:
         """Returns a generator of records in a dbf file.
         Useful for large shapefiles or dbf files.
         To only read some of the fields, specify the 'fields' arg as a
@@ -1859,14 +1873,15 @@ class Reader:
         """
         if self.numRecords is None:
             self.__dbfHeader()
+        if not isinstance(self.numRecords, int):
+            raise Exception("Error when reading number of Records in dbf file header")
         f = self.__getFileObj(self.dbf)
         start = self.__restrictIndex(start)
         if stop is None:
             stop = self.numRecords
         elif abs(stop) > self.numRecords:
             raise IndexError(
-                "abs(stop): %s exceeds number of records: %s."
-                % (abs(stop), self.numRecords)
+                f"abs(stop): {abs(stop)} exceeds number of records: {self.numRecords}."
             )
         elif stop < 0:
             stop = range(self.numRecords)[stop]
@@ -1880,7 +1895,12 @@ class Reader:
             if r:
                 yield r
 
-    def shapeRecord(self, i=0, fields=None, bbox=None):
+    def shapeRecord(
+        self,
+        i: int = 0,
+        fields: Optional[list[str]] = None,
+        bbox: Optional[BBox] = None,
+    ) -> Optional[ShapeRecord]:
         """Returns a combination geometry and attribute record for the
         supplied record index.
         To only read some of the fields, specify the 'fields' arg as a
@@ -1893,8 +1913,13 @@ class Reader:
         if shape:
             record = self.record(i, fields=fields)
             return ShapeRecord(shape=shape, record=record)
+        return None
 
-    def shapeRecords(self, fields=None, bbox=None):
+    def shapeRecords(
+        self,
+        fields: Optional[list[str]] = None,
+        bbox: Optional[BBox] = None,
+    ) -> ShapeRecords:
         """Returns a list of combination geometry/attribute records for
         all records in a shapefile.
         To only read some of the fields, specify the 'fields' arg as a
@@ -1904,7 +1929,11 @@ class Reader:
         """
         return ShapeRecords(self.iterShapeRecords(fields=fields, bbox=bbox))
 
-    def iterShapeRecords(self, fields=None, bbox=None):
+    def iterShapeRecords(
+        self,
+        fields: Optional[list[str]] = None,
+        bbox: Optional[BBox] = None,
+    ) -> Iterator[ShapeRecord]:
         """Returns a generator of combination geometry/attribute records for
         all records in a shapefile.
         To only read some of the fields, specify the 'fields' arg as a
@@ -1957,9 +1986,7 @@ class Writer:
             target = pathlike_obj(target)
             if not is_string(target):
                 raise Exception(
-                    "The target filepath {} must be of type str/unicode or path-like, not {}.".format(
-                        repr(target), type(target)
-                    )
+                    f"The target filepath {target!r} must be of type str/unicode or path-like, not {type(target)}."
                 )
             self.shp = self.__getFileObj(os.path.splitext(target)[0] + ".shp")
             self.shx = self.__getFileObj(os.path.splitext(target)[0] + ".shx")
@@ -2029,8 +2056,8 @@ class Writer:
             if self.recNum != self.shpNum:
                 raise ShapefileException(
                     "When saving both the dbf and shp file, "
-                    "the number of records (%s) must correspond "
-                    "with the number of shapes (%s)" % (self.recNum, self.shpNum)
+                    f"the number of records ({self.recNum}) must correspond "
+                    f"with the number of shapes ({self.shpNum})"
                 )
         # Fill in the blank headers
         if self.shp and shp_open:
@@ -2102,8 +2129,8 @@ class Writer:
             # any shape that is not null should have at least one point, and only those should be sent here.
             # could also mean that earlier code failed to add points to a non-null shape.
             raise Exception(
-                "Cannot create bbox. Expected a valid shape with at least one point. Got a shape of type '%s' and 0 points."
-                % s.shapeType
+                "Cannot create bbox. Expected a valid shape with at least one point. "
+                f"Got a shape of type '{s.shapeType}' and 0 points."
             )
         bbox = [min(x), min(y), max(x), max(y)]
         # update global
@@ -2323,8 +2350,8 @@ class Writer:
             self.shapeType = s.shapeType
         if s.shapeType != NULL and s.shapeType != self.shapeType:
             raise Exception(
-                "The shape's type (%s) must match the type of the shapefile (%s)."
-                % (s.shapeType, self.shapeType)
+                f"The shape's type ({s.shapeType}) must match "
+                f"the type of the shapefile ({self.shapeType})."
             )
         f.write(pack("<i", s.shapeType))
 
@@ -2337,8 +2364,7 @@ class Writer:
                 f.write(pack("<4d", *self.__bbox(s)))
             except error:
                 raise ShapefileException(
-                    "Failed to write bounding box for record %s. Expected floats."
-                    % self.shpNum
+                    f"Failed to write bounding box for record {self.shpNum}. Expected floats."
                 )
         # Shape types with parts
         if s.shapeType in (3, 5, 13, 15, 23, 25, 31):
@@ -2362,8 +2388,7 @@ class Writer:
                 [f.write(pack("<2d", *p[:2])) for p in s.points]
             except error:
                 raise ShapefileException(
-                    "Failed to write points for record %s. Expected floats."
-                    % self.shpNum
+                    f"Failed to write points for record {self.shpNum}. Expected floats."
                 )
         # Write z extremes and values
         # Note: missing z values are autoset to 0, but not sure if this is ideal.
@@ -2372,20 +2397,18 @@ class Writer:
                 f.write(pack("<2d", *self.__zbox(s)))
             except error:
                 raise ShapefileException(
-                    "Failed to write elevation extremes for record %s. Expected floats."
-                    % self.shpNum
+                    f"Failed to write elevation extremes for record {self.shpNum}. Expected floats."
                 )
             try:
                 if hasattr(s, "z"):
                     # if z values are stored in attribute
-                    f.write(pack("<%sd" % len(s.z), *s.z))
+                    f.write(pack(f"<{len(s.z)}d", *s.z))
                 else:
                     # if z values are stored as 3rd dimension
                     [f.write(pack("<d", p[2] if len(p) > 2 else 0)) for p in s.points]
             except error:
                 raise ShapefileException(
-                    "Failed to write elevation values for record %s. Expected floats."
-                    % self.shpNum
+                    f"Failed to write elevation values for record {self.shpNum}. Expected floats."
                 )
         # Write m extremes and values
         # When reading a file, pyshp converts NODATA m values to None, so here we make sure to convert them back to NODATA
@@ -2395,8 +2418,7 @@ class Writer:
                 f.write(pack("<2d", *self.__mbox(s)))
             except error:
                 raise ShapefileException(
-                    "Failed to write measure extremes for record %s. Expected floats"
-                    % self.shpNum
+                    f"Failed to write measure extremes for record {self.shpNum}. Expected floats"
                 )
             try:
                 if hasattr(s, "m"):
@@ -2404,7 +2426,7 @@ class Writer:
                     # fmt: off
                     f.write(
                         pack(
-                            "<%sd" % len(s.m),
+                            f"<{len(s.m)}d",
                             *[m if m is not None else NODATA for m in s.m]
                         )
                     )
@@ -2426,8 +2448,7 @@ class Writer:
                     ]
             except error:
                 raise ShapefileException(
-                    "Failed to write measure values for record %s. Expected floats"
-                    % self.shpNum
+                    f"Failed to write measure values for record {self.shpNum}. Expected floats"
                 )
         # Write a single point
         if s.shapeType in (1, 11, 21):
@@ -2435,8 +2456,7 @@ class Writer:
                 f.write(pack("<2d", s.points[0][0], s.points[0][1]))
             except error:
                 raise ShapefileException(
-                    "Failed to write point for record %s. Expected floats."
-                    % self.shpNum
+                    f"Failed to write point for record {self.shpNum}. Expected floats."
                 )
         # Write a single Z value
         # Note: missing z values are autoset to 0, but not sure if this is ideal.
@@ -2452,8 +2472,7 @@ class Writer:
                     f.write(pack("<d", s.z[0]))
                 except error:
                     raise ShapefileException(
-                        "Failed to write elevation value for record %s. Expected floats."
-                        % self.shpNum
+                        f"Failed to write elevation value for record {self.shpNum}. Expected floats."
                     )
             else:
                 # if z values are stored as 3rd dimension
@@ -2463,8 +2482,7 @@ class Writer:
                     f.write(pack("<d", s.points[0][2]))
                 except error:
                     raise ShapefileException(
-                        "Failed to write elevation value for record %s. Expected floats."
-                        % self.shpNum
+                        f"Failed to write elevation value for record {self.shpNum}. Expected floats."
                     )
         # Write a single M value
         # Note: missing m values are autoset to NODATA.
@@ -2480,8 +2498,7 @@ class Writer:
                     f.write(pack("<1d", s.m[0]))
                 except error:
                     raise ShapefileException(
-                        "Failed to write measure value for record %s. Expected floats."
-                        % self.shpNum
+                        f"Failed to write measure value for record {self.shpNum}. Expected floats."
                     )
             else:
                 # if m values are stored as 3rd/4th dimension
@@ -2495,8 +2512,7 @@ class Writer:
                     f.write(pack("<1d", s.points[0][mpos]))
                 except error:
                     raise ShapefileException(
-                        "Failed to write measure value for record %s. Expected floats."
-                        % self.shpNum
+                        f"Failed to write measure value for record {self.shpNum}. Expected floats."
                     )
         # Finalize record length as 16-bit words
         finish = f.tell()
@@ -2591,7 +2607,7 @@ class Writer:
                     )  # caps the size if exceeds the field size
                 else:
                     value = float(value)
-                    value = format(value, ".%sf" % deci)[:size].rjust(
+                    value = format(value, f".{deci}f")[:size].rjust(
                         size
                     )  # caps the size if exceeds the field size
             elif fieldType == "D":
@@ -2631,8 +2647,7 @@ class Writer:
             if len(value) != size:
                 raise ShapefileException(
                     "Shapefile Writer unable to pack incorrect sized value"
-                    " (size %d) into field '%s' (size %d)."
-                    % (len(value), fieldName, size)
+                    f" (size {len(value)}) into field '{fieldName}' (size {size})."
                 )
             f.write(value)
 
@@ -2894,7 +2909,7 @@ def _replace_remote_url(
         path = old_parsed.path.rpartition("/")[2]
 
     if port not in (None, ""):
-        netloc = "%s:%s" % (netloc, port)
+        netloc = f"{netloc}:{port}"
 
     new_parsed = old_parsed._replace(
         scheme=scheme,
@@ -2951,7 +2966,7 @@ def _test(args: list[str] = sys.argv[1:], verbosity: bool = False) -> int:
     runner = doctest.DocTestRunner(checker=Py23DocChecker(), verbose=verbosity)
 
     if verbosity == 0:
-        print("Running %s doctests..." % len(tests.examples))
+        print(f"Running {len(tests.examples)} doctests...")
     failure_count, test_count = runner.run(tests)
 
     # print results
