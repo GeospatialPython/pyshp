@@ -71,4 +71,3 @@ jobs:
         extra_args: '-m network'
         replace_remote_urls_with_localhost: 'yes'
         pyshp_repo_directory: ./Pyshp
-        python-version: ${{ matrix.python-version }}

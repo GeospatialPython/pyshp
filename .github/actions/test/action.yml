@@ -17,9 +17,6 @@ inputs:
     description: Path to where the PyShp repo was checked out to (to keep separate from Shapefiles & artefacts repo).
     required: false
     default: '.'
-  python-version:
-    description: Set to "2.7" to use caddy instead of python -m SimpleHTTPServer
-    required: true
 
 
 
@@ -50,30 +47,13 @@ runs:
         path: ./PyShp_test_shapefile
 
     - name: Serve shapefiles and zip file artefacts on localhost
-      if: ${{ inputs.replace_remote_urls_with_localhost == 'yes'  && inputs.python-version != '2.7'}}
+      if: ${{ inputs.replace_remote_urls_with_localhost == 'yes' }}
       shell: bash
       working-directory: ./PyShp_test_shapefile
       run: |
         python -m http.server 8000 &
         echo "HTTP_SERVER_PID=$!" >> $GITHUB_ENV
         sleep 4  # give server time to start
-
-    - name: Download and unzip Caddy binary
-      if: ${{ inputs.replace_remote_urls_with_localhost == 'yes' && inputs.python-version == '2.7'}}
-      working-directory: .
-      shell: bash
-      run: |
-        curl -L https://github.com/caddyserver/caddy/releases/download/v2.10.0/caddy_2.10.0_linux_amd64.tar.gz --output caddy.tar.gz
-        tar -xzf caddy.tar.gz
-
-    - name: Serve shapefiles and zip file artefacts on localhost using Caddy
-      if: ${{ inputs.replace_remote_urls_with_localhost == 'yes' && inputs.python-version == '2.7'}}
-      shell: bash
-      working-directory: .
-      run: |
-        ./caddy file-server --root ./PyShp_test_shapefile --listen :8000 &
-        echo "HTTP_SERVER_PID=$!" >> $GITHUB_ENV
-        sleep 2  # give server time to start
 
     - name: Doctests
       shell: bash
