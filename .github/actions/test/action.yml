@@ -84,7 +84,7 @@ runs:
       shell: bash
       working-directory: dist/
       run: |
-        WHEEL_NAME=$(ls pyshp-*-py3-none-any.whl)
+        WHEEL_NAME=$(ls pyshp-*py3-none-any.whl)
         python -m pip install $WHEEL_NAME[test]
 
     - name: Show Python and Pytest versions for logs.
