@@ -103,6 +103,9 @@ BBox = tuple[float, float, float, float]
 # File name, file object or anything with a read() method that returns bytes.
 # TODO: Create simple Protocol with a read() method
 BinaryFileT = Union[str, IO[bytes]]
+BinaryFileStreamT = Union[IO[bytes], io.BytesIO]
+
+RecordValue = Union[float, str, date]
 
 
 class GeoJsonShapeT(TypedDict):
@@ -717,7 +720,12 @@ class _Record(list):
     >>> print(r.ID)
     """
 
-    def __init__(self, field_positions, values, oid=None):
+    def __init__(
+        self,
+        field_positions: dict[str, int],
+        values: Iterable[RecordValue],
+        oid: Optional[int] = None,
+    ):
         """
         A Record should be created by the Reader class
 
@@ -732,7 +740,7 @@ class _Record(list):
             self.__oid = -1
         list.__init__(self, values)
 
-    def __getattr__(self, item):
+    def __getattr__(self, item: str) -> RecordValue:
         """
         __getattr__ is called if an attribute is used that does
         not exist in the normal sense. For example r=Record(...), r.ID
@@ -755,7 +763,7 @@ class _Record(list):
                 f"{item} found as a field but not enough values available."
             )
 
-    def __setattr__(self, key, value):
+    def __setattr__(self, key: str, value: RecordValue):
         """
         Sets a value of a field attribute
         :param key: The field name
@@ -811,11 +819,11 @@ class _Record(list):
                 raise IndexError(f"{key} is not a field name and not an int")
 
     @property
-    def oid(self):
+    def oid(self) -> int:
         """The index position of the record in the original shapefile"""
         return self.__oid
 
-    def as_dict(self, date_strings=False):
+    def as_dict(self, date_strings: bool = False) -> dict[str, RecordValue]:
         """
         Returns this Record as a dictionary using the field names as keys
         :return: dict
@@ -830,7 +838,7 @@ class _Record(list):
     def __repr__(self):
         return f"Record #{self.__oid}: {list(self)}"
 
-    def __dir__(self):
+    def __dir__(self) -> list[str]:
         """
         Helps to show the field names in an interactive environment like IPython.
         See: http://ipython.readthedocs.io/en/stable/config/integrating.html
@@ -856,7 +864,7 @@ class ShapeRecord:
     """A ShapeRecord object containing a shape along with its attributes.
     Provides the GeoJSON __geo_interface__ to return a Feature dictionary."""
 
-    def __init__(self, shape=None, record=None):
+    def __init__(self, shape: Optional[Shape] = None, record: Optional[_Record] = None):
         self.shape = shape
         self.record = record
 
@@ -967,12 +975,12 @@ class Reader:
         self.shp = None
         self.shx = None
         self.dbf = None
-        self._files_to_close: list[IO[bytes]] = []
+        self._files_to_close: list[BinaryFileStreamT] = []
         self.shapeName = "Not specified"
         self._offsets: list[int] = []
-        self.shpLength = None
-        self.numRecords = None
-        self.numShapes = None
+        self.shpLength: Optional[int] = None
+        self.numRecords: Optional[int] = None
+        self.numShapes: Optional[int] = None
         self.fields: list[list[str]] = []
         self.__dbfHdrLength = 0
         self.__fieldLookup: dict[str, int] = {}
@@ -1131,7 +1139,7 @@ class Reader:
         self,
         ext: str,
         file_: Optional[BinaryFileT],
-    ) -> Union[None, io.BytesIO, IO[bytes]]:
+    ) -> Union[None, IO[bytes]]:
         # assert ext in {'shp', 'dbf', 'shx'}
         self._assert_ext_is_supported(ext)
 
@@ -1615,6 +1623,7 @@ class Reader:
         self.numRecords, self.__dbfHdrLength, self.__recordLength = unpack(
             "<xxxxLHH20x", dbf.read(32)
         )
+
         # read fields
         numFields = (self.__dbfHdrLength - 33) // 32
         for field in range(numFields):
@@ -1709,7 +1718,13 @@ class Reader:
             recLookup = self.__fullRecLookup
         return fieldTuples, recLookup, recStruct
 
-    def __record(self, fieldTuples, recLookup, recStruct, oid=None):
+    def __record(
+        self,
+        fieldTuples: list[tuple[str, str, int, bool]],
+        recLookup: dict[str, int],
+        recStruct: Struct,
+        oid: Optional[int] = None,
+    ) -> Optional[_Record]:
         """Reads and returns a dbf record row as a list of values. Requires specifying
         a list of field info tuples 'fieldTuples', a record name-index dict 'recLookup',
         and a Struct instance 'recStruct' for unpacking these fields.
@@ -1801,7 +1816,9 @@ class Reader:
 
         return _Record(recLookup, record, oid)
 
-    def record(self, i=0, fields=None):
+    def record(
+        self, i: int = 0, fields: Optional[list[str]] = None
+    ) -> Optional[_Record]:
         """Returns a specific dbf record based on the supplied index.
         To only read some of the fields, specify the 'fields' arg as a
         list of one or more fieldnames.
@@ -1818,7 +1835,7 @@ class Reader:
             oid=i, fieldTuples=fieldTuples, recLookup=recLookup, recStruct=recStruct
         )
 
-    def records(self, fields=None):
+    def records(self, fields: Optional[list[str]] = None) -> list[_Record]:
         """Returns all records in a dbf file.
         To only read some of the fields, specify the 'fields' arg as a
         list of one or more fieldnames.
@@ -1829,7 +1846,7 @@ class Reader:
         f = self.__getFileObj(self.dbf)
         f.seek(self.__dbfHdrLength)
         fieldTuples, recLookup, recStruct = self.__recordFields(fields)
-        for i in range(self.numRecords):
+        for i in range(self.numRecords):  # type: ignore
             r = self.__record(
                 oid=i, fieldTuples=fieldTuples, recLookup=recLookup, recStruct=recStruct
             )
@@ -1837,7 +1854,12 @@ class Reader:
                 records.append(r)
         return records
 
-    def iterRecords(self, fields=None, start=0, stop=None):
+    def iterRecords(
+        self,
+        fields=Optional[list[str]],
+        start: int = 0,
+        stop: Optional[int] = None,
+    ) -> Iterator[Optional[_Record]]:
         """Returns a generator of records in a dbf file.
         Useful for large shapefiles or dbf files.
         To only read some of the fields, specify the 'fields' arg as a
@@ -1851,6 +1873,8 @@ class Reader:
         """
         if self.numRecords is None:
             self.__dbfHeader()
+        if not isinstance(self.numRecords, int):
+            raise Exception("Error when reading number of Records in dbf file header")
         f = self.__getFileObj(self.dbf)
         start = self.__restrictIndex(start)
         if stop is None:
@@ -1871,7 +1895,12 @@ class Reader:
             if r:
                 yield r
 
-    def shapeRecord(self, i=0, fields=None, bbox=None):
+    def shapeRecord(
+        self,
+        i: int = 0,
+        fields: Optional[list[str]] = None,
+        bbox: Optional[BBox] = None,
+    ) -> Optional[ShapeRecord]:
         """Returns a combination geometry and attribute record for the
         supplied record index.
         To only read some of the fields, specify the 'fields' arg as a
@@ -1884,8 +1913,13 @@ class Reader:
         if shape:
             record = self.record(i, fields=fields)
             return ShapeRecord(shape=shape, record=record)
+        return None
 
-    def shapeRecords(self, fields=None, bbox=None):
+    def shapeRecords(
+        self,
+        fields: Optional[list[str]] = None,
+        bbox: Optional[BBox] = None,
+    ) -> ShapeRecords:
         """Returns a list of combination geometry/attribute records for
         all records in a shapefile.
         To only read some of the fields, specify the 'fields' arg as a
@@ -1895,7 +1929,11 @@ class Reader:
         """
         return ShapeRecords(self.iterShapeRecords(fields=fields, bbox=bbox))
 
-    def iterShapeRecords(self, fields=None, bbox=None):
+    def iterShapeRecords(
+        self,
+        fields: Optional[list[str]] = None,
+        bbox: Optional[BBox] = None,
+    ) -> Iterator[ShapeRecord]:
         """Returns a generator of combination geometry/attribute records for
         all records in a shapefile.
         To only read some of the fields, specify the 'fields' arg as a
