@@ -1223,13 +1223,13 @@ class Reader:
                     shpLength = shp.tell()
                     shp.seek(100)
                     # Do a fast shape iteration until end of file.
-                    unpack = Struct(">2i").unpack
+                    unpack_2_int32_be = Struct(">2i").unpack
                     offsets = []
                     pos = shp.tell()
                     while pos < shpLength:
                         offsets.append(pos)
                         # Unpack the shape header only
-                        (recNum, recLength) = unpack(shp.read(8))
+                        (recNum, recLength) = unpack_2_int32_be(shp.read(8))
                         # Jump to next shape position
                         pos += 8 + (2 * recLength)
                         shp.seek(pos)
