@@ -554,11 +554,11 @@ class Shape:
                     continue
 
                 # coordinates.append([tuple(p) for p in self.points[ps:part]])
-                coordinates.extend(self.points[ps:part])
+                coordinates.append(list(self.points[ps:part]))
                 ps = part
 
             # coordinates.append([tuple(p) for p in self.points[part:]])
-            coordinates.extend(self.points[part:])  # pylint: disable=undefined-loop-variable
+            coordinates.append(list(self.points[part:]))
 
             return {"type": "MultiLineString", "coordinates": coordinates}
 
