@@ -1080,7 +1080,7 @@ class Reader:
                     # Close and delete the temporary zipfile
                     try:
                         zipfileobj.close()
-                    except:  # pylint: disable=broad-exception-caught
+                    except:  # pylint: disable=bare-except
                         pass
                     # Try to load shapefile
                     if self.shp or self.dbf:
@@ -1230,7 +1230,7 @@ class Reader:
                     while pos < shpLength:
                         offsets.append(pos)
                         # Unpack the shape header only
-                        (recNum, recLength) = unpack_2_int32_be(shp.read(8))
+                        (__recNum, recLength) = unpack_2_int32_be(shp.read(8))
                         # Jump to next shape position
                         pos += 8 + (2 * recLength)
                         shp.seek(pos)
@@ -1266,7 +1266,7 @@ class Reader:
         object. Normally this method would be called by the
         constructor with the file name as an argument."""
         if shapefile:
-            (shapeName, ext) = os.path.splitext(shapefile)
+            (shapeName, __ext) = os.path.splitext(shapefile)
             self.shapeName = shapeName
             self.load_shp(shapeName)
             self.load_shx(shapeName)
@@ -1386,6 +1386,8 @@ class Reader:
             raise ShapefileException(
                 "Shapefile Reader requires a shapefile or file-like object. (no shp file found"
             )
+
+        # pylint: disable=attribute-defined-outside-init
         shp = self.shp
         # File length (16-bit word * 2 = bytes)
         shp.seek(24)
@@ -1406,14 +1408,17 @@ class Reader:
             else:
                 self.mbox.append(None)
 
+        # pylint: enable=attribute-defined-outside-init
+
     def __shape(self, oid=None, bbox=None):
         """Returns the header info and geometry for a single shape."""
 
         # pylint: disable=attribute-defined-outside-init
         f = self.__getFileObj(self.shp)
         record = Shape(oid=oid)
-        nParts = nPoints = zmin = zmax = mmin = mmax = None
-        (recNum, recLength) = unpack(">2i", f.read(8))
+        # Formerly we also set __zmin = __zmax = __mmin = __mmax = None
+        nParts = nPoints = None
+        (__recNum, recLength) = unpack(">2i", f.read(8))
         # Determine the start of the next record
         next_shape = f.tell() + (2 * recLength)
         shapeType = unpack("<i", f.read(4))[0]
@@ -1448,12 +1453,12 @@ class Reader:
             record.points = list(zip(*(iter(flat),) * 2))
         # Read z extremes and values
         if shapeType in (13, 15, 18, 31):
-            (zmin, zmax) = unpack("<2d", f.read(16))
+            __zmin, __zmax = unpack("<2d", f.read(16))
             record.z = _Array("d", unpack(f"<{nPoints}d", f.read(nPoints * 8)))
         # Read m extremes and values
         if shapeType in (13, 15, 18, 23, 25, 28, 31):
             if next_shape - f.tell() >= 16:
-                (mmin, mmax) = unpack("<2d", f.read(16))
+                __mmin, __mmax = unpack("<2d", f.read(16))
             # Measure values less than -10e38 are nodata values according to the spec
             if next_shape - f.tell() >= nPoints * 8:
                 record.m = []
@@ -1557,7 +1562,7 @@ class Reader:
                     # Reached the requested index, exit loop with the offset value
                     break
                 # Unpack the shape header only
-                (recNum, recLength) = unpack_2_int32_be(shp.read(8))
+                (__recNum, recLength) = unpack_2_int32_be(shp.read(8))
                 # Jump to next shape position
                 offset += 8 + (2 * recLength)
                 shp.seek(offset)
@@ -1625,6 +1630,8 @@ class Reader:
 
     def __dbfHeader(self):
         """Reads a dbf header. Xbase-related code borrows heavily from ActiveState Python Cookbook Recipe 362715 by Raymond Hettinger"""
+
+        # pylint: disable=attribute-defined-outside-init
         if not self.dbf:
             raise ShapefileException(
                 "Shapefile Reader requires a shapefile or file-like object. (no dbf file found)"
@@ -1638,7 +1645,7 @@ class Reader:
 
         # read fields
         numFields = (self.__dbfHdrLength - 33) // 32
-        for field in range(numFields):
+        for __field in range(numFields):
             fieldDesc = list(unpack("<11sc4xBB14x", dbf.read(32)))
             name = 0
             idx = 0
@@ -1667,9 +1674,11 @@ class Reader:
         # by default, read all fields except the deletion flag, hence "[1:]"
         # note: recLookup gives the index position of a field inside a _Record list
         fieldnames = [f[0] for f in self.fields[1:]]
-        fieldTuples, recLookup, recStruct = self.__recordFields(fieldnames)
+        __fieldTuples, recLookup, recStruct = self.__recordFields(fieldnames)
         self.__fullRecStruct = recStruct
         self.__fullRecLookup = recLookup
+
+        # pylint: enable=attribute-defined-outside-init
 
     def __recordFmt(self, fields=None):
         """Calculates the format and size of a .dbf record. Optional 'fields' arg
@@ -1709,7 +1718,7 @@ class Reader:
             # first ignore repeated field names (order doesn't matter)
             fields = list(set(fields))
             # get the struct
-            fmt, fmtSize = self.__recordFmt(fields=fields)
+            fmt, __fmtSize = self.__recordFmt(fields=fields)
             recStruct = Struct(fmt)
             # make sure the given fieldnames exist
             for name in fields:
@@ -1762,7 +1771,7 @@ class Reader:
 
         # parse each value
         record = []
-        for (name, typ, size, deci), value in zip(fieldTuples, recordContents):
+        for (__name, typ, __size, deci), value in zip(fieldTuples, recordContents):
             if typ in ("N", "F"):
                 # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
                 value = value.split(b"\0")[0]
@@ -2980,7 +2989,7 @@ def _test(args: list[str] = sys.argv[1:], verbosity: bool = False) -> int:
 
     if verbosity == 0:
         print(f"Running {len(tests.examples)} doctests...")
-    failure_count, test_count = runner.run(tests)
+    failure_count, __test_count = runner.run(tests)
 
     # print results
     if verbosity:
