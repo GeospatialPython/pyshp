@@ -66,14 +66,6 @@ runs:
         echo "HTTP_SERVER_PID=$!" >> $GITHUB_ENV
         sleep 4  # give server time to start
 
-    - name: Doctests
-      shell: bash
-      working-directory: ${{ inputs.pyshp_repo_directory }}
-      env:
-        REPLACE_REMOTE_URLS_WITH_LOCALHOST: ${{ inputs.replace_remote_urls_with_localhost }}
-      run: python shapefile.py ${{ inputs.extra_args }}
-
-
     - name: Download wheel and sdist (built in previous jobs)
       uses: actions/download-artifact@v4
       with:
@@ -86,6 +78,13 @@ runs:
       run: |
         WHEEL_NAME=$(ls pyshp-*py3-none-any.whl)
         python -m pip install $WHEEL_NAME[test]
+
+    - name: Doctests
+      shell: bash
+      working-directory: ${{ inputs.pyshp_repo_directory }}
+      env:
+        REPLACE_REMOTE_URLS_WITH_LOCALHOST: ${{ inputs.replace_remote_urls_with_localhost }}
+      run: python test_shapefile.py ${{ inputs.extra_args }}
 
     - name: Show Python and Pytest versions for logs.
       shell: bash
