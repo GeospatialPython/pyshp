@@ -552,13 +552,13 @@ class Shape:
                 if ps is None:
                     ps = part
                     continue
-                else:
-                    # coordinates.append([tuple(p) for p in self.points[ps:part]])
-                    coordinates.append([p for p in self.points[ps:part]])
-                    ps = part
+
+                # coordinates.append([tuple(p) for p in self.points[ps:part]])
+                coordinates.extend(self.points[ps:part])
+                ps = part
 
             # coordinates.append([tuple(p) for p in self.points[part:]])
-            coordinates.append([p for p in self.points[part:]])  # pylint: disable=undefined-loop-variable
+            coordinates.extend(self.points[part:])  # pylint: disable=undefined-loop-variable
 
             return {"type": "MultiLineString", "coordinates": coordinates}
 
@@ -581,7 +581,7 @@ class Shape:
 
                 # extract the points that make up the ring
                 # ring = [tuple(p) for p in self.points[start:end]]
-                ring = [p for p in self.points[start:end]]
+                ring = list(self.points[start:end])
                 rings.append(ring)
 
             # organize rings into list of polygons, where each polygon is defined as list of rings.
@@ -813,8 +813,8 @@ class _Record(list):
                 index = None
         if index is not None:
             return list.__getitem__(self, index)
-        else:
-            raise IndexError(f'"{item}" is not a field name and not an int')
+
+        raise IndexError(f'"{item}" is not a field name and not an int')
 
     def __setitem__(self, key, value):
         """
@@ -831,8 +831,8 @@ class _Record(list):
             index = self.__field_positions.get(key)
             if index is not None:
                 return list.__setitem__(self, index, value)
-            else:
-                raise IndexError(f"{key} is not a field name and not an int")  # pylint: disable=raise-missing-from
+
+            raise IndexError(f"{key} is not a field name and not an int")  # pylint: disable=raise-missing-from
 
     @property
     def oid(self) -> int:
@@ -937,7 +937,7 @@ class ShapefileException(Exception):
     """An exception to handle shapefile specific problems."""
 
 
-class _NoShpSentinel(object):
+class _NoShpSentinel:
     """For use as a default value for shp to preserve the
     behaviour (from when all keyword args were gathered
     in the **kwargs dict) in case someone explictly
