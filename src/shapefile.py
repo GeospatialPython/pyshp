@@ -325,8 +325,8 @@ def ring_sample(coords: list[Coord], ccw: bool = False) -> Point2D:
 
     raise RingSamplingError(
         f"Unexpected error: Unable to find a ring sample point in: {coords}."
-         "Ensure the ring's coordinates are oriented clockwise, "
-         "and ensure the area enclosed is non-zero. "    
+        "Ensure the ring's coordinates are oriented clockwise, "
+        "and ensure the area enclosed is non-zero. "    
     )
 
 
