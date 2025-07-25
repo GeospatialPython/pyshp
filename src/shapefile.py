@@ -100,7 +100,7 @@ Coords = list[Coord]
 BBox = tuple[float, float, float, float]
 
 # File name, file object or anything with a read() method that returns bytes.
-# TODO: Create simple Protocol with a read() method
+# TODO: Create simple Protocol with a read() method pylint: disable=fixme
 BinaryFileT = Union[str, IO[bytes]]
 BinaryFileStreamT = Union[IO[bytes], io.BytesIO]
 
@@ -1972,7 +1972,7 @@ class Reader:
                 yield ShapeRecord(shape=shape, record=record)
         else:
             # only iterate where shape.bbox overlaps with the given bbox
-            # TODO: internal __record method should be faster but would have to
+            # TODO: internal __record method should be faster but would have to pylint: disable=fixme
             # make sure to seek to correct file location...
 
             # fieldTuples,recLookup,recStruct = self.__recordFields(fields)
