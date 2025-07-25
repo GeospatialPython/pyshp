@@ -1,3 +1,18 @@
+VERSION 3.0.0-alpha
+
+Python 2 and Python 3.8 support dropped
+
+2025-07-22
+    Code quality
+    * Type hints
+	* f-strings
+	* Remove Python 2 specific functions.
+	* Run doctests against wheels.
+	* Testing of wheels before publishing them
+	* pyproject.toml src layout
+	* Slow test marked.
+    
+
 VERSION 2.4.0
 
 2025-07-21
