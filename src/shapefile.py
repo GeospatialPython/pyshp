@@ -558,8 +558,8 @@ class Shape:
                 ps = part
 
             # coordinates.append([tuple(p) for p in self.points[part:]])
-            coordinates.append(list(self.points[part:]))  # pylint: disable=undefined-loop-variable (assert len(self.parts) >1)
-
+            # assert len(self.parts) >1 # so disable pylint rule
+            coordinates.append(list(self.points[part:]))  # pylint: disable=undefined-loop-variable
             return {"type": "MultiLineString", "coordinates": coordinates}
 
         if self.shapeType in [POLYGON, POLYGONM, POLYGONZ]:
