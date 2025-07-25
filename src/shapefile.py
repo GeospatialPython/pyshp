@@ -979,7 +979,7 @@ class Reader:
         shp: Union[_NoShpSentinel, Optional[BinaryFileT]] = _NoShpSentinel(),
         shx: Optional[BinaryFileT] = None,
         dbf: Optional[BinaryFileT] = None,
-        **kwargs, # pylint: disable=unused-argument
+        **kwargs,  # pylint: disable=unused-argument
     ):
         self.shp = None
         self.shx = None
@@ -1078,7 +1078,7 @@ class Reader:
                     # Close and delete the temporary zipfile
                     try:
                         zipfileobj.close()
-                    except:
+                    except Exception:
                         pass
                     # Try to load shapefile
                     if self.shp or self.dbf:
@@ -1886,7 +1886,9 @@ class Reader:
         if self.numRecords is None:
             self.__dbfHeader()
         if not isinstance(self.numRecords, int):
-            raise Exception("Error when reading number of Records in dbf file header")
+            raise ShapefileException(
+                "Error when reading number of Records in dbf file header"
+            )
         f = self.__getFileObj(self.dbf)
         start = self.__restrictIndex(start)
         if stop is None:
