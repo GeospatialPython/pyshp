@@ -1078,7 +1078,7 @@ class Reader:
                     # Close and delete the temporary zipfile
                     try:
                         zipfileobj.close()
-                    except Exception:
+                    except:  # pylint disable=broad-exception-caught
                         pass
                     # Try to load shapefile
                     if self.shp or self.dbf:
@@ -1988,7 +1988,7 @@ class Writer:
         shp=None,
         shx=None,
         dbf=None,
-        **kwargs,
+        **kwargs,  # pylint: disable=unused-argument
     ):
         self.target = target
         self.autoBalance = autoBalance
@@ -2976,15 +2976,7 @@ def _test(args: list[str] = sys.argv[1:], verbosity: bool = False) -> int:
             new_url = _replace_remote_url(old_url)
             example.source = example.source.replace(old_url, new_url)
 
-    class Py23DocChecker(doctest.OutputChecker):
-        def check_output(self, want, got, optionflags):
-            res = doctest.OutputChecker.check_output(self, want, got, optionflags)
-            return res
-
-        def summarize(self):
-            doctest.OutputChecker.summarize(True)
-
-    runner = doctest.DocTestRunner(checker=Py23DocChecker(), verbose=verbosity)
+    runner = doctest.DocTestRunner(verbose=verbosity)
 
     if verbosity == 0:
         print(f"Running {len(tests.examples)} doctests...")
