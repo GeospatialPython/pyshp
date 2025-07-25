@@ -979,7 +979,7 @@ class Reader:
         shp: Union[_NoShpSentinel, Optional[BinaryFileT]] = _NoShpSentinel(),
         shx: Optional[BinaryFileT] = None,
         dbf: Optional[BinaryFileT] = None,
-        **kwargs,
+        **kwargs, # pylint: disable=unused-argument
     ):
         self.shp = None
         self.shx = None
@@ -1073,7 +1073,7 @@ class Reader:
                                     fileobj.seek(0)
                                     setattr(self, lower_ext, fileobj)
                                     self._files_to_close.append(fileobj)
-                                except:
+                                except (OSError, AttributeError):
                                     pass
                     # Close and delete the temporary zipfile
                     try:
