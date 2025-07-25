@@ -2314,7 +2314,7 @@ class Writer:
             raise ShapefileException(
                 "Shapefile dbf header length exceeds maximum length."
             )
-        recordLength = sum([int(field[2]) for field in fields]) + 1
+        recordLength = sum(int(field[2]) for field in fields) + 1
         header = pack(
             "<BBBBLHH20x",
             version,
@@ -2371,7 +2371,7 @@ class Writer:
         # Shape Type
         if self.shapeType is None and s.shapeType != NULL:
             self.shapeType = s.shapeType
-        if s.shapeType != NULL and s.shapeType != self.shapeType:
+        if not s.shapeType in {NULL, self.shapeType}:
             raise ShapefileException(
                 f"The shape's type ({s.shapeType}) must match "
                 f"the type of the shapefile ({self.shapeType})."
@@ -2883,7 +2883,7 @@ def _filter_network_doctests(
 
     examples_it = iter(examples)
 
-    yield next(examples_it)
+    yield next(examples_it)  # pylint: disable=stop-iteration-return
 
     for example in examples_it:
         # Track variables in doctest shell sessions defined from commands
