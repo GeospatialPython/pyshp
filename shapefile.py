@@ -2979,10 +2979,14 @@ def _test(args: list[str] = sys.argv[1:], verbosity: bool = False) -> int:
     return failure_count
 
 
-if __name__ == "__main__":
+def main():
     """
     Doctests are contained in the file 'README.md', and are tested using the built-in
     testing libraries.
     """
     failure_count = _test()
     sys.exit(failure_count)
+
+
+if __name__ == "__main__":
+    main()

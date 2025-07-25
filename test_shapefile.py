@@ -1851,3 +1851,9 @@ def test_write_empty_shapefile(tmpdir, shape_type):
         assert len(r.records()) == 0
         # test shapes are empty
         assert len(r.shapes()) == 0
+
+
+# This allows a PyShp wheel installed in the env to be tested
+# against the doctests.
+if __name__ == "__main__":
+    shapefile.main()
