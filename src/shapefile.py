@@ -618,10 +618,9 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
 
             return {"type": "MultiPolygon", "coordinates": polys}
 
-        else:
-            raise GeoJSON_Error(
-                f'Shape type "{SHAPETYPE_LOOKUP[self.shapeType]}" cannot be represented as GeoJSON.'
-            )
+        raise GeoJSON_Error(
+            f'Shape type "{SHAPETYPE_LOOKUP[self.shapeType]}" cannot be represented as GeoJSON.'
+        )
 
     @staticmethod
     def _from_geojson(geoj) -> Shape:
@@ -1053,7 +1052,7 @@ class Reader:
                                 raise ShapefileException(
                                     "Zipfile does not contain any shapefiles"
                                 )
-                            elif len(shapefiles) == 1:
+                            if len(shapefiles) == 1:
                                 shapefile = shapefiles[0]
                             else:
                                 raise ShapefileException(
@@ -1088,12 +1087,12 @@ class Reader:
                         # Load and exit early
                         self.load()
                         return
-                    else:
-                        raise ShapefileException(
-                            f"No shp or dbf file found in zipfile: {path}"
-                        )
 
-                elif path.startswith("http"):
+                    raise ShapefileException(
+                        f"No shp or dbf file found in zipfile: {path}"
+                    )
+
+                if path.startswith("http"):
                     # Shapefile is from a url
                     # Download each file to temporary path and treat as normal shapefile path
                     urlinfo = urlparse(path)
@@ -1126,16 +1125,13 @@ class Reader:
                         # Load and exit early
                         self.load()
                         return
-                    else:
-                        raise ShapefileException(
-                            f"No shp or dbf file found at url: {path}"
-                        )
 
-                else:
-                    # Local file path to a shapefile
-                    # Load and exit early
-                    self.load(path)
-                    return
+                    raise ShapefileException(f"No shp or dbf file found at url: {path}")
+
+                # Local file path to a shapefile
+                # Load and exit early
+                self.load(path)
+                return
 
         if not isinstance(shp, _NoShpSentinel):
             self.shp = self.__seek_0_on_file_obj_wrap_or_open_from_name("shp", shp)
@@ -1208,7 +1204,7 @@ class Reader:
 
             return self.numRecords
 
-        elif self.shp:
+        if self.shp:
             # Otherwise use shape count
             if self.shx:
                 if self.numShapes is None:
@@ -1216,36 +1212,34 @@ class Reader:
 
                 return self.numShapes
 
-            else:
-                # Index file not available, iterate all shapes to get total count
-                if self.numShapes is None:
-                    # Determine length of shp file
-                    shp = self.shp
-                    checkpoint = shp.tell()
-                    shp.seek(0, 2)
-                    shpLength = shp.tell()
-                    shp.seek(100)
-                    # Do a fast shape iteration until end of file.
-                    offsets = []
-                    pos = shp.tell()
-                    while pos < shpLength:
-                        offsets.append(pos)
-                        # Unpack the shape header only
-                        (__recNum, recLength) = unpack_2_int32_be(shp.read(8))
-                        # Jump to next shape position
-                        pos += 8 + (2 * recLength)
-                        shp.seek(pos)
-                    # Set numShapes and offset indices
-                    self.numShapes = len(offsets)
-                    self._offsets = offsets
-                    # Return to previous file position
-                    shp.seek(checkpoint)
+            # Index file not available, iterate all shapes to get total count
+            if self.numShapes is None:
+                # Determine length of shp file
+                shp = self.shp
+                checkpoint = shp.tell()
+                shp.seek(0, 2)
+                shpLength = shp.tell()
+                shp.seek(100)
+                # Do a fast shape iteration until end of file.
+                offsets = []
+                pos = shp.tell()
+                while pos < shpLength:
+                    offsets.append(pos)
+                    # Unpack the shape header only
+                    (__recNum, recLength) = unpack_2_int32_be(shp.read(8))
+                    # Jump to next shape position
+                    pos += 8 + (2 * recLength)
+                    shp.seek(pos)
+                # Set numShapes and offset indices
+                self.numShapes = len(offsets)
+                self._offsets = offsets
+                # Return to previous file position
+                shp.seek(checkpoint)
 
-                return self.numShapes
+            return self.numShapes
 
-        else:
-            # No file loaded yet, treat as 'empty' shapefile
-            return 0
+        # No file loaded yet, treat as 'empty' shapefile
+        return 0
 
     def __iter__(self):
         """Iterates through the shapes/records in the shapefile."""
