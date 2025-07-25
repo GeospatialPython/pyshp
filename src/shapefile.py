@@ -277,6 +277,10 @@ def ring_contains_point(coords: list[Coord], p: Point2D) -> bool:
     return inside_flag
 
 
+class RingSamplingError(Exception):
+    pass
+
+
 def ring_sample(coords: list[Coord], ccw: bool = False) -> Point2D:
     """Return a sample point guaranteed to be within a ring, by efficiently
     finding the first centroid of a coordinate triplet whose orientation
@@ -320,8 +324,11 @@ def ring_sample(coords: list[Coord], ccw: bool = False) -> Point2D:
             # remove oldest triplet coord to allow iterating to next triplet
             triplet.pop(0)
 
-    else:
-        raise Exception("Unexpected error: Unable to find a ring sample point.")
+    raise RingSamplingError(
+        f"Unexpected error: Unable to find a ring sample point in: {coords}."
+         "Ensure the ring's coordinates are oriented clockwise, "
+         "and ensure the area enclosed is non-zero. "    
+    )
 
 
 def ring_contains_ring(coords1: list[Coord], coords2: list[Point2D]) -> bool:
@@ -544,9 +551,7 @@ class Shape:
                         # coordinates.append([tuple(p) for p in self.points[ps:part]])
                         coordinates.append([p for p in self.points[ps:part]])
                         ps = part
-                else:
-                    # coordinates.append([tuple(p) for p in self.points[part:]])
-                    coordinates.append([p for p in self.points[part:]])
+
                 return {"type": "MultiLineString", "coordinates": coordinates}
         elif self.shapeType in [POLYGON, POLYGONM, POLYGONZ]:
             if len(self.parts) == 0:
