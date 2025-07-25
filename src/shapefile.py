@@ -19,7 +19,6 @@ import sys
 import tempfile
 import time
 import zipfile
-from collections.abc import Collection
 from datetime import date
 from struct import Struct, calcsize, error, pack, unpack
 from typing import IO, Any, Iterable, Iterator, Optional, Reversible, TypedDict, Union
@@ -465,6 +464,10 @@ def organize_polygon_rings(
         return polys
 
 
+class GeoJSON_Error(Exception):
+    pass
+
+
 class Shape:
     def __init__(
         self,
@@ -610,7 +613,7 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
                     return {"type": "MultiPolygon", "coordinates": polys}
 
         else:
-            raise Exception(
+            raise GeoJSON_Error(
                 f'Shape type "{SHAPETYPE_LOOKUP[self.shapeType]}" cannot be represented as GeoJSON.'
             )
 
@@ -635,7 +638,7 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
         elif geojType == "MultiPolygon":
             shapeType = POLYGON
         else:
-            raise Exception(f"Cannot create Shape from GeoJSON type '{geojType}'")
+            raise GeoJSON_Error(f"Cannot create Shape from GeoJSON type '{geojType}'")
         shape.shapeType = shapeType
 
         # set points and parts
