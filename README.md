@@ -1446,7 +1446,7 @@ ESRI White Paper](http://downloads.esri.com/support/whitepapers/ao_/J9749_MultiP
 The testing framework is pytest, and the tests are located in test_shapefile.py.
 This includes an extensive set of unit tests of the various pyshp features,
 and tests against various input data.
-In the same folder as README.md and shapefile.py, from the command line run
+In the same folder as README.md and shapefile.py, from the command line run:
 
 ```shell
 python -m pytest
@@ -1455,10 +1455,19 @@ python -m pytest
 Additionally, all the code and examples located in this file, README.md,
 is tested and verified with the builtin doctest framework.
 A special routine for invoking the doctest is run when calling directly on shapefile.py.
-In the same folder as README.md and shapefile.py, from the command line run
+In the same folder as README.md and shapefile.py, from the command line run:
 
 ```shell
 python shapefile.py
+```
+
+This tests the code inside shapefile.py itself.  To test an installed PyShp wheel against
+the doctests, the same special routine can be invoked (in an env with the wheel and pytest
+installed) from the test file:
+
+
+```shell
+python test_shapefile.py
 ```
 
 Linux/Mac and similar platforms may need to run `$ dos2unix README.md` in order
@@ -1497,8 +1506,6 @@ REPLACE_REMOTE_URLS_WITH_LOCALHOST=yes && python shapefile.py
 The network tests alone can also be run (without also running all the tests that don't
 make network requests) using: `pytest -m network` (or the doctests using: `python shapefile.py -m network`).
 
-(*) The steps to host the files using Caddy for PYthon 2 are in ./actions/test/action.yml.  For reasons as
-yet unknown, shapefile.py's Reader class in Python 2 Pytest, can't connect to a Python 2 SimpleHTTPServer.
 
 
 # Contributors
