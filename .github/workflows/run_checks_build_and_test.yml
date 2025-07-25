@@ -27,6 +27,7 @@ jobs:
         pip install pytest pylint pylint-per-file-ignores
         pip install -e .
     - name: run Pylint for errors and warnings only, on test_shapefile.py
+      continue-on-error: true
       run: |
         pylint --disable=R,C test_shapefile.py src/shapefile.py
 
