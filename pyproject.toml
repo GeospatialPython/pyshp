@@ -112,7 +112,6 @@ load-plugins=[
     "pylint_per_file_ignores",
 ]
 
-[tool.pylint.'MESSAGES CONTROL']
 # Silence warning: shapefile.py:2076:20: W0212: Access to a protected
 #                  member _from_geojson of a client class (protected-access)
 # Silence remarks:
@@ -124,20 +123,16 @@ load-plugins=[
 # src\shapefile.py:471:4: R0917: Too many positional arguments (6/5) (too-many-positional-arguments)
 # src\shapefile.py:506:4: R0911: Too many return statements (10/6) (too-many-return-statements)
 # src\shapefile.py:878:0: R0903: Too few public methods (0/2) (too-few-public-methods)
+# src\shapefile.py:1981:0: R0904: Too many public methods (23/20) (too-many-public-methods)
+# src\shapefile.py:2117:17: R1732: Consider using 'with' for resource-allocating operations (consider-using-with)
 # Silence warnings: test_shapefile.py:{783,786,799,803,06,1195}:19:
 #                   W0212: Access to a protected member _offsets of a
 #                   client class (protected-access)
 #
 # Toml multi-line string used instead of array due to:
 # https://github.com/christopherpickering/pylint-per-file-ignores/issues/160
+[tool.pylint.'messages control']
 per-file-ignores = [
-    "src/shapefile.py:W0212",
-    "src/shapefile.py:R0902",
-    "src/shapefile.py:R0903",
-    "src/shapefile.py:R0911",
-    "src/shapefile.py:R0912",
-    "src/shapefile.py:R0914",
-    "src/shapefile.py:R0915",
-    "src/shapefile.py:R0917",
-    "test_shapefile.py:W0212",
+    "/src/shapefile.py:W0212,R0902,R0903,R0904,R0911,R0912,R0913,R0914,R0915,R0917,R1732",
+    "test_shapefile.py:W0212,R1732",
 ]

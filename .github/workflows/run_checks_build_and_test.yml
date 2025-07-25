@@ -29,7 +29,7 @@ jobs:
     - name: run Pylint for errors and warnings only
       continue-on-error: true
       run: |
-        pylint --disable=R,C test_shapefile.py src/shapefile.py
+        pylint --disable=C test_shapefile.py src/shapefile.py
 
   build_wheel_and_sdist:
     runs-on: ubuntu-latest
