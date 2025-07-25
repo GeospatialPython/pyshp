@@ -1,2 +1,0 @@
-include *.md *.txt *.TXT
-recursive-include shapefiles *.dbf *.sbn *.sbx *.shp *.shx
