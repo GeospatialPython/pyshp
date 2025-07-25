@@ -326,7 +326,7 @@ def ring_sample(coords: list[Coord], ccw: bool = False) -> Point2D:
     raise RingSamplingError(
         f"Unexpected error: Unable to find a ring sample point in: {coords}."
         "Ensure the ring's coordinates are oriented clockwise, "
-        "and ensure the area enclosed is non-zero. " 
+        "and ensure the area enclosed is non-zero. "
     )
 
 
@@ -556,7 +556,7 @@ class Shape:
                         ps = part
 
                 # coordinates.append([tuple(p) for p in self.points[part:]])
-                coordinates.append([p for p in self.points[part:]]) # pylint: disable=undefined-loop-variable
+                coordinates.append([p for p in self.points[part:]])  # pylint: disable=undefined-loop-variable
 
                 return {"type": "MultiLineString", "coordinates": coordinates}
         elif self.shapeType in [POLYGON, POLYGONM, POLYGONZ]:
@@ -769,7 +769,7 @@ class _Record(list):
             index = self.__field_positions[item]
             return list.__getitem__(self, index)
         except KeyError:
-            raise AttributeError(f"{item} is not a field name") 
+            raise AttributeError(f"{item} is not a field name")
         except IndexError:
             raise IndexError(
                 f"{item} found as a field but not enough values available."
@@ -790,7 +790,7 @@ class _Record(list):
             index = self.__field_positions[key]
             return list.__setitem__(self, index, value)
         except KeyError:
-            raise AttributeError(f"{key} is not a field name") # pylint: disable=raise-missing-from
+            raise AttributeError(f"{key} is not a field name")  # pylint: disable=raise-missing-from
 
     def __getitem__(self, item):
         """
@@ -829,7 +829,7 @@ class _Record(list):
             if index is not None:
                 return list.__setitem__(self, index, value)
             else:
-                raise IndexError(f"{key} is not a field name and not an int") # pylint: disable=raise-missing-from
+                raise IndexError(f"{key} is not a field name and not an int")  # pylint: disable=raise-missing-from
 
     @property
     def oid(self) -> int:
@@ -940,6 +940,7 @@ class _NoShpSentinel(object):
     in the **kwargs dict) in case someone explictly
     called Reader(shp=None) to load self.shx.
     """
+
 
 class Reader:
     """Reads the three files of a shapefile as a unit or
@@ -1406,7 +1407,7 @@ class Reader:
 
     def __shape(self, oid=None, bbox=None):
         """Returns the header info and geometry for a single shape."""
-        
+
         # pylint: disable=attribute-defined-outside-init
         f = self.__getFileObj(self.shp)
         record = Shape(oid=oid)
@@ -1996,7 +1997,7 @@ class Writer:
         if target:
             target = pathlike_obj(target)
             if not is_string(target):
-                raise Exception(
+                raise TypeError(
                     f"The target filepath {target!r} must be of type str/unicode or path-like, not {type(target)}."
                 )
             self.shp = self.__getFileObj(os.path.splitext(target)[0] + ".shp")
@@ -2010,7 +2011,7 @@ class Writer:
             if dbf:
                 self.dbf = self.__getFileObj(dbf)
         else:
-            raise Exception(
+            raise TypeError(
                 "Either the target filepath, or any of shp, shx, or dbf must be set to create a shapefile."
             )
         # Initiate with empty headers, to be finalized upon closing
@@ -2113,7 +2114,7 @@ class Writer:
 
         if hasattr(f, "write"):
             return f
-        raise Exception(f"Unsupported file-like: {f}")
+        raise ShapefileException(f"Unsupported file-like object: {f}")
 
     def __shpFileLength(self):
         """Calculates the file length of the shp file."""
@@ -2139,7 +2140,7 @@ class Writer:
             # this should not happen.
             # any shape that is not null should have at least one point, and only those should be sent here.
             # could also mean that earlier code failed to add points to a non-null shape.
-            raise Exception(
+            raise ValueError(
                 "Cannot create bbox. Expected a valid shape with at least one point. "
                 f"Got a shape of type '{s.shapeType}' and 0 points."
             )
@@ -2224,7 +2225,7 @@ class Writer:
         """Writes the specified header type to the specified file-like object.
         Several of the shapefile formats are so similar that a single generic
         method to read or write them is warranted."""
-        
+
         # pylint: disable=raise-missing-from
         f = self.__getFileObj(fileObj)
         f.seek(0)
@@ -2283,7 +2284,7 @@ class Writer:
             raise ShapefileException(
                 "Failed to write shapefile elevation and measure values. Floats required."
             )
-        
+
         # pylint: enable=raise-missing-from
 
     def __dbfHeader(self):
@@ -2343,10 +2344,10 @@ class Writer:
             if isinstance(s, dict):
                 s = Shape._from_geojson(s)
             else:
-                raise Exception(
+                raise TypeError(
                     "Can only write Shape objects, GeoJSON dictionaries, "
                     "or objects with the __geo_interface__, "
-                    "not: %r" % s
+                    f"not: {s}"
                 )
         # Write to file
         offset, length = self.__shpRecord(s)
@@ -2354,7 +2355,6 @@ class Writer:
             self.__shxRecord(offset, length)
 
     def __shpRecord(self, s):
-        
         # pylint: disable=raise-missing-from
         f = self.__getFileObj(self.shp)
         offset = f.tell()
@@ -2366,7 +2366,7 @@ class Writer:
         if self.shapeType is None and s.shapeType != NULL:
             self.shapeType = s.shapeType
         if s.shapeType != NULL and s.shapeType != self.shapeType:
-            raise Exception(
+            raise ShapefileException(
                 f"The shape's type ({s.shapeType}) must match "
                 f"the type of the shapefile ({self.shapeType})."
             )
@@ -2422,7 +2422,8 @@ class Writer:
                     f.write(pack(f"<{len(s.z)}d", *s.z))
                 else:
                     # if z values are stored as 3rd dimension
-                    [f.write(pack("<d", p[2] if len(p) > 2 else 0)) for p in s.points]
+                    for p in s.points:
+                        f.write(pack("<d", p[2] if len(p) > 2 else 0))
             except error:
                 raise ShapefileException(
                     f"Failed to write elevation values for record {self.shpNum}. Expected floats."
@@ -2452,7 +2453,7 @@ class Writer:
                     # if m values are stored as 3rd/4th dimension
                     # 0-index position of m value is 3 if z type (x,y,z,m), or 2 if m type (x,y,m)
                     mpos = 3 if s.shapeType in (13, 15, 18, 31) else 2
-                    [
+                    for p in s.points:
                         f.write(
                             pack(
                                 "<d",
@@ -2461,8 +2462,6 @@ class Writer:
                                 else NODATA,
                             )
                         )
-                        for p in s.points
-                    ]
             except error:
                 raise ShapefileException(
                     f"Failed to write measure values for record {self.shpNum}. Expected floats"
@@ -2543,7 +2542,7 @@ class Writer:
 
     def __shxRecord(self, offset, length):
         """Writes the shx records."""
-        
+
         # pylint: disable=raise-missing-from
         f = self.__getFileObj(self.shx)
         try:
@@ -2553,7 +2552,7 @@ class Writer:
                 "The .shp file has reached its file size limit > 4294967294 bytes (4.29 GB). To fix this, break up your file into multiple smaller ones."
             )
         f.write(pack(">i", length))
-        
+
         # pylint: enable=raise-missing-from
 
     def record(self, *recordList, **recordDict):
