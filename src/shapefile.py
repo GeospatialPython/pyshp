@@ -1073,7 +1073,7 @@ class Reader:
                                     fileobj.seek(0)
                                     setattr(self, lower_ext, fileobj)
                                     self._files_to_close.append(fileobj)
-                                except (OSError, AttributeError):
+                                except (OSError, AttributeError, KeyError):
                                     pass
                     # Close and delete the temporary zipfile
                     try:
