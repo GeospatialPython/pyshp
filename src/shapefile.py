@@ -558,7 +558,7 @@ class Shape:
                 ps = part
 
             # coordinates.append([tuple(p) for p in self.points[part:]])
-            coordinates.append(list(self.points[part:]))
+            coordinates.append(list(self.points[part:]))  # pylint: disable=undefined-loop-variable (assert len(self.parts) >1)
 
             return {"type": "MultiLineString", "coordinates": coordinates}
 
