@@ -22,5 +22,8 @@ dist/
 .vscode
 .dmypy.json
 .python-version
-.venv
-venv
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/

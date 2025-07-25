@@ -19,7 +19,6 @@ import sys
 import tempfile
 import time
 import zipfile
-from collections.abc import Collection
 from datetime import date
 from struct import Struct, calcsize, error, pack, unpack
 from typing import IO, Any, Iterable, Iterator, Optional, Reversible, TypedDict, Union
@@ -119,6 +118,8 @@ class GeoJsonShapeT(TypedDict):
 
 MISSING = [None, ""]
 NODATA = -10e38  # as per the ESRI shapefile spec, only used for m-values.
+
+unpack_2_int32_be = Struct(">2i").unpack
 
 
 def b(
@@ -277,6 +278,10 @@ def ring_contains_point(coords: list[Coord], p: Point2D) -> bool:
     return inside_flag
 
 
+class RingSamplingError(Exception):
+    pass
+
+
 def ring_sample(coords: list[Coord], ccw: bool = False) -> Point2D:
     """Return a sample point guaranteed to be within a ring, by efficiently
     finding the first centroid of a coordinate triplet whose orientation
@@ -320,8 +325,11 @@ def ring_sample(coords: list[Coord], ccw: bool = False) -> Point2D:
             # remove oldest triplet coord to allow iterating to next triplet
             triplet.pop(0)
 
-    else:
-        raise Exception("Unexpected error: Unable to find a ring sample point.")
+    raise RingSamplingError(
+        f"Unexpected error: Unable to find a ring sample point in: {coords}."
+        "Ensure the ring's coordinates are oriented clockwise, "
+        "and ensure the area enclosed is non-zero. "
+    )
 
 
 def ring_contains_ring(coords1: list[Coord], coords2: list[Point2D]) -> bool:
@@ -458,6 +466,10 @@ def organize_polygon_rings(
         return polys
 
 
+class GeoJSON_Error(Exception):
+    pass
+
+
 class Shape:
     def __init__(
         self,
@@ -544,9 +556,10 @@ class Shape:
                         # coordinates.append([tuple(p) for p in self.points[ps:part]])
                         coordinates.append([p for p in self.points[ps:part]])
                         ps = part
-                else:
-                    # coordinates.append([tuple(p) for p in self.points[part:]])
-                    coordinates.append([p for p in self.points[part:]])
+
+                # coordinates.append([tuple(p) for p in self.points[part:]])
+                coordinates.append([p for p in self.points[part:]])  # pylint: disable=undefined-loop-variable
+
                 return {"type": "MultiLineString", "coordinates": coordinates}
         elif self.shapeType in [POLYGON, POLYGONM, POLYGONZ]:
             if len(self.parts) == 0:
@@ -605,7 +618,7 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
                     return {"type": "MultiPolygon", "coordinates": polys}
 
         else:
-            raise Exception(
+            raise GeoJSON_Error(
                 f'Shape type "{SHAPETYPE_LOOKUP[self.shapeType]}" cannot be represented as GeoJSON.'
             )
 
@@ -630,7 +643,7 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
         elif geojType == "MultiPolygon":
             shapeType = POLYGON
         else:
-            raise Exception(f"Cannot create Shape from GeoJSON type '{geojType}'")
+            raise GeoJSON_Error(f"Cannot create Shape from GeoJSON type '{geojType}'")
         shape.shapeType = shapeType
 
         # set points and parts
@@ -751,6 +764,7 @@ class _Record(list):
                 and IndexError, if the field exists but the field's
                 corresponding value in the Record does not exist
         """
+        # pylint: disable=raise-missing-from
         try:
             if item == "__setstate__":  # Prevent infinite loop from copy.deepcopy()
                 raise AttributeError("_Record does not implement __setstate__")
@@ -762,6 +776,7 @@ class _Record(list):
             raise IndexError(
                 f"{item} found as a field but not enough values available."
             )
+        # pylint: enable=raise-missing-from
 
     def __setattr__(self, key: str, value: RecordValue):
         """
@@ -777,7 +792,7 @@ class _Record(list):
             index = self.__field_positions[key]
             return list.__setitem__(self, index, value)
         except KeyError:
-            raise AttributeError(f"{key} is not a field name")
+            raise AttributeError(f"{key} is not a field name")  # pylint: disable=raise-missing-from
 
     def __getitem__(self, item):
         """
@@ -816,7 +831,7 @@ class _Record(list):
             if index is not None:
                 return list.__setitem__(self, index, value)
             else:
-                raise IndexError(f"{key} is not a field name and not an int")
+                raise IndexError(f"{key} is not a field name and not an int")  # pylint: disable=raise-missing-from
 
     @property
     def oid(self) -> int:
@@ -920,8 +935,6 @@ class ShapeRecords(list):
 class ShapefileException(Exception):
     """An exception to handle shapefile specific problems."""
 
-    pass
-
 
 class _NoShpSentinel(object):
     """For use as a default value for shp to preserve the
@@ -929,8 +942,6 @@ class _NoShpSentinel(object):
     in the **kwargs dict) in case someone explictly
     called Reader(shp=None) to load self.shx.
     """
-
-    pass
 
 
 class Reader:
@@ -970,7 +981,7 @@ class Reader:
         shp: Union[_NoShpSentinel, Optional[BinaryFileT]] = _NoShpSentinel(),
         shx: Optional[BinaryFileT] = None,
         dbf: Optional[BinaryFileT] = None,
-        **kwargs,
+        **kwargs,  # pylint: disable=unused-argument
     ):
         self.shp = None
         self.shx = None
@@ -1064,12 +1075,12 @@ class Reader:
                                     fileobj.seek(0)
                                     setattr(self, lower_ext, fileobj)
                                     self._files_to_close.append(fileobj)
-                                except:
+                                except (OSError, AttributeError, KeyError):
                                     pass
                     # Close and delete the temporary zipfile
                     try:
                         zipfileobj.close()
-                    except:
+                    except:  # pylint: disable=bare-except
                         pass
                     # Try to load shapefile
                     if self.shp or self.dbf:
@@ -1214,13 +1225,12 @@ class Reader:
                     shpLength = shp.tell()
                     shp.seek(100)
                     # Do a fast shape iteration until end of file.
-                    unpack = Struct(">2i").unpack
                     offsets = []
                     pos = shp.tell()
                     while pos < shpLength:
                         offsets.append(pos)
                         # Unpack the shape header only
-                        (recNum, recLength) = unpack(shp.read(8))
+                        (__recNum, recLength) = unpack_2_int32_be(shp.read(8))
                         # Jump to next shape position
                         pos += 8 + (2 * recLength)
                         shp.seek(pos)
@@ -1256,7 +1266,7 @@ class Reader:
         object. Normally this method would be called by the
         constructor with the file name as an argument."""
         if shapefile:
-            (shapeName, ext) = os.path.splitext(shapefile)
+            (shapeName, __ext) = os.path.splitext(shapefile)
             self.shapeName = shapeName
             self.load_shp(shapeName)
             self.load_shx(shapeName)
@@ -1376,6 +1386,8 @@ class Reader:
             raise ShapefileException(
                 "Shapefile Reader requires a shapefile or file-like object. (no shp file found"
             )
+
+        # pylint: disable=attribute-defined-outside-init
         shp = self.shp
         # File length (16-bit word * 2 = bytes)
         shp.seek(24)
@@ -1396,14 +1408,19 @@ class Reader:
             else:
                 self.mbox.append(None)
 
+        # pylint: enable=attribute-defined-outside-init
+
     def __shape(self, oid=None, bbox=None):
         """Returns the header info and geometry for a single shape."""
+
+        # pylint: disable=attribute-defined-outside-init
         f = self.__getFileObj(self.shp)
         record = Shape(oid=oid)
-        nParts = nPoints = zmin = zmax = mmin = mmax = None
-        (recNum, recLength) = unpack(">2i", f.read(8))
+        # Formerly we also set __zmin = __zmax = __mmin = __mmax = None
+        nParts = nPoints = None
+        (__recNum, recLength) = unpack(">2i", f.read(8))
         # Determine the start of the next record
-        next = f.tell() + (2 * recLength)
+        next_shape = f.tell() + (2 * recLength)
         shapeType = unpack("<i", f.read(4))[0]
         record.shapeType = shapeType
         # For Null shapes create an empty points list for consistency
@@ -1416,7 +1433,7 @@ class Reader:
             if bbox is not None and not bbox_overlap(bbox, record.bbox):
                 # because we stop parsing this shape, skip to beginning of
                 # next shape before we return
-                f.seek(next)
+                f.seek(next_shape)
                 return None
         # Shape types with parts
         if shapeType in (3, 5, 13, 15, 23, 25, 31):
@@ -1436,14 +1453,14 @@ class Reader:
             record.points = list(zip(*(iter(flat),) * 2))
         # Read z extremes and values
         if shapeType in (13, 15, 18, 31):
-            (zmin, zmax) = unpack("<2d", f.read(16))
+            __zmin, __zmax = unpack("<2d", f.read(16))
             record.z = _Array("d", unpack(f"<{nPoints}d", f.read(nPoints * 8)))
         # Read m extremes and values
         if shapeType in (13, 15, 18, 23, 25, 28, 31):
-            if next - f.tell() >= 16:
-                (mmin, mmax) = unpack("<2d", f.read(16))
+            if next_shape - f.tell() >= 16:
+                __mmin, __mmax = unpack("<2d", f.read(16))
             # Measure values less than -10e38 are nodata values according to the spec
-            if next - f.tell() >= nPoints * 8:
+            if next_shape - f.tell() >= nPoints * 8:
                 record.m = []
                 for m in _Array("d", unpack(f"<{nPoints}d", f.read(nPoints * 8))):
                     if m > NODATA:
@@ -1460,14 +1477,14 @@ class Reader:
                 point_bbox = list(record.points[0] + record.points[0])
                 # skip shape if no overlap with bounding box
                 if not bbox_overlap(bbox, point_bbox):
-                    f.seek(next)
+                    f.seek(next_shape)
                     return None
         # Read a single Z value
         if shapeType == 11:
             record.z = list(unpack("<d", f.read(8)))
         # Read a single M value
         if shapeType in (21, 11):
-            if next - f.tell() >= 8:
+            if next_shape - f.tell() >= 8:
                 (m,) = unpack("<d", f.read(8))
             else:
                 m = NODATA
@@ -1476,10 +1493,11 @@ class Reader:
                 record.m = [m]
             else:
                 record.m = [None]
+        # pylint: enable=attribute-defined-outside-init
         # Seek to the end of this record as defined by the record header because
         # the shapefile spec doesn't require the actual content to meet the header
         # definition.  Probably allowed for lazy feature deletion.
-        f.seek(next)
+        f.seek(next_shape)
         return record
 
     def __shxHeader(self):
@@ -1537,7 +1555,6 @@ class Reader:
             shpLength = shp.tell()
             shp.seek(100)
             # Do a fast shape iteration until the requested index or end of file.
-            unpack = Struct(">2i").unpack
             _i = 0
             offset = shp.tell()
             while offset < shpLength:
@@ -1545,7 +1562,7 @@ class Reader:
                     # Reached the requested index, exit loop with the offset value
                     break
                 # Unpack the shape header only
-                (recNum, recLength) = unpack(shp.read(8))
+                (__recNum, recLength) = unpack_2_int32_be(shp.read(8))
                 # Jump to next shape position
                 offset += 8 + (2 * recLength)
                 shp.seek(offset)
@@ -1613,6 +1630,8 @@ class Reader:
 
     def __dbfHeader(self):
         """Reads a dbf header. Xbase-related code borrows heavily from ActiveState Python Cookbook Recipe 362715 by Raymond Hettinger"""
+
+        # pylint: disable=attribute-defined-outside-init
         if not self.dbf:
             raise ShapefileException(
                 "Shapefile Reader requires a shapefile or file-like object. (no dbf file found)"
@@ -1626,7 +1645,7 @@ class Reader:
 
         # read fields
         numFields = (self.__dbfHdrLength - 33) // 32
-        for field in range(numFields):
+        for __field in range(numFields):
             fieldDesc = list(unpack("<11sc4xBB14x", dbf.read(32)))
             name = 0
             idx = 0
@@ -1655,9 +1674,11 @@ class Reader:
         # by default, read all fields except the deletion flag, hence "[1:]"
         # note: recLookup gives the index position of a field inside a _Record list
         fieldnames = [f[0] for f in self.fields[1:]]
-        fieldTuples, recLookup, recStruct = self.__recordFields(fieldnames)
+        __fieldTuples, recLookup, recStruct = self.__recordFields(fieldnames)
         self.__fullRecStruct = recStruct
         self.__fullRecLookup = recLookup
+
+        # pylint: enable=attribute-defined-outside-init
 
     def __recordFmt(self, fields=None):
         """Calculates the format and size of a .dbf record. Optional 'fields' arg
@@ -1697,7 +1718,7 @@ class Reader:
             # first ignore repeated field names (order doesn't matter)
             fields = list(set(fields))
             # get the struct
-            fmt, fmtSize = self.__recordFmt(fields=fields)
+            fmt, __fmtSize = self.__recordFmt(fields=fields)
             recStruct = Struct(fmt)
             # make sure the given fieldnames exist
             for name in fields:
@@ -1750,7 +1771,7 @@ class Reader:
 
         # parse each value
         record = []
-        for (name, typ, size, deci), value in zip(fieldTuples, recordContents):
+        for (__name, typ, __size, deci), value in zip(fieldTuples, recordContents):
             if typ in ("N", "F"):
                 # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
                 value = value.split(b"\0")[0]
@@ -1792,7 +1813,7 @@ class Reader:
                         # return as python date object
                         y, m, d = int(value[:4]), int(value[4:6]), int(value[6:8])
                         value = date(y, m, d)
-                    except:
+                    except (TypeError, ValueError):
                         # if invalid date, just return as unicode string so user can decide
                         value = u(value.strip())
             elif typ == "L":
@@ -1874,7 +1895,9 @@ class Reader:
         if self.numRecords is None:
             self.__dbfHeader()
         if not isinstance(self.numRecords, int):
-            raise Exception("Error when reading number of Records in dbf file header")
+            raise ShapefileException(
+                "Error when reading number of Records in dbf file header"
+            )
         f = self.__getFileObj(self.dbf)
         start = self.__restrictIndex(start)
         if stop is None:
@@ -1974,7 +1997,7 @@ class Writer:
         shp=None,
         shx=None,
         dbf=None,
-        **kwargs,
+        **kwargs,  # pylint: disable=unused-argument
     ):
         self.target = target
         self.autoBalance = autoBalance
@@ -1985,7 +2008,7 @@ class Writer:
         if target:
             target = pathlike_obj(target)
             if not is_string(target):
-                raise Exception(
+                raise TypeError(
                     f"The target filepath {target!r} must be of type str/unicode or path-like, not {type(target)}."
                 )
             self.shp = self.__getFileObj(os.path.splitext(target)[0] + ".shp")
@@ -1999,7 +2022,7 @@ class Writer:
             if dbf:
                 self.dbf = self.__getFileObj(dbf)
         else:
-            raise Exception(
+            raise TypeError(
                 "Either the target filepath, or any of shp, shx, or dbf must be set to create a shapefile."
             )
         # Initiate with empty headers, to be finalized upon closing
@@ -2102,7 +2125,7 @@ class Writer:
 
         if hasattr(f, "write"):
             return f
-        raise Exception(f"Unsupported file-like: {f}")
+        raise ShapefileException(f"Unsupported file-like object: {f}")
 
     def __shpFileLength(self):
         """Calculates the file length of the shp file."""
@@ -2128,7 +2151,7 @@ class Writer:
             # this should not happen.
             # any shape that is not null should have at least one point, and only those should be sent here.
             # could also mean that earlier code failed to add points to a non-null shape.
-            raise Exception(
+            raise ValueError(
                 "Cannot create bbox. Expected a valid shape with at least one point. "
                 f"Got a shape of type '{s.shapeType}' and 0 points."
             )
@@ -2213,6 +2236,8 @@ class Writer:
         """Writes the specified header type to the specified file-like object.
         Several of the shapefile formats are so similar that a single generic
         method to read or write them is warranted."""
+
+        # pylint: disable=raise-missing-from
         f = self.__getFileObj(fileObj)
         f.seek(0)
         # File code, Unused bytes
@@ -2271,6 +2296,8 @@ class Writer:
                 "Failed to write shapefile elevation and measure values. Floats required."
             )
 
+        # pylint: enable=raise-missing-from
+
     def __dbfHeader(self):
         """Writes the dbf header and field descriptors."""
         f = self.__getFileObj(self.dbf)
@@ -2328,10 +2355,10 @@ class Writer:
             if isinstance(s, dict):
                 s = Shape._from_geojson(s)
             else:
-                raise Exception(
+                raise TypeError(
                     "Can only write Shape objects, GeoJSON dictionaries, "
                     "or objects with the __geo_interface__, "
-                    "not: %r" % s
+                    f"not: {s}"
                 )
         # Write to file
         offset, length = self.__shpRecord(s)
@@ -2339,6 +2366,7 @@ class Writer:
             self.__shxRecord(offset, length)
 
     def __shpRecord(self, s):
+        # pylint: disable=raise-missing-from
         f = self.__getFileObj(self.shp)
         offset = f.tell()
         # Record number, Content length place holder
@@ -2349,7 +2377,7 @@ class Writer:
         if self.shapeType is None and s.shapeType != NULL:
             self.shapeType = s.shapeType
         if s.shapeType != NULL and s.shapeType != self.shapeType:
-            raise Exception(
+            raise ShapefileException(
                 f"The shape's type ({s.shapeType}) must match "
                 f"the type of the shapefile ({self.shapeType})."
             )
@@ -2405,7 +2433,8 @@ class Writer:
                     f.write(pack(f"<{len(s.z)}d", *s.z))
                 else:
                     # if z values are stored as 3rd dimension
-                    [f.write(pack("<d", p[2] if len(p) > 2 else 0)) for p in s.points]
+                    for p in s.points:
+                        f.write(pack("<d", p[2] if len(p) > 2 else 0))
             except error:
                 raise ShapefileException(
                     f"Failed to write elevation values for record {self.shpNum}. Expected floats."
@@ -2435,7 +2464,7 @@ class Writer:
                     # if m values are stored as 3rd/4th dimension
                     # 0-index position of m value is 3 if z type (x,y,z,m), or 2 if m type (x,y,m)
                     mpos = 3 if s.shapeType in (13, 15, 18, 31) else 2
-                    [
+                    for p in s.points:
                         f.write(
                             pack(
                                 "<d",
@@ -2444,8 +2473,6 @@ class Writer:
                                 else NODATA,
                             )
                         )
-                        for p in s.points
-                    ]
             except error:
                 raise ShapefileException(
                     f"Failed to write measure values for record {self.shpNum}. Expected floats"
@@ -2521,10 +2548,13 @@ class Writer:
         f.seek(start - 4)
         f.write(pack(">i", length))
         f.seek(finish)
+        # pylint: enable=raise-missing-from
         return offset, length
 
     def __shxRecord(self, offset, length):
         """Writes the shx records."""
+
+        # pylint: disable=raise-missing-from
         f = self.__getFileObj(self.shx)
         try:
             f.write(pack(">i", offset // 2))
@@ -2533,6 +2563,8 @@ class Writer:
                 "The .shp file has reached its file size limit > 4294967294 bytes (4.29 GB). To fix this, break up your file into multiple smaller ones."
             )
         f.write(pack(">i", length))
+
+        # pylint: enable=raise-missing-from
 
     def record(self, *recordList, **recordDict):
         """Creates a dbf attribute record. You can submit either a sequence of
@@ -2953,19 +2985,11 @@ def _test(args: list[str] = sys.argv[1:], verbosity: bool = False) -> int:
             new_url = _replace_remote_url(old_url)
             example.source = example.source.replace(old_url, new_url)
 
-    class Py23DocChecker(doctest.OutputChecker):
-        def check_output(self, want, got, optionflags):
-            res = doctest.OutputChecker.check_output(self, want, got, optionflags)
-            return res
-
-        def summarize(self):
-            doctest.OutputChecker.summarize(True)
-
-    runner = doctest.DocTestRunner(checker=Py23DocChecker(), verbose=verbosity)
+    runner = doctest.DocTestRunner(verbose=verbosity)
 
     if verbosity == 0:
         print(f"Running {len(tests.examples)} doctests...")
-    failure_count, test_count = runner.run(tests)
+    failure_count, __test_count = runner.run(tests)
 
     # print results
     if verbosity:
