@@ -100,7 +100,7 @@ Coords = list[Coord]
 BBox = tuple[float, float, float, float]
 
 # File name, file object or anything with a read() method that returns bytes.
-# TODO: Create simple Protocol with a read() method
+# TODO: Create simple Protocol with a read() method pylint: disable=fixme
 BinaryFileT = Union[str, IO[bytes]]
 BinaryFileStreamT = Union[IO[bytes], io.BytesIO]
 
@@ -128,15 +128,14 @@ def b(
     if isinstance(v, str):
         # For python 3 encode str to bytes.
         return v.encode(encoding, encodingErrors)
-    elif isinstance(v, bytes):
+    if isinstance(v, bytes):
         # Already bytes.
         return v
-    elif v is None:
+    if v is None:
         # Since we're dealing with text, interpret None as ""
         return b""
-    else:
-        # Force string representation.
-        return str(v).encode(encoding, encodingErrors)
+    # Force string representation.
+    return str(v).encode(encoding, encodingErrors)
 
 
 def u(
@@ -145,15 +144,14 @@ def u(
     if isinstance(v, bytes):
         # For python 3 decode bytes to str.
         return v.decode(encoding, encodingErrors)
-    elif isinstance(v, str):
+    if isinstance(v, str):
         # Already str.
         return v
-    elif v is None:
+    if v is None:
         # Since we're dealing with text, interpret None as ""
         return ""
-    else:
-        # Force string representation.
-        return bytes(v).decode(encoding, encodingErrors)
+    # Force string representation.
+    return bytes(v).decode(encoding, encodingErrors)
 
 
 def is_string(v: Any) -> bool:
@@ -163,8 +161,8 @@ def is_string(v: Any) -> bool:
 def pathlike_obj(path: Any) -> Any:
     if isinstance(path, os.PathLike):
         return os.fsdecode(path)
-    else:
-        return path
+
+    return path
 
 
 # Begin
@@ -193,8 +191,8 @@ def signed_area(
     area2 = sum(xs[i] * (ys[i + 1] - ys[i - 1]) for i in range(1, len(coords)))
     if fast:
         return area2
-    else:
-        return area2 / 2.0
+
+    return area2 / 2.0
 
 
 def is_cw(coords: Coords) -> bool:
@@ -374,7 +372,7 @@ def organize_polygon_rings(
     # multiple exteriors, ie multi-polygon, have to group holes with correct exterior
     # shapefile format does not specify which holes belong to which exteriors
     # so have to do efficient multi-stage checking of hole-to-exterior containment
-    elif len(exteriors) > 1:
+    if len(exteriors) > 1:
         # exit early if no holes
         if not holes:
             polys = []
@@ -457,13 +455,12 @@ def organize_polygon_rings(
         return polys
 
     # no exteriors, be nice and assume due to incorrect winding order
-    else:
-        if return_errors is not None:
-            return_errors["polygon_only_holes"] = len(holes)
-        exteriors = holes
-        # add as single exterior without any holes
-        polys = [[ext] for ext in exteriors]
-        return polys
+    if return_errors is not None:
+        return_errors["polygon_only_holes"] = len(holes)
+    exteriors = holes
+    # add as single exterior without any holes
+    polys = [[ext] for ext in exteriors]
+    return polys
 
 
 class GeoJSON_Error(Exception):
@@ -515,112 +512,115 @@ class Shape:
                 # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
                 return {"type": "Point", "coordinates": ()}
                 # return {"type": "Point", "coordinates": tuple()} #type: ignore
-            else:
-                return {"type": "Point", "coordinates": self.points[0]}
-                # return {"type": "Point", "coordinates": tuple(self.points[0])}  # type: ignore
-        elif self.shapeType in [MULTIPOINT, MULTIPOINTM, MULTIPOINTZ]:
+
+            return {"type": "Point", "coordinates": self.points[0]}
+            # return {"type": "Point", "coordinates": tuple(self.points[0])}  # type: ignore
+
+        if self.shapeType in [MULTIPOINT, MULTIPOINTM, MULTIPOINTZ]:
             if len(self.points) == 0:
                 # the shape has no coordinate information, i.e. is 'empty'
                 # the geojson spec does not define a proper null-geometry type
                 # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
                 return {"type": "MultiPoint", "coordinates": []}
-            else:
-                # multipoint
-                return {
-                    "type": "MultiPoint",
-                    "coordinates": self.points,
-                    # "coordinates": [tuple(p) for p in self.points],  #type: ignore
-                }
-        elif self.shapeType in [POLYLINE, POLYLINEM, POLYLINEZ]:
+
+            # multipoint
+            return {
+                "type": "MultiPoint",
+                "coordinates": self.points,
+                # "coordinates": [tuple(p) for p in self.points],  #type: ignore
+            }
+
+        if self.shapeType in [POLYLINE, POLYLINEM, POLYLINEZ]:
             if len(self.parts) == 0:
                 # the shape has no coordinate information, i.e. is 'empty'
                 # the geojson spec does not define a proper null-geometry type
                 # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
                 return {"type": "LineString", "coordinates": []}
-            elif len(self.parts) == 1:
+
+            if len(self.parts) == 1:
                 # linestring
                 return {
                     "type": "LineString",
                     "coordinates": self.points,
                     # "coordinates": [tuple(p) for p in self.points],  #type: ignore
                 }
-            else:
-                # multilinestring
-                ps = None
-                coordinates = []
-                for part in self.parts:
-                    if ps is None:
-                        ps = part
-                        continue
-                    else:
-                        # coordinates.append([tuple(p) for p in self.points[ps:part]])
-                        coordinates.append([p for p in self.points[ps:part]])
-                        ps = part
 
-                # coordinates.append([tuple(p) for p in self.points[part:]])
-                coordinates.append([p for p in self.points[part:]])  # pylint: disable=undefined-loop-variable
+            # multilinestring
+            ps = None
+            coordinates = []
+            for part in self.parts:
+                if ps is None:
+                    ps = part
+                    continue
 
-                return {"type": "MultiLineString", "coordinates": coordinates}
-        elif self.shapeType in [POLYGON, POLYGONM, POLYGONZ]:
+                # coordinates.append([tuple(p) for p in self.points[ps:part]])
+                coordinates.append(list(self.points[ps:part]))
+                ps = part
+
+            # coordinates.append([tuple(p) for p in self.points[part:]])
+            # assert len(self.parts) >1 # so disable pylint rule
+            coordinates.append(list(self.points[part:]))  # pylint: disable=undefined-loop-variable
+            return {"type": "MultiLineString", "coordinates": coordinates}
+
+        if self.shapeType in [POLYGON, POLYGONM, POLYGONZ]:
             if len(self.parts) == 0:
                 # the shape has no coordinate information, i.e. is 'empty'
                 # the geojson spec does not define a proper null-geometry type
                 # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
                 return {"type": "Polygon", "coordinates": []}
-            else:
-                # get all polygon rings
-                rings = []
-                for i in range(len(self.parts)):
-                    # get indexes of start and end points of the ring
-                    start = self.parts[i]
-                    try:
-                        end = self.parts[i + 1]
-                    except IndexError:
-                        end = len(self.points)
 
-                    # extract the points that make up the ring
-                    # ring = [tuple(p) for p in self.points[start:end]]
-                    ring = [p for p in self.points[start:end]]
-                    rings.append(ring)
+            # get all polygon rings
+            rings = []
+            for i in range(len(self.parts)):
+                # get indexes of start and end points of the ring
+                start = self.parts[i]
+                try:
+                    end = self.parts[i + 1]
+                except IndexError:
+                    end = len(self.points)
 
-                # organize rings into list of polygons, where each polygon is defined as list of rings.
-                # the first ring is the exterior and any remaining rings are holes (same as GeoJSON).
-                polys = organize_polygon_rings(rings, self._errors)
+                # extract the points that make up the ring
+                # ring = [tuple(p) for p in self.points[start:end]]
+                ring = list(self.points[start:end])
+                rings.append(ring)
 
-                # if VERBOSE is True, issue detailed warning about any shape errors
-                # encountered during the Shapefile to GeoJSON conversion
-                if VERBOSE and self._errors:
-                    header = f"Possible issue encountered when converting Shape #{self.oid} to GeoJSON: "
-                    orphans = self._errors.get("polygon_orphaned_holes", None)
-                    if orphans:
-                        msg = (
-                            header
-                            + "Shapefile format requires that all polygon interior holes be contained by an exterior ring, \
+            # organize rings into list of polygons, where each polygon is defined as list of rings.
+            # the first ring is the exterior and any remaining rings are holes (same as GeoJSON).
+            polys = organize_polygon_rings(rings, self._errors)
+
+            # if VERBOSE is True, issue detailed warning about any shape errors
+            # encountered during the Shapefile to GeoJSON conversion
+            if VERBOSE and self._errors:
+                header = f"Possible issue encountered when converting Shape #{self.oid} to GeoJSON: "
+                orphans = self._errors.get("polygon_orphaned_holes", None)
+                if orphans:
+                    msg = (
+                        header
+                        + "Shapefile format requires that all polygon interior holes be contained by an exterior ring, \
 but the Shape contained interior holes (defined by counter-clockwise orientation in the shapefile format) that were \
 orphaned, i.e. not contained by any exterior rings. The rings were still included but were \
 encoded as GeoJSON exterior rings instead of holes."
-                        )
-                        logger.warning(msg)
-                    only_holes = self._errors.get("polygon_only_holes", None)
-                    if only_holes:
-                        msg = (
-                            header
-                            + "Shapefile format requires that polygons contain at least one exterior ring, \
+                    )
+                    logger.warning(msg)
+                only_holes = self._errors.get("polygon_only_holes", None)
+                if only_holes:
+                    msg = (
+                        header
+                        + "Shapefile format requires that polygons contain at least one exterior ring, \
 but the Shape was entirely made up of interior holes (defined by counter-clockwise orientation in the shapefile format). The rings were \
 still included but were encoded as GeoJSON exterior rings instead of holes."
-                        )
-                        logger.warning(msg)
+                    )
+                    logger.warning(msg)
 
-                # return as geojson
-                if len(polys) == 1:
-                    return {"type": "Polygon", "coordinates": polys[0]}
-                else:
-                    return {"type": "MultiPolygon", "coordinates": polys}
+            # return as geojson
+            if len(polys) == 1:
+                return {"type": "Polygon", "coordinates": polys[0]}
 
-        else:
-            raise GeoJSON_Error(
-                f'Shape type "{SHAPETYPE_LOOKUP[self.shapeType]}" cannot be represented as GeoJSON.'
-            )
+            return {"type": "MultiPolygon", "coordinates": polys}
+
+        raise GeoJSON_Error(
+            f'Shape type "{SHAPETYPE_LOOKUP[self.shapeType]}" cannot be represented as GeoJSON.'
+        )
 
     @staticmethod
     def _from_geojson(geoj) -> Shape:
@@ -812,8 +812,8 @@ class _Record(list):
                 index = None
         if index is not None:
             return list.__getitem__(self, index)
-        else:
-            raise IndexError(f'"{item}" is not a field name and not an int')
+
+        raise IndexError(f'"{item}" is not a field name and not an int')
 
     def __setitem__(self, key, value):
         """
@@ -830,8 +830,8 @@ class _Record(list):
             index = self.__field_positions.get(key)
             if index is not None:
                 return list.__setitem__(self, index, value)
-            else:
-                raise IndexError(f"{key} is not a field name and not an int")  # pylint: disable=raise-missing-from
+
+            raise IndexError(f"{key} is not a field name and not an int")  # pylint: disable=raise-missing-from
 
     @property
     def oid(self) -> int:
@@ -936,7 +936,7 @@ class ShapefileException(Exception):
     """An exception to handle shapefile specific problems."""
 
 
-class _NoShpSentinel(object):
+class _NoShpSentinel:
     """For use as a default value for shp to preserve the
     behaviour (from when all keyword args were gathered
     in the **kwargs dict) in case someone explictly
@@ -1052,7 +1052,7 @@ class Reader:
                                 raise ShapefileException(
                                     "Zipfile does not contain any shapefiles"
                                 )
-                            elif len(shapefiles) == 1:
+                            if len(shapefiles) == 1:
                                 shapefile = shapefiles[0]
                             else:
                                 raise ShapefileException(
@@ -1087,12 +1087,12 @@ class Reader:
                         # Load and exit early
                         self.load()
                         return
-                    else:
-                        raise ShapefileException(
-                            f"No shp or dbf file found in zipfile: {path}"
-                        )
 
-                elif path.startswith("http"):
+                    raise ShapefileException(
+                        f"No shp or dbf file found in zipfile: {path}"
+                    )
+
+                if path.startswith("http"):
                     # Shapefile is from a url
                     # Download each file to temporary path and treat as normal shapefile path
                     urlinfo = urlparse(path)
@@ -1125,16 +1125,13 @@ class Reader:
                         # Load and exit early
                         self.load()
                         return
-                    else:
-                        raise ShapefileException(
-                            f"No shp or dbf file found at url: {path}"
-                        )
 
-                else:
-                    # Local file path to a shapefile
-                    # Load and exit early
-                    self.load(path)
-                    return
+                    raise ShapefileException(f"No shp or dbf file found at url: {path}")
+
+                # Local file path to a shapefile
+                # Load and exit early
+                self.load(path)
+                return
 
         if not isinstance(shp, _NoShpSentinel):
             self.shp = self.__seek_0_on_file_obj_wrap_or_open_from_name("shp", shp)
@@ -1207,7 +1204,7 @@ class Reader:
 
             return self.numRecords
 
-        elif self.shp:
+        if self.shp:
             # Otherwise use shape count
             if self.shx:
                 if self.numShapes is None:
@@ -1215,36 +1212,34 @@ class Reader:
 
                 return self.numShapes
 
-            else:
-                # Index file not available, iterate all shapes to get total count
-                if self.numShapes is None:
-                    # Determine length of shp file
-                    shp = self.shp
-                    checkpoint = shp.tell()
-                    shp.seek(0, 2)
-                    shpLength = shp.tell()
-                    shp.seek(100)
-                    # Do a fast shape iteration until end of file.
-                    offsets = []
-                    pos = shp.tell()
-                    while pos < shpLength:
-                        offsets.append(pos)
-                        # Unpack the shape header only
-                        (__recNum, recLength) = unpack_2_int32_be(shp.read(8))
-                        # Jump to next shape position
-                        pos += 8 + (2 * recLength)
-                        shp.seek(pos)
-                    # Set numShapes and offset indices
-                    self.numShapes = len(offsets)
-                    self._offsets = offsets
-                    # Return to previous file position
-                    shp.seek(checkpoint)
+            # Index file not available, iterate all shapes to get total count
+            if self.numShapes is None:
+                # Determine length of shp file
+                shp = self.shp
+                checkpoint = shp.tell()
+                shp.seek(0, 2)
+                shpLength = shp.tell()
+                shp.seek(100)
+                # Do a fast shape iteration until end of file.
+                offsets = []
+                pos = shp.tell()
+                while pos < shpLength:
+                    offsets.append(pos)
+                    # Unpack the shape header only
+                    (__recNum, recLength) = unpack_2_int32_be(shp.read(8))
+                    # Jump to next shape position
+                    pos += 8 + (2 * recLength)
+                    shp.seek(pos)
+                # Set numShapes and offset indices
+                self.numShapes = len(offsets)
+                self._offsets = offsets
+                # Return to previous file position
+                shp.seek(checkpoint)
 
-                return self.numShapes
+            return self.numShapes
 
-        else:
-            # No file loaded yet, treat as 'empty' shapefile
-            return 0
+        # No file loaded yet, treat as 'empty' shapefile
+        return 0
 
     def __iter__(self):
         """Iterates through the shapes/records in the shapefile."""
@@ -1972,7 +1967,7 @@ class Reader:
                 yield ShapeRecord(shape=shape, record=record)
         else:
             # only iterate where shape.bbox overlaps with the given bbox
-            # TODO: internal __record method should be faster but would have to
+            # TODO: internal __record method should be faster but would have to pylint: disable=fixme
             # make sure to seek to correct file location...
 
             # fieldTuples,recLookup,recStruct = self.__recordFields(fields)
@@ -2319,7 +2314,7 @@ class Writer:
             raise ShapefileException(
                 "Shapefile dbf header length exceeds maximum length."
             )
-        recordLength = sum([int(field[2]) for field in fields]) + 1
+        recordLength = sum(int(field[2]) for field in fields) + 1
         header = pack(
             "<BBBBLHH20x",
             version,
@@ -2376,7 +2371,7 @@ class Writer:
         # Shape Type
         if self.shapeType is None and s.shapeType != NULL:
             self.shapeType = s.shapeType
-        if s.shapeType != NULL and s.shapeType != self.shapeType:
+        if not s.shapeType in {NULL, self.shapeType}:
             raise ShapefileException(
                 f"The shape's type ({s.shapeType}) must match "
                 f"the type of the shapefile ({self.shapeType})."
@@ -2888,7 +2883,7 @@ def _filter_network_doctests(
 
     examples_it = iter(examples)
 
-    yield next(examples_it)
+    yield next(examples_it)  # pylint: disable=stop-iteration-return
 
     for example in examples_it:
         # Track variables in doctest shell sessions defined from commands
