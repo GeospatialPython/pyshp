@@ -982,6 +982,7 @@ def test_record_oid():
             assert shaperec.record.oid == i
 
 
+@pytest.mark.slow
 def test_iterRecords_start_stop():
     """
     Assert that Reader.iterRecords(start, stop)
