@@ -119,6 +119,8 @@ class GeoJsonShapeT(TypedDict):
 MISSING = [None, ""]
 NODATA = -10e38  # as per the ESRI shapefile spec, only used for m-values.
 
+unpack_2_int32_be = Struct(">2i").unpack
+
 
 def b(
     v: Union[str, bytes], encoding: str = "utf-8", encodingErrors: str = "strict"
@@ -1078,7 +1080,7 @@ class Reader:
                     # Close and delete the temporary zipfile
                     try:
                         zipfileobj.close()
-                    except:  # pylint disable=broad-exception-caught
+                    except:  # pylint: disable=broad-exception-caught
                         pass
                     # Try to load shapefile
                     if self.shp or self.dbf:
@@ -1223,7 +1225,6 @@ class Reader:
                     shpLength = shp.tell()
                     shp.seek(100)
                     # Do a fast shape iteration until end of file.
-                    unpack_2_int32_be = Struct(">2i").unpack
                     offsets = []
                     pos = shp.tell()
                     while pos < shpLength:
@@ -1414,7 +1415,7 @@ class Reader:
         nParts = nPoints = zmin = zmax = mmin = mmax = None
         (recNum, recLength) = unpack(">2i", f.read(8))
         # Determine the start of the next record
-        next = f.tell() + (2 * recLength)
+        next_shape = f.tell() + (2 * recLength)
         shapeType = unpack("<i", f.read(4))[0]
         record.shapeType = shapeType
         # For Null shapes create an empty points list for consistency
@@ -1427,7 +1428,7 @@ class Reader:
             if bbox is not None and not bbox_overlap(bbox, record.bbox):
                 # because we stop parsing this shape, skip to beginning of
                 # next shape before we return
-                f.seek(next)
+                f.seek(next_shape)
                 return None
         # Shape types with parts
         if shapeType in (3, 5, 13, 15, 23, 25, 31):
@@ -1451,10 +1452,10 @@ class Reader:
             record.z = _Array("d", unpack(f"<{nPoints}d", f.read(nPoints * 8)))
         # Read m extremes and values
         if shapeType in (13, 15, 18, 23, 25, 28, 31):
-            if next - f.tell() >= 16:
+            if next_shape - f.tell() >= 16:
                 (mmin, mmax) = unpack("<2d", f.read(16))
             # Measure values less than -10e38 are nodata values according to the spec
-            if next - f.tell() >= nPoints * 8:
+            if next_shape - f.tell() >= nPoints * 8:
                 record.m = []
                 for m in _Array("d", unpack(f"<{nPoints}d", f.read(nPoints * 8))):
                     if m > NODATA:
@@ -1471,14 +1472,14 @@ class Reader:
                 point_bbox = list(record.points[0] + record.points[0])
                 # skip shape if no overlap with bounding box
                 if not bbox_overlap(bbox, point_bbox):
-                    f.seek(next)
+                    f.seek(next_shape)
                     return None
         # Read a single Z value
         if shapeType == 11:
             record.z = list(unpack("<d", f.read(8)))
         # Read a single M value
         if shapeType in (21, 11):
-            if next - f.tell() >= 8:
+            if next_shape - f.tell() >= 8:
                 (m,) = unpack("<d", f.read(8))
             else:
                 m = NODATA
@@ -1491,7 +1492,7 @@ class Reader:
         # Seek to the end of this record as defined by the record header because
         # the shapefile spec doesn't require the actual content to meet the header
         # definition.  Probably allowed for lazy feature deletion.
-        f.seek(next)
+        f.seek(next_shape)
         return record
 
     def __shxHeader(self):
@@ -1549,7 +1550,6 @@ class Reader:
             shpLength = shp.tell()
             shp.seek(100)
             # Do a fast shape iteration until the requested index or end of file.
-            unpack = Struct(">2i").unpack
             _i = 0
             offset = shp.tell()
             while offset < shpLength:
@@ -1557,7 +1557,7 @@ class Reader:
                     # Reached the requested index, exit loop with the offset value
                     break
                 # Unpack the shape header only
-                (recNum, recLength) = unpack(shp.read(8))
+                (recNum, recLength) = unpack_2_int32_be(shp.read(8))
                 # Jump to next shape position
                 offset += 8 + (2 * recLength)
                 shp.seek(offset)
@@ -1804,7 +1804,7 @@ class Reader:
                         # return as python date object
                         y, m, d = int(value[:4]), int(value[4:6]), int(value[6:8])
                         value = date(y, m, d)
-                    except:
+                    except (TypeError, ValueError):
                         # if invalid date, just return as unicode string so user can decide
                         value = u(value.strip())
             elif typ == "L":
