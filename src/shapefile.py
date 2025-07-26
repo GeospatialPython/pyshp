@@ -2799,14 +2799,12 @@ class Writer:
         pointShape.points.append([x, y, z, m])
         self.shape(pointShape)
 
-    def multipoint(self, points):
+    def multipoint(self, points: Coords):
         """Creates a MULTIPOINT shape.
         Points is a list of xy values."""
         shapeType = MULTIPOINT
-        points = [
-            points
-        ]  # nest the points inside a list to be compatible with the generic shapeparts method
-        self._shapeparts(parts=points, shapeType=shapeType)
+        # nest the points inside a list to be compatible with the generic shapeparts method
+        self._shapeparts(parts=[points], shapeType=shapeType)
 
     def multipointm(self, points):
         """Creates a MULTIPOINTM shape.
@@ -2921,9 +2919,8 @@ class Writer:
             # add points
             for point in part:
                 # Ensure point is list
-                if not isinstance(point, list):
-                    point = list(point)
-                polyShape.points.append(point)
+                point_list = list(point)
+                polyShape.points.append(point_list)
         # write the shape
         self.shape(polyShape)
 
