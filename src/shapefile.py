@@ -24,10 +24,13 @@ from struct import Struct, calcsize, error, pack, unpack
 from typing import (
     IO,
     Any,
+    Collection,
+    Generic,
     Iterable,
     Iterator,
     Optional,
     Reversible,
+    Sequence,
     TypedDict,
     TypeVar,
     Union,
@@ -99,8 +102,9 @@ PARTTYPE_LOOKUP = {
     5: "RING",
 }
 
-# Custom type variables
+## Custom type variables
 
+T = TypeVar("T")
 Point2D = tuple[float, float]
 PointZ = tuple[float, float, float]
 PointZM = tuple[float, float, float, float]
@@ -171,9 +175,6 @@ def is_string(v: Any) -> bool:
     return isinstance(v, str)
 
 
-T = TypeVar("T")
-
-
 @overload
 def fsdecode_if_pathlike(path: os.PathLike) -> str: ...
 @overload
@@ -188,7 +189,7 @@ def fsdecode_if_pathlike(path):
 # Begin
 
 
-class _Array(array.array):
+class _Array(array.array, Generic[T]):
     """Converts python tuples to lists of the appropriate type.
     Used to unpack different shapefile header parts."""
 
@@ -235,7 +236,7 @@ def ring_bbox(coords: Coords) -> BBox:
     return bbox
 
 
-def bbox_overlap(bbox1: BBox, bbox2: BBox) -> bool:
+def bbox_overlap(bbox1: BBox, bbox2: Collection[float]) -> bool:
     """Tests whether two bounding boxes overlap."""
     xmin1, ymin1, xmax1, ymax1 = bbox1
     xmin2, ymin2, xmax2, ymax2 = bbox2
@@ -492,8 +493,8 @@ class Shape:
         self,
         shapeType: int = NULL,
         points: Optional[list[Coord]] = None,
-        parts: Optional[list[int]] = None,
-        partTypes: Optional[list[int]] = None,
+        parts: Optional[Sequence[int]] = None,
+        partTypes: Optional[Sequence[int]] = None,
         oid: Optional[int] = None,
     ):
         """Stores the geometry of the different shape types
@@ -521,6 +522,10 @@ class Shape:
             self.__oid = oid
         else:
             self.__oid = -1
+
+        self.z: Optional[Union[list[Optional[float]], _Array[float]]] = None
+        self.m: Optional[list[Optional[float]]] = None
+        self.bbox: Optional[_Array[float]] = None
 
     @property
     def __geo_interface__(self) -> GeoJsonShapeT:
@@ -1425,15 +1430,17 @@ class Reader:
 
         # pylint: enable=attribute-defined-outside-init
 
-    # def __shape(self, oid: Optional[int] = None, bbox: Optional[BBox] = None) -> Shape:
-    def __shape(self, oid=None, bbox=None):
+    def __shape(
+        self, oid: Optional[int] = None, bbox: Optional[BBox] = None
+    ) -> Optional[Shape]:
         """Returns the header info and geometry for a single shape."""
 
         # pylint: disable=attribute-defined-outside-init
         f = self.__getFileObj(self.shp)
         record = Shape(oid=oid)
-        # Formerly we also set __zmin = __zmax = __mmin = __mmax = None
-        nParts = nPoints = None
+        # Previously, we also set __zmin = __zmax = __mmin = __mmax = None
+        nParts: Optional[int] = None
+        nPoints: Optional[int] = None
         (__recNum, recLength) = unpack(">2i", f.read(8))
         # Determine the start of the next record
         next_shape = f.tell() + (2 * recLength)
@@ -1444,7 +1451,7 @@ class Reader:
             record.points = []
         # All shape types capable of having a bounding box
         elif shapeType in (3, 5, 8, 13, 15, 18, 23, 25, 28, 31):
-            record.bbox = _Array("d", unpack("<4d", f.read(32)))
+            record.bbox = _Array[float]("d", unpack("<4d", f.read(32)))
             # if bbox specified and no overlap, skip this shape
             if bbox is not None and not bbox_overlap(bbox, record.bbox):
                 # because we stop parsing this shape, skip to beginning of
@@ -1454,40 +1461,52 @@ class Reader:
         # Shape types with parts
         if shapeType in (3, 5, 13, 15, 23, 25, 31):
             nParts = unpack("<i", f.read(4))[0]
+
+            record.parts = _Array[int]("i", unpack(f"<{nParts}i", f.read(nParts * 4)))
+
+            # Read part types for Multipatch - 31
+            if shapeType == 31:
+                record.partTypes = _Array[int](
+                    "i", unpack(f"<{nParts}i", f.read(nParts * 4))
+                )
+
         # Shape types with points
         if shapeType in (3, 5, 8, 13, 15, 18, 23, 25, 28, 31):
             nPoints = unpack("<i", f.read(4))[0]
-        # Read parts
-        if nParts:
-            record.parts = _Array("i", unpack(f"<{nParts}i", f.read(nParts * 4)))
-        # Read part types for Multipatch - 31
-        if shapeType == 31:
-            record.partTypes = _Array("i", unpack(f"<{nParts}i", f.read(nParts * 4)))
-        # Read points - produces a list of [x,y] values
-        if nPoints:
+            # Read points - produces a list of [x,y] values
+
             flat = unpack(f"<{2 * nPoints}d", f.read(16 * nPoints))
             record.points = list(zip(*(iter(flat),) * 2))
-        # Read z extremes and values
-        if shapeType in (13, 15, 18, 31):
-            __zmin, __zmax = unpack("<2d", f.read(16))
-            record.z = _Array("d", unpack(f"<{nPoints}d", f.read(nPoints * 8)))
-        # Read m extremes and values
-        if shapeType in (13, 15, 18, 23, 25, 28, 31):
-            if next_shape - f.tell() >= 16:
-                __mmin, __mmax = unpack("<2d", f.read(16))
-            # Measure values less than -10e38 are nodata values according to the spec
-            if next_shape - f.tell() >= nPoints * 8:
-                record.m = []
-                for m in _Array("d", unpack(f"<{nPoints}d", f.read(nPoints * 8))):
-                    if m > NODATA:
-                        record.m.append(m)
-                    else:
-                        record.m.append(None)
-            else:
-                record.m = [None for _ in range(nPoints)]
+
+            # Read z extremes and values
+            if shapeType in (13, 15, 18, 31):
+                __zmin, __zmax = unpack("<2d", f.read(16))
+                record.z = _Array[float](
+                    "d", unpack(f"<{nPoints}d", f.read(nPoints * 8))
+                )
+
+            # Read m extremes and values
+            if shapeType in (13, 15, 18, 23, 25, 28, 31):
+                if next_shape - f.tell() >= 16:
+                    __mmin, __mmax = unpack("<2d", f.read(16))
+                # Measure values less than -10e38 are nodata values according to the spec
+                if next_shape - f.tell() >= nPoints * 8:
+                    record.m = []
+                    for m in _Array[float](
+                        "d", unpack(f"<{nPoints}d", f.read(nPoints * 8))
+                    ):
+                        if m > NODATA:
+                            record.m.append(m)
+                        else:
+                            record.m.append(None)
+                else:
+                    record.m = [None for _ in range(nPoints)]
+
         # Read a single point
         if shapeType in (1, 11, 21):
-            record.points = [_Array("d", unpack("<2d", f.read(16)))]
+            array_2D = _Array[float]("d", unpack("<2d", f.read(16)))
+
+            record.points = [tuple(array_2D)]
             if bbox is not None:
                 # create bounding box for Point by duplicating coordinates
                 point_bbox = list(record.points[0] + record.points[0])
@@ -1495,9 +1514,11 @@ class Reader:
                 if not bbox_overlap(bbox, point_bbox):
                     f.seek(next_shape)
                     return None
+
         # Read a single Z value
         if shapeType == 11:
             record.z = list(unpack("<d", f.read(8)))
+
         # Read a single M value
         if shapeType in (21, 11):
             if next_shape - f.tell() >= 8:
@@ -1509,11 +1530,14 @@ class Reader:
                 record.m = [m]
             else:
                 record.m = [None]
+
         # pylint: enable=attribute-defined-outside-init
         # Seek to the end of this record as defined by the record header because
         # the shapefile spec doesn't require the actual content to meet the header
         # definition.  Probably allowed for lazy feature deletion.
+
         f.seek(next_shape)
+
         return record
 
     def __shxHeader(self):
@@ -1538,7 +1562,7 @@ class Reader:
         # Jump to the first record.
         shx.seek(100)
         # Each index record consists of two nrs, we only want the first one
-        shxRecords = _Array("i", shx.read(2 * self.numShapes * 4))
+        shxRecords = _Array[int]("i", shx.read(2 * self.numShapes * 4))
         if sys.byteorder != "big":
             shxRecords.byteswap()
         self._offsets: list[int] = [2 * el for el in shxRecords[::2]]
