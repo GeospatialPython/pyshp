@@ -2775,11 +2775,11 @@ class Writer:
         """Creates a null shape."""
         self.shape(Shape(NULL))
 
-    def point(self, x, y):
+    def point(self, x: float, y: float):
         """Creates a POINT shape."""
         shapeType = POINT
         pointShape = Shape(shapeType)
-        pointShape.points.append([x, y])
+        pointShape.points.append((x, y))
         self.shape(pointShape)
 
     def pointm(self, x, y, m=None):
