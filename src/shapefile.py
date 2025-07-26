@@ -523,9 +523,9 @@ class Shape:
         else:
             self.__oid = -1
 
-        self.z: Optional[Union[list[Optional[float]], _Array[float]]] = None
-        self.m: Optional[list[Optional[float]]] = None
-        self.bbox: Optional[_Array[float]] = None
+        # self.z: Optional[Union[list[Optional[float]], _Array[float]]] = None
+        # self.m: Optional[list[Optional[float]]] = None
+        # self.bbox: Optional[_Array[float]] = None
 
     @property
     def __geo_interface__(self) -> GeoJsonShapeT:
@@ -1451,9 +1451,9 @@ class Reader:
             record.points = []
         # All shape types capable of having a bounding box
         elif shapeType in (3, 5, 8, 13, 15, 18, 23, 25, 28, 31):
-            record.bbox = _Array[float]("d", unpack("<4d", f.read(32)))
+            record.bbox = _Array[float]("d", unpack("<4d", f.read(32)))  # type: ignore [attr-defined]
             # if bbox specified and no overlap, skip this shape
-            if bbox is not None and not bbox_overlap(bbox, record.bbox):
+            if bbox is not None and not bbox_overlap(bbox, record.bbox):  # type: ignore [attr-defined]
                 # because we stop parsing this shape, skip to beginning of
                 # next shape before we return
                 f.seek(next_shape)
@@ -1462,6 +1462,12 @@ class Reader:
         if shapeType in (3, 5, 13, 15, 23, 25, 31):
             nParts = unpack("<i", f.read(4))[0]
 
+        # Shape types with points
+        if shapeType in (3, 5, 8, 13, 15, 18, 23, 25, 28, 31):
+            nPoints = unpack("<i", f.read(4))[0]
+            # Read points - produces a list of [x,y] values
+
+        if nParts:
             record.parts = _Array[int]("i", unpack(f"<{nParts}i", f.read(nParts * 4)))
 
             # Read part types for Multipatch - 31
@@ -1470,18 +1476,14 @@ class Reader:
                     "i", unpack(f"<{nParts}i", f.read(nParts * 4))
                 )
 
-        # Shape types with points
-        if shapeType in (3, 5, 8, 13, 15, 18, 23, 25, 28, 31):
-            nPoints = unpack("<i", f.read(4))[0]
-            # Read points - produces a list of [x,y] values
-
+        if nPoints:
             flat = unpack(f"<{2 * nPoints}d", f.read(16 * nPoints))
             record.points = list(zip(*(iter(flat),) * 2))
 
             # Read z extremes and values
             if shapeType in (13, 15, 18, 31):
                 __zmin, __zmax = unpack("<2d", f.read(16))
-                record.z = _Array[float](
+                record.z = _Array[float](  # type: ignore [attr-defined]
                     "d", unpack(f"<{nPoints}d", f.read(nPoints * 8))
                 )
 
@@ -1491,16 +1493,16 @@ class Reader:
                     __mmin, __mmax = unpack("<2d", f.read(16))
                 # Measure values less than -10e38 are nodata values according to the spec
                 if next_shape - f.tell() >= nPoints * 8:
-                    record.m = []
+                    record.m = []  # type: ignore [attr-defined]
                     for m in _Array[float](
                         "d", unpack(f"<{nPoints}d", f.read(nPoints * 8))
                     ):
                         if m > NODATA:
-                            record.m.append(m)
+                            record.m.append(m)  # type: ignore [attr-defined]
                         else:
-                            record.m.append(None)
+                            record.m.append(None)  # type: ignore [attr-defined]
                 else:
-                    record.m = [None for _ in range(nPoints)]
+                    record.m = [None for _ in range(nPoints)]  # type: ignore [attr-defined]
 
         # Read a single point
         if shapeType in (1, 11, 21):
@@ -1517,7 +1519,7 @@ class Reader:
 
         # Read a single Z value
         if shapeType == 11:
-            record.z = list(unpack("<d", f.read(8)))
+            record.z = list(unpack("<d", f.read(8)))  # type: ignore [attr-defined]
 
         # Read a single M value
         if shapeType in (21, 11):
@@ -1527,9 +1529,9 @@ class Reader:
                 m = NODATA
             # Measure values less than -10e38 are nodata values according to the spec
             if m > NODATA:
-                record.m = [m]
+                record.m = [m]  # type: ignore [attr-defined]
             else:
-                record.m = [None]
+                record.m = [None]  # type: ignore [attr-defined]
 
         # pylint: enable=attribute-defined-outside-init
         # Seek to the end of this record as defined by the record header because
