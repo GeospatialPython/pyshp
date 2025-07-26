@@ -1450,7 +1450,7 @@ class Reader:
         if shapeType == 0:
             record.points = []
         # All shape types capable of having a bounding box
-        elif shapeType in (3, 5, 8, 13, 15, 18, 23, 25, 28, 31):
+        elif shapeType in (3, 13, 23, 5, 15, 25, 8, 18, 28, 31):
             record.bbox = _Array[float]("d", unpack("<4d", f.read(32)))  # type: ignore [attr-defined]
             # if bbox specified and no overlap, skip this shape
             if bbox is not None and not bbox_overlap(bbox, record.bbox):  # type: ignore [attr-defined]
@@ -1459,11 +1459,11 @@ class Reader:
                 f.seek(next_shape)
                 return None
         # Shape types with parts
-        if shapeType in (3, 5, 13, 15, 23, 25, 31):
+        if shapeType in (3, 13, 23, 5, 15, 25, 31):
             nParts = unpack("<i", f.read(4))[0]
 
         # Shape types with points
-        if shapeType in (3, 5, 8, 13, 15, 18, 23, 25, 28, 31):
+        if shapeType in (3, 13, 23, 5, 15, 25, 8, 18, 28, 31):
             nPoints = unpack("<i", f.read(4))[0]
             # Read points - produces a list of [x,y] values
 
@@ -1488,7 +1488,7 @@ class Reader:
                 )
 
             # Read m extremes and values
-            if shapeType in (13, 15, 18, 23, 25, 28, 31):
+            if shapeType in (13, 23, 15, 25, 18, 28, 31):
                 if next_shape - f.tell() >= 16:
                     __mmin, __mmax = unpack("<2d", f.read(16))
                 # Measure values less than -10e38 are nodata values according to the spec
