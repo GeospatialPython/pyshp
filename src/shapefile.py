@@ -25,6 +25,7 @@ from typing import (
     IO,
     Any,
     Collection,
+    Container,
     Generic,
     Iterable,
     Iterator,
@@ -119,6 +120,7 @@ BBox = tuple[float, float, float, float]
 BinaryFileT = Union[str, IO[bytes]]
 BinaryFileStreamT = Union[IO[bytes], io.BytesIO]
 
+FieldTuple = tuple[str, str, int, bool]
 RecordValue = Union[
     bool, int, float, str, date
 ]  # A Possible value in a Shapefile record, e.g. L, N, F, C, D types
@@ -1017,7 +1019,7 @@ class Reader:
         self.shpLength: Optional[int] = None
         self.numRecords: Optional[int] = None
         self.numShapes: Optional[int] = None
-        self.fields: list[list[str]] = []
+        self.fields: list[FieldTuple] = []
         self.__dbfHdrLength = 0
         self.__fieldLookup: dict[str, int] = {}
         self.encoding = encoding
@@ -1581,7 +1583,7 @@ class Reader:
             self.__shxOffsets()
         return self._offsets[i]
 
-    def shape(self, i: int = 0, bbox: Optional[BBox] = None):
+    def shape(self, i: int = 0, bbox: Optional[BBox] = None) -> Optional[Shape]:
         """Returns a shape object for a shape in the geometry
         record file.
         If the 'bbox' arg is given (list or tuple of xmin,ymin,xmax,ymax),
@@ -1619,7 +1621,7 @@ class Reader:
         shp.seek(offset)
         return self.__shape(oid=i, bbox=bbox)
 
-    def shapes(self, bbox=None):
+    def shapes(self, bbox: Optional[BBox] = None) -> Shapes:
         """Returns all shapes in a shapefile.
         To only read shapes within a given spatial region, specify the 'bbox'
         arg as a list or tuple of xmin,ymin,xmax,ymax.
@@ -1628,7 +1630,7 @@ class Reader:
         shapes.extend(self.iterShapes(bbox=bbox))
         return shapes
 
-    def iterShapes(self, bbox=None):
+    def iterShapes(self, bbox: Optional[BBox] = None) -> Iterator[Optional[Shape]]:
         """Returns a generator of shapes in a shapefile. Useful
         for handling large shapefiles.
         To only read shapes within a given spatial region, specify the 'bbox'
@@ -1722,7 +1724,7 @@ class Reader:
 
         # pylint: enable=attribute-defined-outside-init
 
-    def __recordFmt(self, fields=None):
+    def __recordFmt(self, fields: Optional[Container[str]] = None) -> tuple[str, int]:
         """Calculates the format and size of a .dbf record. Optional 'fields' arg
         specifies which fieldnames to unpack and which to ignore. Note that this
         always includes the DeletionFlag at index 0, regardless of the 'fields' arg.
@@ -1748,7 +1750,9 @@ class Reader:
             fmtSize += 1
         return (fmt, fmtSize)
 
-    def __recordFields(self, fields=None):
+    def __recordFields(
+        self, fields: Optional[Iterable[str]] = None
+    ) -> tuple[list[FieldTuple], dict[str, int], Struct]:
         """Returns the necessary info required to unpack a record's fields,
         restricted to a subset of fieldnames 'fields' if specified.
         Returns a list of field info tuples, a name-index lookup dict,
@@ -1758,19 +1762,19 @@ class Reader:
         if fields is not None:
             # restrict info to the specified fields
             # first ignore repeated field names (order doesn't matter)
-            fields = list(set(fields))
+            unique_fields = list(set(fields))
             # get the struct
-            fmt, __fmtSize = self.__recordFmt(fields=fields)
+            fmt, __fmtSize = self.__recordFmt(fields=unique_fields)
             recStruct = Struct(fmt)
             # make sure the given fieldnames exist
-            for name in fields:
+            for name in unique_fields:
                 if name not in self.__fieldLookup or name == "DeletionFlag":
                     raise ValueError(f'"{name}" is not a valid field name')
             # fetch relevant field info tuples
             fieldTuples = []
             for fieldinfo in self.fields[1:]:
                 name = fieldinfo[0]
-                if name in fields:
+                if name in unique_fields:
                     fieldTuples.append(fieldinfo)
             # store the field positions
             recLookup = {f[0]: i for i, f in enumerate(fieldTuples)}
@@ -1783,7 +1787,7 @@ class Reader:
 
     def __record(
         self,
-        fieldTuples: list[tuple[str, str, int, bool]],
+        fieldTuples: list[FieldTuple],
         recLookup: dict[str, int],
         recStruct: Struct,
         oid: Optional[int] = None,
