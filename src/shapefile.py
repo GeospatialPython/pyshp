@@ -2034,23 +2034,23 @@ class Writer:
 
     def __init__(
         self,
-        target=None,
-        shapeType=None,
-        autoBalance=False,
-        encoding="utf-8",
-        encodingErrors="strict",
+        target: Union[str, os.PathLike, None] = None,
+        shapeType: Optional[int] = None,
+        autoBalance: bool = False,
         *,
-        shp=None,
-        shx=None,
-        dbf=None,
+        encoding: str = "utf-8",
+        encodingErrors: str = "strict",
+        shp: Optional[BinaryFileT] = None,
+        shx: Optional[BinaryFileT] = None,
+        dbf: Optional[BinaryFileT] = None,
         **kwargs,  # pylint: disable=unused-argument
     ):
         self.target = target
         self.autoBalance = autoBalance
-        self.fields = []
+        self.fields: list[FieldTuple] = []
         self.shapeType = shapeType
         self.shp = self.shx = self.dbf = None
-        self._files_to_close = []
+        self._files_to_close: list[BinaryFileStreamT] = []
         if target:
             target = fsdecode_if_pathlike(target)
             if not is_string(target):
