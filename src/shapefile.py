@@ -993,7 +993,7 @@ class Reader:
 
     def __init__(
         self,
-        shapefile_path: str = "",
+        shapefile_path: Union[str, os.PathLike] = "",
         /,
         *,
         encoding: str = "utf-8",
@@ -1369,7 +1369,7 @@ class Reader:
                     pass
         self._files_to_close = []
 
-    def __getFileObj(self, f):
+    def __getFileObj(self, f: Optional[T]) -> T:
         """Checks to see if the requested shapefile file object is
         available. If not a ShapefileException is raised."""
         if not f:
