@@ -122,6 +122,10 @@ class BinaryWritable(Protocol):
     def write(self, data: bytes): ...
 
 
+class BinaryWritableSeekable(BinaryWritable):
+    def seek(self, i: int): ...
+
+
 # File name, file object or anything with a read() method that returns bytes.
 BinaryFileT = Union[str, IO[bytes]]
 BinaryFileStreamT = Union[IO[bytes], io.BytesIO]
@@ -137,6 +141,11 @@ class GeoJsonShapeT(TypedDict):
     coordinates: Union[
         tuple[()], Point2D, PointZ, PointZM, Coords, list[Coords], list[list[Coords]]
     ]
+
+
+class HasGeoInterface(Protocol):
+    @property
+    def __geo_interface__(self) -> Any: ...
 
 
 # Helpers
@@ -2046,16 +2055,18 @@ class Writer:
         *,
         encoding: str = "utf-8",
         encodingErrors: str = "strict",
-        shp: Optional[BinaryFileT] = None,
-        shx: Optional[BinaryFileT] = None,
-        dbf: Optional[BinaryFileT] = None,
+        shp: Optional[BinaryWritableSeekable] = None,
+        shx: Optional[BinaryWritableSeekable] = None,
+        dbf: Optional[BinaryWritableSeekable] = None,
         **kwargs,  # pylint: disable=unused-argument
     ):
         self.target = target
         self.autoBalance = autoBalance
         self.fields: list[FieldTuple] = []
         self.shapeType = shapeType
-        self.shp = self.shx = self.dbf = None
+        self.shp: Optional[Union[BinaryFileStreamT, BinaryWritableSeekable]] = None
+        self.shx: Optional[Union[BinaryFileStreamT, BinaryWritableSeekable]] = None
+        self.dbf: Optional[Union[BinaryFileStreamT, BinaryWritableSeekable]] = None
         self._files_to_close: list[BinaryFileStreamT] = []
         if target:
             target = fsdecode_if_pathlike(target)
@@ -2163,7 +2174,7 @@ class Writer:
                     pass
         self._files_to_close = []
 
-    W = TypeVar("W", bound=BinaryWritable)
+    W = TypeVar("W", bound=BinaryWritableSeekable)
 
     @overload
     def __getFileObj(self, f: str) -> IO[bytes]: ...
@@ -2292,7 +2303,11 @@ class Writer:
         """Returns the current m extremes for the shapefile."""
         return self._mbox
 
-    def __shapefileHeader(self, fileObj, headerType="shp"):
+    def __shapefileHeader(
+        self,
+        fileObj: Union[str, BinaryWritableSeekable],
+        headerType: str = "shp",
+    ):
         """Writes the specified header type to the specified file-like object.
         Several of the shapefile formats are so similar that a single generic
         method to read or write them is warranted."""
@@ -2404,14 +2419,17 @@ class Writer:
         # Terminator
         f.write(b"\r")
 
-    def shape(self, s):
+    def shape(
+        self,
+        s: Union[Shape, HasGeoInterface, dict],
+    ):
         # Balance if already not balanced
         if self.autoBalance and self.recNum < self.shpNum:
             self.balance()
         # Check is shape or import from geojson
         if not isinstance(s, Shape):
             if hasattr(s, "__geo_interface__"):
-                s = s.__geo_interface__
+                s = s.__geo_interface__  # type: ignore [assignment]
             if isinstance(s, dict):
                 s = Shape._from_geojson(s)
             else:
