@@ -2275,8 +2275,8 @@ class Writer:
         return mbox
 
     @property
-    def shapeTypeName(self):
-        return SHAPETYPE_LOOKUP[self.shapeType]
+    def shapeTypeName(self) -> str:
+        return SHAPETYPE_LOOKUP[self.shapeType or 0]
 
     def bbox(self):
         """Returns the current bounding box for the shapefile which is
