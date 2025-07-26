@@ -2645,7 +2645,9 @@ class Writer:
 
         # pylint: enable=raise-missing-from
 
-    def record(self, *recordList, **recordDict):
+    def record(
+        self, *recordList: Iterable[RecordValue], **recordDict: dict[str, RecordValue]
+    ):
         """Creates a dbf attribute record. You can submit either a sequence of
         field values or keyword arguments of field names and values. Before
         adding records you must add fields for the record values using the
