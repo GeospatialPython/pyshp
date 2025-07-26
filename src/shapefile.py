@@ -115,7 +115,9 @@ BBox = tuple[float, float, float, float]
 BinaryFileT = Union[str, IO[bytes]]
 BinaryFileStreamT = Union[IO[bytes], io.BytesIO]
 
-RecordValue = Union[float, str, date]
+RecordValue = Union[
+    bool, int, float, str, date
+]  # A Possible value in a Shapefile record, e.g. L, N, F, C, D types
 
 
 class GeoJsonShapeT(TypedDict):
