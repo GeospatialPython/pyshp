@@ -29,7 +29,9 @@ from typing import (
     Generic,
     Iterable,
     Iterator,
+    NoReturn,
     Optional,
+    Protocol,
     Reversible,
     Sequence,
     TypedDict,
@@ -115,8 +117,12 @@ Coords = list[Coord]
 
 BBox = tuple[float, float, float, float]
 
+
+class BinaryWritable(Protocol):
+    def write(self, data: bytes): ...
+
+
 # File name, file object or anything with a read() method that returns bytes.
-# TODO: Create simple Protocol with a read() method pylint: disable=fixme
 BinaryFileT = Union[str, IO[bytes]]
 BinaryFileStreamT = Union[IO[bytes], io.BytesIO]
 
@@ -2157,7 +2163,15 @@ class Writer:
                     pass
         self._files_to_close = []
 
-    def __getFileObj(self, f: Union[IO[bytes], str]) -> IO[bytes]:
+    W = TypeVar("W", bound=BinaryWritable)
+
+    @overload
+    def __getFileObj(self, f: str) -> IO[bytes]: ...
+    @overload
+    def __getFileObj(self, f: None) -> NoReturn: ...
+    @overload
+    def __getFileObj(self, f: W) -> W: ...
+    def __getFileObj(self, f):
         """Safety handler to verify file-like objects"""
         if not f:
             raise ShapefileException("No file-like object available.")
