@@ -2827,7 +2827,7 @@ class Writer:
         ]  # nest the points inside a list to be compatible with the generic shapeparts method
         self._shapeparts(parts=points, shapeType=shapeType)
 
-    def line(self, lines):
+    def line(self, lines: Collection[Coords]):
         """Creates a POLYLINE shape.
         Lines is a collection of lines, each made up of a list of xy values."""
         shapeType = POLYLINE
@@ -2848,7 +2848,7 @@ class Writer:
         shapeType = POLYLINEZ
         self._shapeparts(parts=lines, shapeType=shapeType)
 
-    def poly(self, polys):
+    def poly(self, polys: Collection[Coords]):
         """Creates a POLYGON shape.
         Polys is a collection of polygons, each made up of a list of xy values.
         Note that for ordinary polygons the coordinates must run in a clockwise direction.
