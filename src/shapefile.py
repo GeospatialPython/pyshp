@@ -123,12 +123,13 @@ class BinaryWritable(Protocol):
 
 
 class BinaryWritableSeekable(BinaryWritable):
-    def seek(self, i: int): ...
+    def seek(self, i: int): ...  # pylint: disable=unused-argument
+    def tell(self): ...
 
 
 # File name, file object or anything with a read() method that returns bytes.
 BinaryFileT = Union[str, IO[bytes]]
-BinaryFileStreamT = Union[IO[bytes], io.BytesIO]
+BinaryFileStreamT = Union[IO[bytes], io.BytesIO, BinaryWritableSeekable]
 
 FieldTuple = tuple[str, str, int, bool]
 RecordValue = Union[
@@ -2064,9 +2065,9 @@ class Writer:
         self.autoBalance = autoBalance
         self.fields: list[FieldTuple] = []
         self.shapeType = shapeType
-        self.shp: Optional[Union[BinaryFileStreamT, BinaryWritableSeekable]] = None
-        self.shx: Optional[Union[BinaryFileStreamT, BinaryWritableSeekable]] = None
-        self.dbf: Optional[Union[BinaryFileStreamT, BinaryWritableSeekable]] = None
+        self.shp: Optional[BinaryFileStreamT] = None
+        self.shx: Optional[BinaryFileStreamT] = None
+        self.dbf: Optional[BinaryFileStreamT] = None
         self._files_to_close: list[BinaryFileStreamT] = []
         if target:
             target = fsdecode_if_pathlike(target)
@@ -2305,7 +2306,7 @@ class Writer:
 
     def __shapefileHeader(
         self,
-        fileObj: Union[str, BinaryWritableSeekable],
+        fileObj: Optional[BinaryWritableSeekable],
         headerType: str = "shp",
     ):
         """Writes the specified header type to the specified file-like object.
