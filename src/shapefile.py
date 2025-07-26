@@ -21,7 +21,18 @@ import time
 import zipfile
 from datetime import date
 from struct import Struct, calcsize, error, pack, unpack
-from typing import IO, Any, Iterable, Iterator, Optional, Reversible, TypedDict, Union
+from typing import (
+    IO,
+    Any,
+    Iterable,
+    Iterator,
+    Optional,
+    Reversible,
+    TypedDict,
+    TypeVar,
+    Union,
+    overload,
+)
 from urllib.error import HTTPError
 from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
@@ -158,9 +169,16 @@ def is_string(v: Any) -> bool:
     return isinstance(v, str)
 
 
-def pathlike_obj(path: Any) -> Any:
+T = TypeVar("T")
+
+
+@overload
+def fsdecode_if_pathlike(path: os.PathLike) -> str: ...
+@overload
+def fsdecode_if_pathlike(path: T) -> T: ...
+def fsdecode_if_pathlike(path):
     if isinstance(path, os.PathLike):
-        return os.fsdecode(path)
+        return os.fsdecode(path)  # str
 
     return path
 
@@ -999,7 +1017,7 @@ class Reader:
         self.encodingErrors = encodingErrors
         # See if a shapefile name was passed as the first argument
         if shapefile_path:
-            path = pathlike_obj(shapefile_path)
+            path = fsdecode_if_pathlike(shapefile_path)
             if is_string(path):
                 if ".zip" in path:
                     # Shapefile is inside a zipfile
@@ -2001,7 +2019,7 @@ class Writer:
         self.shp = self.shx = self.dbf = None
         self._files_to_close = []
         if target:
-            target = pathlike_obj(target)
+            target = fsdecode_if_pathlike(target)
             if not is_string(target):
                 raise TypeError(
                     f"The target filepath {target!r} must be of type str/unicode or path-like, not {type(target)}."
