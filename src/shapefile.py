@@ -131,7 +131,7 @@ class BinaryWritableSeekable(BinaryWritable):
 BinaryFileT = Union[str, IO[bytes]]
 BinaryFileStreamT = Union[IO[bytes], io.BytesIO, BinaryWritableSeekable]
 
-FieldTuple = tuple[str, str, int, bool]
+FieldTuple = tuple[str, str, int, int]
 RecordValue = Union[
     bool, int, float, str, date
 ]  # A Possible value in a Shapefile record, e.g. L, N, F, C, D types
@@ -2924,13 +2924,20 @@ class Writer:
         # write the shape
         self.shape(polyShape)
 
-    def field(self, name, fieldType="C", size="50", decimal=0):
+    def field(
+        # Types of args should match *FieldTuple
+        self,
+        name: str,
+        fieldType: str = "C",
+        size: int = 50,
+        decimal: int = 0,
+    ):
         """Adds a dbf field descriptor to the shapefile."""
         if fieldType == "D":
-            size = "8"
+            size = 8
             decimal = 0
         elif fieldType == "L":
-            size = "1"
+            size = 1
             decimal = 0
         if len(self.fields) >= 2046:
             raise ShapefileException(
