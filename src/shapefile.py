@@ -1425,6 +1425,7 @@ class Reader:
 
         # pylint: enable=attribute-defined-outside-init
 
+    # def __shape(self, oid: Optional[int] = None, bbox: Optional[BBox] = None) -> Shape:
     def __shape(self, oid=None, bbox=None):
         """Returns the header info and geometry for a single shape."""
 
@@ -1540,9 +1541,9 @@ class Reader:
         shxRecords = _Array("i", shx.read(2 * self.numShapes * 4))
         if sys.byteorder != "big":
             shxRecords.byteswap()
-        self._offsets = [2 * el for el in shxRecords[::2]]
+        self._offsets: list[int] = [2 * el for el in shxRecords[::2]]
 
-    def __shapeIndex(self, i=None):
+    def __shapeIndex(self, i: Optional[int] = None) -> Optional[int]:
         """Returns the offset in a .shp file for a shape based on information
         in the .shx index file."""
         shx = self.shx
@@ -1554,7 +1555,7 @@ class Reader:
             self.__shxOffsets()
         return self._offsets[i]
 
-    def shape(self, i=0, bbox=None):
+    def shape(self, i: int = 0, bbox: Optional[BBox] = None):
         """Returns a shape object for a shape in the geometry
         record file.
         If the 'bbox' arg is given (list or tuple of xmin,ymin,xmax,ymax),
