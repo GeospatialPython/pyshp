@@ -2865,7 +2865,7 @@ class Writer:
         shapeType = POLYGONZ
         self._shapeparts(parts=polys, shapeType=shapeType)
 
-    def multipatch(self, parts: list[list[PointZ]], partTypes: list[int]):
+    def multipatch(self, parts: list[Points], partTypes: list[int]):
         """Creates a MULTIPATCH shape.
         Parts is a collection of 3D surface patches, each made up of a list of xyzm values.
         PartTypes is a list of types that define each of the surface patches.
