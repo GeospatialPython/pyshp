@@ -2801,15 +2801,13 @@ class Writer:
         # nest the points inside a list to be compatible with the generic shapeparts method
         self._shapeparts(parts=[points], shapeType=shapeType)
 
-    def multipointm(self, points):
+    def multipointm(self, points: list[PointM]):
         """Creates a MULTIPOINTM shape.
         Points is a list of xym values.
         If the m (measure) value is not included, it defaults to None (NoData)."""
         shapeType = MULTIPOINTM
-        points = [
-            points
-        ]  # nest the points inside a list to be compatible with the generic shapeparts method
-        self._shapeparts(parts=points, shapeType=shapeType)
+        # nest the points inside a list to be compatible with the generic shapeparts method
+        self._shapeparts(parts=[points], shapeType=shapeType)
 
     def multipointz(self, points):
         """Creates a MULTIPOINTZ shape.
@@ -2817,25 +2815,23 @@ class Writer:
         If the z (elevation) value is not included, it defaults to 0.
         If the m (measure) value is not included, it defaults to None (NoData)."""
         shapeType = MULTIPOINTZ
-        points = [
-            points
-        ]  # nest the points inside a list to be compatible with the generic shapeparts method
-        self._shapeparts(parts=points, shapeType=shapeType)
+        # nest the points inside a list to be compatible with the generic shapeparts method
+        self._shapeparts(parts=[points], shapeType=shapeType)
 
-    def line(self, lines: Collection[Coords]):
+    def line(self, lines: list[Coords]):
         """Creates a POLYLINE shape.
         Lines is a collection of lines, each made up of a list of xy values."""
         shapeType = POLYLINE
         self._shapeparts(parts=lines, shapeType=shapeType)
 
-    def linem(self, lines):
+    def linem(self, lines: list[Points]):
         """Creates a POLYLINEM shape.
         Lines is a collection of lines, each made up of a list of xym values.
         If the m (measure) value is not included, it defaults to None (NoData)."""
         shapeType = POLYLINEM
         self._shapeparts(parts=lines, shapeType=shapeType)
 
-    def linez(self, lines):
+    def linez(self, lines: list[Points]):
         """Creates a POLYLINEZ shape.
         Lines is a collection of lines, each made up of a list of xyzm values.
         If the z (elevation) value is not included, it defaults to 0.
@@ -2843,7 +2839,7 @@ class Writer:
         shapeType = POLYLINEZ
         self._shapeparts(parts=lines, shapeType=shapeType)
 
-    def poly(self, polys: Collection[Coords]):
+    def poly(self, polys: list[Coords]):
         """Creates a POLYGON shape.
         Polys is a collection of polygons, each made up of a list of xy values.
         Note that for ordinary polygons the coordinates must run in a clockwise direction.
@@ -2851,7 +2847,7 @@ class Writer:
         shapeType = POLYGON
         self._shapeparts(parts=polys, shapeType=shapeType)
 
-    def polym(self, polys):
+    def polym(self, polys: list[Points]):
         """Creates a POLYGONM shape.
         Polys is a collection of polygons, each made up of a list of xym values.
         Note that for ordinary polygons the coordinates must run in a clockwise direction.
@@ -2860,7 +2856,7 @@ class Writer:
         shapeType = POLYGONM
         self._shapeparts(parts=polys, shapeType=shapeType)
 
-    def polyz(self, polys):
+    def polyz(self, polys: list[Points]):
         """Creates a POLYGONZ shape.
         Polys is a collection of polygons, each made up of a list of xyzm values.
         Note that for ordinary polygons the coordinates must run in a clockwise direction.
@@ -2870,7 +2866,7 @@ class Writer:
         shapeType = POLYGONZ
         self._shapeparts(parts=polys, shapeType=shapeType)
 
-    def multipatch(self, parts, partTypes):
+    def multipatch(self, parts: list[list[PointZ]], partTypes: list[int]):
         """Creates a MULTIPATCH shape.
         Parts is a collection of 3D surface patches, each made up of a list of xyzm values.
         PartTypes is a list of types that define each of the surface patches.
@@ -2886,11 +2882,12 @@ class Writer:
             # set part index position
             polyShape.parts.append(len(polyShape.points))
             # add points
-            for point in part:
-                # Ensure point is list
-                if not isinstance(point, list):
-                    point = list(point)
-                polyShape.points.append(point)
+            # for point in part:
+            #     # Ensure point is list
+            #     if not isinstance(point, list):
+            #         point = list(point)
+            #     polyShape.points.append(point)
+            polyShape.points.extend(part)
         polyShape.partTypes = partTypes
         # write the shape
         self.shape(polyShape)
