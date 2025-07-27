@@ -109,10 +109,11 @@ PARTTYPE_LOOKUP = {
 
 T = TypeVar("T")
 Point2D = tuple[float, float]
-PointZ = tuple[float, float, float]
-PointZM = tuple[float, float, float, float]
+Point3D = tuple[float, float, float]
+PointM = tuple[float, float, Optional[float]]
+PointZ = tuple[float, float, float, Optional[float]]
 
-Coord = Union[Point2D, PointZ, PointZM]
+Coord = Union[Point2D, Point2D, Point3D]
 Coords = list[Coord]
 
 BBox = tuple[float, float, float, float]
@@ -140,7 +141,7 @@ RecordValue = Union[
 class GeoJsonShapeT(TypedDict):
     type: str
     coordinates: Union[
-        tuple[()], Point2D, PointZ, PointZM, Coords, list[Coords], list[list[Coords]]
+        tuple[()], Point2D, PointM, PointZ, Coords, list[Coords], list[list[Coords]]
     ]
 
 
