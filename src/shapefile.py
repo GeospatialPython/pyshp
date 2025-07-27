@@ -242,7 +242,7 @@ def is_cw(coords: Coords) -> bool:
     return area2 < 0
 
 
-def rewind(coords: Reversible[Coord]) -> list[Coord]:
+def rewind(coords: Reversible[Coord]) -> Coords:
     """Returns the input coords in reversed order."""
     return list(reversed(coords))
 
@@ -270,7 +270,7 @@ def bbox_contains(bbox1: BBox, bbox2: BBox) -> bool:
     return contains
 
 
-def ring_contains_point(coords: list[Coord], p: Point2D) -> bool:
+def ring_contains_point(coords: Coords, p: Point2D) -> bool:
     """Fast point-in-polygon crossings algorithm, MacMartin optimization.
 
     Adapted from code by Eric Haynes
@@ -319,7 +319,7 @@ class RingSamplingError(Exception):
     pass
 
 
-def ring_sample(coords: list[Coord], ccw: bool = False) -> Point2D:
+def ring_sample(coords: Coords, ccw: bool = False) -> Point2D:
     """Return a sample point guaranteed to be within a ring, by efficiently
     finding the first centroid of a coordinate triplet whose orientation
     matches the orientation of the ring and passes the point-in-ring test.
@@ -369,14 +369,14 @@ def ring_sample(coords: list[Coord], ccw: bool = False) -> Point2D:
     )
 
 
-def ring_contains_ring(coords1: list[Coord], coords2: list[Point2D]) -> bool:
+def ring_contains_ring(coords1: Coords, coords2: list[Point2D]) -> bool:
     """Returns True if all vertexes in coords2 are fully inside coords1."""
     return all(ring_contains_point(coords1, p2) for p2 in coords2)
 
 
 def organize_polygon_rings(
-    rings: Iterable[list[Coord]], return_errors: Optional[dict[str, int]] = None
-) -> list[list[list[Coord]]]:
+    rings: Iterable[Coords], return_errors: Optional[dict[str, int]] = None
+) -> list[list[Coords]]:
     """Organize a list of coordinate rings into one or more polygons with holes.
     Returns a list of polygons, where each polygon is composed of a single exterior
     ring, and one or more interior holes. If a return_errors dict is provided (optional),
@@ -510,7 +510,7 @@ class Shape:
     def __init__(
         self,
         shapeType: int = NULL,
-        points: Optional[list[Coord]] = None,
+        points: Optional[Coords] = None,
         parts: Optional[Sequence[int]] = None,
         partTypes: Optional[Sequence[int]] = None,
         oid: Optional[int] = None,
