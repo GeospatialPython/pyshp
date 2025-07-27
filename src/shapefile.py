@@ -141,8 +141,6 @@ RecordValue = Union[
 ]  # A Possible value in a Shapefile record, e.g. L, N, F, C, D types
 
 
-
-
 class HasGeoInterface(Protocol):
     @property
     def __geo_interface__(self) -> Any: ...
