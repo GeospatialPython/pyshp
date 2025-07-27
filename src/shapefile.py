@@ -2793,14 +2793,14 @@ class Writer:
         pointShape.points.append((x, y, z, m))
         self.shape(pointShape)
 
-    def multipoint(self, points: Coords):
+    def multipoint(self, points: Points):
         """Creates a MULTIPOINT shape.
         Points is a list of xy values."""
         shapeType = MULTIPOINT
         # nest the points inside a list to be compatible with the generic shapeparts method
         self._shapeparts(parts=[points], shapeType=shapeType)
 
-    def multipointm(self, points: list[PointM]):
+    def multipointm(self, points: Points):
         """Creates a MULTIPOINTM shape.
         Points is a list of xym values.
         If the m (measure) value is not included, it defaults to None (NoData)."""
@@ -2808,7 +2808,7 @@ class Writer:
         # nest the points inside a list to be compatible with the generic shapeparts method
         self._shapeparts(parts=[points], shapeType=shapeType)
 
-    def multipointz(self, points):
+    def multipointz(self, points: Points):
         """Creates a MULTIPOINTZ shape.
         Points is a list of xyzm values.
         If the z (elevation) value is not included, it defaults to 0.
@@ -2817,7 +2817,7 @@ class Writer:
         # nest the points inside a list to be compatible with the generic shapeparts method
         self._shapeparts(parts=[points], shapeType=shapeType)
 
-    def line(self, lines: list[Coords]):
+    def line(self, lines: list[Points]):
         """Creates a POLYLINE shape.
         Lines is a collection of lines, each made up of a list of xy values."""
         shapeType = POLYLINE
@@ -2838,7 +2838,7 @@ class Writer:
         shapeType = POLYLINEZ
         self._shapeparts(parts=lines, shapeType=shapeType)
 
-    def poly(self, polys: list[Coords]):
+    def poly(self, polys: list[Points]):
         """Creates a POLYGON shape.
         Polys is a collection of polygons, each made up of a list of xy values.
         Note that for ordinary polygons the coordinates must run in a clockwise direction.
@@ -2891,7 +2891,7 @@ class Writer:
         # write the shape
         self.shape(polyShape)
 
-    def _shapeparts(self, parts, shapeType):
+    def _shapeparts(self, parts: list[Points], shapeType: int):
         """Internal method for adding a shape that has multiple collections of points (parts):
         lines, polygons, and multipoint shapes.
         """
@@ -2908,10 +2908,11 @@ class Writer:
             # set part index position
             polyShape.parts.append(len(polyShape.points))
             # add points
-            for point in part:
-                # Ensure point is list
-                point_list = list(point)
-                polyShape.points.append(point_list)
+            # for point in part:
+            #     # Ensure point is list
+            #     point_list = list(point)
+            #     polyShape.points.append(point_list)
+            polyShape.points.extend(part)
         # write the shape
         self.shape(polyShape)
 
