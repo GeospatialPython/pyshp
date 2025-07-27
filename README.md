@@ -406,7 +406,7 @@ and the bounding box area the shapefile covers:
 	>>> len(sf)
 	663
 	>>> sf.bbox
-	[-122.515048, 37.652916, -122.327622, 37.863433]
+	(-122.515048, 37.652916, -122.327622, 37.863433)
 
 Finally, if you would prefer to work with the entire shapefile in a different
 format, you can convert all of it to a GeoJSON dictionary, although you may lose
