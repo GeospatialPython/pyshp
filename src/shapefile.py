@@ -34,7 +34,6 @@ from typing import (
     Protocol,
     Reversible,
     Sequence,
-    TypedDict,
     TypeVar,
     Union,
     overload,
