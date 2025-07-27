@@ -116,6 +116,9 @@ PointZ = tuple[float, float, float, Optional[float]]
 Coord = Union[Point2D, Point2D, Point3D]
 Coords = list[Coord]
 
+Point = Union[Point2D, PointM, PointZ]
+Points = list[Point]
+
 BBox = tuple[float, float, float, float]
 
 
@@ -138,11 +141,6 @@ RecordValue = Union[
 ]  # A Possible value in a Shapefile record, e.g. L, N, F, C, D types
 
 
-class GeoJsonShapeT(TypedDict):
-    type: str
-    coordinates: Union[
-        tuple[()], Point2D, PointM, PointZ, Coords, list[Coords], list[list[Coords]]
-    ]
 
 
 class HasGeoInterface(Protocol):
@@ -255,11 +253,11 @@ def ring_bbox(coords: Coords) -> BBox:
     return bbox
 
 
-def bbox_overlap(bbox1: BBox, bbox2: Collection[float]) -> bool:
+def bbox_overlap(bbox1: BBox, bbox2: BBox) -> bool:
     """Tests whether two bounding boxes overlap."""
     xmin1, ymin1, xmax1, ymax1 = bbox1
     xmin2, ymin2, xmax2, ymax2 = bbox2
-    overlap = xmin1 <= xmax2 and xmax1 >= xmin2 and ymin1 <= ymax2 and ymax1 >= ymin2
+    overlap = xmin1 <= xmax2 and xmin2 <= xmax1 and ymin1 <= ymax2 and ymin2 <= ymax1
     return overlap
 
 
@@ -267,7 +265,7 @@ def bbox_contains(bbox1: BBox, bbox2: BBox) -> bool:
     """Tests whether bbox1 fully contains bbox2."""
     xmin1, ymin1, xmax1, ymax1 = bbox1
     xmin2, ymin2, xmax2, ymax2 = bbox2
-    contains = xmin1 < xmin2 and xmax1 > xmax2 and ymin1 < ymin2 and ymax1 > ymax2
+    contains = xmin1 < xmin2 and xmax2 < xmax1 and ymin1 < ymin2 and ymax2 < ymax1
     return contains
 
 
@@ -511,7 +509,7 @@ class Shape:
     def __init__(
         self,
         shapeType: int = NULL,
-        points: Optional[Coords] = None,
+        points: Optional[Points] = None,
         parts: Optional[Sequence[int]] = None,
         partTypes: Optional[Sequence[int]] = None,
         oid: Optional[int] = None,
@@ -547,7 +545,7 @@ class Shape:
         # self.bbox: Optional[_Array[float]] = None
 
     @property
-    def __geo_interface__(self) -> GeoJsonShapeT:
+    def __geo_interface__(self):
         if self.shapeType in [POINT, POINTM, POINTZ]:
             # point
             if len(self.points) == 0:
@@ -1435,7 +1433,7 @@ class Reader:
         shp.seek(32)
         self.shapeType = unpack("<i", shp.read(4))[0]
         # The shapefile's bounding box (lower left, upper right)
-        self.bbox = _Array("d", unpack("<4d", shp.read(32)))
+        self.bbox: BBox = tuple(_Array("d", unpack("<4d", shp.read(32))))
         # Elevation
         self.zbox = _Array("d", unpack("<2d", shp.read(16)))
         # Measure
@@ -1470,7 +1468,7 @@ class Reader:
             record.points = []
         # All shape types capable of having a bounding box
         elif shapeType in (3, 13, 23, 5, 15, 25, 8, 18, 28, 31):
-            record.bbox = _Array[float]("d", unpack("<4d", f.read(32)))  # type: ignore [attr-defined]
+            record.bbox = tuple(_Array[float]("d", unpack("<4d", f.read(32))))  # type: ignore [attr-defined]
             # if bbox specified and no overlap, skip this shape
             if bbox is not None and not bbox_overlap(bbox, record.bbox):  # type: ignore [attr-defined]
                 # because we stop parsing this shape, skip to beginning of
@@ -1525,14 +1523,13 @@ class Reader:
 
         # Read a single point
         if shapeType in (1, 11, 21):
-            array_2D = _Array[float]("d", unpack("<2d", f.read(16)))
+            x, y = _Array[float]("d", unpack("<2d", f.read(16)))
 
-            record.points = [tuple(array_2D)]
+            record.points = [(x, y)]
             if bbox is not None:
                 # create bounding box for Point by duplicating coordinates
-                point_bbox = list(record.points[0] + record.points[0])
                 # skip shape if no overlap with bounding box
-                if not bbox_overlap(bbox, point_bbox):
+                if not bbox_overlap(bbox, (x, y, x, y)):
                     f.seek(next_shape)
                     return None
 
@@ -2783,21 +2780,21 @@ class Writer:
         pointShape.points.append((x, y))
         self.shape(pointShape)
 
-    def pointm(self, x, y, m=None):
+    def pointm(self, x: float, y: float, m: Optional[float] = None):
         """Creates a POINTM shape.
         If the m (measure) value is not set, it defaults to NoData."""
         shapeType = POINTM
         pointShape = Shape(shapeType)
-        pointShape.points.append([x, y, m])
+        pointShape.points.append((x, y, m))
         self.shape(pointShape)
 
-    def pointz(self, x, y, z=0, m=None):
+    def pointz(self, x: float, y: float, z: float = 0.0, m: Optional[float] = None):
         """Creates a POINTZ shape.
         If the z (elevation) value is not set, it defaults to 0.
         If the m (measure) value is not set, it defaults to NoData."""
         shapeType = POINTZ
         pointShape = Shape(shapeType)
-        pointShape.points.append([x, y, z, m])
+        pointShape.points.append((x, y, z, m))
         self.shape(pointShape)
 
     def multipoint(self, points: Coords):
