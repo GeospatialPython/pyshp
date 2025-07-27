@@ -24,7 +24,6 @@ from struct import Struct, calcsize, error, pack, unpack
 from typing import (
     IO,
     Any,
-    Collection,
     Container,
     Generic,
     Iterable,
