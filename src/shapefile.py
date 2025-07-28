@@ -194,6 +194,16 @@ GeoJSONHomogeneousGeometryObject = Union[
     GeoJSONMultiPolygon,
 ]
 
+GEOJSON_TO_SHAPETYPE: dict[str, int] = {
+    "Null": NULL,
+    "Point": POINT,
+    "LineString": POLYLINE,
+    "Polygon": POLYGON,
+    "MultiPoint": MULTIPOINT,
+    "MultiLineString": POLYLINE,
+    "MultiPolygon": POLYGON,
+}
+
 
 class GeoJSONGeometryCollection(TypedDict):
     type: Literal["GeometryCollection"]
@@ -759,23 +769,10 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
         shape = Shape()
         # set shapeType
         geojType = geoj["type"] if geoj else "Null"
-        if geojType == "Null":
-            shapeType = NULL
-        elif geojType == "Point":
-            shapeType = POINT
-        elif geojType == "LineString":
-            shapeType = POLYLINE
-        elif geojType == "Polygon":
-            shapeType = POLYGON
-        elif geojType == "MultiPoint":
-            shapeType = MULTIPOINT
-        elif geojType == "MultiLineString":
-            shapeType = POLYLINE
-        elif geojType == "MultiPolygon":
-            shapeType = POLYGON
+        if geojType in GEOJSON_TO_SHAPETYPE:
+            shape.shapeType = GEOJSON_TO_SHAPETYPE[geojType]
         else:
             raise GeoJSON_Error(f"Cannot create Shape from GeoJSON type '{geojType}'")
-        shape.shapeType = shapeType
 
         # set points and parts
         if geojType == "Point":
