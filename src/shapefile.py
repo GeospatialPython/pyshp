@@ -145,55 +145,70 @@ class HasGeoInterface(Protocol):
     @property
     def __geo_interface__(self) -> Any: ...
 
+
 class GeoJSONPoint(TypedDict):
     type: Literal["Point"]
-    # We fix to a tuple (to statically check the length is 2, 3 or 4) but 
+    # We fix to a tuple (to statically check the length is 2, 3 or 4) but
     # RFC7946 only requires: "A position is an array of numbers.  There MUST be two or more
     # elements.  "
     # RFC7946 also requires long/lat easting/northing which we do not enforce,
     # and despite the SHOULD NOT, we may use a 4th element for Shapefile M Measures.
-    coordinates: Union[Point, tuple[()]] 
-    
+    coordinates: Union[Point, tuple[()]]
+
+
 class GeoJSONMultiPoint(TypedDict):
     type: Literal["MultiPoint"]
     coordinates: Points
+
 
 class GeoJSONLineString(TypedDict):
     type: Literal["LineString"]
     # "Two or more positions" not enforced by type checker
     # https://datatracker.ietf.org/doc/html/rfc7946#section-3.1.4
     coordinates: Points
-    
+
+
 class GeoJSONMultiLineString(TypedDict):
     type: Literal["MultiLineString"]
     coordinates: list[Points]
 
+
 class GeoJSONPolygon(TypedDict):
     type: Literal["Polygon"]
-    # Other requirements for Polygon not enforced by type checker 
+    # Other requirements for Polygon not enforced by type checker
     # https://datatracker.ietf.org/doc/html/rfc7946#section-3.1.6
     coordinates: list[Points]
+
 
 class GeoJSONMultiPolygon(TypedDict):
     type: Literal["MultiPolygon"]
     coordinates: list[list[Points]]
 
+
 GeoJSONHomogeneousGeometryObject = Union[
-    GeoJSONPoint, GeoJSONMultiPoint,
-    GeoJSONLineString, GeoJSONMultiLineString,
-    GeoJSONPolygon, GeoJSONMultiPolygon,
+    GeoJSONPoint,
+    GeoJSONMultiPoint,
+    GeoJSONLineString,
+    GeoJSONMultiLineString,
+    GeoJSONPolygon,
+    GeoJSONMultiPolygon,
 ]
+
 
 class GeoJSONGeometryCollection(TypedDict):
     type: Literal["GeometryCollection"]
     geometries: list[GeoJSONHomogeneousGeometryObject]
 
+
 # RFC7946 3.1
 GeoJSONObject = Union[GeoJSONHomogeneousGeometryObject, GeoJSONGeometryCollection]
 
+
 class GeoJSONFeature(TypedDict):
     type: Literal["Feature"]
-    properties: Optional[dict[str, Any]] # RFC7946 3.2 "(any JSON object or a JSON null value)"
+    properties: Optional[
+        dict[str, Any]
+    ]  # RFC7946 3.2 "(any JSON object or a JSON null value)"
     geometry: Optional[GeoJSONObject]
 
 
@@ -201,14 +216,14 @@ class GeoJSONFeatureCollection(TypedDict):
     type: Literal["FeatureCollection"]
     features: list[GeoJSONFeature]
 
+
 class GeoJSONFeatureCollectionWithBBox(GeoJSONFeatureCollection, total=False):
     # bbox is optional
-    # typing.NotRequired requires Python 3.11 
+    # typing.NotRequired requires Python 3.11
     # and we must support 3.9 (at least until October)
     # https://docs.python.org/3/library/typing.html#typing.Required
     # Is there a backport?
     bbox: list[float]
-
 
 
 # Helpers
@@ -278,7 +293,7 @@ class _Array(array.array, Generic[T]):
 
 
 def signed_area(
-    coords: Coords,
+    coords: Points,
     fast: bool = False,
 ) -> float:
     """Return the signed area enclosed by a ring using the linear time
@@ -296,7 +311,7 @@ def signed_area(
     return area2 / 2.0
 
 
-def is_cw(coords: Coords) -> bool:
+def is_cw(coords: Points) -> bool:
     """Returns True if a polygon ring has clockwise orientation, determined
     by a negatively signed area.
     """
@@ -304,14 +319,14 @@ def is_cw(coords: Coords) -> bool:
     return area2 < 0
 
 
-def rewind(coords: Reversible[Coord]) -> Coords:
+def rewind(coords: Reversible[Point]) -> Points:
     """Returns the input coords in reversed order."""
     return list(reversed(coords))
 
 
-def ring_bbox(coords: Coords) -> BBox:
+def ring_bbox(coords: Points) -> BBox:
     """Calculates and returns the bounding box of a ring."""
-    xs, ys = zip(*coords)
+    xs, ys = map(list, list(zip(*coords))[:2])  # ignore any z or m values
     bbox = min(xs), min(ys), max(xs), max(ys)
     return bbox
 
@@ -332,7 +347,7 @@ def bbox_contains(bbox1: BBox, bbox2: BBox) -> bool:
     return contains
 
 
-def ring_contains_point(coords: Coords, p: Point2D) -> bool:
+def ring_contains_point(coords: Points, p: Point2D) -> bool:
     """Fast point-in-polygon crossings algorithm, MacMartin optimization.
 
     Adapted from code by Eric Haynes
@@ -381,7 +396,7 @@ class RingSamplingError(Exception):
     pass
 
 
-def ring_sample(coords: Coords, ccw: bool = False) -> Point2D:
+def ring_sample(coords: Points, ccw: bool = False) -> Point2D:
     """Return a sample point guaranteed to be within a ring, by efficiently
     finding the first centroid of a coordinate triplet whose orientation
     matches the orientation of the ring and passes the point-in-ring test.
@@ -431,14 +446,15 @@ def ring_sample(coords: Coords, ccw: bool = False) -> Point2D:
     )
 
 
-def ring_contains_ring(coords1: Coords, coords2: list[Point2D]) -> bool:
+def ring_contains_ring(coords1: Points, coords2: list[Point]) -> bool:
     """Returns True if all vertexes in coords2 are fully inside coords1."""
-    return all(ring_contains_point(coords1, p2) for p2 in coords2)
+    # Ignore Z and M values in coords2
+    return all(ring_contains_point(coords1, p2[:2]) for p2 in coords2)
 
 
 def organize_polygon_rings(
-    rings: Iterable[Coords], return_errors: Optional[dict[str, int]] = None
-) -> list[list[Coords]]:
+    rings: Iterable[Points], return_errors: Optional[dict[str, int]] = None
+) -> list[list[Points]]:
     """Organize a list of coordinate rings into one or more polygons with holes.
     Returns a list of polygons, where each polygon is composed of a single exterior
     ring, and one or more interior holes. If a return_errors dict is provided (optional),
@@ -992,8 +1008,8 @@ class ShapeRecord:
     def __geo_interface__(self) -> GeoJSONFeature:
         return {
             "type": "Feature",
-            "properties": None 
-            if self.record is None 
+            "properties": None
+            if self.record is None
             else self.record.as_dict(date_strings=True),
             "geometry": None
             if self.shape is None or self.shape.shapeType == NULL
@@ -1015,11 +1031,8 @@ class Shapes(list[Optional[Shape]]):
         # Note: currently this will fail if any of the shapes are null-geometries
         # could be fixed by storing the shapefile shapeType upon init, returning geojson type with empty coords
         collection = GeoJSONGeometryCollection(
-            type= "GeometryCollection",
-            geometries = [shape.__geo_interface__ 
-                          for shape in self
-                          if shape is not None
-                         ],
+            type="GeometryCollection",
+            geometries=[shape.__geo_interface__ for shape in self if shape is not None],
         )
         return collection
 
@@ -1035,10 +1048,6 @@ class ShapeRecords(list[ShapeRecord]):
 
     @property
     def __geo_interface__(self) -> GeoJSONFeatureCollection:
-        collection = {
-            "type": "FeatureCollection",
-            "features": [] #shaperec.__geo_interface__ for shaperec in self],
-        }
         return GeoJSONFeatureCollection(
             type="FeatureCollection",
             features=[shaperec.__geo_interface__ for shaperec in self],
@@ -1362,7 +1371,7 @@ class Reader:
     def __geo_interface__(self) -> GeoJSONFeatureCollectionWithBBox:
         shaperecords = self.shapeRecords()
         fcollection = GeoJSONFeatureCollectionWithBBox(
-            bbox = list(self.bbox),
+            bbox=list(self.bbox),
             **shaperecords.__geo_interface__,
         )
         return fcollection
