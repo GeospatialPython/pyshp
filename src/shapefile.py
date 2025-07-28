@@ -584,12 +584,19 @@ class GeoJSON_Error(Exception):
     pass
 
 
+class _NoShapeTypeSentinel:
+    """For use as a default value for Shape.__init__ to
+    preserve old behaviour for anyone who explictly
+    called Shape(shapeType=None).
+    """
+
+
 class Shape:
-    shapeType = NULL
+    shapeType: int = NULL
 
     def __init__(
         self,
-        shapeType: int = NULL,
+        shapeType: Union[int, _NoShapeTypeSentinel] = _NoShapeTypeSentinel(),
         points: Optional[PointsT] = None,
         parts: Optional[Sequence[int]] = None,
         partTypes: Optional[Sequence[int]] = None,
@@ -606,7 +613,7 @@ class Shape:
         list of shapes. For MultiPatch geometry, partTypes designates
         the patch type of each of the parts.
         """
-        if self.shapeType != shapeType:
+        if not isinstance(shapeType, _NoShapeTypeSentinel):
             self.shapeType = shapeType
         self.points = points or []
         self.parts = parts or []
@@ -850,7 +857,7 @@ class NullShape(Shape):
 
 class _CanHaveBBox(Shape):
     # Not a BBox because the legacy implementation was a list, not a 4-tuple.
-    bbox: Optional[list[float]] = None
+    bbox: Optional[Sequence[float]] = None
 
 
 class Point(Shape):
@@ -882,10 +889,10 @@ class MultiPatch(_HasM, _HasZ, _CanHaveBBox):
 
 
 class PointM(Point, _HasM):
+    shapeType = 21
     # same default as in Writer.__shpRecord (if s.shapeType in (11, 21):)
     # PyShp encodes None m values as NODATA
     m = (None,)
-    shapeType = 21
 
 
 class PolylineM(Polyline, _HasM):
@@ -902,7 +909,8 @@ class MultiPointM(MultiPoint, _HasM):
 
 class PointZ(PointM, _HasZ):
     shapeType = 11
-    z = (0,)  # same default as in Writer.__shpRecord (if s.shapeType == 11:)
+    # same default as in Writer.__shpRecord (if s.shapeType == 11:)
+    z: Sequence[float] = (0.0,)
 
 
 class PolylineZ(PolylineM, _HasZ):
@@ -915,6 +923,24 @@ class PolygonZ(PolygonM, _HasZ):
 
 class MultiPointZ(MultiPointM, _HasZ):
     shapeType = 18
+
+
+SHAPE_CLASS_FROM_SHAPETYPE: dict[int, type[Shape]] = {
+    NULL: NullShape,
+    POINT: Point,
+    POLYLINE: Polyline,
+    POLYGON: Polygon,
+    MULTIPOINT: MultiPoint,
+    POINTZ: PointZ,
+    POLYLINEZ: PolylineZ,
+    POLYGONZ: PolygonZ,
+    MULTIPOINTZ: MultiPointZ,
+    POINTM: PointM,
+    POLYLINEM: PolylineM,
+    POLYGONM: PolygonM,
+    MULTIPOINTM: MultiPointM,
+    MULTIPATCH: MultiPatch,
+}
 
 
 class _Record(list):
@@ -1615,7 +1641,8 @@ class Reader:
 
         # pylint: disable=attribute-defined-outside-init
         f = self.__getFileObj(self.shp)
-        record = Shape(oid=oid)
+        record = SHAPE_CLASS_FROM_SHAPETYPE[self.shapeType](oid=oid)
+        # record = Shape(oid=oid)
         # Previously, we also set __zmin = __zmax = __mmin = __mmax = None
         nParts: Optional[int] = None
         nPoints: Optional[int] = None
@@ -1625,23 +1652,28 @@ class Reader:
         shapeType = unpack("<i", f.read(4))[0]
         record.shapeType = shapeType
         # For Null shapes create an empty points list for consistency
-        if shapeType == 0:
+        # if shapeType == 0:
+        if isinstance(record, NullShape):
             record.points = []
         # All shape types capable of having a bounding box
-        elif shapeType in (3, 13, 23, 5, 15, 25, 8, 18, 28, 31):
-            record.bbox = tuple(_Array[float]("d", unpack("<4d", f.read(32))))  # type: ignore [attr-defined]
+        # elif shapeType in (3, 13, 23, 5, 15, 25, 8, 18, 28, 31):
+        elif isinstance(record, _CanHaveBBox):
+            # record.bbox = tuple(_Array[float]("d", unpack("<4d", f.read(32))))
+            record.bbox = _Array[float]("d", unpack("<4d", f.read(32)))
             # if bbox specified and no overlap, skip this shape
-            if bbox is not None and not bbox_overlap(bbox, record.bbox):  # type: ignore [attr-defined]
+            if bbox is not None and not bbox_overlap(bbox, tuple(record.bbox)):
                 # because we stop parsing this shape, skip to beginning of
                 # next shape before we return
                 f.seek(next_shape)
                 return None
         # Shape types with parts
-        if shapeType in (3, 13, 23, 5, 15, 25, 31):
+        # if shapeType in (3, 13, 23, 5, 15, 25, 31):
+        if isinstance(record, (Polyline, Polygon, MultiPatch)):
             nParts = unpack("<i", f.read(4))[0]
 
         # Shape types with points
-        if shapeType in (3, 13, 23, 5, 15, 25, 8, 18, 28, 31):
+        # if shapeType in (3, 13, 23, 5, 15, 25, 8, 18, 28, 31):
+        if isinstance(record, _CanHaveBBox):
             nPoints = unpack("<i", f.read(4))[0]
             # Read points - produces a list of [x,y] values
 
@@ -1649,7 +1681,8 @@ class Reader:
             record.parts = _Array[int]("i", unpack(f"<{nParts}i", f.read(nParts * 4)))
 
             # Read part types for Multipatch - 31
-            if shapeType == 31:
+            # if shapeType == 31:
+            if isinstance(record, MultiPatch):
                 record.partTypes = _Array[int](
                     "i", unpack(f"<{nParts}i", f.read(nParts * 4))
                 )
@@ -1659,31 +1692,34 @@ class Reader:
             record.points = list(zip(*(iter(flat),) * 2))
 
             # Read z extremes and values
-            if shapeType in (13, 15, 18, 31):
+            # if shapeType in (13, 15, 18, 31):
+            if isinstance(record, _HasZ):
                 __zmin, __zmax = unpack("<2d", f.read(16))
-                record.z = _Array[float](  # type: ignore [attr-defined]
+                record.z = _Array[float](
                     "d", unpack(f"<{nPoints}d", f.read(nPoints * 8))
                 )
 
             # Read m extremes and values
-            if shapeType in (13, 23, 15, 25, 18, 28, 31):
+            # if shapeType in (13, 23, 15, 25, 18, 28, 31):
+            if isinstance(record, _HasM):
                 if next_shape - f.tell() >= 16:
                     __mmin, __mmax = unpack("<2d", f.read(16))
                 # Measure values less than -10e38 are nodata values according to the spec
                 if next_shape - f.tell() >= nPoints * 8:
-                    record.m = []  # type: ignore [attr-defined]
+                    record.m = []
                     for m in _Array[float](
                         "d", unpack(f"<{nPoints}d", f.read(nPoints * 8))
                     ):
                         if m > NODATA:
-                            record.m.append(m)  # type: ignore [attr-defined]
+                            record.m.append(m)
                         else:
-                            record.m.append(None)  # type: ignore [attr-defined]
+                            record.m.append(None)
                 else:
-                    record.m = [None for _ in range(nPoints)]  # type: ignore [attr-defined]
+                    record.m = [None for _ in range(nPoints)]
 
         # Read a single point
-        if shapeType in (1, 11, 21):
+        # if shapeType in (1, 11, 21):
+        if isinstance(record, Point):
             x, y = _Array[float]("d", unpack("<2d", f.read(16)))
 
             record.points = [(x, y)]
@@ -1695,20 +1731,22 @@ class Reader:
                     return None
 
         # Read a single Z value
-        if shapeType == 11:
-            record.z = list(unpack("<d", f.read(8)))  # type: ignore [attr-defined]
+        # if shapeType == 11:
+        if isinstance(record, PointZ):
+            record.z = tuple(unpack("<d", f.read(8)))
 
         # Read a single M value
-        if shapeType in (21, 11):
+        # if shapeType in (21, 11):
+        if isinstance(record, PointM):
             if next_shape - f.tell() >= 8:
                 (m,) = unpack("<d", f.read(8))
             else:
                 m = NODATA
             # Measure values less than -10e38 are nodata values according to the spec
             if m > NODATA:
-                record.m = [m]  # type: ignore [attr-defined]
+                record.m = (m,)
             else:
-                record.m = [None]  # type: ignore [attr-defined]
+                record.m = (None,)
 
         # pylint: enable=attribute-defined-outside-init
         # Seek to the end of this record as defined by the record header because
@@ -2932,20 +2970,18 @@ class Writer:
 
     def null(self):
         """Creates a null shape."""
-        self.shape(Shape(NULL))
+        self.shape(NullShape())
 
     def point(self, x: float, y: float):
         """Creates a POINT shape."""
-        shapeType = POINT
-        pointShape = Shape(shapeType)
+        pointShape = Point()
         pointShape.points.append((x, y))
         self.shape(pointShape)
 
     def pointm(self, x: float, y: float, m: Optional[float] = None):
         """Creates a POINTM shape.
         If the m (measure) value is not set, it defaults to NoData."""
-        shapeType = POINTM
-        pointShape = Shape(shapeType)
+        pointShape = PointM()
         pointShape.points.append((x, y, m))
         self.shape(pointShape)
 
@@ -2953,63 +2989,55 @@ class Writer:
         """Creates a POINTZ shape.
         If the z (elevation) value is not set, it defaults to 0.
         If the m (measure) value is not set, it defaults to NoData."""
-        shapeType = POINTZ
-        pointShape = Shape(shapeType)
+        pointShape = PointZ()
         pointShape.points.append((x, y, z, m))
         self.shape(pointShape)
 
     def multipoint(self, points: PointsT):
         """Creates a MULTIPOINT shape.
         Points is a list of xy values."""
-        shapeType = MULTIPOINT
         # nest the points inside a list to be compatible with the generic shapeparts method
-        self._shapeparts(parts=[points], shapeType=shapeType)
+        self._shapeparts(parts=[points], polyShape=MultiPoint())
 
     def multipointm(self, points: PointsT):
         """Creates a MULTIPOINTM shape.
         Points is a list of xym values.
         If the m (measure) value is not included, it defaults to None (NoData)."""
-        shapeType = MULTIPOINTM
         # nest the points inside a list to be compatible with the generic shapeparts method
-        self._shapeparts(parts=[points], shapeType=shapeType)
+        self._shapeparts(parts=[points], polyShape=MultiPointM())
 
     def multipointz(self, points: PointsT):
         """Creates a MULTIPOINTZ shape.
         Points is a list of xyzm values.
         If the z (elevation) value is not included, it defaults to 0.
         If the m (measure) value is not included, it defaults to None (NoData)."""
-        shapeType = MULTIPOINTZ
         # nest the points inside a list to be compatible with the generic shapeparts method
-        self._shapeparts(parts=[points], shapeType=shapeType)
+        self._shapeparts(parts=[points], polyShape=MultiPointZ())
 
     def line(self, lines: list[PointsT]):
         """Creates a POLYLINE shape.
         Lines is a collection of lines, each made up of a list of xy values."""
-        shapeType = POLYLINE
-        self._shapeparts(parts=lines, shapeType=shapeType)
+        self._shapeparts(parts=lines, polyShape=Polyline())
 
     def linem(self, lines: list[PointsT]):
         """Creates a POLYLINEM shape.
         Lines is a collection of lines, each made up of a list of xym values.
         If the m (measure) value is not included, it defaults to None (NoData)."""
-        shapeType = POLYLINEM
-        self._shapeparts(parts=lines, shapeType=shapeType)
+        self._shapeparts(parts=lines, polyShape=PolylineM())
 
     def linez(self, lines: list[PointsT]):
         """Creates a POLYLINEZ shape.
         Lines is a collection of lines, each made up of a list of xyzm values.
         If the z (elevation) value is not included, it defaults to 0.
         If the m (measure) value is not included, it defaults to None (NoData)."""
-        shapeType = POLYLINEZ
-        self._shapeparts(parts=lines, shapeType=shapeType)
+        self._shapeparts(parts=lines, polyShape=PolylineZ())
 
     def poly(self, polys: list[PointsT]):
         """Creates a POLYGON shape.
         Polys is a collection of polygons, each made up of a list of xy values.
         Note that for ordinary polygons the coordinates must run in a clockwise direction.
         If some of the polygons are holes, these must run in a counterclockwise direction."""
-        shapeType = POLYGON
-        self._shapeparts(parts=polys, shapeType=shapeType)
+        self._shapeparts(parts=polys, polyShape=Polygon())
 
     def polym(self, polys: list[PointsT]):
         """Creates a POLYGONM shape.
@@ -3017,8 +3045,7 @@ class Writer:
         Note that for ordinary polygons the coordinates must run in a clockwise direction.
         If some of the polygons are holes, these must run in a counterclockwise direction.
         If the m (measure) value is not included, it defaults to None (NoData)."""
-        shapeType = POLYGONM
-        self._shapeparts(parts=polys, shapeType=shapeType)
+        self._shapeparts(parts=polys, polyShape=PolygonM())
 
     def polyz(self, polys: list[PointsT]):
         """Creates a POLYGONZ shape.
@@ -3027,8 +3054,7 @@ class Writer:
         If some of the polygons are holes, these must run in a counterclockwise direction.
         If the z (elevation) value is not included, it defaults to 0.
         If the m (measure) value is not included, it defaults to None (NoData)."""
-        shapeType = POLYGONZ
-        self._shapeparts(parts=polys, shapeType=shapeType)
+        self._shapeparts(parts=polys, polyShape=PolygonZ())
 
     def multipatch(self, parts: list[PointsT], partTypes: list[int]):
         """Creates a MULTIPATCH shape.
@@ -3038,8 +3064,7 @@ class Writer:
         TRIANGLE_FAN, OUTER_RING, INNER_RING, FIRST_RING, or RING.
         If the z (elevation) value is not included, it defaults to 0.
         If the m (measure) value is not included, it defaults to None (NoData)."""
-        shapeType = MULTIPATCH
-        polyShape = Shape(shapeType)
+        polyShape = MultiPatch()
         polyShape.parts = []
         polyShape.points = []
         for part in parts:
@@ -3056,15 +3081,18 @@ class Writer:
         # write the shape
         self.shape(polyShape)
 
-    def _shapeparts(self, parts: list[PointsT], shapeType: int):
+    def _shapeparts(
+        self, parts: list[PointsT], polyShape: Union[Polyline, Polygon, MultiPoint]
+    ):
         """Internal method for adding a shape that has multiple collections of points (parts):
         lines, polygons, and multipoint shapes.
         """
-        polyShape = Shape(shapeType)
         polyShape.parts = []
         polyShape.points = []
         # Make sure polygon rings (parts) are closed
-        if shapeType in (5, 15, 25, 31):
+
+        # if shapeType in (5, 15, 25, 31):
+        if isinstance(polyShape, Polygon):
             for part in parts:
                 if part[0] != part[-1]:
                     part.append(part[0])
