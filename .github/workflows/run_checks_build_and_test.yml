@@ -26,7 +26,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install pytest pylint pylint-per-file-ignores
         pip install -e .
-    - name: run Pylint for errors and warnings only
+    - name: run Pylint for errors, warnings and remarks only (ignore Comments/ Code style)
       run: |
         pylint --disable=C test_shapefile.py src/shapefile.py
 
