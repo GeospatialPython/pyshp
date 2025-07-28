@@ -1,0 +1,56 @@
+
+name: Run the speed tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+
+  run_speed_tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [
+          "3.9",
+          "3.13",
+        ]
+        os: [
+          "windows-latest",
+          "ubuntu-24.04",
+        ]
+
+
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+
+    - uses: actions/checkout@v4
+      with:
+        path: ./Pyshp
+
+    - name: Install PyShp + test deps
+      shell: bash
+      working-directory: ./Pyshp
+      run: |
+        python -m pip install -r requirements.test.txt
+        python -m pip install -e .
+
+
+    - name: Checkout shapefiles and zip file artefacts repo
+      uses: actions/checkout@v4
+      with:
+        repository: JamesParrott/PyShp_test_shapefile
+        path: ./PyShp_test_shapefile
+
+    - name: Run Speed tests.
+      env:
+        PYSHP_TEST_REPO: ./PyShp_test_shapefile
+      run: python Pyshp/run_benchmarks.py
+
+
+
