@@ -111,7 +111,7 @@ Point3D = tuple[float, float, float]
 PointM = tuple[float, float, Optional[float]]
 PointZ = tuple[float, float, float, Optional[float]]
 
-Coord = Union[Point2D, Point2D, Point3D]
+Coord = Union[Point2D, Point3D]
 Coords = list[Coord]
 
 Point = Union[Point2D, PointM, PointZ]
