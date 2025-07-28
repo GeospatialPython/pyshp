@@ -152,7 +152,7 @@ class GeoJSONPoint(TypedDict):
     # elements.  "
     # RFC7946 also requires long/lat easting/northing which we do not enforce,
     # and despite the SHOULD NOT, we may use a 4th element for Shapefile M Measures.
-    coordinates: Point 
+    coordinates: Union[Point, tuple[()]] 
     
 class GeoJSONMultiPoint(TypedDict):
     type: Literal["MultiPoint"]
@@ -197,9 +197,11 @@ class GeoJSONFeature(TypedDict):
     geometry: Optional[GeoJSONObject]
 
 
-class GeoJSONFeatureCollection(TypedDict, total= False):
+class GeoJSONFeatureCollection(TypedDict):
     type: Literal["FeatureCollection"]
     features: list[GeoJSONFeature]
+
+class GeoJSONFeatureCollectionWithBBox(GeoJSONFeatureCollection, total=False):
     # bbox is optional
     # typing.NotRequired requires Python 3.11 
     # and we must support 3.9 (at least until October)
@@ -990,14 +992,16 @@ class ShapeRecord:
     def __geo_interface__(self) -> GeoJSONFeature:
         return {
             "type": "Feature",
-            "properties": self.record.as_dict(date_strings=True),
+            "properties": None 
+            if self.record is None 
+            else self.record.as_dict(date_strings=True),
             "geometry": None
-            if self.shape.shapeType == NULL
+            if self.shape is None or self.shape.shapeType == NULL
             else self.shape.__geo_interface__,
         }
 
 
-class Shapes(list):
+class Shapes(list[Optional[Shape]]):
     """A class to hold a list of Shape objects. Subclasses list to ensure compatibility with
     former work and to reuse all the optimizations of the builtin list.
     In addition to the list interface, this also provides the GeoJSON __geo_interface__
@@ -1010,14 +1014,17 @@ class Shapes(list):
     def __geo_interface__(self) -> GeoJSONGeometryCollection:
         # Note: currently this will fail if any of the shapes are null-geometries
         # could be fixed by storing the shapefile shapeType upon init, returning geojson type with empty coords
-        collection = {
-            "type": "GeometryCollection",
-            "geometries": [shape.__geo_interface__ for shape in self],
-        }
+        collection = GeoJSONGeometryCollection(
+            type= "GeometryCollection",
+            geometries = [shape.__geo_interface__ 
+                          for shape in self
+                          if shape is not None
+                         ],
+        )
         return collection
 
 
-class ShapeRecords(list):
+class ShapeRecords(list[ShapeRecord]):
     """A class to hold a list of ShapeRecord objects. Subclasses list to ensure compatibility with
     former work and to reuse all the optimizations of the builtin list.
     In addition to the list interface, this also provides the GeoJSON __geo_interface__
@@ -1030,9 +1037,12 @@ class ShapeRecords(list):
     def __geo_interface__(self) -> GeoJSONFeatureCollection:
         collection = {
             "type": "FeatureCollection",
-            "features": [shaperec.__geo_interface__ for shaperec in self],
+            "features": [] #shaperec.__geo_interface__ for shaperec in self],
         }
-        return collection
+        return GeoJSONFeatureCollection(
+            type="FeatureCollection",
+            features=[shaperec.__geo_interface__ for shaperec in self],
+        )
 
 
 class ShapefileException(Exception):
@@ -1349,10 +1359,12 @@ class Reader:
         yield from self.iterShapeRecords()
 
     @property
-    def __geo_interface__(self) -> GeoJSONFeatureCollection:
+    def __geo_interface__(self) -> GeoJSONFeatureCollectionWithBBox:
         shaperecords = self.shapeRecords()
-        fcollection = shaperecords.__geo_interface__
-        fcollection["bbox"] = list(self.bbox)
+        fcollection = GeoJSONFeatureCollectionWithBBox(
+            bbox = list(self.bbox),
+            **shaperecords.__geo_interface__,
+        )
         return fcollection
 
     @property
