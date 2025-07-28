@@ -852,10 +852,6 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
 
         shape = cls(oid=oid)
 
-        # For Null shapes create an empty points list for consistency
-        # if shapeType == 0:
-        if cls is NullShape:
-            shape.points = []
         # All shape types capable of having a bounding box
         # elif shapeType in (3, 13, 23, 5, 15, 25, 8, 18, 28, 31):
         elif isinstance(shape, _CanHaveBBox):
