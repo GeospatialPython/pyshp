@@ -28,11 +28,13 @@ from typing import (
     Generic,
     Iterable,
     Iterator,
+    Literal,
     NoReturn,
     Optional,
     Protocol,
     Reversible,
     Sequence,
+    TypedDict,
     TypeVar,
     Union,
     overload,
@@ -142,6 +144,69 @@ RecordValue = Union[
 class HasGeoInterface(Protocol):
     @property
     def __geo_interface__(self) -> Any: ...
+
+class GeoJSONPoint(TypedDict):
+    type: Literal["Point"]
+    # We fix to a tuple (to statically check the length is 2, 3 or 4) but 
+    # RFC7946 only requires: "A position is an array of numbers.  There MUST be two or more
+    # elements.  "
+    # RFC7946 also requires long/lat easting/northing which we do not enforce,
+    # and despite the SHOULD NOT, we may use a 4th element for Shapefile M Measures.
+    coordinates: Point 
+    
+class GeoJSONMultiPoint(TypedDict):
+    type: Literal["MultiPoint"]
+    coordinates: Points
+
+class GeoJSONLineString(TypedDict):
+    type: Literal["LineString"]
+    # "Two or more positions" not enforced by type checker
+    # https://datatracker.ietf.org/doc/html/rfc7946#section-3.1.4
+    coordinates: Points
+    
+class GeoJSONMultiLineString(TypedDict):
+    type: Literal["MultiLineString"]
+    coordinates: list[Points]
+
+class GeoJSONPolygon(TypedDict):
+    type: Literal["Polygon"]
+    # Other requirements for Polygon not enforced by type checker 
+    # https://datatracker.ietf.org/doc/html/rfc7946#section-3.1.6
+    coordinates: list[Points]
+
+class GeoJSONMultiPolygon(TypedDict):
+    type: Literal["MultiPolygon"]
+    coordinates: list[list[Points]]
+
+GeoJSONHomogeneousGeometryObject = Union[
+    GeoJSONPoint, GeoJSONMultiPoint,
+    GeoJSONLineString, GeoJSONMultiLineString,
+    GeoJSONPolygon, GeoJSONMultiPolygon,
+]
+
+class GeoJSONGeometryCollection(TypedDict):
+    type: Literal["GeometryCollection"]
+    geometries: list[GeoJSONHomogeneousGeometryObject]
+
+# RFC7946 3.1
+GeoJSONObject = Union[GeoJSONHomogeneousGeometryObject, GeoJSONGeometryCollection]
+
+class GeoJSONFeature(TypedDict):
+    type: Literal["Feature"]
+    properties: Optional[dict[str, Any]] # RFC7946 3.2 "(any JSON object or a JSON null value)"
+    geometry: Optional[GeoJSONObject]
+
+
+class GeoJSONFeatureCollection(TypedDict, total= False):
+    type: Literal["FeatureCollection"]
+    features: list[GeoJSONFeature]
+    # bbox is optional
+    # typing.NotRequired requires Python 3.11 
+    # and we must support 3.9 (at least until October)
+    # https://docs.python.org/3/library/typing.html#typing.Required
+    # Is there a backport?
+    bbox: list[float]
+
 
 
 # Helpers
@@ -541,7 +606,7 @@ class Shape:
         # self.bbox: Optional[_Array[float]] = None
 
     @property
-    def __geo_interface__(self):
+    def __geo_interface__(self) -> GeoJSONHomogeneousGeometryObject:
         if self.shapeType in [POINT, POINTM, POINTZ]:
             # point
             if len(self.points) == 0:
@@ -922,7 +987,7 @@ class ShapeRecord:
         self.record = record
 
     @property
-    def __geo_interface__(self):
+    def __geo_interface__(self) -> GeoJSONFeature:
         return {
             "type": "Feature",
             "properties": self.record.as_dict(date_strings=True),
@@ -942,7 +1007,7 @@ class Shapes(list):
         return f"Shapes: {list(self)}"
 
     @property
-    def __geo_interface__(self):
+    def __geo_interface__(self) -> GeoJSONGeometryCollection:
         # Note: currently this will fail if any of the shapes are null-geometries
         # could be fixed by storing the shapefile shapeType upon init, returning geojson type with empty coords
         collection = {
@@ -962,7 +1027,7 @@ class ShapeRecords(list):
         return f"ShapeRecords: {list(self)}"
 
     @property
-    def __geo_interface__(self):
+    def __geo_interface__(self) -> GeoJSONFeatureCollection:
         collection = {
             "type": "FeatureCollection",
             "features": [shaperec.__geo_interface__ for shaperec in self],
@@ -1284,7 +1349,7 @@ class Reader:
         yield from self.iterShapeRecords()
 
     @property
-    def __geo_interface__(self):
+    def __geo_interface__(self) -> GeoJSONFeatureCollection:
         shaperecords = self.shapeRecords()
         fcollection = shaperecords.__geo_interface__
         fcollection["bbox"] = list(self.bbox)
