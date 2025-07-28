@@ -989,7 +989,7 @@ def _read_shape_from_shp_file(
 
         # Read part types for Multipatch - 31
         # if shapeType == 31:
-        if isinstance(shape, MultiPatch):
+        if ShapeClass is MultiPatch:
             shape.partTypes = _Array[int](
                 "i", unpack(f"<{nParts}i", f.read(nParts * 4))
             )
