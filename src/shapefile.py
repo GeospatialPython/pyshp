@@ -854,7 +854,7 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
 
         # All shape types capable of having a bounding box
         # elif shapeType in (3, 13, 23, 5, 15, 25, 8, 18, 28, 31):
-        elif isinstance(shape, _CanHaveBBox):
+        if isinstance(shape, _CanHaveBBox):
             # record.bbox = tuple(_Array[float]("d", unpack("<4d", f.read(32))))
             shape.bbox = _Array[float]("d", unpack("<4d", f.read(32)))
             # if bbox specified and no overlap, skip this shape
