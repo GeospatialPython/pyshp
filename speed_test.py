@@ -78,5 +78,6 @@ def run(run_count: int) -> None:
             col_width,
         )
 
+
 if __name__ == "__main__":
     run(1)
