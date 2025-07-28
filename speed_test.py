@@ -11,6 +11,7 @@ from typing import Union
 
 import shapefile as shp
 
+# For shapefiles from https://github.com/JamesParrott/PyShp_test_shapefile
 DEFAULT_PYSHP_TEST_REPO = (
     rf"{os.getenv('USERPROFILE')}\Coding\repos\PyShp_test_shapefile"
 )
