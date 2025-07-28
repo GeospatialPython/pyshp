@@ -1060,7 +1060,7 @@ def _read_shape_from_shp_file(
 
     f.seek(next_shape)
 
-    return record
+    return shape
 
 
 class _Record(list):
