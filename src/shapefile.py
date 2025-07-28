@@ -845,7 +845,7 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
         return f"Shape #{self.__oid}: {self.shapeTypeName}"
 
     @classmethod
-    def _from_shp_file(cls, f, recLength, next_shape, oid=None, bbox=None):
+    def _from_shp_file(cls, f, next_shape, oid=None, bbox=None):
         # Previously, we also set __zmin = __zmax = __mmin = __mmax = None
         nParts: Optional[int] = None
         nPoints: Optional[int] = None
@@ -971,7 +971,7 @@ def _read_shape_from_shp_file(
     next_shape = f.tell() + (2 * recLength)
     shapeType = unpack("<i", f.read(4))[0]
     ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[shapeType]
-    shape = ShapeClass._from_shp_file(f, recLength, next_shape, oid=oid, bbox=bbox)
+    shape = ShapeClass._from_shp_file(f, next_shape, oid=oid, bbox=bbox)
 
     f.seek(next_shape)
 
