@@ -845,8 +845,8 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
         return f"Shape #{self.__oid}: {self.shapeTypeName}"
 
     # pylint: disable=unused-argument
-    def _get_and_set_bbox_from_shp_file(self, f):
-        return None
+    def _set_bbox_from_shp_file(self, f):
+        pass
 
     @staticmethod
     def _get_nparts_from_shp_file(f):
@@ -886,7 +886,7 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
     def _from_shp_file(cls, f, next_shape, oid=None, bbox=None):
         shape = cls(oid=oid)
 
-        bbox = shape._get_and_set_bbox_from_shp_file(f)  # pylint: disable=assignment-from-none
+        shape._set_bbox_from_shp_file(f)  # pylint: disable=assignment-from-none
 
         # if bbox specified and no overlap, skip this shape
         if bbox is not None and not bbox_overlap(bbox, tuple(shape.bbox)):  # pylint: disable=no-member
@@ -962,10 +962,9 @@ class _CanHaveBBox(Shape):
     # Not a BBox because the legacy implementation was a list, not a 4-tuple.
     bbox: Optional[Sequence[float]] = None
 
-    def _get_and_set_bbox_from_shp_file(self, f):
+    def _set_bbox_from_shp_file(self, f):
         # record.bbox = tuple(_Array[float]("d", unpack("<4d", f.read(32))))
         self.bbox = _Array[float]("d", unpack("<4d", f.read(32)))
-        return self.bbox
 
     @staticmethod
     def _get_npoints_from_shp_file(f):
