@@ -865,7 +865,6 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
             if bbox is not None and not bbox_overlap(bbox, tuple(shape.bbox)):
                 # because we stop parsing this shape, skip to beginning of
                 # next shape before we return
-                f.seek(next_shape)
                 return None
         # Shape types with parts
         # if shapeType in (3, 13, 23, 5, 15, 25, 31):
@@ -928,7 +927,6 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
                 # create bounding box for Point by duplicating coordinates
                 # skip shape if no overlap with bounding box
                 if not bbox_overlap(bbox, (x, y, x, y)):
-                    f.seek(next_shape)
                     return None
 
         # Read a single Z value
