@@ -845,11 +845,17 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
         return f"Shape #{self.__oid}: {self.shapeTypeName}"
 
     @classmethod
-    def _from_shp_file(cls, oid=None, bbox=None):
+    def _from_shp_file(cls, f, recLength, next_shape, oid=None, bbox=None):
+        # Previously, we also set __zmin = __zmax = __mmin = __mmax = None
+        nParts: Optional[int] = None
+        nPoints: Optional[int] = None
+
+        shape = cls(oid=oid)
+
         # For Null shapes create an empty points list for consistency
         # if shapeType == 0:
         if cls is NullShape:
-            record.points = []
+            shape.points = []
         # All shape types capable of having a bounding box
         # elif shapeType in (3, 13, 23, 5, 15, 25, 8, 18, 28, 31):
         elif isinstance(shape, _CanHaveBBox):
@@ -863,7 +869,7 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
                 return None
         # Shape types with parts
         # if shapeType in (3, 13, 23, 5, 15, 25, 31):
-        if any(cls is class_ for class_ in (shape, (Polyline, Polygon, MultiPatch))):
+        if issubclass(cls, (Polyline, Polygon, MultiPatch)):
             nParts = unpack("<i", f.read(4))[0]
 
         # Shape types with points
@@ -943,6 +949,8 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
             else:
                 shape.m = (None,)
 
+        return shape
+
         # pylint: enable=attribute-defined-outside-init
         # Seek to the end of this record as defined by the record header because
         # the shapefile spec doesn't require the actual content to meet the header
@@ -958,15 +966,12 @@ def _read_shape_from_shp_file(
     a subsequent call to this, to build the next shape.
     """
     # shape = Shape(oid=oid)
-    # Previously, we also set __zmin = __zmax = __mmin = __mmax = None
-    nParts: Optional[int] = None
-    nPoints: Optional[int] = None
-    (__recNum, recLength) = unpack(">2i", f.read(8))
+    (__recNum, recLength) = unpack_2_int32_be(f.read(8))
     # Determine the start of the next record
     next_shape = f.tell() + (2 * recLength)
     shapeType = unpack("<i", f.read(4))[0]
     ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[shapeType]
-    shape = ShapeClass._from_shp_file(f, oid=oid, bbox=bbox)
+    shape = ShapeClass._from_shp_file(f, recLength, next_shape, oid=oid, bbox=bbox)
 
     f.seek(next_shape)
 
@@ -986,19 +991,19 @@ class _CanHaveBBox(Shape):
 
 
 class Point(Shape):
-    shapeType = 1
+    shapeType = POINT
 
 
 class Polyline(_CanHaveBBox):
-    shapeType = 3
+    shapeType = POLYLINE
 
 
 class Polygon(_CanHaveBBox):
-    shapeType = 5
+    shapeType = POLYGON
 
 
 class MultiPoint(_CanHaveBBox):
-    shapeType = 8
+    shapeType = MULTIPOINT
 
 
 class _HasM(Shape):
@@ -1010,44 +1015,44 @@ class _HasZ(Shape):
 
 
 class MultiPatch(_HasM, _HasZ, _CanHaveBBox):
-    shapeType = 31
+    shapeType = MULTIPATCH
 
 
 class PointM(Point, _HasM):
-    shapeType = 21
+    shapeType = POINTM
     # same default as in Writer.__shpRecord (if s.shapeType in (11, 21):)
     # PyShp encodes None m values as NODATA
     m = (None,)
 
 
 class PolylineM(Polyline, _HasM):
-    shapeType = 23
+    shapeType = POLYLINEM
 
 
 class PolygonM(Polygon, _HasM):
-    shapeType = 25
+    shapeType = POLYGONM
 
 
 class MultiPointM(MultiPoint, _HasM):
-    shapeType = 28
+    shapeType = MULTIPOINTM
 
 
 class PointZ(PointM, _HasZ):
-    shapeType = 11
+    shapeType = POINTZ
     # same default as in Writer.__shpRecord (if s.shapeType == 11:)
     z: Sequence[float] = (0.0,)
 
 
 class PolylineZ(PolylineM, _HasZ):
-    shapeType = 13
+    shapeType = POLYLINEZ
 
 
 class PolygonZ(PolygonM, _HasZ):
-    shapeType = 15
+    shapeType = POLYGONZ
 
 
 class MultiPointZ(MultiPointM, _HasZ):
-    shapeType = 18
+    shapeType = MULTIPOINTZ
 
 
 SHAPE_CLASS_FROM_SHAPETYPE: dict[int, type[Shape]] = {
