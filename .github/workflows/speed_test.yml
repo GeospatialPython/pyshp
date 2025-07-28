@@ -61,7 +61,7 @@ jobs:
         repository: JamesParrott/PyShp_test_shapefile
         path: ./PyShp_test_shapefile
 
-    - name: Run Benchmarks
+    - name: Run Speed tests.
       env:
         PYSHP_TEST_REPO: ./PyShp_test_shapefile
       run: python ./Pyshp/speed_test.py
