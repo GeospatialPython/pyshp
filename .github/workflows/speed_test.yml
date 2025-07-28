@@ -1,0 +1,70 @@
+
+name: Run the speed tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+
+
+  build_wheel_and_sdist:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+    - name: Build wheel from the project repo
+      uses: ./.github/actions/build_wheel_and_sdist
+
+  run_speed_tests:
+    needs: build_wheel_and_sdist
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [
+          "3.9",
+          "3.13",
+        ]
+        os: [
+          "windows-latest",
+          "ubuntu-24.04",
+        ]
+
+
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Download wheel and sdist (built in previous job)
+      uses: actions/download-artifact@v4
+      with:
+        name: PyShp_wheel_and_sdist
+        path: dist
+
+    - name: Install PyShp + test deps from the wheel (downloaded in prev step)
+      shell: bash
+      working-directory: dist/
+      run: |
+        WHEEL_NAME=$(ls pyshp-*py3-none-any.whl)
+        python -m pip install $WHEEL_NAME[test]
+
+    - uses: actions/checkout@v4
+      with:
+        path: ./Pyshp
+
+    - name: Checkout shapefiles and zip file artefacts repo
+      uses: actions/checkout@v4
+      with:
+        repository: JamesParrott/PyShp_test_shapefile
+        path: ./PyShp_test_shapefile
+
+    - name: Run Benchmarks
+      env:
+        PYSHP_TEST_REPO: ./PyShp_test_shapefile
+      run: python speed_test.py
+        
+
+
