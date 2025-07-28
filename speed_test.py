@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Union
 
 import shapefile as shp
-import test_shapefile
 
 DEFAULT_PYSHP_TEST_REPO = (
     rf"{os.getenv('USERPROFILE')}\Coding\repos\PyShp_test_shapefile"
@@ -77,9 +76,6 @@ def run(run_count: int) -> None:
             functools.partial(open_shapefile_with_PyShp, target=target),
             col_width,
         )
-
-    benchmark(f"Slow test", 1, test_shapefile.test_iterRecords_start_stop, col_width)
-
 
 if __name__ == "__main__":
     run(1)
