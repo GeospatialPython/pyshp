@@ -1638,7 +1638,6 @@ class Reader:
 
         # pylint: disable=attribute-defined-outside-init
         f = self.__getFileObj(self.shp)
-        record = SHAPE_CLASS_FROM_SHAPETYPE[self.shapeType](oid=oid)
         # record = Shape(oid=oid)
         # Previously, we also set __zmin = __zmax = __mmin = __mmax = None
         nParts: Optional[int] = None
@@ -1647,7 +1646,7 @@ class Reader:
         # Determine the start of the next record
         next_shape = f.tell() + (2 * recLength)
         shapeType = unpack("<i", f.read(4))[0]
-        record.shapeType = shapeType
+        record = SHAPE_CLASS_FROM_SHAPETYPE[self.shapeType](oid=oid)
         # For Null shapes create an empty points list for consistency
         # if shapeType == 0:
         if isinstance(record, NullShape):
