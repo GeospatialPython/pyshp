@@ -940,6 +940,129 @@ SHAPE_CLASS_FROM_SHAPETYPE: dict[int, type[Shape]] = {
 }
 
 
+def __read_shape_from_shp_file(f):
+    """ Constructs a Shape from an open .shp file.  Something else
+        is required to have first read the .shp file's header.
+        Leaves the shp file's .tell() in the correct position for 
+        a subsequent call to this, to build the next shape.
+    """
+    # record = Shape(oid=oid)
+    # Previously, we also set __zmin = __zmax = __mmin = __mmax = None
+    nParts: Optional[int] = None
+    nPoints: Optional[int] = None
+    (__recNum, recLength) = unpack(">2i", f.read(8))
+    # Determine the start of the next record
+    next_shape = f.tell() + (2 * recLength)
+    shapeType = unpack("<i", f.read(4))[0]
+    record = SHAPE_CLASS_FROM_SHAPETYPE[shapeType](oid=oid)
+    # For Null shapes create an empty points list for consistency
+    # if shapeType == 0:
+    if isinstance(record, NullShape):
+        record.points = []
+    # All shape types capable of having a bounding box
+    # elif shapeType in (3, 13, 23, 5, 15, 25, 8, 18, 28, 31):
+    elif isinstance(record, _CanHaveBBox):
+        # record.bbox = tuple(_Array[float]("d", unpack("<4d", f.read(32))))
+        record.bbox = _Array[float]("d", unpack("<4d", f.read(32)))
+        # if bbox specified and no overlap, skip this shape
+        if bbox is not None and not bbox_overlap(bbox, tuple(record.bbox)):
+            # because we stop parsing this shape, skip to beginning of
+            # next shape before we return
+            f.seek(next_shape)
+            return None
+    # Shape types with parts
+    # if shapeType in (3, 13, 23, 5, 15, 25, 31):
+    if isinstance(record, (Polyline, Polygon, MultiPatch)):
+        nParts = unpack("<i", f.read(4))[0]
+
+    # Shape types with points
+    # if shapeType in (3, 13, 23, 5, 15, 25, 8, 18, 28, 31):
+    if isinstance(record, _CanHaveBBox):
+        nPoints = unpack("<i", f.read(4))[0]
+        # Read points - produces a list of [x,y] values
+
+    if nParts:
+        record.parts = _Array[int]("i", unpack(f"<{nParts}i", f.read(nParts * 4)))
+
+        # Read part types for Multipatch - 31
+        # if shapeType == 31:
+        if isinstance(record, MultiPatch):
+            record.partTypes = _Array[int](
+                "i", unpack(f"<{nParts}i", f.read(nParts * 4))
+            )
+
+    if nPoints:
+        flat = unpack(f"<{2 * nPoints}d", f.read(16 * nPoints))
+        record.points = list(zip(*(iter(flat),) * 2))
+
+        # Read z extremes and values
+        # if shapeType in (13, 15, 18, 31):
+        if isinstance(record, _HasZ):
+            __zmin, __zmax = unpack("<2d", f.read(16))
+            record.z = _Array[float](
+                "d", unpack(f"<{nPoints}d", f.read(nPoints * 8))
+            )
+
+        # Read m extremes and values
+        # if shapeType in (13, 23, 15, 25, 18, 28, 31):
+        if isinstance(record, _HasM):
+            if next_shape - f.tell() >= 16:
+                __mmin, __mmax = unpack("<2d", f.read(16))
+            # Measure values less than -10e38 are nodata values according to the spec
+            if next_shape - f.tell() >= nPoints * 8:
+                record.m = []
+                for m in _Array[float](
+                    "d", unpack(f"<{nPoints}d", f.read(nPoints * 8))
+                ):
+                    if m > NODATA:
+                        record.m.append(m)
+                    else:
+                        record.m.append(None)
+            else:
+                record.m = [None for _ in range(nPoints)]
+
+    # Read a single point
+    # if shapeType in (1, 11, 21):
+    if isinstance(record, Point):
+        x, y = _Array[float]("d", unpack("<2d", f.read(16)))
+
+        record.points = [(x, y)]
+        if bbox is not None:
+            # create bounding box for Point by duplicating coordinates
+            # skip shape if no overlap with bounding box
+            if not bbox_overlap(bbox, (x, y, x, y)):
+                f.seek(next_shape)
+                return None
+
+    # Read a single Z value
+    # if shapeType == 11:
+    if isinstance(record, PointZ):
+        record.z = tuple(unpack("<d", f.read(8)))
+
+    # Read a single M value
+    # if shapeType in (21, 11):
+    if isinstance(record, PointM):
+        if next_shape - f.tell() >= 8:
+            (m,) = unpack("<d", f.read(8))
+        else:
+            m = NODATA
+        # Measure values less than -10e38 are nodata values according to the spec
+        if m > NODATA:
+            record.m = (m,)
+        else:
+            record.m = (None,)
+
+    # pylint: enable=attribute-defined-outside-init
+    # Seek to the end of this record as defined by the record header because
+    # the shapefile spec doesn't require the actual content to meet the header
+    # definition.  Probably allowed for lazy feature deletion.
+
+    f.seek(next_shape)
+
+    return record
+
+
+
 class _Record(list):
     """
     A class to hold a record. Subclasses list to ensure compatibility with
@@ -1638,120 +1761,10 @@ class Reader:
 
         # pylint: disable=attribute-defined-outside-init
         f = self.__getFileObj(self.shp)
-        # record = Shape(oid=oid)
-        # Previously, we also set __zmin = __zmax = __mmin = __mmax = None
-        nParts: Optional[int] = None
-        nPoints: Optional[int] = None
-        (__recNum, recLength) = unpack(">2i", f.read(8))
-        # Determine the start of the next record
-        next_shape = f.tell() + (2 * recLength)
-        shapeType = unpack("<i", f.read(4))[0]
-        record = SHAPE_CLASS_FROM_SHAPETYPE[shapeType](oid=oid)
-        # For Null shapes create an empty points list for consistency
-        # if shapeType == 0:
-        if isinstance(record, NullShape):
-            record.points = []
-        # All shape types capable of having a bounding box
-        # elif shapeType in (3, 13, 23, 5, 15, 25, 8, 18, 28, 31):
-        elif isinstance(record, _CanHaveBBox):
-            # record.bbox = tuple(_Array[float]("d", unpack("<4d", f.read(32))))
-            record.bbox = _Array[float]("d", unpack("<4d", f.read(32)))
-            # if bbox specified and no overlap, skip this shape
-            if bbox is not None and not bbox_overlap(bbox, tuple(record.bbox)):
-                # because we stop parsing this shape, skip to beginning of
-                # next shape before we return
-                f.seek(next_shape)
-                return None
-        # Shape types with parts
-        # if shapeType in (3, 13, 23, 5, 15, 25, 31):
-        if isinstance(record, (Polyline, Polygon, MultiPatch)):
-            nParts = unpack("<i", f.read(4))[0]
 
-        # Shape types with points
-        # if shapeType in (3, 13, 23, 5, 15, 25, 8, 18, 28, 31):
-        if isinstance(record, _CanHaveBBox):
-            nPoints = unpack("<i", f.read(4))[0]
-            # Read points - produces a list of [x,y] values
+        shape = __read_shape_from_shp_file(f)
 
-        if nParts:
-            record.parts = _Array[int]("i", unpack(f"<{nParts}i", f.read(nParts * 4)))
-
-            # Read part types for Multipatch - 31
-            # if shapeType == 31:
-            if isinstance(record, MultiPatch):
-                record.partTypes = _Array[int](
-                    "i", unpack(f"<{nParts}i", f.read(nParts * 4))
-                )
-
-        if nPoints:
-            flat = unpack(f"<{2 * nPoints}d", f.read(16 * nPoints))
-            record.points = list(zip(*(iter(flat),) * 2))
-
-            # Read z extremes and values
-            # if shapeType in (13, 15, 18, 31):
-            if isinstance(record, _HasZ):
-                __zmin, __zmax = unpack("<2d", f.read(16))
-                record.z = _Array[float](
-                    "d", unpack(f"<{nPoints}d", f.read(nPoints * 8))
-                )
-
-            # Read m extremes and values
-            # if shapeType in (13, 23, 15, 25, 18, 28, 31):
-            if isinstance(record, _HasM):
-                if next_shape - f.tell() >= 16:
-                    __mmin, __mmax = unpack("<2d", f.read(16))
-                # Measure values less than -10e38 are nodata values according to the spec
-                if next_shape - f.tell() >= nPoints * 8:
-                    record.m = []
-                    for m in _Array[float](
-                        "d", unpack(f"<{nPoints}d", f.read(nPoints * 8))
-                    ):
-                        if m > NODATA:
-                            record.m.append(m)
-                        else:
-                            record.m.append(None)
-                else:
-                    record.m = [None for _ in range(nPoints)]
-
-        # Read a single point
-        # if shapeType in (1, 11, 21):
-        if isinstance(record, Point):
-            x, y = _Array[float]("d", unpack("<2d", f.read(16)))
-
-            record.points = [(x, y)]
-            if bbox is not None:
-                # create bounding box for Point by duplicating coordinates
-                # skip shape if no overlap with bounding box
-                if not bbox_overlap(bbox, (x, y, x, y)):
-                    f.seek(next_shape)
-                    return None
-
-        # Read a single Z value
-        # if shapeType == 11:
-        if isinstance(record, PointZ):
-            record.z = tuple(unpack("<d", f.read(8)))
-
-        # Read a single M value
-        # if shapeType in (21, 11):
-        if isinstance(record, PointM):
-            if next_shape - f.tell() >= 8:
-                (m,) = unpack("<d", f.read(8))
-            else:
-                m = NODATA
-            # Measure values less than -10e38 are nodata values according to the spec
-            if m > NODATA:
-                record.m = (m,)
-            else:
-                record.m = (None,)
-
-        # pylint: enable=attribute-defined-outside-init
-        # Seek to the end of this record as defined by the record header because
-        # the shapefile spec doesn't require the actual content to meet the header
-        # definition.  Probably allowed for lazy feature deletion.
-
-        f.seek(next_shape)
-
-        return record
+        return shape
 
     def __shxHeader(self):
         """Reads the header information from a .shx file."""
