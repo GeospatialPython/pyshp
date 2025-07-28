@@ -110,14 +110,14 @@ PARTTYPE_LOOKUP = {
 T = TypeVar("T")
 Point2D = tuple[float, float]
 Point3D = tuple[float, float, float]
-PointM = tuple[float, float, Optional[float]]
-PointZ = tuple[float, float, float, Optional[float]]
+PointMT = tuple[float, float, Optional[float]]
+PointZT = tuple[float, float, float, Optional[float]]
 
 Coord = Union[Point2D, Point3D]
 Coords = list[Coord]
 
-Point = Union[Point2D, PointM, PointZ]
-Points = list[Point]
+PointT = Union[Point2D, PointMT, PointZT]
+PointsT = list[PointT]
 
 BBox = tuple[float, float, float, float]
 
@@ -153,36 +153,36 @@ class GeoJSONPoint(TypedDict):
     # elements.  "
     # RFC7946 also requires long/lat easting/northing which we do not enforce,
     # and despite the SHOULD NOT, we may use a 4th element for Shapefile M Measures.
-    coordinates: Union[Point, tuple[()]]
+    coordinates: Union[PointT, tuple[()]]
 
 
 class GeoJSONMultiPoint(TypedDict):
     type: Literal["MultiPoint"]
-    coordinates: Points
+    coordinates: PointsT
 
 
 class GeoJSONLineString(TypedDict):
     type: Literal["LineString"]
     # "Two or more positions" not enforced by type checker
     # https://datatracker.ietf.org/doc/html/rfc7946#section-3.1.4
-    coordinates: Points
+    coordinates: PointsT
 
 
 class GeoJSONMultiLineString(TypedDict):
     type: Literal["MultiLineString"]
-    coordinates: list[Points]
+    coordinates: list[PointsT]
 
 
 class GeoJSONPolygon(TypedDict):
     type: Literal["Polygon"]
     # Other requirements for Polygon not enforced by type checker
     # https://datatracker.ietf.org/doc/html/rfc7946#section-3.1.6
-    coordinates: list[Points]
+    coordinates: list[PointsT]
 
 
 class GeoJSONMultiPolygon(TypedDict):
     type: Literal["MultiPolygon"]
-    coordinates: list[list[Points]]
+    coordinates: list[list[PointsT]]
 
 
 GeoJSONHomogeneousGeometryObject = Union[
@@ -293,7 +293,7 @@ class _Array(array.array, Generic[T]):
 
 
 def signed_area(
-    coords: Points,
+    coords: PointsT,
     fast: bool = False,
 ) -> float:
     """Return the signed area enclosed by a ring using the linear time
@@ -311,7 +311,7 @@ def signed_area(
     return area2 / 2.0
 
 
-def is_cw(coords: Points) -> bool:
+def is_cw(coords: PointsT) -> bool:
     """Returns True if a polygon ring has clockwise orientation, determined
     by a negatively signed area.
     """
@@ -319,12 +319,12 @@ def is_cw(coords: Points) -> bool:
     return area2 < 0
 
 
-def rewind(coords: Reversible[Point]) -> Points:
+def rewind(coords: Reversible[PointT]) -> PointsT:
     """Returns the input coords in reversed order."""
     return list(reversed(coords))
 
 
-def ring_bbox(coords: Points) -> BBox:
+def ring_bbox(coords: PointsT) -> BBox:
     """Calculates and returns the bounding box of a ring."""
     xs, ys = map(list, list(zip(*coords))[:2])  # ignore any z or m values
     bbox = min(xs), min(ys), max(xs), max(ys)
@@ -347,7 +347,7 @@ def bbox_contains(bbox1: BBox, bbox2: BBox) -> bool:
     return contains
 
 
-def ring_contains_point(coords: Points, p: Point2D) -> bool:
+def ring_contains_point(coords: PointsT, p: Point2D) -> bool:
     """Fast point-in-polygon crossings algorithm, MacMartin optimization.
 
     Adapted from code by Eric Haynes
@@ -396,7 +396,7 @@ class RingSamplingError(Exception):
     pass
 
 
-def ring_sample(coords: Points, ccw: bool = False) -> Point2D:
+def ring_sample(coords: PointsT, ccw: bool = False) -> Point2D:
     """Return a sample point guaranteed to be within a ring, by efficiently
     finding the first centroid of a coordinate triplet whose orientation
     matches the orientation of the ring and passes the point-in-ring test.
@@ -446,15 +446,15 @@ def ring_sample(coords: Points, ccw: bool = False) -> Point2D:
     )
 
 
-def ring_contains_ring(coords1: Points, coords2: list[Point]) -> bool:
+def ring_contains_ring(coords1: PointsT, coords2: list[PointT]) -> bool:
     """Returns True if all vertexes in coords2 are fully inside coords1."""
     # Ignore Z and M values in coords2
     return all(ring_contains_point(coords1, p2[:2]) for p2 in coords2)
 
 
 def organize_polygon_rings(
-    rings: Iterable[Points], return_errors: Optional[dict[str, int]] = None
-) -> list[list[Points]]:
+    rings: Iterable[PointsT], return_errors: Optional[dict[str, int]] = None
+) -> list[list[PointsT]]:
     """Organize a list of coordinate rings into one or more polygons with holes.
     Returns a list of polygons, where each polygon is composed of a single exterior
     ring, and one or more interior holes. If a return_errors dict is provided (optional),
@@ -585,10 +585,12 @@ class GeoJSON_Error(Exception):
 
 
 class Shape:
+    shapeType = NULL
+
     def __init__(
         self,
         shapeType: int = NULL,
-        points: Optional[Points] = None,
+        points: Optional[PointsT] = None,
         parts: Optional[Sequence[int]] = None,
         partTypes: Optional[Sequence[int]] = None,
         oid: Optional[int] = None,
@@ -604,7 +606,8 @@ class Shape:
         list of shapes. For MultiPatch geometry, partTypes designates
         the patch type of each of the parts.
         """
-        self.shapeType = shapeType
+        if self.shapeType != shapeType:
+            self.shapeType = shapeType
         self.points = points or []
         self.parts = parts or []
         if partTypes:
@@ -836,6 +839,82 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
 
     def __repr__(self):
         return f"Shape #{self.__oid}: {self.shapeTypeName}"
+
+
+class NullShape(Shape):
+    # Shape.shapeType = NULL already,
+    # to preserve handling of default args in Shape.__init__
+    # Repeated for clarity.
+    shapeType = NULL
+
+
+class _CanHaveBBox(Shape):
+    # Not a BBox because the legacy implementation was a list, not a 4-tuple.
+    bbox: Optional[list[float]] = None
+
+
+class Point(Shape):
+    shapeType = 1
+
+
+class Polyline(_CanHaveBBox):
+    shapeType = 3
+
+
+class Polygon(_CanHaveBBox):
+    shapeType = 5
+
+
+class MultiPoint(_CanHaveBBox):
+    shapeType = 8
+
+
+class _HasM(Shape):
+    m: Sequence[Optional[float]]
+
+
+class _HasZ(Shape):
+    z: Sequence[float]
+
+
+class MultiPatch(_HasM, _HasZ, _CanHaveBBox):
+    shapeType = 31
+
+
+class PointM(Point, _HasM):
+    # same default as in Writer.__shpRecord (if s.shapeType in (11, 21):)
+    # PyShp encodes None m values as NODATA
+    m = (None,)
+    shapeType = 21
+
+
+class PolylineM(Polyline, _HasM):
+    shapeType = 23
+
+
+class PolygonM(Polygon, _HasM):
+    shapeType = 25
+
+
+class MultiPointM(MultiPoint, _HasM):
+    shapeType = 28
+
+
+class PointZ(PointM, _HasZ):
+    shapeType = 11
+    z = (0,)  # same default as in Writer.__shpRecord (if s.shapeType == 11:)
+
+
+class PolylineZ(PolylineM, _HasZ):
+    shapeType = 13
+
+
+class PolygonZ(PolygonM, _HasZ):
+    shapeType = 15
+
+
+class MultiPointZ(MultiPointM, _HasZ):
+    shapeType = 18
 
 
 class _Record(list):
@@ -2879,14 +2958,14 @@ class Writer:
         pointShape.points.append((x, y, z, m))
         self.shape(pointShape)
 
-    def multipoint(self, points: Points):
+    def multipoint(self, points: PointsT):
         """Creates a MULTIPOINT shape.
         Points is a list of xy values."""
         shapeType = MULTIPOINT
         # nest the points inside a list to be compatible with the generic shapeparts method
         self._shapeparts(parts=[points], shapeType=shapeType)
 
-    def multipointm(self, points: Points):
+    def multipointm(self, points: PointsT):
         """Creates a MULTIPOINTM shape.
         Points is a list of xym values.
         If the m (measure) value is not included, it defaults to None (NoData)."""
@@ -2894,7 +2973,7 @@ class Writer:
         # nest the points inside a list to be compatible with the generic shapeparts method
         self._shapeparts(parts=[points], shapeType=shapeType)
 
-    def multipointz(self, points: Points):
+    def multipointz(self, points: PointsT):
         """Creates a MULTIPOINTZ shape.
         Points is a list of xyzm values.
         If the z (elevation) value is not included, it defaults to 0.
@@ -2903,20 +2982,20 @@ class Writer:
         # nest the points inside a list to be compatible with the generic shapeparts method
         self._shapeparts(parts=[points], shapeType=shapeType)
 
-    def line(self, lines: list[Points]):
+    def line(self, lines: list[PointsT]):
         """Creates a POLYLINE shape.
         Lines is a collection of lines, each made up of a list of xy values."""
         shapeType = POLYLINE
         self._shapeparts(parts=lines, shapeType=shapeType)
 
-    def linem(self, lines: list[Points]):
+    def linem(self, lines: list[PointsT]):
         """Creates a POLYLINEM shape.
         Lines is a collection of lines, each made up of a list of xym values.
         If the m (measure) value is not included, it defaults to None (NoData)."""
         shapeType = POLYLINEM
         self._shapeparts(parts=lines, shapeType=shapeType)
 
-    def linez(self, lines: list[Points]):
+    def linez(self, lines: list[PointsT]):
         """Creates a POLYLINEZ shape.
         Lines is a collection of lines, each made up of a list of xyzm values.
         If the z (elevation) value is not included, it defaults to 0.
@@ -2924,7 +3003,7 @@ class Writer:
         shapeType = POLYLINEZ
         self._shapeparts(parts=lines, shapeType=shapeType)
 
-    def poly(self, polys: list[Points]):
+    def poly(self, polys: list[PointsT]):
         """Creates a POLYGON shape.
         Polys is a collection of polygons, each made up of a list of xy values.
         Note that for ordinary polygons the coordinates must run in a clockwise direction.
@@ -2932,7 +3011,7 @@ class Writer:
         shapeType = POLYGON
         self._shapeparts(parts=polys, shapeType=shapeType)
 
-    def polym(self, polys: list[Points]):
+    def polym(self, polys: list[PointsT]):
         """Creates a POLYGONM shape.
         Polys is a collection of polygons, each made up of a list of xym values.
         Note that for ordinary polygons the coordinates must run in a clockwise direction.
@@ -2941,7 +3020,7 @@ class Writer:
         shapeType = POLYGONM
         self._shapeparts(parts=polys, shapeType=shapeType)
 
-    def polyz(self, polys: list[Points]):
+    def polyz(self, polys: list[PointsT]):
         """Creates a POLYGONZ shape.
         Polys is a collection of polygons, each made up of a list of xyzm values.
         Note that for ordinary polygons the coordinates must run in a clockwise direction.
@@ -2951,7 +3030,7 @@ class Writer:
         shapeType = POLYGONZ
         self._shapeparts(parts=polys, shapeType=shapeType)
 
-    def multipatch(self, parts: list[Points], partTypes: list[int]):
+    def multipatch(self, parts: list[PointsT], partTypes: list[int]):
         """Creates a MULTIPATCH shape.
         Parts is a collection of 3D surface patches, each made up of a list of xyzm values.
         PartTypes is a list of types that define each of the surface patches.
@@ -2977,7 +3056,7 @@ class Writer:
         # write the shape
         self.shape(polyShape)
 
-    def _shapeparts(self, parts: list[Points], shapeType: int):
+    def _shapeparts(self, parts: list[PointsT], shapeType: int):
         """Internal method for adding a shape that has multiple collections of points (parts):
         lines, polygons, and multipoint shapes.
         """
