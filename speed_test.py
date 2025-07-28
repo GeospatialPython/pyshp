@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 import functools
 import os
-from pathlib import Path
 import timeit
+from collections.abc import Callable
+from pathlib import Path
+from typing import Union
 
 import shapefile as shp
-
 import test_shapefile
 
-DEFAULT_PYSHP_TEST_REPO = fr"{os.getenv('USERPROFILE')}\Coding\repos\PyShp_test_shapefile"
+DEFAULT_PYSHP_TEST_REPO = (
+    rf"{os.getenv('USERPROFILE')}\Coding\repos\PyShp_test_shapefile"
+)
 PYSHP_TEST_REPO = Path(os.getenv("PYSHP_TEST_REPO", DEFAULT_PYSHP_TEST_REPO))
 REPO_ROOT = Path(__file__).parent
 
@@ -42,7 +44,6 @@ def benchmark(
     return time_taken
 
 
-
 def open_shapefile_with_PyShp(target: Union[str, os.PathLike]):
     with shp.Reader(target) as r:
         for shapeRecord in r.iterShapeRecords():
@@ -55,7 +56,7 @@ READER_TESTS = {
     "Merge": merge_file,
     "States_35MB": states_provinces_file,
     "Tiny Countries": tiny_countries_file,
-    "GIS_OSM_zip_10MB": gis_osm_natural_file, 
+    "GIS_OSM_zip_10MB": gis_osm_natural_file,
 }
 
 
@@ -67,15 +68,17 @@ def run(run_count: int) -> None:
         file_path.read_bytes()
     print(f"Running benchmarks {run_count} times:")
     print("-" * col_width[0] + "---" + "-" * col_width[1])
-    print(
-        f"{col_head[0]:>{col_width[0]}} | {col_head[1]:>{col_width[1]}}"
-    )
+    print(f"{col_head[0]:>{col_width[0]}} | {col_head[1]:>{col_width[1]}}")
     print("-" * col_width[0] + "-+-" + "-" * col_width[1])
     for test_name, target in READER_TESTS.items():
-        benchmark(f"Read {test_name}", run_count, functools.partial(open_shapefile_with_PyShp, target=target), col_width)
+        benchmark(
+            f"Read {test_name}",
+            run_count,
+            functools.partial(open_shapefile_with_PyShp, target=target),
+            col_width,
+        )
 
     benchmark(f"Slow test", 1, test_shapefile.test_iterRecords_start_stop, col_width)
-
 
 
 if __name__ == "__main__":
