@@ -72,7 +72,7 @@ runs:
         name: PyShp_wheel_and_sdist
         path: dist
 
-    - name: Install PyShp from the wheel (built in prev step)
+    - name: Install PyShp from the wheel (downloaded in prev step)
       shell: bash
       working-directory: dist/
       run: |
