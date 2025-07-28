@@ -940,11 +940,13 @@ SHAPE_CLASS_FROM_SHAPETYPE: dict[int, type[Shape]] = {
 }
 
 
-def __read_shape_from_shp_file(f):
-    """ Constructs a Shape from an open .shp file.  Something else
-        is required to have first read the .shp file's header.
-        Leaves the shp file's .tell() in the correct position for 
-        a subsequent call to this, to build the next shape.
+def _read_shape_from_shp_file(
+    f, oid=None, bbox=None
+):  # oid: Optional[int] = None, bbox: Optional[BBox] = None):
+    """Constructs a Shape from an open .shp file.  Something else
+    is required to have first read the .shp file's header.
+    Leaves the shp file's .tell() in the correct position for
+    a subsequent call to this, to build the next shape.
     """
     # record = Shape(oid=oid)
     # Previously, we also set __zmin = __zmax = __mmin = __mmax = None
@@ -999,9 +1001,7 @@ def __read_shape_from_shp_file(f):
         # if shapeType in (13, 15, 18, 31):
         if isinstance(record, _HasZ):
             __zmin, __zmax = unpack("<2d", f.read(16))
-            record.z = _Array[float](
-                "d", unpack(f"<{nPoints}d", f.read(nPoints * 8))
-            )
+            record.z = _Array[float]("d", unpack(f"<{nPoints}d", f.read(nPoints * 8)))
 
         # Read m extremes and values
         # if shapeType in (13, 23, 15, 25, 18, 28, 31):
@@ -1060,7 +1060,6 @@ def __read_shape_from_shp_file(f):
     f.seek(next_shape)
 
     return record
-
 
 
 class _Record(list):
@@ -1762,7 +1761,7 @@ class Reader:
         # pylint: disable=attribute-defined-outside-init
         f = self.__getFileObj(self.shp)
 
-        shape = __read_shape_from_shp_file(f)
+        shape = _read_shape_from_shp_file(f, oid, bbox)
 
         return shape
 
