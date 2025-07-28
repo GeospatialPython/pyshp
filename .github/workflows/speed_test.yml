@@ -64,7 +64,7 @@ jobs:
     - name: Run Speed tests.
       env:
         PYSHP_TEST_REPO: ./PyShp_test_shapefile
-      run: python ./Pyshp/speed_test.py
+      run: python ./Pyshp/run_benchmarks.py
 
 
 
