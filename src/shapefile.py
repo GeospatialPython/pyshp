@@ -3139,7 +3139,7 @@ class Writer:
         # Make sure polygon rings (parts) are closed
 
         # if shapeType in (5, 15, 25, 31):
-        # This method is never actually called on a MultiPatch 
+        # This method is never actually called on a MultiPatch
         # so we omit its shapeType (31) for efficiency
         if isinstance(polyShape, Polygon):
             for part in parts:
