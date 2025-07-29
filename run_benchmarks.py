@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import collections
 import functools
 import os
 import timeit
 from collections.abc import Callable
 from pathlib import Path
+from tempfile import TemporaryFile as TempF
 from typing import Union
 
-import shapefile as shp
+import shapefile
 
 # For shapefiles from https://github.com/JamesParrott/PyShp_test_shapefile
 DEFAULT_PYSHP_TEST_REPO = (
@@ -31,26 +33,41 @@ def benchmark(
     name: str,
     run_count: int,
     func: Callable,
-    col_width: tuple,
+    col_widths: tuple,
     compare_to: float | None = None,
 ) -> float:
     placeholder = "Running..."
-    print(f"{name:>{col_width[0]}} | {placeholder}", end="", flush=True)
+    print(f"{name:>{col_widths[0]}} | {placeholder}", end="", flush=True)
     time_taken = timeit.timeit(func, number=run_count)
     print("\b" * len(placeholder), end="")
     time_suffix = " s"
-    print(f"{time_taken:{col_width[1]-len(time_suffix)}.3g}{time_suffix}", end="")
+    print(f"{time_taken:{col_widths[1]-len(time_suffix)}.3g}{time_suffix}", end="")
     print()
     return time_taken
 
 
+fields = {}
+shapeRecords = collections.defaultdict(list)
+
+
 def open_shapefile_with_PyShp(target: Union[str, os.PathLike]):
-    with shp.Reader(target) as r:
+    with shapefile.Reader(target) as r:
+        fields[target] = r.fields
         for shapeRecord in r.iterShapeRecords():
-            pass
+            shapeRecords[target].append(shapeRecord)
 
 
-READER_TESTS = {
+def write_shapefile_with_PyShp(target: Union[str, os.PathLike]):
+    with TempF("wb") as shp, TempF("wb") as dbf, TempF("wb") as shx:
+        with shapefile.Writer(shp=shp, dbf=dbf, shx=shx) as w:  # type: ignore [arg-type]
+            for field_info_tuple in fields[target]:
+                w.field(*field_info_tuple)
+            for shapeRecord in shapeRecords[target]:
+                w.shape(shapeRecord.shape)
+                w.record(*shapeRecord.record)
+
+
+SHAPEFILES = {
     "Blockgroups": blockgroups_file,
     "Edit": edit_file,
     "Merge": merge_file,
@@ -60,24 +77,47 @@ READER_TESTS = {
 }
 
 
-def run(run_count: int) -> None:
-    col_width = (21, 10)
+# Load files to avoid one off delays that only affect first disk seek
+for file_path in SHAPEFILES.values():
+    file_path.read_bytes()
+
+reader_benchmarks = [
+    functools.partial(
+        benchmark,
+        name=f"Read {test_name}",
+        func=functools.partial(open_shapefile_with_PyShp, target=target),
+    )
+    for test_name, target in SHAPEFILES.items()
+]
+
+# Require fields and shapeRecords to first have been populated
+# from data from previouly running the reader_benchmarks
+writer_benchmarks = [
+    functools.partial(
+        benchmark,
+        name=f"Write {test_name}",
+        func=functools.partial(write_shapefile_with_PyShp, target=target),
+    )
+    for test_name, target in SHAPEFILES.items()
+]
+
+
+def run(run_count: int, benchmarks: list[Callable[[], None]]) -> None:
+    col_widths = (22, 10)
     col_head = ("parser", "exec time", "performance (more is better)")
-    # Load files to avoid one off delays that only affect first disk seek
-    for file_path in READER_TESTS.values():
-        file_path.read_bytes()
     print(f"Running benchmarks {run_count} times:")
-    print("-" * col_width[0] + "---" + "-" * col_width[1])
-    print(f"{col_head[0]:>{col_width[0]}} | {col_head[1]:>{col_width[1]}}")
-    print("-" * col_width[0] + "-+-" + "-" * col_width[1])
-    for test_name, target in READER_TESTS.items():
-        benchmark(
-            f"Read {test_name}",
-            run_count,
-            functools.partial(open_shapefile_with_PyShp, target=target),
-            col_width,
+    print("-" * col_widths[0] + "---" + "-" * col_widths[1])
+    print(f"{col_head[0]:>{col_widths[0]}} | {col_head[1]:>{col_widths[1]}}")
+    print("-" * col_widths[0] + "-+-" + "-" * col_widths[1])
+    for benchmark in benchmarks:
+        benchmark(  # type: ignore [call-arg]
+            run_count=run_count,
+            col_widths=col_widths,
         )
 
 
 if __name__ == "__main__":
-    run(1)
+    print("Reader tests:")
+    run(1, reader_benchmarks)  # type: ignore [arg-type]
+    print("\n\nWrite tests:")
+    run(1, writer_benchmarks)  # type: ignore [arg-type]
