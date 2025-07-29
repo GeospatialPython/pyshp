@@ -1325,7 +1325,6 @@ class _Record(list):
                 and IndexError, if the field exists but the field's
                 corresponding value in the Record does not exist
         """
-        # pylint: disable=raise-missing-from
         try:
             if item == "__setstate__":  # Prevent infinite loop from copy.deepcopy()
                 raise AttributeError("_Record does not implement __setstate__")
@@ -1337,7 +1336,6 @@ class _Record(list):
             raise IndexError(
                 f"{item} found as a field but not enough values available."
             )
-        # pylint: enable=raise-missing-from
 
     def __setattr__(self, key: str, value: RecordValue):
         """
@@ -1353,7 +1351,7 @@ class _Record(list):
             index = self.__field_positions[key]
             return list.__setitem__(self, index, value)
         except KeyError:
-            raise AttributeError(f"{key} is not a field name")  # pylint: disable=raise-missing-from
+            raise AttributeError(f"{key} is not a field name")
 
     def __getitem__(self, item):
         """
@@ -1392,7 +1390,7 @@ class _Record(list):
             if index is not None:
                 return list.__setitem__(self, index, value)
 
-            raise IndexError(f"{key} is not a field name and not an int")  # pylint: disable=raise-missing-from
+            raise IndexError(f"{key} is not a field name and not an int")
 
     @property
     def oid(self) -> int:
@@ -2727,7 +2725,6 @@ class Writer:
         Several of the shapefile formats are so similar that a single generic
         method to read or write them is warranted."""
 
-        # pylint: disable=raise-missing-from
         f = self.__getFileObj(fileObj)
         f.seek(0)
         # File code, Unused bytes
@@ -2785,8 +2782,6 @@ class Writer:
             raise ShapefileException(
                 "Failed to write shapefile elevation and measure values. Floats required."
             )
-
-        # pylint: enable=raise-missing-from
 
     def __dbfHeader(self):
         """Writes the dbf header and field descriptors."""
@@ -2859,7 +2854,6 @@ class Writer:
             self.__shxRecord(offset, length)
 
     def __shpRecord(self, s):
-        # pylint: disable=raise-missing-from
         f = self.__getFileObj(self.shp)
         offset = f.tell()
         # Record number, Content length place holder
@@ -2891,13 +2885,11 @@ class Writer:
         f.seek(start - 4)
         f.write(pack(">i", length))
         f.seek(finish)
-        # pylint: enable=raise-missing-from
         return offset, length
 
     def __shxRecord(self, offset, length):
         """Writes the shx records."""
 
-        # pylint: disable=raise-missing-from
         f = self.__getFileObj(self.shx)
         try:
             f.write(pack(">i", offset // 2))
@@ -2906,8 +2898,6 @@ class Writer:
                 "The .shp file has reached its file size limit > 4294967294 bytes (4.29 GB). To fix this, break up your file into multiple smaller ones."
             )
         f.write(pack(">i", length))
-
-        # pylint: enable=raise-missing-from
 
     def record(
         self, *recordList: Iterable[RecordValue], **recordDict: dict[str, RecordValue]
