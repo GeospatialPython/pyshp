@@ -119,5 +119,5 @@ def run(run_count: int, benchmarks: list[Callable[[], None]]) -> None:
 if __name__ == "__main__":
     print("Reader tests:")
     run(1, reader_benchmarks)  # type: ignore [arg-type]
-    print("\n\nWrite tests:")
+    print("\n\nWriter tests:")
     run(1, writer_benchmarks)  # type: ignore [arg-type]
