@@ -870,23 +870,20 @@ def _read_shape_from_shp_file(
     return shape
 
 
-def _write_shape_to_shp_file(
-    f,
-    s,
-    i,
-    bbox,
-    mbox,
-    zbox,
-):
-    f.write(pack("<i", s.shapeType))
+# def _write_shape_to_shp_file(
+#     f,
+#     s,
+#     i,
+#     bbox,
+#     mbox,
+#     zbox,
+# ):
 
-    # ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[s.shapeType]
-    # ShapeClass._try_write_to_shp_file(f, s, i, bbox, mbox, zbox)
 
-    if s.shapeType in Point._shapeTypes:
-        Point._try_write_to_shp_file(f, s, i, bbox, mbox, zbox)
-    elif s.shapeType in _CanHaveBBox._shapeTypes:
-        _CanHaveBBox._try_write_to_shp_file(f, s, i, bbox, mbox, zbox)
+#     if s.shapeType in Point._shapeTypes:
+#         Point._try_write_to_shp_file(f, s, i, bbox, mbox, zbox)
+#     elif s.shapeType in _CanHaveBBox._shapeTypes:
+#         _CanHaveBBox._try_write_to_shp_file(f, s, i, bbox, mbox, zbox)
 
 
 class NullShape(Shape):
@@ -900,6 +897,9 @@ class NullShape(Shape):
         # Shape.__init__ sets self.points = points or []
         return cls(oid=oid)
 
+    @staticmethod
+    def _try_write_to_shp_file(f, s, i, bbox, mbox, zbox):  # pylint: disable=unused-argument
+        pass
 
 class _CanHaveBBox(Shape):
     """As well as setting bounding boxes, we also utilize the
@@ -2991,10 +2991,15 @@ class Writer:
             else None
         )
         new_zbox = (
-            self.__zbox(s) if s.shapeType in {POINTZ} | _HasZ._shapeTypes else None
+            self.__zbox(s)
+            if s.shapeType in {POINTZ} | _HasZ._shapeTypes
+            else None
         )
 
-        _write_shape_to_shp_file(
+        f.write(pack("<i", s.shapeType))
+
+        ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[s.shapeType]
+        ShapeClass._try_write_to_shp_file(
             f=f,
             s=s,
             i=self.shpNum,
@@ -3010,6 +3015,8 @@ class Writer:
         f.seek(start - 4)
         f.write(pack(">i", length))
         f.seek(finish)
+
+
         return offset, length
 
     def __shxRecord(self, offset, length):
