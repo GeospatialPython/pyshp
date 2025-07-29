@@ -2967,52 +2967,58 @@ class Writer:
             self.__shxRecord(offset, length)
 
     def __shpRecord(self, s):
-        f = self.__getFileObj(self.shp)
-        offset = f.tell()
+        shp = self.__getFileObj(self.shp)
+        offset = shp.tell()
         # Record number, Content length place holder
         self.shpNum += 1
-        f.write(pack(">2i", self.shpNum, 0))
-        start = f.tell()
-        # Shape Type
-        if self.shapeType is None and s.shapeType != NULL:
-            self.shapeType = s.shapeType
-        if not s.shapeType in {NULL, self.shapeType}:
-            raise ShapefileException(
-                f"The shape's type ({s.shapeType}) must match "
-                f"the type of the shapefile ({self.shapeType})."
+        with io.BytesIO() as f:
+            f.write(pack(">2i", self.shpNum, 0))
+            start = f.tell()
+            # Shape Type
+            if self.shapeType is None and s.shapeType != NULL:
+                self.shapeType = s.shapeType
+            if not s.shapeType in {NULL, self.shapeType}:
+                raise ShapefileException(
+                    f"The shape's type ({s.shapeType}) must match "
+                    f"the type of the shapefile ({self.shapeType})."
+                )
+
+            # For both single point and multiple-points non-null shapes,
+            # update bbox, mbox and zbox of the whole shapefile
+            new_bbox = self.__bbox(s) if s.shapeType != NULL else None
+            new_mbox = (
+                self.__mbox(s)
+                if s.shapeType in {POINTM, POINTZ} | _HasM._shapeTypes
+                else None
+            )
+            new_zbox = (
+                self.__zbox(s)
+                if s.shapeType in {POINTZ} | _HasZ._shapeTypes
+                else None
             )
 
-        # For both single point and multiple-points non-null shapes,
-        # update bbox, mbox and zbox of the whole shapefile
-        new_bbox = self.__bbox(s) if s.shapeType != NULL else None
-        new_mbox = (
-            self.__mbox(s)
-            if s.shapeType in {POINTM, POINTZ} | _HasM._shapeTypes
-            else None
-        )
-        new_zbox = (
-            self.__zbox(s) if s.shapeType in {POINTZ} | _HasZ._shapeTypes else None
-        )
+            f.write(pack("<i", s.shapeType))
 
-        f.write(pack("<i", s.shapeType))
+            ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[s.shapeType]
+            ShapeClass._try_write_to_shp_file(
+                f=f,
+                s=s,
+                i=self.shpNum,
+                bbox=new_bbox,
+                mbox=new_mbox,
+                zbox=new_zbox,
+            )
 
-        ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[s.shapeType]
-        ShapeClass._try_write_to_shp_file(
-            f=f,
-            s=s,
-            i=self.shpNum,
-            bbox=new_bbox,
-            mbox=new_mbox,
-            zbox=new_zbox,
-        )
+            # Finalize record length as 16-bit words
+            finish = f.tell()
+            length = (finish - start) // 2
+            # start - 4 bytes is the content length field
+            f.seek(start - 4)
+            f.write(pack(">i", length))
+            # f.seek(finish)
 
-        # Finalize record length as 16-bit words
-        finish = f.tell()
-        length = (finish - start) // 2
-        # start - 4 bytes is the content length field
-        f.seek(start - 4)
-        f.write(pack(">i", length))
-        f.seek(finish)
+            f.seek(0)
+            shp.write(f.read())
         return offset, length
 
     def __shxRecord(self, offset, length):
