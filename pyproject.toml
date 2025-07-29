@@ -112,9 +112,11 @@ load-plugins=[
     "pylint_per_file_ignores",
 ]
 
-# Silence warning: shapefile.py:2076:20: W0212: Access to a protected
-#                  member _from_geojson of a client class (protected-access)
-#                  shapefile.py:950:16: W0201: Attribute 'm' defined outside __init__ (attribute-defined-outside-init)
+# Silence warnings: src/shapefile.py:2076:20: W0212: Access to a protected member _from_geojson of a client class (protected-access)
+#                   src/shapefile.py:950:16: W0201: Attribute 'm' defined outside __init__ (attribute-defined-outside-init)
+#                   src/shapefile.py:973:12: W0707: Consider explicitly re-raising using 'except error as exc' and
+#                                                  'raise ShapefileException(f'Failed to write bounding box for record {i}.
+#                                                   Expected floats.') from exc' (raise-missing-from)
 # Silence remarks:
 # src\shapefile.py:338:0: R0914: Too many local variables (21/15) (too-many-locals)
 # src\shapefile.py:338:0: R0912: Too many branches (24/12) (too-many-branches)
@@ -134,6 +136,6 @@ load-plugins=[
 # https://github.com/christopherpickering/pylint-per-file-ignores/issues/160
 [tool.pylint.'messages control']
 per-file-ignores = [
-    "/src/shapefile.py:W0212,W0201,R0902,R0903,R0904,R0911,R0912,R0913,R0914,R0915,R0917,R1732",
+    "/src/shapefile.py:W0707,W0212,W0201,R0902,R0903,R0904,R0911,R0912,R0913,R0914,R0915,R0917,R1732",
     "test_shapefile.py:W0212,R1732",
 ]

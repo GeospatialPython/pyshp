@@ -623,6 +623,7 @@ class Shape:
         list of shapes. For MultiPatch geometry, partTypes designates
         the patch type of each of the parts.
         """
+        # Preserve previous behaviour for anyone who set self.shapeType = None
         if not isinstance(shapeType, _NoShapeTypeSentinel):
             self.shapeType = shapeType
         self.points = points or []
@@ -844,112 +845,6 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
     def __repr__(self):
         return f"Shape #{self.__oid}: {self.shapeTypeName}"
 
-    # pylint: disable=unused-argument
-    def _set_bbox_from_shp_file(self, f):
-        pass
-
-    @staticmethod
-    def _get_nparts_from_shp_file(f):
-        return None
-
-    @staticmethod
-    def _get_npoints_from_shp_file(f):
-        return None
-
-    def _set_parts_from_shp_file(self, f, nParts):
-        pass
-
-    def _set_part_types_from_shp_file(self, f, nParts):
-        pass
-
-    def _set_points_from_shp_file(self, f, nPoints):
-        pass
-
-    def _set_z_from_shp_file(self, f, nPoints):
-        pass
-
-    def _set_m_from_shp_file(self, f, nPoints, next_shape):
-        pass
-
-    def _get_and_set_2D_point_from_shp_file(self, f):
-        return None
-
-    def _set_single_point_z_from_shp_file(self, f):
-        pass
-
-    def _set_single_point_m_from_shp_file(self, f, next_shape):
-        pass
-
-    # pylint: enable=unused-argument
-
-    @classmethod
-    def _from_shp_file(cls, f, next_shape, oid=None, bbox=None):
-        shape = cls(oid=oid)
-
-        shape._set_bbox_from_shp_file(f)  # pylint: disable=assignment-from-none
-
-        # if bbox specified and no overlap, skip this shape
-        if bbox is not None and not bbox_overlap(bbox, tuple(shape.bbox)):  # pylint: disable=no-member
-            # because we stop parsing this shape, skip to beginning of
-            # next shape before we return
-            return None
-
-        nParts: Optional[int] = shape._get_nparts_from_shp_file(f)
-        nPoints: Optional[int] = shape._get_npoints_from_shp_file(f)
-        # Previously, we also set __zmin = __zmax = __mmin = __mmax = None
-
-        if nParts:
-            shape._set_parts_from_shp_file(f, nParts)
-            shape._set_part_types_from_shp_file(f, nParts)
-
-        if nPoints:
-            shape._set_points_from_shp_file(f, nPoints)
-
-            shape._set_z_from_shp_file(f, nPoints)
-
-            shape._set_m_from_shp_file(f, nPoints, next_shape)
-
-        # Read a single point
-        # if shapeType in (1, 11, 21):
-        point_2D = shape._get_and_set_2D_point_from_shp_file(f)  # pylint: disable=assignment-from-none
-
-        if bbox is not None and point_2D is not None:
-            x, y = point_2D  # pylint: disable=unpacking-non-sequence
-            # create bounding box for Point by duplicating coordinates
-            # skip shape if no overlap with bounding box
-            if not bbox_overlap(bbox, (x, y, x, y)):
-                return None
-
-        shape._set_single_point_z_from_shp_file(f)
-
-        shape._set_single_point_m_from_shp_file(f, next_shape)
-
-        return shape
-
-
-def _read_shape_from_shp_file(
-    f, oid=None, bbox=None
-):  # oid: Optional[int] = None, bbox: Optional[BBox] = None):
-    """Constructs a Shape from an open .shp file.  Something else
-    is required to have first read the .shp file's header.
-    Leaves the shp file's .tell() in the correct position for
-    a subsequent call to this, to build the next shape.
-    """
-    # shape = Shape(oid=oid)
-    (__recNum, recLength) = unpack_2_int32_be(f.read(8))
-    # Determine the start of the next record
-    next_shape = f.tell() + (2 * recLength)
-    shapeType = unpack("<i", f.read(4))[0]
-    ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[shapeType]
-    shape = ShapeClass._from_shp_file(f, next_shape, oid=oid, bbox=bbox)
-
-    # Seek to the end of this record as defined by the record header because
-    # the shapefile spec doesn't require the actual content to meet the header
-    # definition.  Probably allowed for lazy feature deletion.
-    f.seek(next_shape)
-
-    return shape
-
 
 class NullShape(Shape):
     # Shape.shapeType = NULL already,
@@ -957,40 +852,248 @@ class NullShape(Shape):
     # Repeated for clarity.
     shapeType = NULL
 
+    @classmethod
+    def from_byte_stream(cls, b_io, next_shape, oid=None, bbox=None):  # pylint: disable=unused-argument
+        # Shape.__init__ sets self.points = points or []
+        return cls(oid=oid)
+
+    @staticmethod
+    def write_to_byte_stream(b_io, s, i, bbox, mbox, zbox):  # pylint: disable=unused-argument
+        pass
+
 
 class _CanHaveBBox(Shape):
+    """As well as setting bounding boxes, we also utilize the
+    fact that this mixin applies to all the shapes that are
+    not a single point.
+    """
+
+    _shapeTypes = frozenset(
+        [
+            POLYLINE,
+            POLYLINEM,
+            POLYLINEZ,
+            POLYGON,
+            POLYGONM,
+            POLYGONZ,
+            MULTIPOINT,
+            MULTIPOINTM,
+            MULTIPOINTZ,
+            MULTIPATCH,
+        ]
+    )
+
     # Not a BBox because the legacy implementation was a list, not a 4-tuple.
     bbox: Optional[Sequence[float]] = None
 
-    def _set_bbox_from_shp_file(self, f):
-        # record.bbox = tuple(_Array[float]("d", unpack("<4d", f.read(32))))
-        self.bbox = _Array[float]("d", unpack("<4d", f.read(32)))
+    def _set_bbox_from_byte_stream(self, b_io):
+        self.bbox = _Array[float]("d", unpack("<4d", b_io.read(32)))
 
     @staticmethod
-    def _get_npoints_from_shp_file(f):
-        return unpack("<i", f.read(4))[0]
+    def _write_bbox_to_byte_stream(b_io, i, bbox):
+        try:
+            b_io.write(pack("<4d", *bbox))
+        except error:
+            raise ShapefileException(
+                f"Failed to write bounding box for record {i}. Expected floats."
+            )
 
-    def _set_points_from_shp_file(self, f, nPoints):
-        flat = unpack(f"<{2 * nPoints}d", f.read(16 * nPoints))
+    @staticmethod
+    def _get_npoints_from_byte_stream(b_io):
+        return unpack("<i", b_io.read(4))[0]
+
+    @staticmethod
+    def _write_npoints_to_byte_stream(b_io, s):
+        b_io.write(pack("<i", len(s.points)))
+
+    def _set_points_from_byte_stream(self, b_io, nPoints):
+        flat = unpack(f"<{2 * nPoints}d", b_io.read(16 * nPoints))
         self.points = list(zip(*(iter(flat),) * 2))
+
+    @staticmethod
+    def _write_points_to_byte_stream(b_io, s, i):
+        try:
+            for point in s.points:
+                b_io.write(pack("<2d", *point[:2]))
+        except error:
+            raise ShapefileException(
+                f"Failed to write points for record {i}. Expected floats."
+            )
+
+    # pylint: disable=unused-argument
+    @staticmethod
+    def _get_nparts_from_byte_stream(b_io):
+        return None
+
+    def _set_parts_from_byte_stream(self, b_io, nParts):
+        pass
+
+    def _set_part_types_from_byte_stream(self, b_io, nParts):
+        pass
+
+    def _set_zs_from_byte_stream(self, b_io, nPoints):
+        pass
+
+    def _set_ms_from_byte_stream(self, b_io, nPoints, next_shape):
+        pass
+
+    # pylint: enable=unused-argument
+
+    @classmethod
+    def from_byte_stream(cls, b_io, next_shape, oid=None, bbox=None):
+        shape = cls(oid=oid)
+
+        shape._set_bbox_from_byte_stream(b_io)  # pylint: disable=assignment-from-none
+
+        # if bbox specified and no overlap, skip this shape
+        if bbox is not None and not bbox_overlap(bbox, tuple(shape.bbox)):  # pylint: disable=no-member
+            # because we stop parsing this shape, caller must skip to beginning of
+            # next shape after we return (as done in f.seek(next_shape))
+            return None
+
+        nParts: Optional[int] = shape._get_nparts_from_byte_stream(b_io)
+        nPoints: int = shape._get_npoints_from_byte_stream(b_io)
+        # Previously, we also set __zmin = __zmax = __mmin = __mmax = None
+
+        if nParts:
+            shape._set_parts_from_byte_stream(b_io, nParts)
+            shape._set_part_types_from_byte_stream(b_io, nParts)
+
+        if nPoints:
+            shape._set_points_from_byte_stream(b_io, nPoints)
+
+            shape._set_zs_from_byte_stream(b_io, nPoints)
+
+            shape._set_ms_from_byte_stream(b_io, nPoints, next_shape)
+
+        return shape
+
+    @staticmethod
+    def write_to_byte_stream(b_io, s, i, bbox, mbox, zbox):
+        # We use static methods here and below,
+        # to support s only being an instance of a the
+        # Shape base class (with shapeType set)
+        # i.e. not necessarily one of our newer shape specific
+        # sub classes.
+
+        _CanHaveBBox._write_bbox_to_byte_stream(b_io, i, bbox)
+
+        if s.shapeType in _CanHaveParts._shapeTypes:
+            _CanHaveParts._write_nparts_to_byte_stream(b_io, s)
+        # Shape types with multiple points per record
+        if s.shapeType in _CanHaveBBox._shapeTypes:
+            _CanHaveBBox._write_npoints_to_byte_stream(b_io, s)
+        # Write part indexes.  Includes MultiPatch
+        if s.shapeType in _CanHaveParts._shapeTypes:
+            _CanHaveParts._write_part_indices_to_byte_stream(b_io, s)
+
+        if s.shapeType == MULTIPATCH:
+            MultiPatch._write_part_types_to_byte_stream(b_io, s)
+        # Write points for multiple-point records
+        if s.shapeType in _CanHaveBBox._shapeTypes:
+            _CanHaveBBox._write_points_to_byte_stream(b_io, s, i)
+        if s.shapeType in _HasZ._shapeTypes:
+            _HasZ._write_zs_to_byte_stream(b_io, s, i, zbox)
+
+        if s.shapeType in _HasM._shapeTypes:
+            _HasM._write_ms_to_byte_stream(b_io, s, i, mbox)
 
 
 class _CanHaveParts(_CanHaveBBox):
-    @staticmethod
-    def _get_nparts_from_shp_file(f):
-        return unpack("<i", f.read(4))[0]
+    # The parts attribute is initialised by
+    # the base class Shape's __init__, to parts or [].
+    # "Can Have Parts" should be read as "Can Have non-empty parts".
+    _shapeTypes = frozenset(
+        [
+            POLYLINE,
+            POLYLINEM,
+            POLYLINEZ,
+            POLYGON,
+            POLYGONM,
+            POLYGONZ,
+            MULTIPATCH,
+        ]
+    )
 
-    def _set_parts_from_shp_file(self, f, nParts):
-        self.parts = _Array[int]("i", unpack(f"<{nParts}i", f.read(nParts * 4)))
+    @staticmethod
+    def _get_nparts_from_byte_stream(b_io):
+        return unpack("<i", b_io.read(4))[0]
+
+    @staticmethod
+    def _write_nparts_to_byte_stream(b_io, s):
+        b_io.write(pack("<i", len(s.parts)))
+
+    def _set_parts_from_byte_stream(self, b_io, nParts):
+        self.parts = _Array[int]("i", unpack(f"<{nParts}i", b_io.read(nParts * 4)))
+
+    @staticmethod
+    def _write_part_indices_to_byte_stream(b_io, s):
+        for part in s.parts:
+            b_io.write(pack("<i", part))
 
 
 class Point(Shape):
+    # We also use the fact that the single Point types are the only
+    # shapes that cannot have their own bounding box (a user supplied
+    # bbox is still used to filter out points).
     shapeType = POINT
+    _shapeTypes = frozenset([POINT, POINTM, POINTZ])
 
-    def _get_and_set_2D_point_from_shp_file(self, f):
-        x, y = _Array[float]("d", unpack("<2d", f.read(16)))
+    def _set_single_point_z_from_byte_stream(self, b_io):
+        pass
 
-        self.points = [(x, y)]
+    def _set_single_point_m_from_byte_stream(self, b_io, next_shape):
+        pass
+
+    @staticmethod
+    def _x_y_from_byte_stream(b_io):
+        # Unpack _Array too
+        x, y = _Array[float]("d", unpack("<2d", b_io.read(16)))
+        # Convert to tuple
+        return x, y
+
+    @staticmethod
+    def _write_x_y_to_byte_stream(b_io, x, y, i):
+        try:
+            b_io.write(pack("<2d", x, y))
+        except error:
+            raise ShapefileException(
+                f"Failed to write point for record {i}. Expected floats."
+            )
+
+    @classmethod
+    def from_byte_stream(cls, b_io, next_shape, oid=None, bbox=None):
+        shape = cls(oid=oid)
+
+        x, y = cls._x_y_from_byte_stream(b_io)
+
+        if bbox is not None:
+            # create bounding box for Point by duplicating coordinates
+            # skip shape if no overlap with bounding box
+            if not bbox_overlap(bbox, (x, y, x, y)):
+                return None
+
+        shape.points = [(x, y)]
+
+        shape._set_single_point_z_from_byte_stream(b_io)
+
+        shape._set_single_point_m_from_byte_stream(b_io, next_shape)
+
+        return shape
+
+    @staticmethod
+    def write_to_byte_stream(b_io, s, i, bbox, mbox, zbox):  # pylint: disable=unused-argument
+        # Serialize a single point
+        x, y = s.points[0][0], s.points[0][1]
+        Point._write_x_y_to_byte_stream(b_io, x, y, i)
+
+        # Write a single Z value
+        if s.shapeType == POINTZ:
+            PointZ._write_single_point_z_to_byte_stream(b_io, s, i)
+
+        # Write a single M value
+        if s.shapeType in {POINTM, POINTZ}:
+            PointM._write_single_point_m_to_byte_stream(b_io, s, i)
 
 
 class Polyline(_CanHaveParts):
@@ -1005,16 +1108,28 @@ class MultiPoint(_CanHaveBBox):
     shapeType = MULTIPOINT
 
 
-class _HasM(Shape):
+class _HasM(_CanHaveBBox):
+    # Not a Point
+    _shapeTypes = frozenset(
+        [
+            POLYLINEM,
+            POLYLINEZ,
+            POLYGONM,
+            POLYGONZ,
+            MULTIPOINTM,
+            MULTIPOINTZ,
+            MULTIPATCH,
+        ]
+    )
     m: Sequence[Optional[float]]
 
-    def _set_m_from_shp_file(self, f, nPoints, next_shape):
-        if next_shape - f.tell() >= 16:
-            __mmin, __mmax = unpack("<2d", f.read(16))
+    def _set_ms_from_byte_stream(self, b_io, nPoints, next_shape):
+        if next_shape - b_io.tell() >= 16:
+            __mmin, __mmax = unpack("<2d", b_io.read(16))
         # Measure values less than -10e38 are nodata values according to the spec
-        if next_shape - f.tell() >= nPoints * 8:
+        if next_shape - b_io.tell() >= nPoints * 8:
             self.m = []
-            for m in _Array[float]("d", unpack(f"<{nPoints}d", f.read(nPoints * 8))):
+            for m in _Array[float]("d", unpack(f"<{nPoints}d", b_io.read(nPoints * 8))):
                 if m > NODATA:
                     self.m.append(m)
                 else:
@@ -1022,31 +1137,105 @@ class _HasM(Shape):
         else:
             self.m = [None for _ in range(nPoints)]
 
+    @staticmethod
+    def _write_ms_to_byte_stream(b_io, s, i, mbox):
+        # Write m extremes and values
+        # When reading a file, pyshp converts NODATA m values to None, so here we make sure to convert them back to NODATA
+        # Note: missing m values are autoset to NODATA.
+        try:
+            b_io.write(pack("<2d", *mbox))
+        except error:
+            raise ShapefileException(
+                f"Failed to write measure extremes for record {i}. Expected floats"
+            )
+        try:
+            if hasattr(s, "m"):
+                # if m values are stored in attribute
+                b_io.write(
+                    pack(
+                        f"<{len(s.m)}d", *[m if m is not None else NODATA for m in s.m]
+                    )
+                )
+            else:
+                # if m values are stored as 3rd/4th dimension
+                # 0-index position of m value is 3 if z type (x,y,z,m), or 2 if m type (x,y,m)
+                mpos = 3 if s.shapeType in _HasZ._shapeTypes else 2
+                for p in s.points:
+                    b_io.write(
+                        pack(
+                            "<d",
+                            p[mpos]
+                            if len(p) > mpos and p[mpos] is not None
+                            else NODATA,
+                        )
+                    )
+        except error:
+            raise ShapefileException(
+                f"Failed to write measure values for record {i}. Expected floats"
+            )
 
-class _HasZ(Shape):
+
+class _HasZ(_CanHaveBBox):
+    # Not a Point
+    _shapeTypes = frozenset(
+        [
+            POLYLINEZ,
+            POLYGONZ,
+            MULTIPOINTZ,
+            MULTIPATCH,
+        ]
+    )
     z: Sequence[float]
 
-    def _set_z_from_shp_file(self, f, nPoints):
-        __zmin, __zmax = unpack("<2d", f.read(16))  # pylint: disable=unused-private-member
-        self.z = _Array[float]("d", unpack(f"<{nPoints}d", f.read(nPoints * 8)))
+    def _set_zs_from_byte_stream(self, b_io, nPoints):
+        __zmin, __zmax = unpack("<2d", b_io.read(16))  # pylint: disable=unused-private-member
+        self.z = _Array[float]("d", unpack(f"<{nPoints}d", b_io.read(nPoints * 8)))
+
+    @staticmethod
+    def _write_zs_to_byte_stream(b_io, s, i, zbox):
+        # Write z extremes and values
+        # Note: missing z values are autoset to 0, but not sure if this is ideal.
+        try:
+            b_io.write(pack("<2d", *zbox))
+        except error:
+            raise ShapefileException(
+                f"Failed to write elevation extremes for record {i}. Expected floats."
+            )
+        try:
+            if hasattr(s, "z"):
+                # if z values are stored in attribute
+                b_io.write(pack(f"<{len(s.z)}d", *s.z))
+            else:
+                # if z values are stored as 3rd dimension
+                for p in s.points:
+                    b_io.write(pack("<d", p[2] if len(p) > 2 else 0))
+        except error:
+            raise ShapefileException(
+                f"Failed to write elevation values for record {i}. Expected floats."
+            )
 
 
 class MultiPatch(_HasM, _HasZ, _CanHaveParts):
     shapeType = MULTIPATCH
 
-    def _set_part_types_from_shp_file(self, f, nParts):
-        self.partTypes = _Array[int]("i", unpack(f"<{nParts}i", f.read(nParts * 4)))
+    def _set_part_types_from_byte_stream(self, b_io, nParts):
+        self.partTypes = _Array[int]("i", unpack(f"<{nParts}i", b_io.read(nParts * 4)))
+
+    @staticmethod
+    def _write_part_types_to_byte_stream(b_io, s):
+        for partType in s.partTypes:
+            b_io.write(pack("<i", partType))
 
 
-class PointM(Point, _HasM):
+class PointM(Point):
     shapeType = POINTM
     # same default as in Writer.__shpRecord (if s.shapeType in (11, 21):)
     # PyShp encodes None m values as NODATA
     m = (None,)
 
-    def _set_single_point_m_from_shp_file(self, f, next_shape):
-        if next_shape - f.tell() >= 8:
-            (m,) = unpack("<d", f.read(8))
+    def _set_single_point_m_from_byte_stream(self, b_io, next_shape):
+        if next_shape - b_io.tell() >= 8:
+            (m,) = unpack("<d", b_io.read(8))
         else:
             m = NODATA
         # Measure values less than -10e38 are nodata values according to the spec
@@ -1054,6 +1243,46 @@ class PointM(Point, _HasM):
             self.m = (m,)
         else:
             self.m = (None,)
+
+    @staticmethod
+    def _write_single_point_m_to_byte_stream(b_io, s, i):
+        # Write a single M value
+        # Note: missing m values are autoset to NODATA.
+
+        if hasattr(s, "m"):
+            # if m values are stored in attribute
+            try:
+                # if not s.m or s.m[0] is None:
+                #     s.m = (NODATA,)
+                # m = s.m[0]
+                if s.m and s.m[0] is not None:
+                    m = s.m[0]
+                else:
+                    m = NODATA
+            except error:
+                raise ShapefileException(
+                    f"Failed to write measure value for record {i}. Expected floats."
+                )
+        else:
+            # if m values are stored as 3rd/4th dimension
+            # 0-index position of m value is 3 if z type (x,y,z,m), or 2 if m type (x,y,m)
+            try:
+                mpos = 3 if s.shapeType == POINTZ else 2
+                if len(s.points[0]) < mpos + 1:
+                    # s.points[0].append(NODATA)
+                    m = NODATA
+                elif s.points[0][mpos] is None:
+                    # s.points[0][mpos] = NODATA
+                    m = NODATA
+                else:
+                    m = s.points[0][mpos]
+
+            except error:
+                raise ShapefileException(
+                    f"Failed to write measure value for record {i}. Expected floats."
+                )
+
+        b_io.write(pack("<1d", m))
 
 
 class PolylineM(Polyline, _HasM):
@@ -1068,13 +1297,45 @@ class MultiPointM(MultiPoint, _HasM):
     shapeType = MULTIPOINTM
 
 
-class PointZ(PointM, _HasZ):
+class PointZ(PointM):
     shapeType = POINTZ
     # same default as in Writer.__shpRecord (if s.shapeType == 11:)
     z: Sequence[float] = (0.0,)
 
-    def _set_single_point_z_from_shp_file(self, f):
-        self.z = tuple(unpack("<d", f.read(8)))
+    def _set_single_point_z_from_byte_stream(self, b_io):
+        self.z = tuple(unpack("<d", b_io.read(8)))
+
+    @staticmethod
+    def _write_single_point_z_to_byte_stream(b_io, s, i):
+        # Note: missing z values are autoset to 0, but not sure if this is ideal.
+
+        # then write value
+        if hasattr(s, "z"):
+            # if z values are stored in attribute
+            try:
+                if not s.z:
+                    # s.z = (0,)
+                    z = 0
+                else:
+                    z = s.z[0]
+            except error:
+                raise ShapefileException(
+                    f"Failed to write elevation value for record {i}. Expected floats."
+                )
+        else:
+            # if z values are stored as 3rd dimension
+            try:
+                if len(s.points[0]) < 3:
+                    # s.points[0].append(0)
+                    z = 0
+                else:
+                    z = s.points[0][2]
+            except error:
+                raise ShapefileException(
+                    f"Failed to write elevation value for record {i}. Expected floats."
+                )
+
+        b_io.write(pack("<d", z))
 
 
 class PolylineZ(PolylineM, _HasZ):
@@ -1089,7 +1350,7 @@ class MultiPointZ(MultiPointM, _HasZ):
     shapeType = MULTIPOINTZ
 
 
-SHAPE_CLASS_FROM_SHAPETYPE: dict[int, type[Shape]] = {
+SHAPE_CLASS_FROM_SHAPETYPE: dict[int, type[Union[NullShape, Point, _CanHaveBBox]]] = {
     NULL: NullShape,
     POINT: Point,
     POLYLINE: Polyline,
@@ -1154,7 +1415,6 @@ class _Record(list):
                 and IndexError, if the field exists but the field's
                 corresponding value in the Record does not exist
         """
-        # pylint: disable=raise-missing-from
         try:
             if item == "__setstate__":  # Prevent infinite loop from copy.deepcopy()
                 raise AttributeError("_Record does not implement __setstate__")
@@ -1166,7 +1426,6 @@ class _Record(list):
             raise IndexError(
                 f"{item} found as a field but not enough values available."
             )
-        # pylint: enable=raise-missing-from
 
     def __setattr__(self, key: str, value: RecordValue):
         """
@@ -1182,7 +1441,7 @@ class _Record(list):
             index = self.__field_positions[key]
             return list.__setitem__(self, index, value)
         except KeyError:
-            raise AttributeError(f"{key} is not a field name")  # pylint: disable=raise-missing-from
+            raise AttributeError(f"{key} is not a field name")
 
     def __getitem__(self, item):
         """
@@ -1221,7 +1480,7 @@ class _Record(list):
             if index is not None:
                 return list.__setitem__(self, index, value)
 
-            raise IndexError(f"{key} is not a field name and not an int")  # pylint: disable=raise-missing-from
+            raise IndexError(f"{key} is not a field name and not an int")
 
     @property
     def oid(self) -> int:
@@ -1802,7 +2061,24 @@ class Reader:
 
         f = self.__getFileObj(self.shp)
 
-        shape = _read_shape_from_shp_file(f, oid, bbox)
+        # shape = Shape(oid=oid)
+        (__recNum, recLength) = unpack_2_int32_be(f.read(8))
+        # Determine the start of the next record
+
+        # Convert from num of 16 bit words, to 8 bit bytes
+        recLength_bytes = 2 * recLength
+
+        next_shape = f.tell() + recLength_bytes
+
+        shapeType = unpack("<i", f.read(4))[0]
+
+        ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[shapeType]
+        shape = ShapeClass.from_byte_stream(f, next_shape, oid=oid, bbox=bbox)
+
+        # Seek to the end of this record as defined by the record header because
+        # the shapefile spec doesn't require the actual content to meet the header
+        # definition.  Probably allowed for lazy feature deletion.
+        f.seek(next_shape)
 
         return shape
 
@@ -2487,6 +2763,9 @@ class Writer:
 
     def __zbox(self, s):
         z = []
+        if self._zbox:
+            z.extend(self._zbox)
+
         for p in s.points:
             try:
                 z.append(p[2])
@@ -2494,19 +2773,18 @@ class Writer:
                 # point did not have z value
                 # setting it to 0 is probably ok, since it means all are on the same elevation
                 z.append(0)
-        zbox = [min(z), max(z)]
-        # update global
-        if self._zbox:
-            # compare with existing
-            self._zbox = [min(zbox[0], self._zbox[0]), max(zbox[1], self._zbox[1])]
-        else:
-            # first time zbox is being set
-            self._zbox = zbox
-        return zbox
+
+        # Original self._zbox bounds (if any) are the first two entries.
+        # Set zbox for the first, and all later times
+        self._zbox = [min(z), max(z)]
+        return self._zbox
 
     def __mbox(self, s):
-        mpos = 3 if s.shapeType in (11, 13, 15, 18, 31) else 2
+        mpos = 3 if s.shapeType in _HasZ._shapeTypes else 2
         m = []
+        if self._mbox:
+            m.extend(self._mbox)
+
         for p in s.points:
             try:
                 if p[mpos] is not None:
@@ -2519,15 +2797,11 @@ class Writer:
         if not m:
             # only if none of the shapes had m values, should mbox be set to missing m values
             m.append(NODATA)
-        mbox = [min(m), max(m)]
-        # update global
-        if self._mbox:
-            # compare with existing
-            self._mbox = [min(mbox[0], self._mbox[0]), max(mbox[1], self._mbox[1])]
-        else:
-            # first time mbox is being set
-            self._mbox = mbox
-        return mbox
+
+        # Original self._mbox bounds (if any) are the first two entries.
+        # Set mbox for the first, and all later times
+        self._mbox = [min(m), max(m)]
+        return self._mbox
 
     @property
     def shapeTypeName(self) -> str:
@@ -2556,7 +2830,6 @@ class Writer:
         Several of the shapefile formats are so similar that a single generic
         method to read or write them is warranted."""
 
-        # pylint: disable=raise-missing-from
         f = self.__getFileObj(fileObj)
         f.seek(0)
         # File code, Unused bytes
@@ -2614,8 +2887,6 @@ class Writer:
             raise ShapefileException(
                 "Failed to write shapefile elevation and measure values. Floats required."
             )
-
-        # pylint: enable=raise-missing-from
 
     def __dbfHeader(self):
         """Writes the dbf header and field descriptors."""
@@ -2688,7 +2959,6 @@ class Writer:
             self.__shxRecord(offset, length)
 
     def __shpRecord(self, s):
-        # pylint: disable=raise-missing-from
         f = self.__getFileObj(self.shp)
         offset = f.tell()
         # Record number, Content length place holder
@@ -2703,180 +2973,45 @@ class Writer:
                 f"The shape's type ({s.shapeType}) must match "
                 f"the type of the shapefile ({self.shapeType})."
             )
+
+        # For both single point and multiple-points non-null shapes,
+        # update bbox, mbox and zbox of the whole shapefile
+        new_bbox = self.__bbox(s) if s.shapeType != NULL else None
+        new_mbox = (
+            self.__mbox(s)
+            if s.shapeType in {POINTM, POINTZ} | _HasM._shapeTypes
+            else None
+        )
+        new_zbox = (
+            self.__zbox(s) if s.shapeType in {POINTZ} | _HasZ._shapeTypes else None
+        )
+
         f.write(pack("<i", s.shapeType))
 
-        # For point just update bbox of the whole shapefile
-        if s.shapeType in (1, 11, 21):
-            self.__bbox(s)
-        # All shape types capable of having a bounding box
-        if s.shapeType in (3, 5, 8, 13, 15, 18, 23, 25, 28, 31):
-            try:
-                f.write(pack("<4d", *self.__bbox(s)))
-            except error:
-                raise ShapefileException(
-                    f"Failed to write bounding box for record {self.shpNum}. Expected floats."
-                )
-        # Shape types with parts
-        if s.shapeType in (3, 5, 13, 15, 23, 25, 31):
-            # Number of parts
-            f.write(pack("<i", len(s.parts)))
-        # Shape types with multiple points per record
-        if s.shapeType in (3, 5, 8, 13, 15, 18, 23, 25, 28, 31):
-            # Number of points
-            f.write(pack("<i", len(s.points)))
-        # Write part indexes
-        if s.shapeType in (3, 5, 13, 15, 23, 25, 31):
-            for p in s.parts:
-                f.write(pack("<i", p))
-        # Part types for Multipatch (31)
-        if s.shapeType == 31:
-            for pt in s.partTypes:
-                f.write(pack("<i", pt))
-        # Write points for multiple-point records
-        if s.shapeType in (3, 5, 8, 13, 15, 18, 23, 25, 28, 31):
-            try:
-                [f.write(pack("<2d", *p[:2])) for p in s.points]
-            except error:
-                raise ShapefileException(
-                    f"Failed to write points for record {self.shpNum}. Expected floats."
-                )
-        # Write z extremes and values
-        # Note: missing z values are autoset to 0, but not sure if this is ideal.
-        if s.shapeType in (13, 15, 18, 31):
-            try:
-                f.write(pack("<2d", *self.__zbox(s)))
-            except error:
-                raise ShapefileException(
-                    f"Failed to write elevation extremes for record {self.shpNum}. Expected floats."
-                )
-            try:
-                if hasattr(s, "z"):
-                    # if z values are stored in attribute
-                    f.write(pack(f"<{len(s.z)}d", *s.z))
-                else:
-                    # if z values are stored as 3rd dimension
-                    for p in s.points:
-                        f.write(pack("<d", p[2] if len(p) > 2 else 0))
-            except error:
-                raise ShapefileException(
-                    f"Failed to write elevation values for record {self.shpNum}. Expected floats."
-                )
-        # Write m extremes and values
-        # When reading a file, pyshp converts NODATA m values to None, so here we make sure to convert them back to NODATA
-        # Note: missing m values are autoset to NODATA.
-        if s.shapeType in (13, 15, 18, 23, 25, 28, 31):
-            try:
-                f.write(pack("<2d", *self.__mbox(s)))
-            except error:
-                raise ShapefileException(
-                    f"Failed to write measure extremes for record {self.shpNum}. Expected floats"
-                )
-            try:
-                if hasattr(s, "m"):
-                    # if m values are stored in attribute
-                    # fmt: off
-                    f.write(
-                        pack(
-                            f"<{len(s.m)}d",
-                            *[m if m is not None else NODATA for m in s.m]
-                        )
-                    )
-                    # fmt: on
-                else:
-                    # if m values are stored as 3rd/4th dimension
-                    # 0-index position of m value is 3 if z type (x,y,z,m), or 2 if m type (x,y,m)
-                    mpos = 3 if s.shapeType in (13, 15, 18, 31) else 2
-                    for p in s.points:
-                        f.write(
-                            pack(
-                                "<d",
-                                p[mpos]
-                                if len(p) > mpos and p[mpos] is not None
-                                else NODATA,
-                            )
-                        )
-            except error:
-                raise ShapefileException(
-                    f"Failed to write measure values for record {self.shpNum}. Expected floats"
-                )
-        # Write a single point
-        if s.shapeType in (1, 11, 21):
-            try:
-                f.write(pack("<2d", s.points[0][0], s.points[0][1]))
-            except error:
-                raise ShapefileException(
-                    f"Failed to write point for record {self.shpNum}. Expected floats."
-                )
-        # Write a single Z value
-        # Note: missing z values are autoset to 0, but not sure if this is ideal.
-        if s.shapeType == 11:
-            # update the global z box
-            self.__zbox(s)
-            # then write value
-            if hasattr(s, "z"):
-                # if z values are stored in attribute
-                try:
-                    if not s.z:
-                        s.z = (0,)
-                    f.write(pack("<d", s.z[0]))
-                except error:
-                    raise ShapefileException(
-                        f"Failed to write elevation value for record {self.shpNum}. Expected floats."
-                    )
-            else:
-                # if z values are stored as 3rd dimension
-                try:
-                    if len(s.points[0]) < 3:
-                        s.points[0].append(0)
-                    f.write(pack("<d", s.points[0][2]))
-                except error:
-                    raise ShapefileException(
-                        f"Failed to write elevation value for record {self.shpNum}. Expected floats."
-                    )
-        # Write a single M value
-        # Note: missing m values are autoset to NODATA.
-        if s.shapeType in (11, 21):
-            # update the global m box
-            self.__mbox(s)
-            # then write value
-            if hasattr(s, "m"):
-                # if m values are stored in attribute
-                try:
-                    if not s.m or s.m[0] is None:
-                        s.m = (NODATA,)
-                    f.write(pack("<1d", s.m[0]))
-                except error:
-                    raise ShapefileException(
-                        f"Failed to write measure value for record {self.shpNum}. Expected floats."
-                    )
-            else:
-                # if m values are stored as 3rd/4th dimension
-                # 0-index position of m value is 3 if z type (x,y,z,m), or 2 if m type (x,y,m)
-                try:
-                    mpos = 3 if s.shapeType == 11 else 2
-                    if len(s.points[0]) < mpos + 1:
-                        s.points[0].append(NODATA)
-                    elif s.points[0][mpos] is None:
-                        s.points[0][mpos] = NODATA
-                    f.write(pack("<1d", s.points[0][mpos]))
-                except error:
-                    raise ShapefileException(
-                        f"Failed to write measure value for record {self.shpNum}. Expected floats."
-                    )
-        # Finalize record length as 16-bit words
+        ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[s.shapeType]
+        ShapeClass.write_to_byte_stream(
+            b_io=f,
+            s=s,
+            i=self.shpNum,
+            bbox=new_bbox,
+            mbox=new_mbox,
+            zbox=new_zbox,
+        )
+
+        # # Finalize record length as 16-bit words
         finish = f.tell()
         length = (finish - start) // 2
         # start - 4 bytes is the content length field
         f.seek(start - 4)
         f.write(pack(">i", length))
+
         f.seek(finish)
-        # pylint: enable=raise-missing-from
+
         return offset, length
 
     def __shxRecord(self, offset, length):
         """Writes the shx records."""
 
-        # pylint: disable=raise-missing-from
         f = self.__getFileObj(self.shx)
         try:
             f.write(pack(">i", offset // 2))
@@ -2885,8 +3020,6 @@ class Writer:
                 "The .shp file has reached its file size limit > 4294967294 bytes (4.29 GB). To fix this, break up your file into multiple smaller ones."
             )
         f.write(pack(">i", length))
-
-        # pylint: enable=raise-missing-from
 
     def record(
         self, *recordList: Iterable[RecordValue], **recordDict: dict[str, RecordValue]
@@ -3138,6 +3271,8 @@ class Writer:
         # Make sure polygon rings (parts) are closed
 
         # if shapeType in (5, 15, 25, 31):
+        # This method is never actually called on a MultiPatch
+        # so we omit its shapeType (31) for efficiency
         if isinstance(polyShape, Polygon):
             for part in parts:
                 if part[0] != part[-1]:
