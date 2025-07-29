@@ -995,7 +995,7 @@ def test_iterRecords_start_stop():
 
         # Arbitrary selection of record indices
         # (there are 663 records in blockgroups.dbf).
-        for i in [
+        indices = [
             0,
             1,
             2,
@@ -1013,18 +1013,20 @@ def test_iterRecords_start_stop():
             N - 3,
             N - 2,
             N - 1,
-        ]:
-            for record in sf.iterRecords(start=i):
+        ]
+        for i, index in enumerate(indices):
+            for record in sf.iterRecords(start=index):
                 assert record == sf.record(record.oid)
 
-            for record in sf.iterRecords(stop=i):
+            for record in sf.iterRecords(stop=index):
                 assert record == sf.record(record.oid)
 
-            for stop in range(i, len(sf)):
+            for j in range(i+1, len(indices)):
+                stop = indices[j]
                 # test negative indexing from end, as well as
                 # positive values of stop, and its default
-                for stop_arg in (stop, stop - len(sf)):
-                    for record in sf.iterRecords(start=i, stop=stop_arg):
+                for stop_arg in (stop, stop - N):
+                    for record in sf.iterRecords(start=index, stop=stop_arg):
                         assert record == sf.record(record.oid)
 
 
