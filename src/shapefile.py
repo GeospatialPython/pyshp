@@ -623,6 +623,7 @@ class Shape:
         list of shapes. For MultiPatch geometry, partTypes designates
         the patch type of each of the parts.
         """
+        # Preserve previous behaviour for anyone who set self.shapeType = None
         if not isinstance(shapeType, _NoShapeTypeSentinel):
             self.shapeType = shapeType
         self.points = points or []
@@ -3138,6 +3139,8 @@ class Writer:
         # Make sure polygon rings (parts) are closed
 
         # if shapeType in (5, 15, 25, 31):
+        # This method is never actually called on a MultiPatch 
+        # so we omit its shapeType (31) for efficiency
         if isinstance(polyShape, Polygon):
             for part in parts:
                 if part[0] != part[-1]:
