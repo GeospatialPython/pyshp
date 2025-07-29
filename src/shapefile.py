@@ -883,161 +883,43 @@ def _write_shape_to_shp_file(
     # For point just update bbox of the whole shapefile
     if s.shapeType in Point._shapeTypes:
         update_bbox(s)
-    # All shape types capable of having a bounding box
     elif s.shapeType in _CanHaveBBox._shapeTypes:
-        try:
-            f.write(pack("<4d", *update_bbox(s)))
-        except error:
-            raise ShapefileException(
-                f"Failed to write bounding box for record {i}. Expected floats."
-            )
-    # Shape types with parts
+        # We use static methods here and below,
+        # to support s a Shape base class, with shapeType set,
+        # not one of our newer shape specific sub classes.
+        _CanHaveBBox._try_write_bbox_to_shp_file(f, s, i, update_bbox)
+
     if s.shapeType in _CanHaveParts._shapeTypes:
-        # Number of parts
-        f.write(pack("<i", len(s.parts)))
+        _CanHaveParts._write_nparts_to_shp_file(f, s)
     # Shape types with multiple points per record
     if s.shapeType in _CanHaveBBox._shapeTypes:
-        # Number of points
-        f.write(pack("<i", len(s.points)))
-    # Write part indexes
+        _CanHaveBBox._write_npoints_to_shp_file(f, s)
+    # Write part indexes.  Includes MultiPatch
     if s.shapeType in _CanHaveParts._shapeTypes:
-        for p in s.parts:
-            f.write(pack("<i", p))
-    # Part types for Multipatch (31)
+        _CanHaveParts._write_part_indices_to_shp_file(f, s)
+
     if s.shapeType == MULTIPATCH:
-        for pt in s.partTypes:
-            f.write(pack("<i", pt))
+        MultiPatch._write_part_types_to_shp_file(f, s)
     # Write points for multiple-point records
     if s.shapeType in _CanHaveBBox._shapeTypes:
-        try:
-            [f.write(pack("<2d", *p[:2])) for p in s.points]
-        except error:
-            raise ShapefileException(
-                f"Failed to write points for record {i}. Expected floats."
-            )
-    # Write z extremes and values
-    # Note: missing z values are autoset to 0, but not sure if this is ideal.
+        _CanHaveBBox._try_write_points_to_shp_file(f, s, i)
     if s.shapeType in _HasZ._shapeTypes:
-        try:
-            f.write(pack("<2d", *update_zbox(s)))
-        except error:
-            raise ShapefileException(
-                f"Failed to write elevation extremes for record {i}. Expected floats."
-            )
-        try:
-            if hasattr(s, "z"):
-                # if z values are stored in attribute
-                f.write(pack(f"<{len(s.z)}d", *s.z))
-            else:
-                # if z values are stored as 3rd dimension
-                for p in s.points:
-                    f.write(pack("<d", p[2] if len(p) > 2 else 0))
-        except error:
-            raise ShapefileException(
-                f"Failed to write elevation values for record {i}. Expected floats."
-            )
-    # Write m extremes and values
-    # When reading a file, pyshp converts NODATA m values to None, so here we make sure to convert them back to NODATA
-    # Note: missing m values are autoset to NODATA.
+        _HasZ._try_write_zs_to_shp_file(f, s, i, update_zbox)
+
     if s.shapeType in _HasM._shapeTypes:
-        try:
-            f.write(pack("<2d", *update_mbox(s)))
-        except error:
-            raise ShapefileException(
-                f"Failed to write measure extremes for record {i}. Expected floats"
-            )
-        try:
-            if hasattr(s, "m"):
-                # if m values are stored in attribute
-                # fmt: off
-                f.write(
-                    pack(
-                        f"<{len(s.m)}d",
-                        *[m if m is not None else NODATA for m in s.m]
-                    )
-                )
-                # fmt: on
-            else:
-                # if m values are stored as 3rd/4th dimension
-                # 0-index position of m value is 3 if z type (x,y,z,m), or 2 if m type (x,y,m)
-                mpos = 3 if s.shapeType in {13, 15, 18, 31} else 2
-                for p in s.points:
-                    f.write(
-                        pack(
-                            "<d",
-                            p[mpos]
-                            if len(p) > mpos and p[mpos] is not None
-                            else NODATA,
-                        )
-                    )
-        except error:
-            raise ShapefileException(
-                f"Failed to write measure values for record {i}. Expected floats"
-            )
+        _HasM._try_write_ms_to_shp_file(f, s, i, update_mbox)
+
     # Write a single point
     if s.shapeType in Point._shapeTypes:
-        try:
-            f.write(pack("<2d", s.points[0][0], s.points[0][1]))
-        except error:
-            raise ShapefileException(
-                f"Failed to write point for record {i}. Expected floats."
-            )
+        Point._try_write_to_shp(f, s, i)
+
     # Write a single Z value
-    # Note: missing z values are autoset to 0, but not sure if this is ideal.
     if s.shapeType == POINTZ:
-        # update the global z box
-        update_zbox(s)
-        # then write value
-        if hasattr(s, "z"):
-            # if z values are stored in attribute
-            try:
-                if not s.z:
-                    s.z = (0,)
-                f.write(pack("<d", s.z[0]))
-            except error:
-                raise ShapefileException(
-                    f"Failed to write elevation value for record {i}. Expected floats."
-                )
-        else:
-            # if z values are stored as 3rd dimension
-            try:
-                if len(s.points[0]) < 3:
-                    s.points[0].append(0)
-                f.write(pack("<d", s.points[0][2]))
-            except error:
-                raise ShapefileException(
-                    f"Failed to write elevation value for record {i}. Expected floats."
-                )
+        PointZ._try_write_single_point_z_to_shp_file(f, s, i, update_zbox)
+
     # Write a single M value
-    # Note: missing m values are autoset to NODATA.
-    if s.shapeType in {POINTM, POINTZ}:
-        # update the global m box
-        update_mbox(s)
-        # then write value
-        if hasattr(s, "m"):
-            # if m values are stored in attribute
-            try:
-                if not s.m or s.m[0] is None:
-                    s.m = (NODATA,)
-                f.write(pack("<1d", s.m[0]))
-            except error:
-                raise ShapefileException(
-                    f"Failed to write measure value for record {i}. Expected floats."
-                )
-        else:
-            # if m values are stored as 3rd/4th dimension
-            # 0-index position of m value is 3 if z type (x,y,z,m), or 2 if m type (x,y,m)
-            try:
-                mpos = 3 if s.shapeType == 11 else 2
-                if len(s.points[0]) < mpos + 1:
-                    s.points[0].append(NODATA)
-                elif s.points[0][mpos] is None:
-                    s.points[0][mpos] = NODATA
-                f.write(pack("<1d", s.points[0][mpos]))
-            except error:
-                raise ShapefileException(
-                    f"Failed to write measure value for record {i}. Expected floats."
-                )
+    if s.shapeType == POINTM:
+        PointM._try_write_single_point_m_to_shp_file(f, s, i, update_mbox)
 
 
 class NullShape(Shape):
@@ -1084,9 +966,23 @@ class _CanHaveBBox(Shape):
     def _get_npoints_from_shp_file(f):
         return unpack("<i", f.read(4))[0]
 
+    @staticmethod
+    def _write_npoints_to_shp_file(f, s):
+        f.write(pack("<i", len(s.points)))
+
     def _set_points_from_shp_file(self, f, nPoints):
         flat = unpack(f"<{2 * nPoints}d", f.read(16 * nPoints))
         self.points = list(zip(*(iter(flat),) * 2))
+
+    @staticmethod
+    def _try_write_points_to_shp_file(f, s, i):
+        try:
+            for point in s.points:
+                f.write(pack("<2d", *point[:2]))
+        except error:
+            raise ShapefileException(
+                f"Failed to write points for record {i}. Expected floats."
+            )
 
     # pylint: disable=unused-argument
     @staticmethod
@@ -1136,8 +1032,20 @@ class _CanHaveBBox(Shape):
 
         return shape
 
+    @staticmethod
+    def _try_write_bbox_to_shp_file(f, shape, i, update_bbox):
+        try:
+            f.write(pack("<4d", *update_bbox(shape)))
+        except error:
+            raise ShapefileException(
+                f"Failed to write bounding box for record {i}. Expected floats."
+            )
+
 
 class _CanHaveParts(_CanHaveBBox):
+    # The parts attribute is initialised by
+    # the base class Shape's __init__, to parts or [].
+    # "Can Have Parts" should be read as "Can Have non-empty parts".
     _shapeTypes = frozenset(
         [
             POLYLINE,
@@ -1154,8 +1062,17 @@ class _CanHaveParts(_CanHaveBBox):
     def _get_nparts_from_shp_file(f):
         return unpack("<i", f.read(4))[0]
 
+    @staticmethod
+    def _write_nparts_to_shp_file(f, s):
+        f.write(pack("<i", len(s.parts)))
+
     def _set_parts_from_shp_file(self, f, nParts):
         self.parts = _Array[int]("i", unpack(f"<{nParts}i", f.read(nParts * 4)))
+
+    @staticmethod
+    def _write_part_indices_to_shp_file(f, s):
+        for part in s.parts:
+            f.write(pack("<i", part))
 
 
 class Point(Shape):
@@ -1190,6 +1107,15 @@ class Point(Shape):
         shape._set_single_point_m_from_shp_file(f, next_shape)
 
         return shape
+
+    @staticmethod
+    def _try_write_to_shp(f, s, i):
+        try:
+            f.write(pack("<2d", s.points[0][0], s.points[0][1]))
+        except error:
+            raise ShapefileException(
+                f"Failed to write point for record {i}. Expected floats."
+            )
 
 
 class Polyline(_CanHaveParts):
@@ -1233,6 +1159,46 @@ class _HasM(_CanHaveBBox):
         else:
             self.m = [None for _ in range(nPoints)]
 
+    @staticmethod
+    def _try_write_ms_to_shp_file(f, s, i, update_mbox):
+        # Write m extremes and values
+        # When reading a file, pyshp converts NODATA m values to None, so here we make sure to convert them back to NODATA
+        # Note: missing m values are autoset to NODATA.
+        try:
+            f.write(pack("<2d", *update_mbox(s)))
+        except error:
+            raise ShapefileException(
+                f"Failed to write measure extremes for record {i}. Expected floats"
+            )
+        try:
+            if hasattr(s, "m"):
+                # if m values are stored in attribute
+                # fmt: off
+                f.write(
+                    pack(
+                        f"<{len(s.m)}d",
+                        *[m if m is not None else NODATA for m in s.m]
+                    )
+                )
+                # fmt: on
+            else:
+                # if m values are stored as 3rd/4th dimension
+                # 0-index position of m value is 3 if z type (x,y,z,m), or 2 if m type (x,y,m)
+                mpos = 3 if s.shapeType in _HasZ._shapeTypes else 2
+                for p in s.points:
+                    f.write(
+                        pack(
+                            "<d",
+                            p[mpos]
+                            if len(p) > mpos and p[mpos] is not None
+                            else NODATA,
+                        )
+                    )
+        except error:
+            raise ShapefileException(
+                f"Failed to write measure values for record {i}. Expected floats"
+            )
+
 
 class _HasZ(_CanHaveBBox):
     # Not a Point
@@ -1250,12 +1216,40 @@ class _HasZ(_CanHaveBBox):
         __zmin, __zmax = unpack("<2d", f.read(16))  # pylint: disable=unused-private-member
         self.z = _Array[float]("d", unpack(f"<{nPoints}d", f.read(nPoints * 8)))
 
+    @staticmethod
+    def _try_write_zs_to_shp_file(f, s, i, update_zbox):
+        # Write z extremes and values
+        # Note: missing z values are autoset to 0, but not sure if this is ideal.
+        try:
+            f.write(pack("<2d", *update_zbox(s)))
+        except error:
+            raise ShapefileException(
+                f"Failed to write elevation extremes for record {i}. Expected floats."
+            )
+        try:
+            if hasattr(s, "z"):
+                # if z values are stored in attribute
+                f.write(pack(f"<{len(s.z)}d", *s.z))
+            else:
+                # if z values are stored as 3rd dimension
+                for p in s.points:
+                    f.write(pack("<d", p[2] if len(p) > 2 else 0))
+        except error:
+            raise ShapefileException(
+                f"Failed to write elevation values for record {i}. Expected floats."
+            )
+
 
 class MultiPatch(_HasM, _HasZ, _CanHaveParts):
     shapeType = MULTIPATCH
 
     def _set_part_types_from_shp_file(self, f, nParts):
         self.partTypes = _Array[int]("i", unpack(f"<{nParts}i", f.read(nParts * 4)))
+
+    @staticmethod
+    def _write_part_types_to_shp_file(f, s):
+        for partType in s.partTypes:
+            f.write(pack("<i", partType))
 
 
 class PointM(Point):
@@ -1274,6 +1268,39 @@ class PointM(Point):
             self.m = (m,)
         else:
             self.m = (None,)
+
+    @staticmethod
+    def _try_write_single_point_m_to_shp_file(f, s, i, update_mbox):
+        # Write a single M value
+        # Note: missing m values are autoset to NODATA.
+        if s.shapeType in {POINTM, POINTZ}:
+            # update the global m box
+            update_mbox(s)
+            # then write value
+            if hasattr(s, "m"):
+                # if m values are stored in attribute
+                try:
+                    if not s.m or s.m[0] is None:
+                        s.m = (NODATA,)
+                    f.write(pack("<1d", s.m[0]))
+                except error:
+                    raise ShapefileException(
+                        f"Failed to write measure value for record {i}. Expected floats."
+                    )
+            else:
+                # if m values are stored as 3rd/4th dimension
+                # 0-index position of m value is 3 if z type (x,y,z,m), or 2 if m type (x,y,m)
+                try:
+                    mpos = 3 if s.shapeType == 11 else 2
+                    if len(s.points[0]) < mpos + 1:
+                        s.points[0].append(NODATA)
+                    elif s.points[0][mpos] is None:
+                        s.points[0][mpos] = NODATA
+                    f.write(pack("<1d", s.points[0][mpos]))
+                except error:
+                    raise ShapefileException(
+                        f"Failed to write measure value for record {i}. Expected floats."
+                    )
 
 
 class PolylineM(Polyline, _HasM):
@@ -1295,6 +1322,33 @@ class PointZ(PointM):
 
     def _set_single_point_z_from_shp_file(self, f):
         self.z = tuple(unpack("<d", f.read(8)))
+
+    @staticmethod
+    def _try_write_single_point_z_to_shp_file(f, s, i, update_zbox):
+        # Note: missing z values are autoset to 0, but not sure if this is ideal.
+        # update the global z box
+        update_zbox(s)
+        # then write value
+        if hasattr(s, "z"):
+            # if z values are stored in attribute
+            try:
+                if not s.z:
+                    s.z = (0,)
+                f.write(pack("<d", s.z[0]))
+            except error:
+                raise ShapefileException(
+                    f"Failed to write elevation value for record {i}. Expected floats."
+                )
+        else:
+            # if z values are stored as 3rd dimension
+            try:
+                if len(s.points[0]) < 3:
+                    s.points[0].append(0)
+                f.write(pack("<d", s.points[0][2]))
+            except error:
+                raise ShapefileException(
+                    f"Failed to write elevation value for record {i}. Expected floats."
+                )
 
 
 class PolylineZ(PolylineM, _HasZ):
