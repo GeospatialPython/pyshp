@@ -458,11 +458,13 @@ shapeType Point do not have a bounding box 'bbox'.
 	...     if not name.startswith('_'):
 	...         name
 	'bbox'
+	'from_bytes'
 	'oid'
 	'parts'
 	'points'
 	'shapeType'
 	'shapeTypeName'
+	'to_bytes'
 
   * `oid`: The shape's index position in the original shapefile.
 
