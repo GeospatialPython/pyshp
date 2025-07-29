@@ -112,10 +112,9 @@ load-plugins=[
     "pylint_per_file_ignores",
 ]
 
-# Silence warning: src/shapefile.py:2076:20: W0212: Access to a protected
-#                  member _from_geojson of a client class (protected-access)
-#                  src/shapefile.py:950:16: W0201: Attribute 'm' defined outside __init__ (attribute-defined-outside-init)
-#                  src/shapefile.py:973:12: W0707: Consider explicitly re-raising using 'except error as exc' and
+# Silence warnings: src/shapefile.py:2076:20: W0212: Access to a protected member _from_geojson of a client class (protected-access)
+#                   src/shapefile.py:950:16: W0201: Attribute 'm' defined outside __init__ (attribute-defined-outside-init)
+#                   src/shapefile.py:973:12: W0707: Consider explicitly re-raising using 'except error as exc' and
 #                                                  'raise ShapefileException(f'Failed to write bounding box for record {i}.
 #                                                   Expected floats.') from exc' (raise-missing-from)
 # Silence remarks:

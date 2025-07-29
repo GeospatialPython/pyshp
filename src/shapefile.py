@@ -874,52 +874,19 @@ def _write_shape_to_shp_file(
     f,
     s,
     i,
-    update_bbox,
-    update_mbox,
-    update_zbox,
+    bbox,
+    mbox,
+    zbox,
 ):
     f.write(pack("<i", s.shapeType))
 
-    # For point just update bbox of the whole shapefile
+    # ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[s.shapeType]
+    # ShapeClass._try_write_to_shp_file(f, s, i, bbox, mbox, zbox)
+
     if s.shapeType in Point._shapeTypes:
-        update_bbox(s)
+        Point._try_write_to_shp_file(f, s, i, bbox, mbox, zbox)
     elif s.shapeType in _CanHaveBBox._shapeTypes:
-        # We use static methods here and below,
-        # to support s a Shape base class, with shapeType set,
-        # not one of our newer shape specific sub classes.
-        _CanHaveBBox._try_write_bbox_to_shp_file(f, s, i, update_bbox)
-
-    if s.shapeType in _CanHaveParts._shapeTypes:
-        _CanHaveParts._write_nparts_to_shp_file(f, s)
-    # Shape types with multiple points per record
-    if s.shapeType in _CanHaveBBox._shapeTypes:
-        _CanHaveBBox._write_npoints_to_shp_file(f, s)
-    # Write part indexes.  Includes MultiPatch
-    if s.shapeType in _CanHaveParts._shapeTypes:
-        _CanHaveParts._write_part_indices_to_shp_file(f, s)
-
-    if s.shapeType == MULTIPATCH:
-        MultiPatch._write_part_types_to_shp_file(f, s)
-    # Write points for multiple-point records
-    if s.shapeType in _CanHaveBBox._shapeTypes:
-        _CanHaveBBox._try_write_points_to_shp_file(f, s, i)
-    if s.shapeType in _HasZ._shapeTypes:
-        _HasZ._try_write_zs_to_shp_file(f, s, i, update_zbox)
-
-    if s.shapeType in _HasM._shapeTypes:
-        _HasM._try_write_ms_to_shp_file(f, s, i, update_mbox)
-
-    # Write a single point
-    if s.shapeType in Point._shapeTypes:
-        Point._try_write_to_shp(f, s, i)
-
-    # Write a single Z value
-    if s.shapeType == POINTZ:
-        PointZ._try_write_single_point_z_to_shp_file(f, s, i, update_zbox)
-
-    # Write a single M value
-    if s.shapeType == POINTM:
-        PointM._try_write_single_point_m_to_shp_file(f, s, i, update_mbox)
+        _CanHaveBBox._try_write_to_shp_file(f, s, i, bbox, mbox, zbox)
 
 
 class NullShape(Shape):
@@ -961,6 +928,15 @@ class _CanHaveBBox(Shape):
     def _set_bbox_from_shp_file(self, f):
         # record.bbox = tuple(_Array[float]("d", unpack("<4d", f.read(32))))
         self.bbox = _Array[float]("d", unpack("<4d", f.read(32)))
+
+    @staticmethod
+    def _try_write_bbox_to_shp_file(f, i, bbox):
+        try:
+            f.write(pack("<4d", *bbox))
+        except error:
+            raise ShapefileException(
+                f"Failed to write bounding box for record {i}. Expected floats."
+            )
 
     @staticmethod
     def _get_npoints_from_shp_file(f):
@@ -1033,13 +1009,31 @@ class _CanHaveBBox(Shape):
         return shape
 
     @staticmethod
-    def _try_write_bbox_to_shp_file(f, shape, i, update_bbox):
-        try:
-            f.write(pack("<4d", *update_bbox(shape)))
-        except error:
-            raise ShapefileException(
-                f"Failed to write bounding box for record {i}. Expected floats."
-            )
+    def _try_write_to_shp_file(f, s, i, bbox, mbox, zbox):
+        # We use static methods here and below,
+        # to support s a Shape base class, with shapeType set,
+        # not one of our newer shape specific sub classes.
+        _CanHaveBBox._try_write_bbox_to_shp_file(f, i, bbox)
+
+        if s.shapeType in _CanHaveParts._shapeTypes:
+            _CanHaveParts._write_nparts_to_shp_file(f, s)
+        # Shape types with multiple points per record
+        if s.shapeType in _CanHaveBBox._shapeTypes:
+            _CanHaveBBox._write_npoints_to_shp_file(f, s)
+        # Write part indexes.  Includes MultiPatch
+        if s.shapeType in _CanHaveParts._shapeTypes:
+            _CanHaveParts._write_part_indices_to_shp_file(f, s)
+
+        if s.shapeType == MULTIPATCH:
+            MultiPatch._write_part_types_to_shp_file(f, s)
+        # Write points for multiple-point records
+        if s.shapeType in _CanHaveBBox._shapeTypes:
+            _CanHaveBBox._try_write_points_to_shp_file(f, s, i)
+        if s.shapeType in _HasZ._shapeTypes:
+            _HasZ._try_write_zs_to_shp_file(f, s, i, zbox)
+
+        if s.shapeType in _HasM._shapeTypes:
+            _HasM._try_write_ms_to_shp_file(f, s, i, mbox)
 
 
 class _CanHaveParts(_CanHaveBBox):
@@ -1088,11 +1082,27 @@ class Point(Shape):
     def _set_single_point_m_from_shp_file(self, f, next_shape):
         pass
 
+    @staticmethod
+    def _get_set_x_y_from_shp_file(f):
+        # Unpack _Array too
+        x, y = _Array[float]("d", unpack("<2d", f.read(16)))
+        # Convert to tuple
+        return x, y
+
+    @staticmethod
+    def _try_write_x_y_to_shp(f, x, y, i):
+        try:
+            f.write(pack("<2d", x, y))
+        except error:
+            raise ShapefileException(
+                f"Failed to write point for record {i}. Expected floats."
+            )
+
     @classmethod
     def _from_shp_file(cls, f, next_shape, oid=None, bbox=None):
         shape = cls(oid=oid)
 
-        x, y = _Array[float]("d", unpack("<2d", f.read(16)))
+        x, y = cls._get_set_x_y_from_shp_file(f)
 
         if bbox is not None:
             # create bounding box for Point by duplicating coordinates
@@ -1109,13 +1119,18 @@ class Point(Shape):
         return shape
 
     @staticmethod
-    def _try_write_to_shp(f, s, i):
-        try:
-            f.write(pack("<2d", s.points[0][0], s.points[0][1]))
-        except error:
-            raise ShapefileException(
-                f"Failed to write point for record {i}. Expected floats."
-            )
+    def _try_write_to_shp_file(f, s, i, bbox, mbox, zbox):  # pylint: disable=unused-argument
+        # Write a single point
+        x, y = s.points[0][0], s.points[0][1]
+        Point._try_write_x_y_to_shp(f, x, y, i)
+
+        # Write a single Z value
+        if s.shapeType == POINTZ:
+            PointZ._try_write_single_point_z_to_shp_file(f, s, i)
+
+        # Write a single M value
+        if s.shapeType == POINTM:
+            PointM._try_write_single_point_m_to_shp_file(f, s, i)
 
 
 class Polyline(_CanHaveParts):
@@ -1160,12 +1175,12 @@ class _HasM(_CanHaveBBox):
             self.m = [None for _ in range(nPoints)]
 
     @staticmethod
-    def _try_write_ms_to_shp_file(f, s, i, update_mbox):
+    def _try_write_ms_to_shp_file(f, s, i, mbox):
         # Write m extremes and values
         # When reading a file, pyshp converts NODATA m values to None, so here we make sure to convert them back to NODATA
         # Note: missing m values are autoset to NODATA.
         try:
-            f.write(pack("<2d", *update_mbox(s)))
+            f.write(pack("<2d", *mbox))
         except error:
             raise ShapefileException(
                 f"Failed to write measure extremes for record {i}. Expected floats"
@@ -1217,11 +1232,11 @@ class _HasZ(_CanHaveBBox):
         self.z = _Array[float]("d", unpack(f"<{nPoints}d", f.read(nPoints * 8)))
 
     @staticmethod
-    def _try_write_zs_to_shp_file(f, s, i, update_zbox):
+    def _try_write_zs_to_shp_file(f, s, i, zbox):
         # Write z extremes and values
         # Note: missing z values are autoset to 0, but not sure if this is ideal.
         try:
-            f.write(pack("<2d", *update_zbox(s)))
+            f.write(pack("<2d", *zbox))
         except error:
             raise ShapefileException(
                 f"Failed to write elevation extremes for record {i}. Expected floats."
@@ -1270,12 +1285,10 @@ class PointM(Point):
             self.m = (None,)
 
     @staticmethod
-    def _try_write_single_point_m_to_shp_file(f, s, i, update_mbox):
+    def _try_write_single_point_m_to_shp_file(f, s, i):
         # Write a single M value
         # Note: missing m values are autoset to NODATA.
         if s.shapeType in {POINTM, POINTZ}:
-            # update the global m box
-            update_mbox(s)
             # then write value
             if hasattr(s, "m"):
                 # if m values are stored in attribute
@@ -1324,10 +1337,9 @@ class PointZ(PointM):
         self.z = tuple(unpack("<d", f.read(8)))
 
     @staticmethod
-    def _try_write_single_point_z_to_shp_file(f, s, i, update_zbox):
+    def _try_write_single_point_z_to_shp_file(f, s, i):
         # Note: missing z values are autoset to 0, but not sure if this is ideal.
-        # update the global z box
-        update_zbox(s)
+
         # then write value
         if hasattr(s, "z"):
             # if z values are stored in attribute
@@ -2759,6 +2771,9 @@ class Writer:
 
     def __zbox(self, s):
         z = []
+        if self._zbox:
+            z.extend(self._zbox)
+
         for p in s.points:
             try:
                 z.append(p[2])
@@ -2766,19 +2781,18 @@ class Writer:
                 # point did not have z value
                 # setting it to 0 is probably ok, since it means all are on the same elevation
                 z.append(0)
-        zbox = [min(z), max(z)]
-        # update global
-        if self._zbox:
-            # compare with existing
-            self._zbox = [min(zbox[0], self._zbox[0]), max(zbox[1], self._zbox[1])]
-        else:
-            # first time zbox is being set
-            self._zbox = zbox
-        return zbox
+
+        # Original self._zbox bounds (if any) are the first two entries.
+        # Set zbox for the first, and all later times
+        self._zbox = [min(z), max(z)]
+        return self._zbox
 
     def __mbox(self, s):
-        mpos = 3 if s.shapeType in (11, 13, 15, 18, 31) else 2
+        mpos = 3 if s.shapeType in _HasZ._shapeTypes else 2
         m = []
+        if self._mbox:
+            m.extend(self._mbox)
+
         for p in s.points:
             try:
                 if p[mpos] is not None:
@@ -2791,15 +2805,11 @@ class Writer:
         if not m:
             # only if none of the shapes had m values, should mbox be set to missing m values
             m.append(NODATA)
-        mbox = [min(m), max(m)]
-        # update global
-        if self._mbox:
-            # compare with existing
-            self._mbox = [min(mbox[0], self._mbox[0]), max(mbox[1], self._mbox[1])]
-        else:
-            # first time mbox is being set
-            self._mbox = mbox
-        return mbox
+
+        # Original self._mbox bounds (if any) are the first two entries.
+        # Set mbox for the first, and all later times
+        self._mbox = [min(m), max(m)]
+        return self._mbox
 
     @property
     def shapeTypeName(self) -> str:
@@ -2972,13 +2982,25 @@ class Writer:
                 f"the type of the shapefile ({self.shapeType})."
             )
 
+        # For both single point and multiple-points non-null shapes,
+        # update bbox, mbox and zbox of the whole shapefile
+        new_bbox = self.__bbox(s) if s.shapeType != NULL else None
+        new_mbox = (
+            self.__mbox(s)
+            if s.shapeType in {POINTM, POINTZ} | _HasM._shapeTypes
+            else None
+        )
+        new_zbox = (
+            self.__zbox(s) if s.shapeType in {POINTZ} | _HasZ._shapeTypes else None
+        )
+
         _write_shape_to_shp_file(
             f=f,
             s=s,
             i=self.shpNum,
-            update_bbox=self.__bbox,
-            update_mbox=self.__mbox,
-            update_zbox=self.__zbox,
+            bbox=new_bbox,
+            mbox=new_mbox,
+            zbox=new_zbox,
         )
 
         # Finalize record length as 16-bit words
