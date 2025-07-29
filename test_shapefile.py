@@ -1021,7 +1021,7 @@ def test_iterRecords_start_stop():
             for record in sf.iterRecords(stop=index):
                 assert record == sf.record(record.oid)
 
-            for j in range(i+1, len(indices)):
+            for j in range(i + 1, len(indices)):
                 stop = indices[j]
                 # test negative indexing from end, as well as
                 # positive values of stop, and its default
