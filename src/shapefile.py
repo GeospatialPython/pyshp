@@ -901,6 +901,7 @@ class NullShape(Shape):
     def _try_write_to_shp_file(f, s, i, bbox, mbox, zbox):  # pylint: disable=unused-argument
         pass
 
+
 class _CanHaveBBox(Shape):
     """As well as setting bounding boxes, we also utilize the
     fact that this mixin applies to all the shapes that are
@@ -2991,9 +2992,7 @@ class Writer:
             else None
         )
         new_zbox = (
-            self.__zbox(s)
-            if s.shapeType in {POINTZ} | _HasZ._shapeTypes
-            else None
+            self.__zbox(s) if s.shapeType in {POINTZ} | _HasZ._shapeTypes else None
         )
 
         f.write(pack("<i", s.shapeType))
@@ -3015,7 +3014,6 @@ class Writer:
         f.seek(start - 4)
         f.write(pack(">i", length))
         f.seek(finish)
-
 
         return offset, length
 
