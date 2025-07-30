@@ -877,6 +877,9 @@ def compatible_with(s: Shape, cls: type[S]) -> TypeIs[S]:
     return s.shapeType in cls._shapeTypes
 
 
+# pylint: disable=unused-argument
+# Need unused arguments to keep the same call signature for
+# different implementations of from_byte_stream and write_to_byte_stream
 class NullShape(Shape):
     # Shape.shapeType = NULL already,
     # to preserve handling of default args in Shape.__init__
@@ -891,7 +894,7 @@ class NullShape(Shape):
         next_shape: int,
         oid: Optional[int] = None,
         bbox: Optional[BBox] = None,
-    ) -> NullShape:  # pylint: disable=unused-argument
+    ) -> NullShape:
         # Shape.__init__ sets self.points = points or []
         return cls(oid=oid)
 
@@ -903,7 +906,7 @@ class NullShape(Shape):
         bbox: Optional[BBox],
         mbox: Optional[MBox],
         zbox: Optional[ZBox],
-    ) -> int:  # pylint: disable=unused-argument
+    ) -> int:
         return 0
 
 
@@ -928,8 +931,6 @@ class _CanHaveBBox(Shape):
         ]
     )
 
-    # Not a BBox because the legacy implementation was a list, not a 4-tuple.
-    # bbox: Optional[Sequence[float]] = None
     bbox: Optional[BBox] = None
 
     def _get_set_bbox_from_byte_stream(self, b_io: BinaryReadableSeekable) -> BBox:
@@ -941,9 +942,7 @@ class _CanHaveBBox(Shape):
         b_io: BinaryWritableSeekable, i: int, bbox: Optional[BBox]
     ) -> int:
         if not bbox or len(bbox) != 4:
-            raise ShapefileException(
-                f"Four numbers required. Got: {bbox=}"
-            )
+            raise ShapefileException(f"Four numbers required. Got: {bbox=}")
         try:
             return b_io.write(pack("<4d", *bbox))
         except error:
@@ -979,7 +978,6 @@ class _CanHaveBBox(Shape):
                 f"Failed to write points for record {i}. Expected floats."
             )
 
-    # pylint: disable=unused-argument
     @staticmethod
     def _get_nparts_from_byte_stream(b_io: BinaryReadableSeekable) -> int:
         return 0
@@ -1000,8 +998,6 @@ class _CanHaveBBox(Shape):
     ):
         pass
 
-    # pylint: enable=unused-argument
-
     @classmethod
     def from_byte_stream(
         cls,
@@ -1009,13 +1005,13 @@ class _CanHaveBBox(Shape):
         next_shape: int,
         oid: Optional[int] = None,
         bbox: Optional[BBox] = None,
-    ) -> Optional[_CanHaveBBox]:  # pylint: disable=unused-argument
+    ) -> Optional[_CanHaveBBox]:
         shape = cls(oid=oid)
 
-        shape_bbox = shape._get_set_bbox_from_byte_stream(b_io)  # pylint: disable=assignment-from-none
+        shape_bbox = shape._get_set_bbox_from_byte_stream(b_io)
 
         # if bbox specified and no overlap, skip this shape
-        if bbox is not None and not bbox_overlap(bbox, shape_bbox):  # pylint: disable=no-member #type: ignore [index]
+        if bbox is not None and not bbox_overlap(bbox, shape_bbox):
             # because we stop parsing this shape, caller must skip to beginning of
             # next shape after we return (as done in f.seek(next_shape))
             return None
@@ -1150,7 +1146,7 @@ class Point(Shape):
         next_shape: int,
         oid: Optional[int] = None,
         bbox: Optional[BBox] = None,
-    ):  # pylint: disable=unused-argument
+    ):
         shape = cls(oid=oid)
 
         x, y = cls._x_y_from_byte_stream(b_io)
@@ -1177,7 +1173,7 @@ class Point(Shape):
         bbox: Optional[BBox],
         mbox: Optional[MBox],
         zbox: Optional[ZBox],
-    ) -> int:  # pylint: disable=unused-argument
+    ) -> int:
         # Serialize a single point
         x, y = s.points[0][0], s.points[0][1]
         n = Point._write_x_y_to_byte_stream(b_io, x, y, i)
@@ -1191,6 +1187,9 @@ class Point(Shape):
             n += PointM._write_single_point_m_to_byte_stream(b_io, s, i)
 
         return n
+
+
+# pylint: enable=unused-argument
 
 
 class Polyline(_CanHaveParts):
@@ -1725,6 +1724,7 @@ class Reader:
         assert ext in self.CONSTITUENT_FILE_EXTS
 
     def __init__(
+        # pylint: disable=unused-argument
         self,
         shapefile_path: Union[str, os.PathLike] = "",
         /,
@@ -1734,7 +1734,9 @@ class Reader:
         shp: Union[_NoShpSentinel, Optional[BinaryFileT]] = _NoShpSentinel(),
         shx: Optional[BinaryFileT] = None,
         dbf: Optional[BinaryFileT] = None,
-        **kwargs,  # pylint: disable=unused-argument
+        # Keep kwargs even though unused, to preserve PyShp 2.4 API
+        **kwargs,
+        # pylint: enable=unused-argument
     ):
         self.shp = None
         self.shx = None
@@ -2677,6 +2679,7 @@ class Writer:
 
     W = TypeVar("W", bound=BinaryWritableSeekable)
 
+    # pylint: disable=unused-argument
     def __init__(
         self,
         target: Union[str, os.PathLike, None] = None,
@@ -2688,7 +2691,9 @@ class Writer:
         shp: Optional[BinaryWritableSeekable] = None,
         shx: Optional[BinaryWritableSeekable] = None,
         dbf: Optional[BinaryWritableSeekable] = None,
-        **kwargs,  # pylint: disable=unused-argument
+        # Keep kwargs even though unused, to preserve PyShp 2.4 API
+        **kwargs,
+        # pylint: enable=unused-argument
     ):
         self.target = target
         self.autoBalance = autoBalance
