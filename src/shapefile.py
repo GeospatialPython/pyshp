@@ -43,7 +43,7 @@ from urllib.error import HTTPError
 from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
 
-from typing_extensions import Never, NotRequired, Self, TypeIs
+from typing_extensions import Never, NotRequired, Self, TypeIs, Unpack
 
 # Create named logger
 logger = logging.getLogger(__name__)
@@ -267,26 +267,10 @@ class GeoJSONFeatureCollectionWithBBox(GeoJSONFeatureCollection):
 
 # Helpers
 
-MISSING = [None, ""]
+MISSING = {None, ""}
 NODATA = -10e38  # as per the ESRI shapefile spec, only used for m-values.
 
 unpack_2_int32_be = Struct(">2i").unpack
-
-
-def b(
-    v: Union[str, bytes], encoding: str = "utf-8", encodingErrors: str = "strict"
-) -> bytes:
-    if isinstance(v, str):
-        # For python 3 encode str to bytes.
-        return v.encode(encoding, encodingErrors)
-    if isinstance(v, bytes):
-        # Already bytes.
-        return v
-    if v is None:
-        # Since we're dealing with text, interpret None as ""
-        return b""
-    # Force string representation.
-    return str(v).encode(encoding, encodingErrors)
 
 
 def u(
@@ -2169,7 +2153,7 @@ class Reader:
                 i = range(self.numRecords)[i]
         return i
 
-    def __shpHeader(self):
+    def __shpHeader(self) -> None:
         """Reads the header information from a .shp file."""
         if not self.shp:
             raise ShapefileException(
@@ -2362,7 +2346,7 @@ class Reader:
             self.numShapes = i
             self._offsets = offsets
 
-    def __dbfHeader(self):
+    def __dbfHeader(self) -> None:
         """Reads a dbf header. Xbase-related code borrows heavily from ActiveState Python Cookbook Recipe 362715 by Raymond Hettinger"""
 
         if not self.dbf:
@@ -2389,10 +2373,10 @@ class Reader:
             else:
                 idx = len(encoded_name) - 1
             encoded_name = encoded_name[:idx]
-            name = u(encoded_name, self.encoding, self.encodingErrors)
+            name = encoded_name.decode(self.encoding, self.encodingErrors)
             name = name.lstrip()
 
-            type_char = u(encoded_type_char, "ascii")
+            type_char = encoded_type_char.decode("ascii")
 
             self.fields.append(FieldData(name, type_char, size, decimal))
         terminator = dbf.read(1)
@@ -2422,14 +2406,14 @@ class Reader:
         """
         if self.numRecords is None:
             self.__dbfHeader()
-        structcodes = [f"{fieldinfo[2]}s" for fieldinfo in self.fields]
+        structcodes = [f"{fieldinfo.size}s" for fieldinfo in self.fields]
         if fields is not None:
             # only unpack specified fields, ignore others using padbytes (x)
             structcodes = [
                 code
-                if fieldinfo[0] in fields
-                or fieldinfo[0] == "DeletionFlag"  # always unpack delflag
-                else f"{fieldinfo[2]}x"
+                if fieldinfo.name in fields
+                or fieldinfo.name == "DeletionFlag"  # always unpack delflag
+                else f"{fieldinfo.size}x"
                 for fieldinfo, code in zip(self.fields, structcodes)
             ]
         fmt = "".join(structcodes)
@@ -2484,11 +2468,14 @@ class Reader:
         oid: Optional[int] = None,
     ) -> Optional[_Record]:
         """Reads and returns a dbf record row as a list of values. Requires specifying
-        a list of field info tuples 'fieldTuples', a record name-index dict 'recLookup',
+        a list of field info FieldData namedtuples 'fieldTuples', a record name-index dict 'recLookup',
         and a Struct instance 'recStruct' for unpacking these fields.
         """
         f = self.__getFileObj(self.dbf)
 
+        # The only format chars in from self.__recordFmt, in recStruct from __recordFields, 
+        # are s and x (ascii encoded str and pad byte) so everything in recordContents is bytes 
+        # https://docs.python.org/3/library/struct.html#format-characters
         recordContents = recStruct.unpack(f.read(recStruct.size))
 
         # deletion flag field is always unpacked as first value (see __recordFmt)
@@ -2552,7 +2539,7 @@ class Reader:
                         value = date(y, m, d)
                     except (TypeError, ValueError):
                         # if invalid date, just return as unicode string so user can decide
-                        value = u(value.strip())
+                        value = str(value.strip())
             elif typ == "L":
                 # logical: 1 byte - initialized to 0x20 (space) otherwise T or F.
                 if value == b" ":
@@ -2877,7 +2864,7 @@ class Writer:
             return f
         raise ShapefileException(f"Unsupported file-like object: {f}")
 
-    def __shpFileLength(self):
+    def __shpFileLength(self) -> int:
         """Calculates the file length of the shp file."""
         shp = self.__getFileObj(self.shp)
 
@@ -2893,7 +2880,7 @@ class Writer:
         shp.seek(start)
         return size
 
-    def __bbox(self, s: Shape):
+    def __bbox(self, s: Shape) -> BBox:
         x: list[float] = []
         y: list[float] = []
 
@@ -2964,25 +2951,25 @@ class Writer:
     def shapeTypeName(self) -> str:
         return SHAPETYPE_LOOKUP[self.shapeType or 0]
 
-    def bbox(self):
+    def bbox(self) -> Optional[BBox]:
         """Returns the current bounding box for the shapefile which is
         the lower-left and upper-right corners. It does not contain the
         elevation or measure extremes."""
         return self._bbox
 
-    def zbox(self):
+    def zbox(self) -> Optional[ZBox]:
         """Returns the current z extremes for the shapefile."""
         return self._zbox
 
-    def mbox(self):
+    def mbox(self) -> Optional[MBox]:
         """Returns the current m extremes for the shapefile."""
         return self._mbox
 
     def __shapefileHeader(
         self,
         fileObj: Optional[WriteSeekableBinStream],
-        headerType: str = "shp",
-    ):
+        headerType: Literal["shp", "dbf", "shx"] = "shp",
+    ) -> None:
         """Writes the specified header type to the specified file-like object.
         Several of the shapefile formats are so similar that a single generic
         method to read or write them is warranted."""
@@ -3009,7 +2996,7 @@ class Writer:
                     # In such cases of empty shapefiles, ESRI spec says the bbox values are 'unspecified'.
                     # Not sure what that means, so for now just setting to 0s, which is the same behavior as in previous versions.
                     # This would also make sense since the Z and M bounds are similarly set to 0 for non-Z/M type shapefiles.
-                    bbox = [0, 0, 0, 0]
+                    bbox = (0, 0, 0, 0)
                 f.write(pack("<4d", *bbox))
             except error:
                 raise ShapefileException(
@@ -3018,25 +3005,25 @@ class Writer:
         else:
             f.write(pack("<4d", 0, 0, 0, 0))
         # Elevation
-        if self.shapeType in (11, 13, 15, 18):
+        if self.shapeType in {POINTZ} | _HasZ._shapeTypes:
             # Z values are present in Z type
             zbox = self.zbox()
             if zbox is None:
                 # means we have empty shapefile/only null geoms (see commentary on bbox above)
-                zbox = [0, 0]
+                zbox = (0, 0)
         else:
             # As per the ESRI shapefile spec, the zbox for non-Z type shapefiles are set to 0s
-            zbox = [0, 0]
+            zbox = (0, 0)
         # Measure
-        if self.shapeType in (11, 13, 15, 18, 21, 23, 25, 28, 31):
+        if self.shapeType in {POINTM, POINTZ} | _HasM._shapeTypes:
             # M values are present in M or Z type
             mbox = self.mbox()
             if mbox is None:
                 # means we have empty shapefile/only null geoms (see commentary on bbox above)
-                mbox = [0, 0]
+                mbox = (0, 0)
         else:
             # As per the ESRI shapefile spec, the mbox for non-M type shapefiles are set to 0s
-            mbox = [0, 0]
+            mbox = (0, 0)
         # Try writing
         try:
             f.write(pack("<4d", zbox[0], zbox[1], mbox[0], mbox[1]))
@@ -3045,7 +3032,7 @@ class Writer:
                 "Failed to write shapefile elevation and measure values. Floats required."
             )
 
-    def __dbfHeader(self):
+    def __dbfHeader(self) -> None:
         """Writes the dbf header and field descriptors."""
         f = self.__getFileObj(self.dbf)
         f.seek(0)
@@ -3081,10 +3068,10 @@ class Writer:
         # Field descriptors
         for field in fields:
             name, fieldType, size, decimal = field
-            encoded_name = b(name, self.encoding, self.encodingErrors)
+            encoded_name = name.encode(self.encoding, self.encodingErrors)
             encoded_name = encoded_name.replace(b" ", b"_")
             encoded_name = encoded_name[:10].ljust(11).replace(b" ", b"\x00")
-            encodedFieldType = b(fieldType, "ascii")
+            encodedFieldType = fieldType.encode("ascii")
             fld = pack("<11sc4xBB14x", encoded_name, encodedFieldType, size, decimal)
             f.write(fld)
         # Terminator
@@ -3093,7 +3080,7 @@ class Writer:
     def shape(
         self,
         s: Union[Shape, HasGeoInterface, dict],
-    ):
+    ) -> None:
         # Balance if already not balanced
         if self.autoBalance and self.recNum < self.shpNum:
             self.balance()
@@ -3178,7 +3165,7 @@ class Writer:
         f.write(b_io.read())
         return offset, length
 
-    def __shxRecord(self, offset, length):
+    def __shxRecord(self, offset: int, length: int) -> None:
         """Writes the shx records."""
 
         f = self.__getFileObj(self.shx)
@@ -3191,8 +3178,10 @@ class Writer:
         f.write(pack(">i", length))
 
     def record(
-        self, *recordList: Iterable[RecordValue], **recordDict: dict[str, RecordValue]
-    ):
+        self,
+        *recordList: list[RecordValue],
+        **recordDict: RecordValue,
+    ) -> None:
         """Creates a dbf attribute record. You can submit either a sequence of
         field values or keyword arguments of field names and values. Before
         adding records you must add fields for the record values using the
@@ -3203,10 +3192,10 @@ class Writer:
         # Balance if already not balanced
         if self.autoBalance and self.recNum > self.shpNum:
             self.balance()
-
+        record: list[RecordValue]
         fieldCount = sum(1 for field in self.fields if field[0] != "DeletionFlag")
         if recordList:
-            record = list(recordList)
+            record = list(*recordList)
             while len(record) < fieldCount:
                 record.append("")
         elif recordDict:
@@ -3227,7 +3216,7 @@ class Writer:
             record = ["" for _ in range(fieldCount)]
         self.__dbfRecord(record)
 
-    def __dbfRecord(self, record):
+    def __dbfRecord(self, record: list[RecordValue]) -> None:
         """Writes the dbf records."""
         f = self.__getFileObj(self.dbf)
         if self.recNum == 0:
@@ -3246,68 +3235,69 @@ class Writer:
             # write
             fieldType = fieldType.upper()
             size = int(size)
-            if fieldType in ("N", "F"):
+            str_val: str
+            if fieldType in {"N", "F"}:
                 # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
                 if value in MISSING:
-                    value = b"*" * size  # QGIS NULL
+                    str_val = "*" * size  # QGIS NULL
                 elif not deci:
                     # force to int
                     try:
                         # first try to force directly to int.
                         # forcing a large int to float and back to int
                         # will lose information and result in wrong nr.
-                        value = int(value)
+                        int_val = int(value)
                     except ValueError:
                         # forcing directly to int failed, so was probably a float.
-                        value = int(float(value))
-                    value = format(value, "d")[:size].rjust(
+                        int_val = int(float(value))
+                    str_val = format(int_val, "d")[:size].rjust(
                         size
                     )  # caps the size if exceeds the field size
                 else:
-                    value = float(value)
-                    value = format(value, f".{deci}f")[:size].rjust(
+                    f_val = float(value)
+                    str_val = format(f_val, f".{deci}f")[:size].rjust(
                         size
                     )  # caps the size if exceeds the field size
             elif fieldType == "D":
                 # date: 8 bytes - date stored as a string in the format YYYYMMDD.
-                if isinstance(value, date):
-                    value = f"{value.year:04d}{value.month:02d}{value.day:02d}"
-                elif isinstance(value, list) and len(value) == 3:
-                    value = f"{value[0]:04d}{value[1]:02d}{value[2]:02d}"
-                elif value in MISSING:
-                    value = b"0" * 8  # QGIS NULL for date type
+                if value in MISSING:
+                    str_val = "0" * 8  # QGIS NULL for date type
+                elif isinstance(value, date):
+                    str_val = f"{value.year:04d}{value.month:02d}{value.day:02d}"
+                elif isinstance(value, (list, tuple)) and len(value) == 3:
+                    str_val = f"{value[0]:04d}{value[1]:02d}{value[2]:02d}"
                 elif is_string(value) and len(value) == 8:
-                    pass  # value is already a date string
+                    str_val = value  # value is already a date string
                 else:
                     raise ShapefileException(
-                        "Date values must be either a datetime.date object, a list, a YYYYMMDD string, or a missing value."
+                        "Date values must be either a datetime.date object, a list/tuple, a YYYYMMDD string, or a missing value."
                     )
             elif fieldType == "L":
                 # logical: 1 byte - initialized to 0x20 (space) otherwise T or F.
                 if value in MISSING:
-                    value = b" "  # missing is set to space
-                elif value in [True, 1]:
-                    value = b"T"
-                elif value in [False, 0]:
-                    value = b"F"
+                    str_val = " "  # missing is set to space
+                elif value in {True, 1}:
+                    str_val = "T"
+                elif value in {False, 0}:
+                    str_val = "F"
                 else:
-                    value = b" "  # unknown is set to space
+                    str_val = " "  # unknown is set to space
             else:
                 # anything else is forced to string, truncated to the length of the field
-                value = b(value, self.encoding, self.encodingErrors)[:size].ljust(size)
-            if not isinstance(value, bytes):
-                # just in case some of the numeric format() and date strftime() results are still in unicode (Python 3 only)
-                value = b(
-                    value, "ascii", self.encodingErrors
-                )  # should be default ascii encoding
-            if len(value) != size:
+                str_val = u(value, self.encoding, self.encodingErrors)[:size].ljust(
+                    size
+                )
+            
+            # should be default ascii encoding
+            encoded_val = str_val.encode("ascii", self.encodingErrors)
+            if len(encoded_val) != size:
                 raise ShapefileException(
                     "Shapefile Writer unable to pack incorrect sized value"
-                    f" (size {len(value)}) into field '{fieldName}' (size {size})."
+                    f" (size {len(encoded_val)}) into field '{fieldName}' (size {size})."
                 )
-            f.write(value)
+            f.write(encoded_val)
 
-    def balance(self):
+    def balance(self) -> None:
         """Adds corresponding empty attributes or null geometry records depending
         on which type of record was created to make sure all three files
         are in synch."""
@@ -3316,24 +3306,26 @@ class Writer:
         while self.recNum < self.shpNum:
             self.record()
 
-    def null(self):
+    def null(self) -> None:
         """Creates a null shape."""
         self.shape(NullShape())
 
-    def point(self, x: float, y: float):
+    def point(self, x: float, y: float) -> None:
         """Creates a POINT shape."""
         pointShape = Point()
         pointShape.points.append((x, y))
         self.shape(pointShape)
 
-    def pointm(self, x: float, y: float, m: Optional[float] = None):
+    def pointm(self, x: float, y: float, m: Optional[float] = None) -> None:
         """Creates a POINTM shape.
         If the m (measure) value is not set, it defaults to NoData."""
         pointShape = PointM()
         pointShape.points.append((x, y, m))
         self.shape(pointShape)
 
-    def pointz(self, x: float, y: float, z: float = 0.0, m: Optional[float] = None):
+    def pointz(
+        self, x: float, y: float, z: float = 0.0, m: Optional[float] = None
+    ) -> None:
         """Creates a POINTZ shape.
         If the z (elevation) value is not set, it defaults to 0.
         If the m (measure) value is not set, it defaults to NoData."""
@@ -3341,20 +3333,20 @@ class Writer:
         pointShape.points.append((x, y, z, m))
         self.shape(pointShape)
 
-    def multipoint(self, points: PointsT):
+    def multipoint(self, points: PointsT) -> None:
         """Creates a MULTIPOINT shape.
         Points is a list of xy values."""
         # nest the points inside a list to be compatible with the generic shapeparts method
         self._shapeparts(parts=[points], polyShape=MultiPoint())
 
-    def multipointm(self, points: PointsT):
+    def multipointm(self, points: PointsT) -> None:
         """Creates a MULTIPOINTM shape.
         Points is a list of xym values.
         If the m (measure) value is not included, it defaults to None (NoData)."""
         # nest the points inside a list to be compatible with the generic shapeparts method
         self._shapeparts(parts=[points], polyShape=MultiPointM())
 
-    def multipointz(self, points: PointsT):
+    def multipointz(self, points: PointsT) -> None:
         """Creates a MULTIPOINTZ shape.
         Points is a list of xyzm values.
         If the z (elevation) value is not included, it defaults to 0.
@@ -3362,32 +3354,32 @@ class Writer:
         # nest the points inside a list to be compatible with the generic shapeparts method
         self._shapeparts(parts=[points], polyShape=MultiPointZ())
 
-    def line(self, lines: list[PointsT]):
+    def line(self, lines: list[PointsT]) -> None:
         """Creates a POLYLINE shape.
         Lines is a collection of lines, each made up of a list of xy values."""
         self._shapeparts(parts=lines, polyShape=Polyline())
 
-    def linem(self, lines: list[PointsT]):
+    def linem(self, lines: list[PointsT]) -> None:
         """Creates a POLYLINEM shape.
         Lines is a collection of lines, each made up of a list of xym values.
         If the m (measure) value is not included, it defaults to None (NoData)."""
         self._shapeparts(parts=lines, polyShape=PolylineM())
 
-    def linez(self, lines: list[PointsT]):
+    def linez(self, lines: list[PointsT]) -> None:
         """Creates a POLYLINEZ shape.
         Lines is a collection of lines, each made up of a list of xyzm values.
         If the z (elevation) value is not included, it defaults to 0.
         If the m (measure) value is not included, it defaults to None (NoData)."""
         self._shapeparts(parts=lines, polyShape=PolylineZ())
 
-    def poly(self, polys: list[PointsT]):
+    def poly(self, polys: list[PointsT]) -> None:
         """Creates a POLYGON shape.
         Polys is a collection of polygons, each made up of a list of xy values.
         Note that for ordinary polygons the coordinates must run in a clockwise direction.
         If some of the polygons are holes, these must run in a counterclockwise direction."""
         self._shapeparts(parts=polys, polyShape=Polygon())
 
-    def polym(self, polys: list[PointsT]):
+    def polym(self, polys: list[PointsT]) -> None:
         """Creates a POLYGONM shape.
         Polys is a collection of polygons, each made up of a list of xym values.
         Note that for ordinary polygons the coordinates must run in a clockwise direction.
@@ -3395,7 +3387,7 @@ class Writer:
         If the m (measure) value is not included, it defaults to None (NoData)."""
         self._shapeparts(parts=polys, polyShape=PolygonM())
 
-    def polyz(self, polys: list[PointsT]):
+    def polyz(self, polys: list[PointsT]) -> None:
         """Creates a POLYGONZ shape.
         Polys is a collection of polygons, each made up of a list of xyzm values.
         Note that for ordinary polygons the coordinates must run in a clockwise direction.
@@ -3404,7 +3396,7 @@ class Writer:
         If the m (measure) value is not included, it defaults to None (NoData)."""
         self._shapeparts(parts=polys, polyShape=PolygonZ())
 
-    def multipatch(self, parts: list[PointsT], partTypes: list[int]):
+    def multipatch(self, parts: list[PointsT], partTypes: list[int]) -> None:
         """Creates a MULTIPATCH shape.
         Parts is a collection of 3D surface patches, each made up of a list of xyzm values.
         PartTypes is a list of types that define each of the surface patches.
@@ -3431,7 +3423,7 @@ class Writer:
 
     def _shapeparts(
         self, parts: list[PointsT], polyShape: Union[Polyline, Polygon, MultiPoint]
-    ):
+    ) -> None:
         """Internal method for adding a shape that has multiple collections of points (parts):
         lines, polygons, and multipoint shapes.
         """
@@ -3442,7 +3434,7 @@ class Writer:
         # if shapeType in (5, 15, 25, 31):
         # This method is never actually called on a MultiPatch
         # so we omit its shapeType (31) for efficiency
-        if isinstance(polyShape, Polygon):
+        if compatible_with(polyShape, Polygon):
             for part in parts:
                 if part[0] != part[-1]:
                     part.append(part[0])
@@ -3466,7 +3458,7 @@ class Writer:
         fieldType: str = "C",
         size: int = 50,
         decimal: int = 0,
-    ):
+    ) -> None:
         """Adds a dbf field descriptor to the shapefile."""
         if fieldType == "D":
             size = 8
