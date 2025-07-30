@@ -2176,17 +2176,17 @@ class Reader:
         shp.seek(32)
         self.shapeType = unpack("<i", shp.read(4))[0]
         # The shapefile's bounding box (lower left, upper right)
-        self.bbox: BBox = tuple(_Array("d", unpack("<4d", shp.read(32))))
+        self.bbox: BBox = tuple(unpack("<4d", shp.read(32)))
         # Elevation
-        self.zbox = _Array("d", unpack("<2d", shp.read(16)))
+        self.zbox: ZBox = tuple(unpack("<2d", shp.read(16)))
         # Measure
-        self.mbox = []
-        for m in _Array("d", unpack("<2d", shp.read(16))):
-            # Measure values less than -10e38 are nodata values according to the spec
-            if m > NODATA:
-                self.mbox.append(m)
-            else:
-                self.mbox.append(None)
+        # Measure values less than -10e38 are nodata values according to the spec
+
+        self.mbox: tuple[Optional[float], Optional[float]]
+        for i, m_bound in enumerate(unpack("<2d", shp.read(16))):
+            self.mbox[i] = m_bound if m_bound < NODATA else None
+            
+
 
     def __shape(
         self, oid: Optional[int] = None, bbox: Optional[BBox] = None
@@ -2240,13 +2240,19 @@ class Reader:
             raise ShapefileException(
                 "Shapefile Reader requires a shapefile or file-like object. (no shx file found"
             )
+        if self.numShapes is None:
+            raise ShapefileException(
+                "numShapes must not be None. "
+                " Was there a problem with .__shxHeader() ?"
+                f"Got: {self.numShapes=}"
+            )
         # Jump to the first record.
         shx.seek(100)
         # Each index record consists of two nrs, we only want the first one
         shxRecords = _Array[int]("i", shx.read(2 * self.numShapes * 4))
         if sys.byteorder != "big":
             shxRecords.byteswap()
-        self._offsets: list[int] = [2 * el for el in shxRecords[::2]]
+        self._offsets = [2 * el for el in shxRecords[::2]]
 
     def __shapeIndex(self, i: Optional[int] = None) -> Optional[int]:
         """Returns the offset in a .shp file for a shape based on information
@@ -2366,18 +2372,20 @@ class Reader:
         # read fields
         numFields = (self.__dbfHdrLength - 33) // 32
         for __field in range(numFields):
-            fieldDesc = list(unpack("<11sc4xBB14x", dbf.read(32)))
-            name = 0
-            idx = 0
-            if b"\x00" in fieldDesc[name]:
-                idx = fieldDesc[name].index(b"\x00")
+            encoded_field_tuple: tuple[bytes,bytes,int,int] = unpack("<11sc4xBB14x", dbf.read(32))
+            encoded_name, encoded_field_type_char, size, decimal = encoded_field_tuple
+            
+            if b"\x00" in encoded_name:
+                idx = encoded_name.index(b"\x00")
             else:
-                idx = len(fieldDesc[name]) - 1
-            fieldDesc[name] = fieldDesc[name][:idx]
-            fieldDesc[name] = u(fieldDesc[name], self.encoding, self.encodingErrors)
-            fieldDesc[name] = fieldDesc[name].lstrip()
-            fieldDesc[1] = u(fieldDesc[1], "ascii")
-            self.fields.append(fieldDesc)
+                idx = len(encoded_name) - 1
+            encoded_name = encoded_name[:idx]
+            field_name = u(encoded_name, self.encoding, self.encodingErrors)
+            field_name = field_name.lstrip()
+
+            field_type_char = u(encoded_field_type_char, "ascii")
+
+            self.fields.append((field_name, field_type_char, size, decimal))
         terminator = dbf.read(1)
         if terminator != b"\r":
             raise ShapefileException(
