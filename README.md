@@ -95,10 +95,13 @@ part of your geospatial project.
 
 # Version Changes
 
-## 2.4.0
+## 2.4.1
+
+###	Improvements:
+- Speed up writing shapefiles by up to ~39%.  Combined for loops of calls to f.write(pack(...)), into single calls.
 
 ### Breaking Change.  Support for Python 2 and Pythons <= 3.8 to be dropped.
-- PyShp 2.4.0 is the latest (and likely last) version of PyShp to support Python 2.7 and Pythons <= 3.8.
+- PyShp 2.4.1 is the latest (and likely last) version of PyShp to support Python 2.7 and Pythons <= 3.8.
 These CPython versions have reached [end of life](https://devguide.python.org/versions/#versions).
 - Future development will focus on PyShp v3.0.0 onwards (currently intended to supporting Pythons >= 3.9).
 - This will not break any projects, as pip and other package managers should not install PyShp 3.0.0
@@ -107,6 +110,7 @@ bug fixes and features.
 - If this negatively impacts your project, all feedback about this decision is welcome
 on our [the discussion page](https://github.com/GeospatialPython/pyshp/discussions/290).
 
+## 2.4.0
 
 ### New Features:
 - Reader.iterRecords now allows start and stop to be specified, to lookup smaller ranges of records.
