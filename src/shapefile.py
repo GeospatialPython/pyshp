@@ -1167,7 +1167,7 @@ class _HasM(_CanHaveBBox):
                     else:
                         ms.append(NODATA)
             
-            num_bytes_written += b_io.write(pack(f"<{len(ms)}<d", *ms))
+            num_bytes_written += b_io.write(pack(f"<{len(ms)}d", *ms))
 
         except error:
             raise ShapefileException(
