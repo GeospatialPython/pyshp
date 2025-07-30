@@ -2969,8 +2969,9 @@ class Writer:
         offset = f.tell()
         # Record number, Content length place holder
         self.shpNum += 1
-        f.write(pack(">2i", self.shpNum, 0))
-        start = f.tell()
+        
+        # f.write(pack(">2i", self.shpNum, 0))
+        # start = f.tell()
         n = 0
         # Shape Type
         if self.shapeType is None and s.shapeType != NULL:
@@ -2992,12 +2993,14 @@ class Writer:
         new_zbox = (
             self.__zbox(s) if s.shapeType in {POINTZ} | _HasZ._shapeTypes else None
         )
+        
+        b_io = io.BytesIO()
 
-        n += f.write(pack("<i", s.shapeType))
+        n += b_io.write(pack("<i", s.shapeType))
 
         ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[s.shapeType]
         n += ShapeClass.write_to_byte_stream(
-            b_io=f,
+            b_io=b_io,
             s=s,
             i=self.shpNum,
             bbox=new_bbox,
@@ -3005,15 +3008,21 @@ class Writer:
             zbox=new_zbox,
         )
 
-        # # Finalize record length as 16-bit words
-        finish = f.tell()
-        assert n == finish - start
-        length = (finish - start) // 2
-        # start - 4 bytes is the content length field
-        f.seek(start - 4)
-        f.write(pack(">i", length))
 
-        f.seek(finish)
+
+        # # Finalize record length as 16-bit words
+        # finish = f.tell()
+        # assert n == finish - start
+        # length = (finish - start) // 2
+        length = n // 2
+        # start - 4 bytes is the content length field
+        # f.seek(start - 4)
+        # f.write(pack(">i", length))
+        f.write(pack(">2i", self.shpNum, length))
+        b_io.seek(0)
+        f.write(b_io.read())
+
+        # f.seek(finish)
 
         return offset, length
 
