@@ -29,6 +29,7 @@ from typing import (
     Iterable,
     Iterator,
     Literal,
+    NamedTuple,
     Optional,
     Protocol,
     Reversible,
@@ -156,7 +157,14 @@ class ReadWriteSeekableBinStream(Protocol):
 BinaryFileT = Union[str, IO[bytes]]
 BinaryFileStreamT = Union[IO[bytes], io.BytesIO, WriteSeekableBinStream]
 
-FieldTuple = tuple[str, str, int, int]
+
+class FieldData(NamedTuple):
+    name: str
+    fieldType: str
+    size: int
+    decimal: int
+
+
 RecordValue = Union[
     bool, int, float, str, date
 ]  # A Possible value in a Shapefile record, e.g. L, N, F, C, D types
@@ -1776,7 +1784,7 @@ class Reader:
         self.shpLength: Optional[int] = None
         self.numRecords: Optional[int] = None
         self.numShapes: Optional[int] = None
-        self.fields: list[FieldTuple] = []
+        self.fields: list[FieldData] = []
         self.__dbfHdrLength = 0
         self.__fieldLookup: dict[str, int] = {}
         self.encoding = encoding
@@ -2181,12 +2189,11 @@ class Reader:
         self.zbox: ZBox = tuple(unpack("<2d", shp.read(16)))
         # Measure
         # Measure values less than -10e38 are nodata values according to the spec
-
-        self.mbox: tuple[Optional[float], Optional[float]] = tuple(
-            m_bound if m_bound >= NODATA else None
+        m_bounds = [
+            float(m_bound) if m_bound >= NODATA else None
             for m_bound in unpack("<2d", shp.read(16))
-        )
-
+        ]
+        self.mbox = tuple(m_bounds[:2])
 
     def __shape(
         self, oid: Optional[int] = None, bbox: Optional[BBox] = None
@@ -2372,20 +2379,22 @@ class Reader:
         # read fields
         numFields = (self.__dbfHdrLength - 33) // 32
         for __field in range(numFields):
-            encoded_field_tuple: tuple[bytes,bytes,int,int] = unpack("<11sc4xBB14x", dbf.read(32))
-            encoded_name, encoded_field_type_char, size, decimal = encoded_field_tuple
+            encoded_field_tuple: tuple[bytes, bytes, int, int] = unpack(
+                "<11sc4xBB14x", dbf.read(32)
+            )
+            encoded_name, encoded_type_char, size, decimal = encoded_field_tuple
 
             if b"\x00" in encoded_name:
                 idx = encoded_name.index(b"\x00")
             else:
                 idx = len(encoded_name) - 1
             encoded_name = encoded_name[:idx]
-            field_name = u(encoded_name, self.encoding, self.encodingErrors)
-            field_name = field_name.lstrip()
+            name = u(encoded_name, self.encoding, self.encodingErrors)
+            name = name.lstrip()
 
-            field_type_char = u(encoded_field_type_char, "ascii")
+            type_char = u(encoded_type_char, "ascii")
 
-            self.fields.append((field_name, field_type_char, size, decimal))
+            self.fields.append(FieldData(name, type_char, size, decimal))
         terminator = dbf.read(1)
         if terminator != b"\r":
             raise ShapefileException(
@@ -2393,7 +2402,7 @@ class Reader:
             )
 
         # insert deletion field at start
-        self.fields.insert(0, ("DeletionFlag", "C", 1, 0))
+        self.fields.insert(0, FieldData("DeletionFlag", "C", 1, 0))
 
         # store all field positions for easy lookups
         # note: fieldLookup gives the index position of a field inside Reader.fields
@@ -2434,7 +2443,7 @@ class Reader:
 
     def __recordFields(
         self, fields: Optional[Iterable[str]] = None
-    ) -> tuple[list[FieldTuple], dict[str, int], Struct]:
+    ) -> tuple[list[FieldData], dict[str, int], Struct]:
         """Returns the necessary info required to unpack a record's fields,
         restricted to a subset of fieldnames 'fields' if specified.
         Returns a list of field info tuples, a name-index lookup dict,
@@ -2469,7 +2478,7 @@ class Reader:
 
     def __record(
         self,
-        fieldTuples: list[FieldTuple],
+        fieldTuples: list[FieldData],
         recLookup: dict[str, int],
         recStruct: Struct,
         oid: Optional[int] = None,
@@ -2734,7 +2743,7 @@ class Writer:
     ):
         self.target = target
         self.autoBalance = autoBalance
-        self.fields: list[FieldTuple] = []
+        self.fields: list[FieldData] = []
         self.shapeType = shapeType
         self.shp: Optional[WriteSeekableBinStream] = None
         self.shx: Optional[WriteSeekableBinStream] = None
@@ -2829,6 +2838,8 @@ class Writer:
 
         # Flush files
         for attribute in (self.shp, self.shx, self.dbf):
+            if attribute is None:
+                continue
             if hasattr(attribute, "flush") and not getattr(attribute, "closed", False):
                 try:
                     attribute.flush()
@@ -2868,20 +2879,30 @@ class Writer:
 
     def __shpFileLength(self):
         """Calculates the file length of the shp file."""
+        shp = self.__getFileObj(self.shp)
+
         # Remember starting position
-        start = self.shp.tell()
+
+        start = shp.tell()
         # Calculate size of all shapes
-        self.shp.seek(0, 2)
-        size = self.shp.tell()
+        shp.seek(0, 2)
+        size = shp.tell()
         # Calculate size as 16-bit words
         size //= 2
         # Return to start
-        self.shp.seek(start)
+        shp.seek(start)
         return size
 
-    def __bbox(self, s):
-        x = []
-        y = []
+    def __bbox(self, s: Shape):
+        x: list[float] = []
+        y: list[float] = []
+
+        if self._bbox:
+            x.append(self._bbox[0])
+            y.append(self._bbox[1])
+            x.append(self._bbox[2])
+            y.append(self._bbox[3])
+
         if len(s.points) > 0:
             px, py = list(zip(*s.points))[:2]
             x.extend(px)
@@ -2894,20 +2915,8 @@ class Writer:
                 "Cannot create bbox. Expected a valid shape with at least one point. "
                 f"Got a shape of type '{s.shapeType}' and 0 points."
             )
-        bbox = [min(x), min(y), max(x), max(y)]
-        # update global
-        if self._bbox:
-            # compare with existing
-            self._bbox = [
-                min(bbox[0], self._bbox[0]),
-                min(bbox[1], self._bbox[1]),
-                max(bbox[2], self._bbox[2]),
-                max(bbox[3], self._bbox[3]),
-            ]
-        else:
-            # first time bbox is being set
-            self._bbox = bbox
-        return bbox
+        self._bbox = (min(x), min(y), max(x), max(y))
+        return self._bbox
 
     def __zbox(self, s) -> ZBox:
         z: list[float] = []
@@ -3057,7 +3066,7 @@ class Writer:
             raise ShapefileException(
                 "Shapefile dbf header length exceeds maximum length."
             )
-        recordLength = sum(int(field[2]) for field in fields) + 1
+        recordLength = sum(field.size for field in fields) + 1
         header = pack(
             "<BBBBLHH20x",
             version,
@@ -3072,12 +3081,11 @@ class Writer:
         # Field descriptors
         for field in fields:
             name, fieldType, size, decimal = field
-            name = b(name, self.encoding, self.encodingErrors)
-            name = name.replace(b" ", b"_")
-            name = name[:10].ljust(11).replace(b" ", b"\x00")
-            fieldType = b(fieldType, "ascii")
-            size = int(size)
-            fld = pack("<11sc4xBB14x", name, fieldType, size, decimal)
+            encoded_name = b(name, self.encoding, self.encodingErrors)
+            encoded_name = encoded_name.replace(b" ", b"_")
+            encoded_name = encoded_name[:10].ljust(11).replace(b" ", b"\x00")
+            encodedFieldType = b(fieldType, "ascii")
+            fld = pack("<11sc4xBB14x", encoded_name, encodedFieldType, size, decimal)
             f.write(fld)
         # Terminator
         f.write(b"\r")
@@ -3452,7 +3460,7 @@ class Writer:
         self.shape(polyShape)
 
     def field(
-        # Types of args should match *FieldTuple
+        # Types of args should match *FieldData
         self,
         name: str,
         fieldType: str = "C",
@@ -3470,7 +3478,11 @@ class Writer:
             raise ShapefileException(
                 "Shapefile Writer reached maximum number of fields: 2046."
             )
-        self.fields.append((name, fieldType, size, decimal))
+        # A doctest in README.md used to pass in a string ('40') for size, so
+        # try to be robust for incorrect types.
+        self.fields.append(
+            FieldData(str(name), str(fieldType), int(size), int(decimal))
+        )
 
 
 # Begin Testing

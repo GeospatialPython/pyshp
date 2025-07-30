@@ -919,8 +919,8 @@ You can also add attributes using keyword arguments where the keys are field nam
 
 
 	>>> w = shapefile.Writer('shapefiles/test/dtype')
-	>>> w.field('FIRST_FLD','C','40')
-	>>> w.field('SECOND_FLD','C','40')
+	>>> w.field('FIRST_FLD','C', 40)
+	>>> w.field('SECOND_FLD','C', 40)
 	>>> w.null()
 	>>> w.null()
 	>>> w.record('First', 'Line')
