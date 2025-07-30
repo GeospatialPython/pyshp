@@ -2967,12 +2967,8 @@ class Writer:
     def __shpRecord(self, s):
         f = self.__getFileObj(self.shp)
         offset = f.tell()
-        # Record number, Content length place holder
         self.shpNum += 1
 
-        # f.write(pack(">2i", self.shpNum, 0))
-        # start = f.tell()
-        n = 0
         # Shape Type
         if self.shapeType is None and s.shapeType != NULL:
             self.shapeType = s.shapeType
@@ -2994,7 +2990,19 @@ class Writer:
             self.__zbox(s) if s.shapeType in {POINTZ} | _HasZ._shapeTypes else None
         )
 
+        # Create an in-memory binary buffer to avoid
+        # unnecessary seeks to files on disk
+        # (other ops are already buffered until .seek
+        # or .flush is called if not using RawIOBase).
+        # https://docs.python.org/3/library/io.html#id2
+        # https://docs.python.org/3/library/io.html#io.BufferedWriter
         b_io = io.BytesIO()
+
+        # Record number, Content length place holder
+        b_io.write(pack(">2i", self.shpNum, -1))
+
+        # Track number of content bytes written.  Excluding self.shpNum and length t.b.c.
+        n = 0
 
         n += b_io.write(pack("<i", s.shapeType))
 
@@ -3008,20 +3016,17 @@ class Writer:
             zbox=new_zbox,
         )
 
-        # # Finalize record length as 16-bit words
-        # finish = f.tell()
-        # assert n == finish - start
-        # length = (finish - start) // 2
+
+        # Finalize record length as 16-bit words
         length = n // 2
-        # start - 4 bytes is the content length field
-        # f.seek(start - 4)
-        # f.write(pack(">i", length))
-        f.write(pack(">2i", self.shpNum, length))
+
+        # 4 bytes in is the content length field
+        b_io.seek(4)
+        b_io.write(pack(">i", length))
+
+        # Flush to file.
         b_io.seek(0)
         f.write(b_io.read())
-
-        # f.seek(finish)
-
         return offset, length
 
     def __shxRecord(self, offset, length):
