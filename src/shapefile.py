@@ -43,6 +43,8 @@ from urllib.error import HTTPError
 from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
 
+from typing_extensions import NotRequired, TypeIs
+
 # Create named logger
 logger = logging.getLogger(__name__)
 
@@ -120,15 +122,27 @@ PointT = Union[Point2D, PointMT, PointZT]
 PointsT = list[PointT]
 
 BBox = tuple[float, float, float, float]
+MBox = tuple[float, float]
+ZBox = tuple[float, float]
 
 
-class BinaryWritable(Protocol):
-    def write(self, data: bytes): ...
-
-
-class BinaryWritableSeekable(BinaryWritable):
-    def seek(self, i: int): ...  # pylint: disable=unused-argument
+class BinaryWritableSeekable(Protocol):
+    def write(self, bbox: bytes): ...
+    def seek(self, offset: int, whence: int = 0): ...  # pylint: disable=unused-argument
     def tell(self): ...
+
+
+class BinaryReadableSeekable(Protocol):
+    def seek(self, offset: int, whence: int = 0): ...  # pylint: disable=unused-argument
+    def tell(self): ...
+    def read(self, size: int = -1): ...
+
+
+class BinaryReadableWritableSeekable(Protocol):
+    def write(self, bbox: bytes): ...
+    def seek(self, offset: int, whence: int = 0): ...  # pylint: disable=unused-argument
+    def tell(self): ...
+    def read(self, size: int = -1): ...
 
 
 # File name, file object or anything with a read() method that returns bytes.
@@ -227,13 +241,13 @@ class GeoJSONFeatureCollection(TypedDict):
     features: list[GeoJSONFeature]
 
 
-class GeoJSONFeatureCollectionWithBBox(GeoJSONFeatureCollection, total=False):
+class GeoJSONFeatureCollectionWithBBox(GeoJSONFeatureCollection):
     # bbox is optional
     # typing.NotRequired requires Python 3.11
     # and we must support 3.9 (at least until October)
     # https://docs.python.org/3/library/typing.html#typing.Required
     # Is there a backport?
-    bbox: list[float]
+    bbox: NotRequired[list[float]]
 
 
 # Helpers
@@ -603,6 +617,24 @@ class _NoShapeTypeSentinel:
 
 class Shape:
     shapeType: int = NULL
+    _shapeTypes = frozenset(
+        [
+            NULL,
+            POINT,
+            POINTM,
+            POINTZ,
+            POLYLINE,
+            POLYLINEM,
+            POLYLINEZ,
+            POLYGON,
+            POLYGONM,
+            POLYGONZ,
+            MULTIPOINT,
+            MULTIPOINTM,
+            MULTIPOINTZ,
+            MULTIPATCH,
+        ]
+    )
 
     def __init__(
         self,
@@ -838,19 +870,40 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
         return f"Shape #{self.__oid}: {self.shapeTypeName}"
 
 
+S = TypeVar("S", bound=Shape)
+
+
+def compatible_with(s: Shape, cls: type[S]) -> TypeIs[S]:
+    return s.shapeType in cls._shapeTypes
+
+
 class NullShape(Shape):
     # Shape.shapeType = NULL already,
     # to preserve handling of default args in Shape.__init__
     # Repeated for clarity.
     shapeType = NULL
+    _shapeTypes = frozenset([NULL])
 
     @classmethod
-    def from_byte_stream(cls, b_io, next_shape, oid=None, bbox=None):  # pylint: disable=unused-argument
+    def from_byte_stream(
+        cls,
+        b_io: BinaryReadableSeekable,
+        next_shape: int,
+        oid: Optional[int] = None,
+        bbox: Optional[BBox] = None,
+    ) -> NullShape:  # pylint: disable=unused-argument
         # Shape.__init__ sets self.points = points or []
         return cls(oid=oid)
 
     @staticmethod
-    def write_to_byte_stream(b_io, s, i, bbox, mbox, zbox):  # pylint: disable=unused-argument
+    def write_to_byte_stream(
+        b_io: BinaryWritableSeekable,
+        s: Shape,
+        i: int,
+        bbox: Optional[BBox],
+        mbox: Optional[MBox],
+        zbox: Optional[ZBox],
+    ) -> int:  # pylint: disable=unused-argument
         return 0
 
 
@@ -876,13 +929,21 @@ class _CanHaveBBox(Shape):
     )
 
     # Not a BBox because the legacy implementation was a list, not a 4-tuple.
-    bbox: Optional[Sequence[float]] = None
+    # bbox: Optional[Sequence[float]] = None
+    bbox: Optional[BBox] = None
 
-    def _set_bbox_from_byte_stream(self, b_io):
-        self.bbox = _Array[float]("d", unpack("<4d", b_io.read(32)))
+    def _get_set_bbox_from_byte_stream(self, b_io: BinaryReadableSeekable) -> BBox:
+        self.bbox: BBox = tuple(_Array[float]("d", unpack("<4d", b_io.read(32))))
+        return self.bbox
 
     @staticmethod
-    def _write_bbox_to_byte_stream(b_io, i, bbox):
+    def _write_bbox_to_byte_stream(
+        b_io: BinaryWritableSeekable, i: int, bbox: Optional[BBox]
+    ) -> int:
+        if not bbox or len(bbox) != 4:
+            raise ShapefileException(
+                f"Four numbers required. Got: {bbox=}"
+            )
         try:
             return b_io.write(pack("<4d", *bbox))
         except error:
@@ -891,20 +952,24 @@ class _CanHaveBBox(Shape):
             )
 
     @staticmethod
-    def _get_npoints_from_byte_stream(b_io):
+    def _get_npoints_from_byte_stream(b_io: BinaryReadableSeekable) -> int:
         return unpack("<i", b_io.read(4))[0]
 
     @staticmethod
-    def _write_npoints_to_byte_stream(b_io, s):
+    def _write_npoints_to_byte_stream(
+        b_io: BinaryWritableSeekable, s: _CanHaveBBox
+    ) -> int:
         return b_io.write(pack("<i", len(s.points)))
 
-    def _set_points_from_byte_stream(self, b_io, nPoints):
+    def _set_points_from_byte_stream(self, b_io: BinaryReadableSeekable, nPoints: int):
         flat = unpack(f"<{2 * nPoints}d", b_io.read(16 * nPoints))
         self.points = list(zip(*(iter(flat),) * 2))
 
     @staticmethod
-    def _write_points_to_byte_stream(b_io, s, i):
-        x_ys = []
+    def _write_points_to_byte_stream(
+        b_io: BinaryWritableSeekable, s: _CanHaveBBox, i: int
+    ) -> int:
+        x_ys: list[float] = []
         for point in s.points:
             x_ys.extend(point[:2])
         try:
@@ -916,31 +981,41 @@ class _CanHaveBBox(Shape):
 
     # pylint: disable=unused-argument
     @staticmethod
-    def _get_nparts_from_byte_stream(b_io):
-        return None
+    def _get_nparts_from_byte_stream(b_io: BinaryReadableSeekable) -> int:
+        return 0
 
-    def _set_parts_from_byte_stream(self, b_io, nParts):
+    def _set_parts_from_byte_stream(self, b_io: BinaryReadableSeekable, nParts: int):
         pass
 
-    def _set_part_types_from_byte_stream(self, b_io, nParts):
+    def _set_part_types_from_byte_stream(
+        self, b_io: BinaryReadableSeekable, nParts: int
+    ):
         pass
 
-    def _set_zs_from_byte_stream(self, b_io, nPoints):
+    def _set_zs_from_byte_stream(self, b_io: BinaryReadableSeekable, nPoints: int):
         pass
 
-    def _set_ms_from_byte_stream(self, b_io, nPoints, next_shape):
+    def _set_ms_from_byte_stream(
+        self, b_io: BinaryReadableSeekable, nPoints: int, next_shape: int
+    ):
         pass
 
     # pylint: enable=unused-argument
 
     @classmethod
-    def from_byte_stream(cls, b_io, next_shape, oid=None, bbox=None):
+    def from_byte_stream(
+        cls,
+        b_io: BinaryReadableSeekable,
+        next_shape: int,
+        oid: Optional[int] = None,
+        bbox: Optional[BBox] = None,
+    ) -> Optional[_CanHaveBBox]:  # pylint: disable=unused-argument
         shape = cls(oid=oid)
 
-        shape._set_bbox_from_byte_stream(b_io)  # pylint: disable=assignment-from-none
+        shape_bbox = shape._get_set_bbox_from_byte_stream(b_io)  # pylint: disable=assignment-from-none
 
         # if bbox specified and no overlap, skip this shape
-        if bbox is not None and not bbox_overlap(bbox, tuple(shape.bbox)):  # pylint: disable=no-member
+        if bbox is not None and not bbox_overlap(bbox, shape_bbox):  # pylint: disable=no-member #type: ignore [index]
             # because we stop parsing this shape, caller must skip to beginning of
             # next shape after we return (as done in f.seek(next_shape))
             return None
@@ -963,33 +1038,43 @@ class _CanHaveBBox(Shape):
         return shape
 
     @staticmethod
-    def write_to_byte_stream(b_io, s, i, bbox, mbox, zbox):
+    def write_to_byte_stream(
+        b_io: BinaryWritableSeekable,
+        s: Shape,
+        i: int,
+        bbox: Optional[BBox],
+        mbox: Optional[MBox],
+        zbox: Optional[ZBox],
+    ) -> int:
         # We use static methods here and below,
         # to support s only being an instance of a the
         # Shape base class (with shapeType set)
         # i.e. not necessarily one of our newer shape specific
         # sub classes.
 
-        n = _CanHaveBBox._write_bbox_to_byte_stream(b_io, i, bbox)
+        n = 0
 
-        if s.shapeType in _CanHaveParts._shapeTypes:
+        if compatible_with(s, _CanHaveBBox):
+            n += _CanHaveBBox._write_bbox_to_byte_stream(b_io, i, bbox)
+
+        if compatible_with(s, _CanHaveParts):
             n += _CanHaveParts._write_nparts_to_byte_stream(b_io, s)
         # Shape types with multiple points per record
-        if s.shapeType in _CanHaveBBox._shapeTypes:
+        if compatible_with(s, _CanHaveBBox):
             n += _CanHaveBBox._write_npoints_to_byte_stream(b_io, s)
         # Write part indexes.  Includes MultiPatch
-        if s.shapeType in _CanHaveParts._shapeTypes:
+        if compatible_with(s, _CanHaveParts):
             n += _CanHaveParts._write_part_indices_to_byte_stream(b_io, s)
 
-        if s.shapeType == MULTIPATCH:
+        if compatible_with(s, MultiPatch):
             n += MultiPatch._write_part_types_to_byte_stream(b_io, s)
         # Write points for multiple-point records
-        if s.shapeType in _CanHaveBBox._shapeTypes:
+        if compatible_with(s, _CanHaveBBox):
             n += _CanHaveBBox._write_points_to_byte_stream(b_io, s, i)
-        if s.shapeType in _HasZ._shapeTypes:
+        if compatible_with(s, _HasZ):
             n += _HasZ._write_zs_to_byte_stream(b_io, s, i, zbox)
 
-        if s.shapeType in _HasM._shapeTypes:
+        if compatible_with(s, _HasM):
             n += _HasM._write_ms_to_byte_stream(b_io, s, i, mbox)
 
         return n
@@ -1012,18 +1097,20 @@ class _CanHaveParts(_CanHaveBBox):
     )
 
     @staticmethod
-    def _get_nparts_from_byte_stream(b_io):
+    def _get_nparts_from_byte_stream(b_io: BinaryReadableSeekable) -> int:
         return unpack("<i", b_io.read(4))[0]
 
     @staticmethod
     def _write_nparts_to_byte_stream(b_io, s):
         return b_io.write(pack("<i", len(s.parts)))
 
-    def _set_parts_from_byte_stream(self, b_io, nParts):
+    def _set_parts_from_byte_stream(self, b_io: BinaryReadableSeekable, nParts: int):
         self.parts = _Array[int]("i", unpack(f"<{nParts}i", b_io.read(nParts * 4)))
 
     @staticmethod
-    def _write_part_indices_to_byte_stream(b_io, s):
+    def _write_part_indices_to_byte_stream(
+        b_io: BinaryWritableSeekable, s: _CanHaveParts
+    ) -> int:
         return b_io.write(pack(f"<{len(s.parts)}i", *s.parts))
 
 
@@ -1057,7 +1144,13 @@ class Point(Shape):
             )
 
     @classmethod
-    def from_byte_stream(cls, b_io, next_shape, oid=None, bbox=None):
+    def from_byte_stream(
+        cls,
+        b_io: BinaryReadableSeekable,
+        next_shape: int,
+        oid: Optional[int] = None,
+        bbox: Optional[BBox] = None,
+    ):  # pylint: disable=unused-argument
         shape = cls(oid=oid)
 
         x, y = cls._x_y_from_byte_stream(b_io)
@@ -1077,7 +1170,14 @@ class Point(Shape):
         return shape
 
     @staticmethod
-    def write_to_byte_stream(b_io, s, i, bbox, mbox, zbox):  # pylint: disable=unused-argument
+    def write_to_byte_stream(
+        b_io: BinaryWritableSeekable,
+        s: Shape,
+        i: int,
+        bbox: Optional[BBox],
+        mbox: Optional[MBox],
+        zbox: Optional[ZBox],
+    ) -> int:  # pylint: disable=unused-argument
         # Serialize a single point
         x, y = s.points[0][0], s.points[0][1]
         n = Point._write_x_y_to_byte_stream(b_io, x, y, i)
@@ -1216,6 +1316,7 @@ class _HasZ(_CanHaveBBox):
 
 class MultiPatch(_HasM, _HasZ, _CanHaveParts):
     shapeType = MULTIPATCH
+    _shapeTypes = frozenset([MULTIPATCH])
 
     def _set_part_types_from_byte_stream(self, b_io, nParts):
         self.partTypes = _Array[int]("i", unpack(f"<{nParts}i", b_io.read(nParts * 4)))
@@ -1227,6 +1328,8 @@ class MultiPatch(_HasM, _HasZ, _CanHaveParts):
 
 class PointM(Point):
     shapeType = POINTM
+    _shapeTypes = frozenset([POINTM, POINTZ])
+
     # same default as in Writer.__shpRecord (if s.shapeType in (11, 21):)
     # PyShp encodes None m values as NODATA
     m = (None,)
@@ -1297,6 +1400,8 @@ class MultiPointM(MultiPoint, _HasM):
 
 class PointZ(PointM):
     shapeType = POINTZ
+    _shapeTypes = frozenset([POINTZ])
+
     # same default as in Writer.__shpRecord (if s.shapeType == 11:)
     z: Sequence[float] = (0.0,)
 
@@ -2070,7 +2175,7 @@ class Reader:
 
         # Read entire record into memory to avoid having to call
         # seek on the file afterwards
-        b_io = io.BytesIO(f.read(recLength_bytes))
+        b_io: BinaryReadableSeekable = io.BytesIO(f.read(recLength_bytes))
         b_io.seek(0)
 
         shapeType = unpack("<i", b_io.read(4))[0]
@@ -2570,6 +2675,8 @@ class Reader:
 class Writer:
     """Provides write support for ESRI Shapefiles."""
 
+    W = TypeVar("W", bound=BinaryWritableSeekable)
+
     def __init__(
         self,
         target: Union[str, os.PathLike, None] = None,
@@ -2587,9 +2694,9 @@ class Writer:
         self.autoBalance = autoBalance
         self.fields: list[FieldTuple] = []
         self.shapeType = shapeType
-        self.shp: Optional[BinaryFileStreamT] = None
-        self.shx: Optional[BinaryFileStreamT] = None
-        self.dbf: Optional[BinaryFileStreamT] = None
+        self.shp: Optional[BinaryWritableSeekable] = None
+        self.shx: Optional[BinaryWritableSeekable] = None
+        self.dbf: Optional[BinaryWritableSeekable] = None
         self._files_to_close: list[BinaryFileStreamT] = []
         if target:
             target = fsdecode_if_pathlike(target)
@@ -2619,9 +2726,9 @@ class Writer:
         # Geometry record offsets and lengths for writing shx file.
         self.recNum = 0
         self.shpNum = 0
-        self._bbox = None
-        self._zbox = None
-        self._mbox = None
+        self._bbox: Optional[BBox] = None
+        self._zbox: Optional[ZBox] = None
+        self._mbox: Optional[MBox] = None
         # Use deletion flags in dbf? Default is false (0). Note: Currently has no effect, records should NOT contain deletion flags.
         self.deletionFlag = 0
         # Encoding
@@ -2695,14 +2802,12 @@ class Writer:
                     pass
         self._files_to_close = []
 
-    W = TypeVar("W", bound=BinaryWritableSeekable)
-
     @overload
-    def __getFileObj(self, f: str) -> IO[bytes]: ...
+    def __getFileObj(self, f: str) -> BinaryWritableSeekable: ...
     @overload
     def __getFileObj(self, f: None) -> NoReturn: ...
     @overload
-    def __getFileObj(self, f: W) -> W: ...
+    def __getFileObj(self, f: BinaryWritableSeekable) -> BinaryWritableSeekable: ...
     def __getFileObj(self, f):
         """Safety handler to verify file-like objects"""
         if not f:
@@ -2762,8 +2867,8 @@ class Writer:
             self._bbox = bbox
         return bbox
 
-    def __zbox(self, s):
-        z = []
+    def __zbox(self, s) -> ZBox:
+        z: list[float] = []
         if self._zbox:
             z.extend(self._zbox)
 
@@ -2777,12 +2882,12 @@ class Writer:
 
         # Original self._zbox bounds (if any) are the first two entries.
         # Set zbox for the first, and all later times
-        self._zbox = [min(z), max(z)]
+        self._zbox = (min(z), max(z))
         return self._zbox
 
-    def __mbox(self, s):
+    def __mbox(self, s) -> MBox:
         mpos = 3 if s.shapeType in _HasZ._shapeTypes else 2
-        m = []
+        m: list[float] = []
         if self._mbox:
             m.extend(self._mbox)
 
@@ -2801,7 +2906,7 @@ class Writer:
 
         # Original self._mbox bounds (if any) are the first two entries.
         # Set mbox for the first, and all later times
-        self._mbox = [min(m), max(m)]
+        self._mbox = (min(m), max(m))
         return self._mbox
 
     @property
@@ -2959,8 +3064,8 @@ class Writer:
         if self.shx:
             self.__shxRecord(offset, length)
 
-    def __shpRecord(self, s):
-        f = self.__getFileObj(self.shp)
+    def __shpRecord(self, s: Shape) -> tuple[int, int]:
+        f: BinaryWritableSeekable = self.__getFileObj(self.shp)
         offset = f.tell()
         self.shpNum += 1
 
@@ -2991,7 +3096,7 @@ class Writer:
         # or .flush is called if not using RawIOBase).
         # https://docs.python.org/3/library/io.html#id2
         # https://docs.python.org/3/library/io.html#io.BufferedWriter
-        b_io = io.BytesIO()
+        b_io: BinaryReadableWritableSeekable = io.BytesIO()
 
         # Record number, Content length place holder
         b_io.write(pack(">2i", self.shpNum, -1))

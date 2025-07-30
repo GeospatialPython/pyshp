@@ -26,6 +26,9 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
+dependencies = [
+    "typing_extensions",
+]
 
 [project.optional-dependencies]
 test = ["pytest"]
