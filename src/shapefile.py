@@ -157,10 +157,20 @@ class ReadWriteSeekableBinStream(Protocol):
 BinaryFileT = Union[str, IO[bytes]]
 BinaryFileStreamT = Union[IO[bytes], io.BytesIO, WriteSeekableBinStream]
 
+FieldTypeCode = Literal["N", "F", "L", "D", "C", "M"]
+FIELD_TYPE_CODES: dict[str, FieldTypeCode] = {
+    "N": "N",
+    "F": "F",
+    "L": "L",
+    "D": "D",
+    "C": "C",
+    "M": "M",
+}
+
 
 class FieldData(NamedTuple):
     name: str
-    fieldType: str
+    fieldType: FieldTypeCode
     size: int
     decimal: int
 
@@ -287,10 +297,6 @@ def u(
         return ""
     # Force string representation.
     return bytes(v).decode(encoding, encodingErrors)
-
-
-def is_string(v: Any) -> bool:
-    return isinstance(v, str)
 
 
 @overload
@@ -1776,7 +1782,7 @@ class Reader:
         # See if a shapefile name was passed as the first argument
         if shapefile_path:
             path = fsdecode_if_pathlike(shapefile_path)
-            if is_string(path):
+            if isinstance(path, str):
                 if ".zip" in path:
                     # Shapefile is inside a zipfile
                     if path.count(".zip") > 1:
@@ -2376,7 +2382,9 @@ class Reader:
             name = encoded_name.decode(self.encoding, self.encodingErrors)
             name = name.lstrip()
 
-            type_char = encoded_type_char.decode("ascii")
+            type_char: FieldTypeCode = FIELD_TYPE_CODES.get(
+                encoded_type_char.decode("ascii").upper(), "C"
+            )
 
             self.fields.append(FieldData(name, type_char, size, decimal))
         terminator = dbf.read(1)
@@ -2473,8 +2481,8 @@ class Reader:
         """
         f = self.__getFileObj(self.dbf)
 
-        # The only format chars in from self.__recordFmt, in recStruct from __recordFields, 
-        # are s and x (ascii encoded str and pad byte) so everything in recordContents is bytes 
+        # The only format chars in from self.__recordFmt, in recStruct from __recordFields,
+        # are s and x (ascii encoded str and pad byte) so everything in recordContents is bytes
         # https://docs.python.org/3/library/struct.html#format-characters
         recordContents = recStruct.unpack(f.read(recStruct.size))
 
@@ -2552,8 +2560,7 @@ class Reader:
                     else:
                         value = None  # unknown value is set to missing
             else:
-                # anything else is forced to string/unicode
-                value = u(value, self.encoding, self.encodingErrors)
+                value = value.decode(self.encoding, self.encodingErrors)
                 value = value.strip().rstrip(
                     "\x00"
                 )  # remove null-padding at end of strings
@@ -2738,7 +2745,7 @@ class Writer:
         self._files_to_close: list[BinaryFileStreamT] = []
         if target:
             target = fsdecode_if_pathlike(target)
-            if not is_string(target):
+            if not isinstance(target, str):
                 raise TypeError(
                     f"The target filepath {target!r} must be of type str/unicode or path-like, not {type(target)}."
                 )
@@ -3216,6 +3223,65 @@ class Writer:
             record = ["" for _ in range(fieldCount)]
         self.__dbfRecord(record)
 
+    @staticmethod
+    def _dbf_missing_placeholder(
+        value: RecordValue, fieldType: FieldTypeCode, size: int
+    ) -> str:
+        if fieldType in {"N", "F"}:
+            return "*" * size  # QGIS NULL
+        if fieldType == "D":
+            return "0" * 8  # QGIS NULL for date type
+        if fieldType == "L":
+            return " "
+        return str(value)
+
+    @staticmethod
+    def _try_coerce_to_numeric_str(value: RecordValue, size: int, deci: int) -> str:
+        # numeric or float: number stored as a string,
+        # right justified, and padded with blanks
+        # to the width of the field.
+        if not deci:
+            # force to int
+            try:
+                # first try to force directly to int.
+                # forcing a large int to float and back to int
+                # will lose information and result in wrong nr.
+                int_val = int(value)
+            except ValueError:
+                # forcing directly to int failed, so was probably a float.
+                int_val = int(float(value))
+
+            str_val = format(int_val, "d")
+        else:
+            f_val = float(value)
+            str_val = format(f_val, f".{deci}f")
+
+        # caps the size if exceeds the field size
+        return str_val[:size].rjust(size)
+
+    @staticmethod
+    def _try_coerce_to_date_str(value: RecordValue) -> str:
+        # date: 8 bytes - date stored as a string in the format YYYYMMDD.
+        if isinstance(value, date):
+            return f"{value.year:04d}{value.month:02d}{value.day:02d}"
+        if isinstance(value, (list, tuple)) and len(value) == 3:
+            return f"{value[0]:04d}{value[1]:02d}{value[2]:02d}"
+        if isinstance(value, str) and len(value) == 8:
+            return value  # value is already a date string
+
+        raise ShapefileException(
+            "Date values must be either a datetime.date object, a list/tuple, a YYYYMMDD string, or a missing value."
+        )
+
+    @staticmethod
+    def _try_coerce_to_logical_str(value: RecordValue) -> str:
+        # logical: 1 byte - initialized to 0x20 (space) otherwise T or F.
+        if value == 1:  # True == 1
+            return "T"
+        if value == 0:  # False == 0
+            return "F"
+        return " "  # unknown is set to space
+
     def __dbfRecord(self, record: list[RecordValue]) -> None:
         """Writes the dbf records."""
         f = self.__getFileObj(self.dbf)
@@ -3233,63 +3299,31 @@ class Writer:
         )  # ignore deletionflag field in case it was specified
         for (fieldName, fieldType, size, deci), value in zip(fields, record):
             # write
-            fieldType = fieldType.upper()
+            fieldType = FIELD_TYPE_CODES.get(fieldType.upper(), fieldType)
             size = int(size)
             str_val: str
+
+            if value in MISSING:
+                str_val = self._dbf_missing_placeholder(value, fieldType, size)
             if fieldType in {"N", "F"}:
-                # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
-                if value in MISSING:
-                    str_val = "*" * size  # QGIS NULL
-                elif not deci:
-                    # force to int
-                    try:
-                        # first try to force directly to int.
-                        # forcing a large int to float and back to int
-                        # will lose information and result in wrong nr.
-                        int_val = int(value)
-                    except ValueError:
-                        # forcing directly to int failed, so was probably a float.
-                        int_val = int(float(value))
-                    str_val = format(int_val, "d")[:size].rjust(
-                        size
-                    )  # caps the size if exceeds the field size
-                else:
-                    f_val = float(value)
-                    str_val = format(f_val, f".{deci}f")[:size].rjust(
-                        size
-                    )  # caps the size if exceeds the field size
+                str_val = self._try_coerce_to_numeric_str(value, size, deci)
             elif fieldType == "D":
-                # date: 8 bytes - date stored as a string in the format YYYYMMDD.
-                if value in MISSING:
-                    str_val = "0" * 8  # QGIS NULL for date type
-                elif isinstance(value, date):
-                    str_val = f"{value.year:04d}{value.month:02d}{value.day:02d}"
-                elif isinstance(value, (list, tuple)) and len(value) == 3:
-                    str_val = f"{value[0]:04d}{value[1]:02d}{value[2]:02d}"
-                elif is_string(value) and len(value) == 8:
-                    str_val = value  # value is already a date string
-                else:
-                    raise ShapefileException(
-                        "Date values must be either a datetime.date object, a list/tuple, a YYYYMMDD string, or a missing value."
-                    )
+                str_val = self._try_coerce_to_date_str(value)
             elif fieldType == "L":
-                # logical: 1 byte - initialized to 0x20 (space) otherwise T or F.
-                if value in MISSING:
-                    str_val = " "  # missing is set to space
-                elif value in {True, 1}:
-                    str_val = "T"
-                elif value in {False, 0}:
-                    str_val = "F"
-                else:
-                    str_val = " "  # unknown is set to space
+                str_val = self._try_coerce_to_logical_str(value)
             else:
-                # anything else is forced to string, truncated to the length of the field
-                str_val = u(value, self.encoding, self.encodingErrors)[:size].ljust(
-                    size
-                )
-            
+                #
+                if isinstance(value, bytes):
+                    decoded_val = value.decode(self.encoding, self.encodingErrors)
+                else:
+                    # anything else is forced to string.
+                    decoded_val = str(value)
+                # Truncate to the length of the field
+                str_val = decoded_val[:size].ljust(size)
+
             # should be default ascii encoding
             encoded_val = str_val.encode("ascii", self.encodingErrors)
+
             if len(encoded_val) != size:
                 raise ShapefileException(
                     "Shapefile Writer unable to pack incorrect sized value"
@@ -3455,7 +3489,7 @@ class Writer:
         # Types of args should match *FieldData
         self,
         name: str,
-        fieldType: str = "C",
+        fieldType: FieldTypeCode = "C",
         size: int = 50,
         decimal: int = 0,
     ) -> None:
@@ -3466,15 +3500,18 @@ class Writer:
         elif fieldType == "L":
             size = 1
             decimal = 0
+        elif fieldType not in {"C", "N", "F", "M"}:
+            raise ShapefileException(
+                "fieldType must be C,N,F,M,L or D. " f"Got: {fieldType=}. "
+            )
         if len(self.fields) >= 2046:
             raise ShapefileException(
                 "Shapefile Writer reached maximum number of fields: 2046."
             )
         # A doctest in README.md used to pass in a string ('40') for size, so
         # try to be robust for incorrect types.
-        self.fields.append(
-            FieldData(str(name), str(fieldType), int(size), int(decimal))
-        )
+        fieldType = FIELD_TYPE_CODES.get(str(fieldType)[0].upper(), fieldType)
+        self.fields.append(FieldData(str(name), fieldType, int(size), int(decimal)))
 
 
 # Begin Testing
