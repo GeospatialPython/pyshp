@@ -125,6 +125,14 @@ MBox = tuple[float, float]
 ZBox = tuple[float, float]
 
 
+class WriteableBinStream(Protocol):
+    def write(self, b: bytes): ...  # pylint: disable=redefined-outer-name
+
+
+class ReadableBinStream(Protocol):
+    def read(self, size: int = -1): ...
+
+
 class WriteSeekableBinStream(Protocol):
     def write(self, b: bytes): ...  # pylint: disable=redefined-outer-name
     def seek(self, offset: int, whence: int = 0): ...  # pylint: disable=unused-argument
@@ -899,7 +907,7 @@ class NullShape(Shape):
 
     @staticmethod
     def write_to_byte_stream(
-        b_io: WriteSeekableBinStream,
+        b_io: WriteableBinStream,
         s: Shape,
         i: int,
         bbox: Optional[BBox],
@@ -932,13 +940,13 @@ class _CanHaveBBox(Shape):
 
     bbox: Optional[BBox] = None
 
-    def _get_set_bbox_from_byte_stream(self, b_io: ReadSeekableBinStream) -> BBox:
+    def _get_set_bbox_from_byte_stream(self, b_io: ReadableBinStream) -> BBox:
         self.bbox: BBox = tuple(_Array[float]("d", unpack("<4d", b_io.read(32))))
         return self.bbox
 
     @staticmethod
     def _write_bbox_to_byte_stream(
-        b_io: WriteSeekableBinStream, i: int, bbox: Optional[BBox]
+        b_io: WriteableBinStream, i: int, bbox: Optional[BBox]
     ) -> int:
         if not bbox or len(bbox) != 4:
             raise ShapefileException(f"Four numbers required for bbox. Got: {bbox}")
@@ -950,22 +958,20 @@ class _CanHaveBBox(Shape):
             )
 
     @staticmethod
-    def _get_npoints_from_byte_stream(b_io: ReadSeekableBinStream) -> int:
+    def _get_npoints_from_byte_stream(b_io: ReadableBinStream) -> int:
         return unpack("<i", b_io.read(4))[0]
 
     @staticmethod
-    def _write_npoints_to_byte_stream(
-        b_io: WriteSeekableBinStream, s: _CanHaveBBox
-    ) -> int:
+    def _write_npoints_to_byte_stream(b_io: WriteableBinStream, s: _CanHaveBBox) -> int:
         return b_io.write(pack("<i", len(s.points)))
 
-    def _set_points_from_byte_stream(self, b_io: ReadSeekableBinStream, nPoints: int):
+    def _set_points_from_byte_stream(self, b_io: ReadableBinStream, nPoints: int):
         flat = unpack(f"<{2 * nPoints}d", b_io.read(16 * nPoints))
         self.points = list(zip(*(iter(flat),) * 2))
 
     @staticmethod
     def _write_points_to_byte_stream(
-        b_io: WriteSeekableBinStream, s: _CanHaveBBox, i: int
+        b_io: WriteableBinStream, s: _CanHaveBBox, i: int
     ) -> int:
         x_ys: list[float] = []
         for point in s.points:
@@ -978,18 +984,16 @@ class _CanHaveBBox(Shape):
             )
 
     @staticmethod
-    def _get_nparts_from_byte_stream(b_io: ReadSeekableBinStream) -> int:
+    def _get_nparts_from_byte_stream(b_io: ReadableBinStream) -> int:
         return 0
 
-    def _set_parts_from_byte_stream(self, b_io: ReadSeekableBinStream, nParts: int):
+    def _set_parts_from_byte_stream(self, b_io: ReadableBinStream, nParts: int):
         pass
 
-    def _set_part_types_from_byte_stream(
-        self, b_io: ReadSeekableBinStream, nParts: int
-    ):
+    def _set_part_types_from_byte_stream(self, b_io: ReadableBinStream, nParts: int):
         pass
 
-    def _set_zs_from_byte_stream(self, b_io: ReadSeekableBinStream, nPoints: int):
+    def _set_zs_from_byte_stream(self, b_io: ReadableBinStream, nPoints: int):
         pass
 
     def _set_ms_from_byte_stream(
@@ -1034,7 +1038,7 @@ class _CanHaveBBox(Shape):
 
     @staticmethod
     def write_to_byte_stream(
-        b_io: WriteSeekableBinStream,
+        b_io: WriteableBinStream,
         s: Shape,
         i: int,
         bbox: Optional[BBox],
@@ -1092,19 +1096,19 @@ class _CanHaveParts(_CanHaveBBox):
     )
 
     @staticmethod
-    def _get_nparts_from_byte_stream(b_io: ReadSeekableBinStream) -> int:
+    def _get_nparts_from_byte_stream(b_io: ReadableBinStream) -> int:
         return unpack("<i", b_io.read(4))[0]
 
     @staticmethod
-    def _write_nparts_to_byte_stream(b_io: WriteSeekableBinStream, s) -> int:
+    def _write_nparts_to_byte_stream(b_io: WriteableBinStream, s) -> int:
         return b_io.write(pack("<i", len(s.parts)))
 
-    def _set_parts_from_byte_stream(self, b_io: ReadSeekableBinStream, nParts: int):
+    def _set_parts_from_byte_stream(self, b_io: ReadableBinStream, nParts: int):
         self.parts = _Array[int]("i", unpack(f"<{nParts}i", b_io.read(nParts * 4)))
 
     @staticmethod
     def _write_part_indices_to_byte_stream(
-        b_io: WriteSeekableBinStream, s: _CanHaveParts
+        b_io: WriteableBinStream, s: _CanHaveParts
     ) -> int:
         return b_io.write(pack(f"<{len(s.parts)}i", *s.parts))
 
@@ -1116,7 +1120,7 @@ class Point(Shape):
     shapeType = POINT
     _shapeTypes = frozenset([POINT, POINTM, POINTZ])
 
-    def _set_single_point_z_from_byte_stream(self, b_io: ReadSeekableBinStream):
+    def _set_single_point_z_from_byte_stream(self, b_io: ReadableBinStream):
         pass
 
     def _set_single_point_m_from_byte_stream(
@@ -1125,7 +1129,7 @@ class Point(Shape):
         pass
 
     @staticmethod
-    def _x_y_from_byte_stream(b_io: ReadSeekableBinStream):
+    def _x_y_from_byte_stream(b_io: ReadableBinStream):
         # Unpack _Array too
         x, y = _Array[float]("d", unpack("<2d", b_io.read(16)))
         # Convert to tuple
@@ -1133,7 +1137,7 @@ class Point(Shape):
 
     @staticmethod
     def _write_x_y_to_byte_stream(
-        b_io: WriteSeekableBinStream, x: float, y: float, i: int
+        b_io: WriteableBinStream, x: float, y: float, i: int
     ) -> int:
         try:
             return b_io.write(pack("<2d", x, y))
@@ -1170,7 +1174,7 @@ class Point(Shape):
 
     @staticmethod
     def write_to_byte_stream(
-        b_io: WriteSeekableBinStream,
+        b_io: WriteableBinStream,
         s: Shape,
         i: int,
         bbox: Optional[BBox],
@@ -1243,7 +1247,7 @@ class _HasM(_CanHaveBBox):
 
     @staticmethod
     def _write_ms_to_byte_stream(
-        b_io: WriteSeekableBinStream, s: Shape, i: int, mbox: Optional[MBox]
+        b_io: WriteableBinStream, s: Shape, i: int, mbox: Optional[MBox]
     ) -> int:
         if not mbox or len(mbox) != 2:
             raise ShapefileException(f"Two numbers required for mbox. Got: {mbox}")
@@ -1294,13 +1298,13 @@ class _HasZ(_CanHaveBBox):
     )
     z: Sequence[float]
 
-    def _set_zs_from_byte_stream(self, b_io: ReadSeekableBinStream, nPoints: int):
+    def _set_zs_from_byte_stream(self, b_io: ReadableBinStream, nPoints: int):
         __zmin, __zmax = unpack("<2d", b_io.read(16))  # pylint: disable=unused-private-member
         self.z = _Array[float]("d", unpack(f"<{nPoints}d", b_io.read(nPoints * 8)))
 
     @staticmethod
     def _write_zs_to_byte_stream(
-        b_io: WriteSeekableBinStream, s: Shape, i: int, zbox: Optional[ZBox]
+        b_io: WriteableBinStream, s: Shape, i: int, zbox: Optional[ZBox]
     ) -> int:
         if not zbox or len(zbox) != 2:
             raise ShapefileException(f"Two numbers required for zbox. Got: {zbox}")
@@ -1334,13 +1338,11 @@ class MultiPatch(_HasM, _HasZ, _CanHaveParts):
     shapeType = MULTIPATCH
     _shapeTypes = frozenset([MULTIPATCH])
 
-    def _set_part_types_from_byte_stream(
-        self, b_io: ReadSeekableBinStream, nParts: int
-    ):
+    def _set_part_types_from_byte_stream(self, b_io: ReadableBinStream, nParts: int):
         self.partTypes = _Array[int]("i", unpack(f"<{nParts}i", b_io.read(nParts * 4)))
 
     @staticmethod
-    def _write_part_types_to_byte_stream(b_io: WriteSeekableBinStream, s: Shape) -> int:
+    def _write_part_types_to_byte_stream(b_io: WriteableBinStream, s: Shape) -> int:
         return b_io.write(pack(f"<{len(s.partTypes)}i", *s.partTypes))
 
 
@@ -1367,7 +1369,7 @@ class PointM(Point):
 
     @staticmethod
     def _write_single_point_m_to_byte_stream(
-        b_io: WriteSeekableBinStream, s: Shape, i: int
+        b_io: WriteableBinStream, s: Shape, i: int
     ) -> int:
         # Write a single M value
         # Note: missing m values are autoset to NODATA.
@@ -1431,12 +1433,12 @@ class PointZ(PointM):
     # same default as in Writer.__shpRecord (if s.shapeType == 11:)
     z: Sequence[float] = (0.0,)
 
-    def _set_single_point_z_from_byte_stream(self, b_io: ReadSeekableBinStream):
+    def _set_single_point_z_from_byte_stream(self, b_io: ReadableBinStream):
         self.z = tuple(unpack("<d", b_io.read(8)))
 
     @staticmethod
     def _write_single_point_z_to_byte_stream(
-        b_io: WriteSeekableBinStream, s: Shape, i: int
+        b_io: WriteableBinStream, s: Shape, i: int
     ) -> int:
         # Note: missing z values are autoset to 0, but not sure if this is ideal.
         z: float = 0.0
