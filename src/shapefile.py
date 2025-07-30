@@ -1002,6 +1002,7 @@ class _CanHaveBBox(Shape):
 
         return n
 
+
 class _CanHaveParts(_CanHaveBBox):
     # The parts attribute is initialised by
     # the base class Shape's __init__, to parts or [].
@@ -1099,6 +1100,7 @@ class Point(Shape):
 
         return n
 
+
 class Polyline(_CanHaveParts):
     shapeType = POLYLINE
 
@@ -1166,7 +1168,7 @@ class _HasM(_CanHaveBBox):
                         ms.append(p[mpos])
                     else:
                         ms.append(NODATA)
-            
+
             num_bytes_written += b_io.write(pack(f"<{len(ms)}d", *ms))
 
         except error:
@@ -1209,9 +1211,7 @@ class _HasZ(_CanHaveBBox):
                 zs = s.z
             else:
                 # if z values are stored as 3rd dimension
-                zs = [p[2] if len(p) > 2 else 0
-                      for p in s.points
-                ] 
+                zs = [p[2] if len(p) > 2 else 0 for p in s.points]
 
             num_bytes_written += b_io.write(pack(f"<{len(zs)}d", *zs))
         except error:
@@ -2969,7 +2969,7 @@ class Writer:
         offset = f.tell()
         # Record number, Content length place holder
         self.shpNum += 1
-        
+
         # f.write(pack(">2i", self.shpNum, 0))
         # start = f.tell()
         n = 0
@@ -2993,7 +2993,7 @@ class Writer:
         new_zbox = (
             self.__zbox(s) if s.shapeType in {POINTZ} | _HasZ._shapeTypes else None
         )
-        
+
         b_io = io.BytesIO()
 
         n += b_io.write(pack("<i", s.shapeType))
@@ -3007,8 +3007,6 @@ class Writer:
             mbox=new_mbox,
             zbox=new_zbox,
         )
-
-
 
         # # Finalize record length as 16-bit words
         # finish = f.tell()
