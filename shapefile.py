@@ -2314,16 +2314,17 @@ class Writer(object):
             f.write(pack("<i", len(s.points)))
         # Write part indexes
         if s.shapeType in (3, 5, 13, 15, 23, 25, 31):
-            for p in s.parts:
-                f.write(pack("<i", p))
+            f.write(pack("<%si" % len(s.parts), *s.parts))
         # Part types for Multipatch (31)
         if s.shapeType == 31:
-            for pt in s.partTypes:
-                f.write(pack("<i", pt))
+            f.write(pack("<%si" % len(s.partTypes), *s.partTypes))
         # Write points for multiple-point records
         if s.shapeType in (3, 5, 8, 13, 15, 18, 23, 25, 28, 31):
+            x_ys = []
+            for point in s.points:
+                x_ys.extend(point[:2])
             try:
-                [f.write(pack("<2d", *p[:2])) for p in s.points]
+                f.write(pack("<%sd" % len(x_ys), *x_ys))
             except error:
                 raise ShapefileException(
                     "Failed to write points for record %s. Expected floats."
@@ -2345,7 +2346,8 @@ class Writer(object):
                     f.write(pack("<%sd" % len(s.z), *s.z))
                 else:
                     # if z values are stored as 3rd dimension
-                    [f.write(pack("<d", p[2] if len(p) > 2 else 0)) for p in s.points]
+                    zs = [p[2] if len(p) > 2 else 0 for p in s.points]
+                    f.write(pack("<%sd" % len(zs), *zs))
             except error:
                 raise ShapefileException(
                     "Failed to write elevation values for record %s. Expected floats."
