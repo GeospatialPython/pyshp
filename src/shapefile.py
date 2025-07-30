@@ -2074,17 +2074,21 @@ class Reader:
         # Convert from num of 16 bit words, to 8 bit bytes
         recLength_bytes = 2 * recLength
 
-        next_shape = f.tell() + recLength_bytes
+        # next_shape = f.tell() + recLength_bytes
 
-        shapeType = unpack("<i", f.read(4))[0]
+        # Read entire record into memory
+        b_io = io.BytesIO(f.read(recLength_bytes))
+        b_io.seek(0)
+
+        shapeType = unpack("<i", b_io.read(4))[0]
 
         ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[shapeType]
-        shape = ShapeClass.from_byte_stream(f, next_shape, oid=oid, bbox=bbox)
+        shape = ShapeClass.from_byte_stream(b_io, recLength_bytes, oid=oid, bbox=bbox)
 
         # Seek to the end of this record as defined by the record header because
         # the shapefile spec doesn't require the actual content to meet the header
         # definition.  Probably allowed for lazy feature deletion.
-        f.seek(next_shape)
+        # f.seek(next_shape)
 
         return shape
 
