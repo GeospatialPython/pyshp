@@ -3016,7 +3016,6 @@ class Writer:
             zbox=new_zbox,
         )
 
-
         # Finalize record length as 16-bit words
         length = n // 2
 
