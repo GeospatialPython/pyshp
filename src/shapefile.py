@@ -653,10 +653,8 @@ class Shape:
                 # the geojson spec does not define a proper null-geometry type
                 # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
                 return {"type": "Point", "coordinates": ()}
-                # return {"type": "Point", "coordinates": tuple()} #type: ignore
 
             return {"type": "Point", "coordinates": self.points[0]}
-            # return {"type": "Point", "coordinates": tuple(self.points[0])}  # type: ignore
 
         if self.shapeType in [MULTIPOINT, MULTIPOINTM, MULTIPOINTZ]:
             if len(self.points) == 0:
@@ -669,7 +667,6 @@ class Shape:
             return {
                 "type": "MultiPoint",
                 "coordinates": self.points,
-                # "coordinates": [tuple(p) for p in self.points],  #type: ignore
             }
 
         if self.shapeType in [POLYLINE, POLYLINEM, POLYLINEZ]:
@@ -684,7 +681,6 @@ class Shape:
                 return {
                     "type": "LineString",
                     "coordinates": self.points,
-                    # "coordinates": [tuple(p) for p in self.points],  #type: ignore
                 }
 
             # multilinestring
@@ -695,11 +691,9 @@ class Shape:
                     ps = part
                     continue
 
-                # coordinates.append([tuple(p) for p in self.points[ps:part]])
                 coordinates.append(list(self.points[ps:part]))
                 ps = part
 
-            # coordinates.append([tuple(p) for p in self.points[part:]])
             # assert len(self.parts) >1 # so disable pylint rule
             coordinates.append(list(self.points[part:]))  # pylint: disable=undefined-loop-variable
             return {"type": "MultiLineString", "coordinates": coordinates}
@@ -713,16 +707,14 @@ class Shape:
 
             # get all polygon rings
             rings = []
-            for i in range(len(self.parts)):
+            for i, start in enumerate(self.parts):
                 # get indexes of start and end points of the ring
-                start = self.parts[i]
                 try:
                     end = self.parts[i + 1]
                 except IndexError:
                     end = len(self.points)
 
                 # extract the points that make up the ring
-                # ring = [tuple(p) for p in self.points[start:end]]
                 ring = list(self.points[start:end])
                 rings.append(ring)
 
@@ -2076,7 +2068,8 @@ class Reader:
 
         # next_shape = f.tell() + recLength_bytes
 
-        # Read entire record into memory
+        # Read entire record into memory to avoid having to call
+        # seek on the file afterwards
         b_io = io.BytesIO(f.read(recLength_bytes))
         b_io.seek(0)
 
@@ -2363,7 +2356,7 @@ class Reader:
         # parse each value
         record = []
         for (__name, typ, __size, deci), value in zip(fieldTuples, recordContents):
-            if typ in ("N", "F"):
+            if typ in {"N", "F"}:
                 # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
                 value = value.split(b"\0")[0]
                 value = value.replace(b"*", b"")  # QGIS NULL is all '*' chars
@@ -2687,9 +2680,7 @@ class Writer:
 
         # Flush files
         for attribute in (self.shp, self.shx, self.dbf):
-            if hasattr(attribute, "flush") and not (
-                hasattr(attribute, "closed") and attribute.closed
-            ):
+            if hasattr(attribute, "flush") and not getattr(attribute, "closed", False):
                 try:
                     attribute.flush()
                 except OSError:
