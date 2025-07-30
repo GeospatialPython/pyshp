@@ -29,7 +29,6 @@ from typing import (
     Iterable,
     Iterator,
     Literal,
-    NoReturn,
     Optional,
     Protocol,
     Reversible,
@@ -43,7 +42,7 @@ from urllib.error import HTTPError
 from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
 
-from typing_extensions import NotRequired, TypeIs
+from typing_extensions import Never, NotRequired, TypeIs,
 
 # Create named logger
 logger = logging.getLogger(__name__)
@@ -2810,7 +2809,7 @@ class Writer:
     @overload
     def __getFileObj(self, f: str) -> WriteSeekableBinStream: ...
     @overload
-    def __getFileObj(self, f: None) -> NoReturn: ...
+    def __getFileObj(self, f: None) -> Never: ...
     @overload
     def __getFileObj(self, f: WriteSeekableBinStream) -> WriteSeekableBinStream: ...
     def __getFileObj(self, f):
