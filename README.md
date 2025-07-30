@@ -1375,7 +1375,7 @@ Shapefiles containing M-values can be examined in several ways:
 	>>> r = shapefile.Reader('shapefiles/test/linem')
 
 	>>> r.mbox # the lower and upper bound of M-values in the shapefile
-	[0.0, 3.0]
+	(0.0, 3.0)
 
 	>>> r.shape(0).m # flat list of M-values
 	[0.0, None, 3.0, None, 0.0, None, None]
@@ -1408,7 +1408,7 @@ To examine a Z-type shapefile you can do:
 	>>> r = shapefile.Reader('shapefiles/test/linez')
 
 	>>> r.zbox # the lower and upper bound of Z-values in the shapefile
-	[0.0, 22.0]
+	(0.0, 22.0)
 
 	>>> r.shape(0).z # flat list of Z-values
 	[18.0, 20.0, 22.0, 0.0, 0.0, 0.0, 0.0, 15.0, 13.0, 14.0]
