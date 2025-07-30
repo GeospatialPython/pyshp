@@ -42,7 +42,7 @@ from urllib.error import HTTPError
 from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
 
-from typing_extensions import Never, NotRequired, TypeIs,
+from typing_extensions import Never, NotRequired, Self, TypeIs
 
 # Create named logger
 logger = logging.getLogger(__name__)
@@ -893,7 +893,7 @@ class NullShape(Shape):
         next_shape: int,
         oid: Optional[int] = None,
         bbox: Optional[BBox] = None,
-    ) -> NullShape:
+    ) -> Self:
         # Shape.__init__ sets self.points = points or []
         return cls(oid=oid)
 
@@ -941,7 +941,7 @@ class _CanHaveBBox(Shape):
         b_io: WriteSeekableBinStream, i: int, bbox: Optional[BBox]
     ) -> int:
         if not bbox or len(bbox) != 4:
-            raise ShapefileException(f"Four numbers required. Got: {bbox=}")
+            raise ShapefileException(f"Four numbers required for bbox. Got: {bbox}")
         try:
             return b_io.write(pack("<4d", *bbox))
         except error:
@@ -1004,7 +1004,7 @@ class _CanHaveBBox(Shape):
         next_shape: int,
         oid: Optional[int] = None,
         bbox: Optional[BBox] = None,
-    ) -> Optional[_CanHaveBBox]:
+    ) -> Optional[Self]:
         shape = cls(oid=oid)
 
         shape_bbox = shape._get_set_bbox_from_byte_stream(b_io)
@@ -1116,21 +1116,25 @@ class Point(Shape):
     shapeType = POINT
     _shapeTypes = frozenset([POINT, POINTM, POINTZ])
 
-    def _set_single_point_z_from_byte_stream(self, b_io):
+    def _set_single_point_z_from_byte_stream(self, b_io: ReadSeekableBinStream):
         pass
 
-    def _set_single_point_m_from_byte_stream(self, b_io, next_shape):
+    def _set_single_point_m_from_byte_stream(
+        self, b_io: ReadSeekableBinStream, next_shape: int
+    ):
         pass
 
     @staticmethod
-    def _x_y_from_byte_stream(b_io):
+    def _x_y_from_byte_stream(b_io: ReadSeekableBinStream):
         # Unpack _Array too
         x, y = _Array[float]("d", unpack("<2d", b_io.read(16)))
         # Convert to tuple
         return x, y
 
     @staticmethod
-    def _write_x_y_to_byte_stream(b_io, x, y, i):
+    def _write_x_y_to_byte_stream(
+        b_io: WriteSeekableBinStream, x: float, y: float, i: int
+    ) -> int:
         try:
             return b_io.write(pack("<2d", x, y))
         except error:
@@ -1145,7 +1149,7 @@ class Point(Shape):
         next_shape: int,
         oid: Optional[int] = None,
         bbox: Optional[BBox] = None,
-    ):
+    ) -> Optional[Self]:
         shape = cls(oid=oid)
 
         x, y = cls._x_y_from_byte_stream(b_io)
@@ -1193,14 +1197,17 @@ class Point(Shape):
 
 class Polyline(_CanHaveParts):
     shapeType = POLYLINE
+    _shapeTypes = frozenset([POLYLINE, POLYLINEM, POLYLINEZ])
 
 
 class Polygon(_CanHaveParts):
     shapeType = POLYGON
+    _shapeTypes = frozenset([POLYGON, POLYGONM, POLYGONZ])
 
 
 class MultiPoint(_CanHaveBBox):
     shapeType = MULTIPOINT
+    _shapeTypes = frozenset([MULTIPOINT, MULTIPOINTM, MULTIPOINTZ])
 
 
 class _HasM(_CanHaveBBox):
@@ -1218,7 +1225,9 @@ class _HasM(_CanHaveBBox):
     )
     m: Sequence[Optional[float]]
 
-    def _set_ms_from_byte_stream(self, b_io, nPoints, next_shape):
+    def _set_ms_from_byte_stream(
+        self, b_io: ReadSeekableBinStream, nPoints: int, next_shape: int
+    ):
         if next_shape - b_io.tell() >= 16:
             __mmin, __mmax = unpack("<2d", b_io.read(16))
         # Measure values less than -10e38 are nodata values according to the spec
@@ -1233,7 +1242,11 @@ class _HasM(_CanHaveBBox):
             self.m = [None for _ in range(nPoints)]
 
     @staticmethod
-    def _write_ms_to_byte_stream(b_io, s, i, mbox):
+    def _write_ms_to_byte_stream(
+        b_io: WriteSeekableBinStream, s: Shape, i: int, mbox: Optional[MBox]
+    ) -> int:
+        if not mbox or len(mbox) != 2:
+            raise ShapefileException(f"Two numbers required for mbox. Got: {mbox}")
         # Write m extremes and values
         # When reading a file, pyshp converts NODATA m values to None, so here we make sure to convert them back to NODATA
         # Note: missing m values are autoset to NODATA.
@@ -1281,12 +1294,17 @@ class _HasZ(_CanHaveBBox):
     )
     z: Sequence[float]
 
-    def _set_zs_from_byte_stream(self, b_io, nPoints):
+    def _set_zs_from_byte_stream(self, b_io: ReadSeekableBinStream, nPoints: int):
         __zmin, __zmax = unpack("<2d", b_io.read(16))  # pylint: disable=unused-private-member
         self.z = _Array[float]("d", unpack(f"<{nPoints}d", b_io.read(nPoints * 8)))
 
     @staticmethod
-    def _write_zs_to_byte_stream(b_io, s, i, zbox):
+    def _write_zs_to_byte_stream(
+        b_io: WriteSeekableBinStream, s: Shape, i: int, zbox: Optional[ZBox]
+    ) -> int:
+        if not zbox or len(zbox) != 2:
+            raise ShapefileException(f"Two numbers required for zbox. Got: {zbox}")
+
         # Write z extremes and values
         # Note: missing z values are autoset to 0, but not sure if this is ideal.
         try:
@@ -1316,11 +1334,13 @@ class MultiPatch(_HasM, _HasZ, _CanHaveParts):
     shapeType = MULTIPATCH
     _shapeTypes = frozenset([MULTIPATCH])
 
-    def _set_part_types_from_byte_stream(self, b_io, nParts):
+    def _set_part_types_from_byte_stream(
+        self, b_io: ReadSeekableBinStream, nParts: int
+    ):
         self.partTypes = _Array[int]("i", unpack(f"<{nParts}i", b_io.read(nParts * 4)))
 
     @staticmethod
-    def _write_part_types_to_byte_stream(b_io, s):
+    def _write_part_types_to_byte_stream(b_io: WriteSeekableBinStream, s: Shape) -> int:
         return b_io.write(pack(f"<{len(s.partTypes)}i", *s.partTypes))
 
 
@@ -1332,7 +1352,9 @@ class PointM(Point):
     # PyShp encodes None m values as NODATA
     m = (None,)
 
-    def _set_single_point_m_from_byte_stream(self, b_io, next_shape):
+    def _set_single_point_m_from_byte_stream(
+        self, b_io: ReadSeekableBinStream, next_shape: int
+    ):
         if next_shape - b_io.tell() >= 8:
             (m,) = unpack("<d", b_io.read(8))
         else:
@@ -1344,7 +1366,9 @@ class PointM(Point):
             self.m = (None,)
 
     @staticmethod
-    def _write_single_point_m_to_byte_stream(b_io, s, i):
+    def _write_single_point_m_to_byte_stream(
+        b_io: WriteSeekableBinStream, s: Shape, i: int
+    ) -> int:
         # Write a single M value
         # Note: missing m values are autoset to NODATA.
 
@@ -1386,14 +1410,18 @@ class PointM(Point):
 
 class PolylineM(Polyline, _HasM):
     shapeType = POLYLINEM
+    _shapeTypes = frozenset([POLYLINEM, POLYLINEZ])
 
 
 class PolygonM(Polygon, _HasM):
     shapeType = POLYGONM
+    _shapeTypes = frozenset([POLYGONM, POLYGONZ])
 
 
 class MultiPointM(MultiPoint, _HasM):
     shapeType = MULTIPOINTM
+
+    _shapeTypes = frozenset([MULTIPOINTM, MULTIPOINTZ])
 
 
 class PointZ(PointM):
@@ -1403,21 +1431,20 @@ class PointZ(PointM):
     # same default as in Writer.__shpRecord (if s.shapeType == 11:)
     z: Sequence[float] = (0.0,)
 
-    def _set_single_point_z_from_byte_stream(self, b_io):
+    def _set_single_point_z_from_byte_stream(self, b_io: ReadSeekableBinStream):
         self.z = tuple(unpack("<d", b_io.read(8)))
 
     @staticmethod
-    def _write_single_point_z_to_byte_stream(b_io, s, i):
+    def _write_single_point_z_to_byte_stream(
+        b_io: WriteSeekableBinStream, s: Shape, i: int
+    ) -> int:
         # Note: missing z values are autoset to 0, but not sure if this is ideal.
-
+        z: float = 0.0
         # then write value
         if hasattr(s, "z"):
             # if z values are stored in attribute
             try:
-                if not s.z:
-                    # s.z = (0,)
-                    z = 0
-                else:
+                if s.z:
                     z = s.z[0]
             except error:
                 raise ShapefileException(
@@ -1426,10 +1453,7 @@ class PointZ(PointM):
         else:
             # if z values are stored as 3rd dimension
             try:
-                if len(s.points[0]) < 3:
-                    # s.points[0].append(0)
-                    z = 0
-                else:
+                if len(s.points[0]) >= 3 and s.points[0][2] is not None:
                     z = s.points[0][2]
             except error:
                 raise ShapefileException(
@@ -1441,14 +1465,18 @@ class PointZ(PointM):
 
 class PolylineZ(PolylineM, _HasZ):
     shapeType = POLYLINEZ
+    _shapeTypes = frozenset([POLYLINEZ])
 
 
 class PolygonZ(PolygonM, _HasZ):
     shapeType = POLYGONZ
 
+    _shapeTypes = frozenset([POLYGONZ])
+
 
 class MultiPointZ(MultiPointM, _HasZ):
     shapeType = MULTIPOINTZ
+    _shapeTypes = frozenset([MULTIPOINTZ])
 
 
 SHAPE_CLASS_FROM_SHAPETYPE: dict[int, type[Union[NullShape, Point, _CanHaveBBox]]] = {
