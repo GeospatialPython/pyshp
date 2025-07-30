@@ -126,20 +126,20 @@ MBox = tuple[float, float]
 ZBox = tuple[float, float]
 
 
-class BinaryWritableSeekable(Protocol):
-    def write(self, bbox: bytes): ...
+class WriteSeekableBinStream(Protocol):
+    def write(self, b: bytes): ...  # pylint: disable=redefined-outer-name
     def seek(self, offset: int, whence: int = 0): ...  # pylint: disable=unused-argument
     def tell(self): ...
 
 
-class BinaryReadableSeekable(Protocol):
+class ReadSeekableBinStream(Protocol):
     def seek(self, offset: int, whence: int = 0): ...  # pylint: disable=unused-argument
     def tell(self): ...
     def read(self, size: int = -1): ...
 
 
-class BinaryReadableWritableSeekable(Protocol):
-    def write(self, bbox: bytes): ...
+class ReadWriteSeekableBinStream(Protocol):
+    def write(self, b: bytes): ...  # pylint: disable=redefined-outer-name
     def seek(self, offset: int, whence: int = 0): ...  # pylint: disable=unused-argument
     def tell(self): ...
     def read(self, size: int = -1): ...
@@ -147,7 +147,7 @@ class BinaryReadableWritableSeekable(Protocol):
 
 # File name, file object or anything with a read() method that returns bytes.
 BinaryFileT = Union[str, IO[bytes]]
-BinaryFileStreamT = Union[IO[bytes], io.BytesIO, BinaryWritableSeekable]
+BinaryFileStreamT = Union[IO[bytes], io.BytesIO, WriteSeekableBinStream]
 
 FieldTuple = tuple[str, str, int, int]
 RecordValue = Union[
@@ -890,7 +890,7 @@ class NullShape(Shape):
     @classmethod
     def from_byte_stream(
         cls,
-        b_io: BinaryReadableSeekable,
+        b_io: ReadSeekableBinStream,
         next_shape: int,
         oid: Optional[int] = None,
         bbox: Optional[BBox] = None,
@@ -900,7 +900,7 @@ class NullShape(Shape):
 
     @staticmethod
     def write_to_byte_stream(
-        b_io: BinaryWritableSeekable,
+        b_io: WriteSeekableBinStream,
         s: Shape,
         i: int,
         bbox: Optional[BBox],
@@ -933,13 +933,13 @@ class _CanHaveBBox(Shape):
 
     bbox: Optional[BBox] = None
 
-    def _get_set_bbox_from_byte_stream(self, b_io: BinaryReadableSeekable) -> BBox:
+    def _get_set_bbox_from_byte_stream(self, b_io: ReadSeekableBinStream) -> BBox:
         self.bbox: BBox = tuple(_Array[float]("d", unpack("<4d", b_io.read(32))))
         return self.bbox
 
     @staticmethod
     def _write_bbox_to_byte_stream(
-        b_io: BinaryWritableSeekable, i: int, bbox: Optional[BBox]
+        b_io: WriteSeekableBinStream, i: int, bbox: Optional[BBox]
     ) -> int:
         if not bbox or len(bbox) != 4:
             raise ShapefileException(f"Four numbers required. Got: {bbox=}")
@@ -951,22 +951,22 @@ class _CanHaveBBox(Shape):
             )
 
     @staticmethod
-    def _get_npoints_from_byte_stream(b_io: BinaryReadableSeekable) -> int:
+    def _get_npoints_from_byte_stream(b_io: ReadSeekableBinStream) -> int:
         return unpack("<i", b_io.read(4))[0]
 
     @staticmethod
     def _write_npoints_to_byte_stream(
-        b_io: BinaryWritableSeekable, s: _CanHaveBBox
+        b_io: WriteSeekableBinStream, s: _CanHaveBBox
     ) -> int:
         return b_io.write(pack("<i", len(s.points)))
 
-    def _set_points_from_byte_stream(self, b_io: BinaryReadableSeekable, nPoints: int):
+    def _set_points_from_byte_stream(self, b_io: ReadSeekableBinStream, nPoints: int):
         flat = unpack(f"<{2 * nPoints}d", b_io.read(16 * nPoints))
         self.points = list(zip(*(iter(flat),) * 2))
 
     @staticmethod
     def _write_points_to_byte_stream(
-        b_io: BinaryWritableSeekable, s: _CanHaveBBox, i: int
+        b_io: WriteSeekableBinStream, s: _CanHaveBBox, i: int
     ) -> int:
         x_ys: list[float] = []
         for point in s.points:
@@ -979,29 +979,29 @@ class _CanHaveBBox(Shape):
             )
 
     @staticmethod
-    def _get_nparts_from_byte_stream(b_io: BinaryReadableSeekable) -> int:
+    def _get_nparts_from_byte_stream(b_io: ReadSeekableBinStream) -> int:
         return 0
 
-    def _set_parts_from_byte_stream(self, b_io: BinaryReadableSeekable, nParts: int):
+    def _set_parts_from_byte_stream(self, b_io: ReadSeekableBinStream, nParts: int):
         pass
 
     def _set_part_types_from_byte_stream(
-        self, b_io: BinaryReadableSeekable, nParts: int
+        self, b_io: ReadSeekableBinStream, nParts: int
     ):
         pass
 
-    def _set_zs_from_byte_stream(self, b_io: BinaryReadableSeekable, nPoints: int):
+    def _set_zs_from_byte_stream(self, b_io: ReadSeekableBinStream, nPoints: int):
         pass
 
     def _set_ms_from_byte_stream(
-        self, b_io: BinaryReadableSeekable, nPoints: int, next_shape: int
+        self, b_io: ReadSeekableBinStream, nPoints: int, next_shape: int
     ):
         pass
 
     @classmethod
     def from_byte_stream(
         cls,
-        b_io: BinaryReadableSeekable,
+        b_io: ReadSeekableBinStream,
         next_shape: int,
         oid: Optional[int] = None,
         bbox: Optional[BBox] = None,
@@ -1035,7 +1035,7 @@ class _CanHaveBBox(Shape):
 
     @staticmethod
     def write_to_byte_stream(
-        b_io: BinaryWritableSeekable,
+        b_io: WriteSeekableBinStream,
         s: Shape,
         i: int,
         bbox: Optional[BBox],
@@ -1093,19 +1093,19 @@ class _CanHaveParts(_CanHaveBBox):
     )
 
     @staticmethod
-    def _get_nparts_from_byte_stream(b_io: BinaryReadableSeekable) -> int:
+    def _get_nparts_from_byte_stream(b_io: ReadSeekableBinStream) -> int:
         return unpack("<i", b_io.read(4))[0]
 
     @staticmethod
-    def _write_nparts_to_byte_stream(b_io, s):
+    def _write_nparts_to_byte_stream(b_io: WriteSeekableBinStream, s) -> int:
         return b_io.write(pack("<i", len(s.parts)))
 
-    def _set_parts_from_byte_stream(self, b_io: BinaryReadableSeekable, nParts: int):
+    def _set_parts_from_byte_stream(self, b_io: ReadSeekableBinStream, nParts: int):
         self.parts = _Array[int]("i", unpack(f"<{nParts}i", b_io.read(nParts * 4)))
 
     @staticmethod
     def _write_part_indices_to_byte_stream(
-        b_io: BinaryWritableSeekable, s: _CanHaveParts
+        b_io: WriteSeekableBinStream, s: _CanHaveParts
     ) -> int:
         return b_io.write(pack(f"<{len(s.parts)}i", *s.parts))
 
@@ -1142,7 +1142,7 @@ class Point(Shape):
     @classmethod
     def from_byte_stream(
         cls,
-        b_io: BinaryReadableSeekable,
+        b_io: ReadSeekableBinStream,
         next_shape: int,
         oid: Optional[int] = None,
         bbox: Optional[BBox] = None,
@@ -1167,7 +1167,7 @@ class Point(Shape):
 
     @staticmethod
     def write_to_byte_stream(
-        b_io: BinaryWritableSeekable,
+        b_io: WriteSeekableBinStream,
         s: Shape,
         i: int,
         bbox: Optional[BBox],
@@ -2177,7 +2177,7 @@ class Reader:
 
         # Read entire record into memory to avoid having to call
         # seek on the file afterwards
-        b_io: BinaryReadableSeekable = io.BytesIO(f.read(recLength_bytes))
+        b_io: ReadSeekableBinStream = io.BytesIO(f.read(recLength_bytes))
         b_io.seek(0)
 
         shapeType = unpack("<i", b_io.read(4))[0]
@@ -2677,7 +2677,7 @@ class Reader:
 class Writer:
     """Provides write support for ESRI Shapefiles."""
 
-    W = TypeVar("W", bound=BinaryWritableSeekable)
+    W = TypeVar("W", bound=WriteSeekableBinStream)
 
     # pylint: disable=unused-argument
     def __init__(
@@ -2688,9 +2688,9 @@ class Writer:
         *,
         encoding: str = "utf-8",
         encodingErrors: str = "strict",
-        shp: Optional[BinaryWritableSeekable] = None,
-        shx: Optional[BinaryWritableSeekable] = None,
-        dbf: Optional[BinaryWritableSeekable] = None,
+        shp: Optional[WriteSeekableBinStream] = None,
+        shx: Optional[WriteSeekableBinStream] = None,
+        dbf: Optional[WriteSeekableBinStream] = None,
         # Keep kwargs even though unused, to preserve PyShp 2.4 API
         **kwargs,
         # pylint: enable=unused-argument
@@ -2699,9 +2699,9 @@ class Writer:
         self.autoBalance = autoBalance
         self.fields: list[FieldTuple] = []
         self.shapeType = shapeType
-        self.shp: Optional[BinaryWritableSeekable] = None
-        self.shx: Optional[BinaryWritableSeekable] = None
-        self.dbf: Optional[BinaryWritableSeekable] = None
+        self.shp: Optional[WriteSeekableBinStream] = None
+        self.shx: Optional[WriteSeekableBinStream] = None
+        self.dbf: Optional[WriteSeekableBinStream] = None
         self._files_to_close: list[BinaryFileStreamT] = []
         if target:
             target = fsdecode_if_pathlike(target)
@@ -2808,11 +2808,11 @@ class Writer:
         self._files_to_close = []
 
     @overload
-    def __getFileObj(self, f: str) -> BinaryWritableSeekable: ...
+    def __getFileObj(self, f: str) -> WriteSeekableBinStream: ...
     @overload
     def __getFileObj(self, f: None) -> NoReturn: ...
     @overload
-    def __getFileObj(self, f: BinaryWritableSeekable) -> BinaryWritableSeekable: ...
+    def __getFileObj(self, f: WriteSeekableBinStream) -> WriteSeekableBinStream: ...
     def __getFileObj(self, f):
         """Safety handler to verify file-like objects"""
         if not f:
@@ -2934,7 +2934,7 @@ class Writer:
 
     def __shapefileHeader(
         self,
-        fileObj: Optional[BinaryWritableSeekable],
+        fileObj: Optional[WriteSeekableBinStream],
         headerType: str = "shp",
     ):
         """Writes the specified header type to the specified file-like object.
@@ -3070,7 +3070,7 @@ class Writer:
             self.__shxRecord(offset, length)
 
     def __shpRecord(self, s: Shape) -> tuple[int, int]:
-        f: BinaryWritableSeekable = self.__getFileObj(self.shp)
+        f: WriteSeekableBinStream = self.__getFileObj(self.shp)
         offset = f.tell()
         self.shpNum += 1
 
@@ -3101,7 +3101,7 @@ class Writer:
         # or .flush is called if not using RawIOBase).
         # https://docs.python.org/3/library/io.html#id2
         # https://docs.python.org/3/library/io.html#io.BufferedWriter
-        b_io: BinaryReadableWritableSeekable = io.BytesIO()
+        b_io: ReadWriteSeekableBinStream = io.BytesIO()
 
         # Record number, Content length place holder
         b_io.write(pack(">2i", self.shpNum, -1))
