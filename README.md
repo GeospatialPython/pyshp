@@ -553,7 +553,7 @@ in the shp geometry file and the dbf attribute file.
 
 The field names of a shapefile are available as soon as you read a shapefile.
 You can call the "fields" attribute of the shapefile as a Python list. Each
-field is a Python list with the following information:
+field is a Python tuple with the following information:
 
   * Field name: the name describing the data at this column index.
   * Field type: the type of data at this column index. Types can be:
@@ -574,24 +574,24 @@ attribute:
 
 	>>> fields = sf.fields
 
-	>>> assert fields == [("DeletionFlag", "C", 1, 0), ["AREA", "N", 18, 5],
-	... ["BKG_KEY", "C", 12, 0], ["POP1990", "N", 9, 0], ["POP90_SQMI", "N", 10, 1],
-	... ["HOUSEHOLDS", "N", 9, 0],
-	... ["MALES", "N", 9, 0], ["FEMALES", "N", 9, 0], ["WHITE", "N", 9, 0],
-	... ["BLACK", "N", 8, 0], ["AMERI_ES", "N", 7, 0], ["ASIAN_PI", "N", 8, 0],
-	... ["OTHER", "N", 8, 0], ["HISPANIC", "N", 8, 0], ["AGE_UNDER5", "N", 8, 0],
-	... ["AGE_5_17", "N", 8, 0], ["AGE_18_29", "N", 8, 0], ["AGE_30_49", "N", 8, 0],
-	... ["AGE_50_64", "N", 8, 0], ["AGE_65_UP", "N", 8, 0],
-	... ["NEVERMARRY", "N", 8, 0], ["MARRIED", "N", 9, 0], ["SEPARATED", "N", 7, 0],
-	... ["WIDOWED", "N", 8, 0], ["DIVORCED", "N", 8, 0], ["HSEHLD_1_M", "N", 8, 0],
-	... ["HSEHLD_1_F", "N", 8, 0], ["MARHH_CHD", "N", 8, 0],
-	... ["MARHH_NO_C", "N", 8, 0], ["MHH_CHILD", "N", 7, 0],
-	... ["FHH_CHILD", "N", 7, 0], ["HSE_UNITS", "N", 9, 0], ["VACANT", "N", 7, 0],
-	... ["OWNER_OCC", "N", 8, 0], ["RENTER_OCC", "N", 8, 0],
-	... ["MEDIAN_VAL", "N", 7, 0], ["MEDIANRENT", "N", 4, 0],
-	... ["UNITS_1DET", "N", 8, 0], ["UNITS_1ATT", "N", 7, 0], ["UNITS2", "N", 7, 0],
-	... ["UNITS3_9", "N", 8, 0], ["UNITS10_49", "N", 8, 0],
-	... ["UNITS50_UP", "N", 8, 0], ["MOBILEHOME", "N", 7, 0]]
+	>>> assert fields == [("DeletionFlag", "C", 1, 0), ("AREA", "N", 18, 5),
+	... ("BKG_KEY", "C", 12, 0), ("POP1990", "N", 9, 0), ("POP90_SQMI", "N", 10, 1),
+	... ("HOUSEHOLDS", "N", 9, 0),
+	... ("MALES", "N", 9, 0), ("FEMALES", "N", 9, 0), ("WHITE", "N", 9, 0),
+	... ("BLACK", "N", 8, 0), ("AMERI_ES", "N", 7, 0), ("ASIAN_PI", "N", 8, 0),
+	... ("OTHER", "N", 8, 0), ("HISPANIC", "N", 8, 0), ("AGE_UNDER5", "N", 8, 0),
+	... ("AGE_5_17", "N", 8, 0), ("AGE_18_29", "N", 8, 0), ("AGE_30_49", "N", 8, 0),
+	... ("AGE_50_64", "N", 8, 0), ("AGE_65_UP", "N", 8, 0),
+	... ("NEVERMARRY", "N", 8, 0), ("MARRIED", "N", 9, 0), ("SEPARATED", "N", 7, 0),
+	... ("WIDOWED", "N", 8, 0), ("DIVORCED", "N", 8, 0), ("HSEHLD_1_M", "N", 8, 0),
+	... ("HSEHLD_1_F", "N", 8, 0), ("MARHH_CHD", "N", 8, 0),
+	... ("MARHH_NO_C", "N", 8, 0), ("MHH_CHILD", "N", 7, 0),
+	... ("FHH_CHILD", "N", 7, 0), ("HSE_UNITS", "N", 9, 0), ("VACANT", "N", 7, 0),
+	... ("OWNER_OCC", "N", 8, 0), ("RENTER_OCC", "N", 8, 0),
+	... ("MEDIAN_VAL", "N", 7, 0), ("MEDIANRENT", "N", 4, 0),
+	... ("UNITS_1DET", "N", 8, 0), ("UNITS_1ATT", "N", 7, 0), ("UNITS2", "N", 7, 0),
+	... ("UNITS3_9", "N", 8, 0), ("UNITS10_49", "N", 8, 0),
+	... ("UNITS50_UP", "N", 8, 0), ("MOBILEHOME", "N", 7, 0)]
 
 The first field of a dbf file is always a 1-byte field called "DeletionFlag",
 which indicates records that have been deleted but not removed. However,

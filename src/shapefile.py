@@ -2182,10 +2182,10 @@ class Reader:
         # Measure
         # Measure values less than -10e38 are nodata values according to the spec
 
-        self.mbox: tuple[Optional[float], Optional[float]]
-        for i, m_bound in enumerate(unpack("<2d", shp.read(16))):
-            self.mbox[i] = m_bound if m_bound < NODATA else None
-            
+        self.mbox: tuple[Optional[float], Optional[float]] = tuple(
+            m_bound if m_bound >= NODATA else None
+            for m_bound in unpack("<2d", shp.read(16))
+        )
 
 
     def __shape(
@@ -2374,7 +2374,7 @@ class Reader:
         for __field in range(numFields):
             encoded_field_tuple: tuple[bytes,bytes,int,int] = unpack("<11sc4xBB14x", dbf.read(32))
             encoded_name, encoded_field_type_char, size, decimal = encoded_field_tuple
-            
+
             if b"\x00" in encoded_name:
                 idx = encoded_name.index(b"\x00")
             else:
