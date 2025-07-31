@@ -3263,12 +3263,14 @@ class Writer:
         self.__dbfRecord(record)
 
     @staticmethod
-    def _dbf_missing_placeholder(value: RecordValue, type: FieldType, size: int) -> str:
-        if type in {FieldType.N, FieldType.F}:
+    def _dbf_missing_placeholder(
+        value: RecordValue, field_type: FieldType, size: int
+    ) -> str:
+        if field_type in {FieldType.N, FieldType.F}:
             return "*" * size  # QGIS NULL
-        if type is FieldType.D:
+        if field_type is FieldType.D:
             return "0" * 8  # QGIS NULL for date type
-        if type is FieldType.L:
+        if field_type is FieldType.L:
             return " "
         return str(value)
 
@@ -3345,18 +3347,18 @@ class Writer:
         fields = (
             field for field in self.fields if field[0] != "DeletionFlag"
         )  # ignore deletionflag field in case it was specified
-        for (fieldName, type, size, decimal), value in zip(fields, record):
+        for (fieldName, type_, size, decimal), value in zip(fields, record):
             # write
             size = int(size)
             str_val: str
 
             if value in MISSING:
-                str_val = self._dbf_missing_placeholder(value, type, size)
-            elif type in {FieldType.N, FieldType.F}:
+                str_val = self._dbf_missing_placeholder(value, type_, size)
+            elif type_ in {FieldType.N, FieldType.F}:
                 str_val = self._try_coerce_to_numeric_str(value, size, decimal)
-            elif type is FieldType.D:
+            elif type_ is FieldType.D:
                 str_val = self._try_coerce_to_date_str(value)
-            elif type is FieldType.L:
+            elif type_ is FieldType.L:
                 str_val = self._try_coerce_to_logical_str(value)
             else:
                 if isinstance(value, bytes):
