@@ -12,6 +12,7 @@ __version__ = "3.0.0-alpha"
 
 import array
 import doctest
+import enum
 import io
 import logging
 import os
@@ -37,6 +38,7 @@ from typing import (
     TypedDict,
     TypeVar,
     Union,
+    cast,
     overload,
 )
 from urllib.error import HTTPError
@@ -121,9 +123,22 @@ Coords = list[Coord]
 PointT = Union[Point2D, PointMT, PointZT]
 PointsT = list[PointT]
 
-BBox = tuple[float, float, float, float]
-MBox = tuple[float, float]
-ZBox = tuple[float, float]
+
+class BBox(NamedTuple):
+    xmin: float
+    ymin: float
+    xmax: float
+    ymax: float
+
+
+class MBox(NamedTuple):
+    mmin: Optional[float]
+    mmax: Optional[float]
+
+
+class ZBox(NamedTuple):
+    zmin: float
+    zmax: float
 
 
 class WriteableBinStream(Protocol):
@@ -157,27 +172,57 @@ class ReadWriteSeekableBinStream(Protocol):
 BinaryFileT = Union[str, IO[bytes]]
 BinaryFileStreamT = Union[IO[bytes], io.BytesIO, WriteSeekableBinStream]
 
-FieldTypeCode = Literal["N", "F", "L", "D", "C", "M"]
-FIELD_TYPE_CODES: dict[str, FieldTypeCode] = {
-    "N": "N",
-    "F": "F",
-    "L": "L",
-    "D": "D",
-    "C": "C",
-    "M": "M",
-}
+
+# https://en.wikipedia.org/wiki/.dbf#Database_records
+class FieldType(enum.Enum):
+    # Use an ascii-encoded byte of the name, to save a decoding step.
+    C = "Character"  # (str)
+    D = "Date"
+    F = "Float"
+    L = "Logical"  # (bool)
+    M = "Memo"  # Legacy. (10 digit str, starting block in an .dbt file)
+    N = "Numeric"  # (int)
 
 
 class FieldData(NamedTuple):
     name: str
-    fieldType: FieldTypeCode
+    fieldType: FieldType
     size: int
     decimal: int
 
+    @classmethod
+    def from_unchecked(
+        cls,
+        name: str,
+        fieldType: Union[str, FieldType] = FieldType.C,
+        size: int = 50,
+        decimal: int = 0,
+    ) -> Self:
+        if isinstance(fieldType, str):
+            try:
+                fieldType = FieldType[fieldType.upper()]
+            except:
+                raise ShapefileException(
+                    "fieldType must be C,N,F,M,L,D or a FieldType enum member. "
+                    f"Got: {fieldType=}. "
+                )
 
-RecordValue = Union[
-    bool, int, float, str, date
-]  # A Possible value in a Shapefile record, e.g. L, N, F, C, D types
+        if fieldType is FieldType.D:
+            size = 8
+            decimal = 0
+        elif fieldType is FieldType.L:
+            size = 1
+            decimal = 0
+
+        # A doctest in README.md previously passed in a string ('40') for size,
+        # so explictly convert name to str, and size and decimal to ints.
+        return cls(str(name), fieldType, int(size), int(decimal))
+
+
+RecordValueNotDate = Union[bool, int, float, str, date]
+
+# A Possible value in a Shapefile dbf record, i.e. L, N, M, F, C, or D types
+RecordValue = Union[RecordValueNotDate, date]
 
 
 class HasGeoInterface(Protocol):
@@ -356,7 +401,7 @@ def rewind(coords: Reversible[PointT]) -> PointsT:
 def ring_bbox(coords: PointsT) -> BBox:
     """Calculates and returns the bounding box of a ring."""
     xs, ys = map(list, list(zip(*coords))[:2])  # ignore any z or m values
-    bbox = min(xs), min(ys), max(xs), max(ys)
+    bbox = BBox(xmin=min(xs), ymin=min(ys), xmax=max(xs), ymax=max(ys))
     return bbox
 
 
@@ -939,7 +984,7 @@ class _CanHaveBBox(Shape):
     bbox: Optional[BBox] = None
 
     def _get_set_bbox_from_byte_stream(self, b_io: ReadableBinStream) -> BBox:
-        self.bbox: BBox = tuple(_Array[float]("d", unpack("<4d", b_io.read(32))))
+        self.bbox: BBox = BBox(*_Array[float]("d", unpack("<4d", b_io.read(32))))
         return self.bbox
 
     @staticmethod
@@ -1159,7 +1204,7 @@ class Point(Shape):
         if bbox is not None:
             # create bounding box for Point by duplicating coordinates
             # skip shape if no overlap with bounding box
-            if not bbox_overlap(bbox, (x, y, x, y)):
+            if not bbox_overlap(bbox, BBox(x, y, x, y)):
                 return None
 
         shape.points = [(x, y)]
@@ -2174,16 +2219,18 @@ class Reader:
         shp.seek(32)
         self.shapeType = unpack("<i", shp.read(4))[0]
         # The shapefile's bounding box (lower left, upper right)
-        self.bbox: BBox = tuple(unpack("<4d", shp.read(32)))
+        xmin, ymin, xmax, ymax = unpack("<4d", shp.read(32))
+        self.bbox = BBox(xmin=xmin, ymin=ymin, xmax=xmax, ymax=ymax)
         # Elevation
-        self.zbox: ZBox = tuple(unpack("<2d", shp.read(16)))
+        zmin, zmax = unpack("<2d", shp.read(16))
+        self.zbox = ZBox(zmin=zmin, zmax=zmax)
         # Measure
         # Measure values less than -10e38 are nodata values according to the spec
         m_bounds = [
             float(m_bound) if m_bound >= NODATA else None
             for m_bound in unpack("<2d", shp.read(16))
         ]
-        self.mbox = tuple(m_bounds[:2])
+        self.mbox = MBox(mmin=m_bounds[0], mmax=m_bounds[1])
 
     def __shape(
         self, oid: Optional[int] = None, bbox: Optional[BBox] = None
@@ -2382,11 +2429,9 @@ class Reader:
             name = encoded_name.decode(self.encoding, self.encodingErrors)
             name = name.lstrip()
 
-            type_char: FieldTypeCode = FIELD_TYPE_CODES.get(
-                encoded_type_char.decode("ascii").upper(), "C"
-            )
+            field_type = FieldType[encoded_type_char.decode("ascii").upper()]
 
-            self.fields.append(FieldData(name, type_char, size, decimal))
+            self.fields.append(FieldData(name, field_type, size, decimal))
         terminator = dbf.read(1)
         if terminator != b"\r":
             raise ShapefileException(
@@ -2394,7 +2439,7 @@ class Reader:
             )
 
         # insert deletion field at start
-        self.fields.insert(0, FieldData("DeletionFlag", "C", 1, 0))
+        self.fields.insert(0, FieldData("DeletionFlag", FieldType.C, 1, 0))
 
         # store all field positions for easy lookups
         # note: fieldLookup gives the index position of a field inside Reader.fields
@@ -2892,10 +2937,10 @@ class Writer:
         y: list[float] = []
 
         if self._bbox:
-            x.append(self._bbox[0])
-            y.append(self._bbox[1])
-            x.append(self._bbox[2])
-            y.append(self._bbox[3])
+            x.append(self._bbox.xmin)
+            y.append(self._bbox.ymin)
+            x.append(self._bbox.xmax)
+            y.append(self._bbox.ymax)
 
         if len(s.points) > 0:
             px, py = list(zip(*s.points))[:2]
@@ -2909,7 +2954,7 @@ class Writer:
                 "Cannot create bbox. Expected a valid shape with at least one point. "
                 f"Got a shape of type '{s.shapeType}' and 0 points."
             )
-        self._bbox = (min(x), min(y), max(x), max(y))
+        self._bbox = BBox(xmin=min(x), ymin=min(y), xmax=max(x), ymax=max(y))
         return self._bbox
 
     def __zbox(self, s) -> ZBox:
@@ -2927,14 +2972,14 @@ class Writer:
 
         # Original self._zbox bounds (if any) are the first two entries.
         # Set zbox for the first, and all later times
-        self._zbox = (min(z), max(z))
+        self._zbox = ZBox(zmin=min(z), zmax=max(z))
         return self._zbox
 
     def __mbox(self, s) -> MBox:
         mpos = 3 if s.shapeType in _HasZ._shapeTypes else 2
         m: list[float] = []
         if self._mbox:
-            m.extend(self._mbox)
+            m.extend(m_bound for m_bound in self._mbox if m_bound is not None)
 
         for p in s.points:
             try:
@@ -2951,7 +2996,7 @@ class Writer:
 
         # Original self._mbox bounds (if any) are the first two entries.
         # Set mbox for the first, and all later times
-        self._mbox = (min(m), max(m))
+        self._mbox = MBox(mmin=min(m), mmax=max(m))
         return self._mbox
 
     @property
@@ -3003,7 +3048,7 @@ class Writer:
                     # In such cases of empty shapefiles, ESRI spec says the bbox values are 'unspecified'.
                     # Not sure what that means, so for now just setting to 0s, which is the same behavior as in previous versions.
                     # This would also make sense since the Z and M bounds are similarly set to 0 for non-Z/M type shapefiles.
-                    bbox = (0, 0, 0, 0)
+                    bbox = BBox(0, 0, 0, 0)
                 f.write(pack("<4d", *bbox))
             except error:
                 raise ShapefileException(
@@ -3017,20 +3062,20 @@ class Writer:
             zbox = self.zbox()
             if zbox is None:
                 # means we have empty shapefile/only null geoms (see commentary on bbox above)
-                zbox = (0, 0)
+                zbox = ZBox(0, 0)
         else:
             # As per the ESRI shapefile spec, the zbox for non-Z type shapefiles are set to 0s
-            zbox = (0, 0)
+            zbox = ZBox(0, 0)
         # Measure
         if self.shapeType in {POINTM, POINTZ} | _HasM._shapeTypes:
             # M values are present in M or Z type
             mbox = self.mbox()
             if mbox is None:
                 # means we have empty shapefile/only null geoms (see commentary on bbox above)
-                mbox = (0, 0)
+                mbox = MBox(0, 0)
         else:
             # As per the ESRI shapefile spec, the mbox for non-M type shapefiles are set to 0s
-            mbox = (0, 0)
+            mbox = MBox(0, 0)
         # Try writing
         try:
             f.write(pack("<4d", zbox[0], zbox[1], mbox[0], mbox[1]))
@@ -3078,7 +3123,7 @@ class Writer:
             encoded_name = name.encode(self.encoding, self.encodingErrors)
             encoded_name = encoded_name.replace(b" ", b"_")
             encoded_name = encoded_name[:10].ljust(11).replace(b" ", b"\x00")
-            encodedFieldType = fieldType.encode("ascii")
+            encodedFieldType = fieldType.name.encode("ascii")
             fld = pack("<11sc4xBB14x", encoded_name, encodedFieldType, size, decimal)
             f.write(fld)
         # Terminator
@@ -3225,18 +3270,26 @@ class Writer:
 
     @staticmethod
     def _dbf_missing_placeholder(
-        value: RecordValue, fieldType: FieldTypeCode, size: int
+        value: RecordValue, fieldType: FieldType, size: int
     ) -> str:
-        if fieldType in {"N", "F"}:
+        if fieldType in {FieldType.N, FieldType.F}:
             return "*" * size  # QGIS NULL
-        if fieldType == "D":
+        if fieldType is FieldType.D:
             return "0" * 8  # QGIS NULL for date type
-        if fieldType == "L":
+        if fieldType is FieldType.L:
             return " "
         return str(value)
 
+    @overload
     @staticmethod
-    def _try_coerce_to_numeric_str(value: RecordValue, size: int, deci: int) -> str:
+    def _try_coerce_to_numeric_str(value: date, size: int, deci: int) -> Never: ...
+    @overload
+    @staticmethod
+    def _try_coerce_to_numeric_str(
+        value: RecordValueNotDate, size: int, deci: int
+    ) -> str: ...
+    @staticmethod
+    def _try_coerce_to_numeric_str(value, size, deci):
         # numeric or float: number stored as a string,
         # right justified, and padded with blanks
         # to the width of the field.
@@ -3247,17 +3300,20 @@ class Writer:
                 # forcing a large int to float and back to int
                 # will lose information and result in wrong nr.
                 int_val = int(value)
-            except ValueError:
+            except (ValueError, TypeError):
                 # forcing directly to int failed, so was probably a float.
                 int_val = int(float(value))
+            except TypeError:
+                raise ShapefileException(f"Could not form int from: {value}")
+            # length capped to the field size
+            return format(int_val, "d")[:size].rjust(size)
 
-            str_val = format(int_val, "d")
-        else:
+        try:
             f_val = float(value)
-            str_val = format(f_val, f".{deci}f")
-
-        # caps the size if exceeds the field size
-        return str_val[:size].rjust(size)
+        except ValueError:
+            raise ShapefileException(f"Could not form float from: {value}")
+        # length capped to the field size
+        return format(f_val, f".{deci}f")[:size].rjust(size)
 
     @staticmethod
     def _try_coerce_to_date_str(value: RecordValue) -> str:
@@ -3299,20 +3355,18 @@ class Writer:
         )  # ignore deletionflag field in case it was specified
         for (fieldName, fieldType, size, deci), value in zip(fields, record):
             # write
-            fieldType = FIELD_TYPE_CODES.get(fieldType.upper(), fieldType)
             size = int(size)
             str_val: str
 
             if value in MISSING:
                 str_val = self._dbf_missing_placeholder(value, fieldType, size)
-            if fieldType in {"N", "F"}:
+            elif fieldType in {FieldType.N, FieldType.F}:
                 str_val = self._try_coerce_to_numeric_str(value, size, deci)
-            elif fieldType == "D":
+            elif fieldType is FieldType.D:
                 str_val = self._try_coerce_to_date_str(value)
-            elif fieldType == "L":
+            elif fieldType is FieldType.L:
                 str_val = self._try_coerce_to_logical_str(value)
             else:
-                #
                 if isinstance(value, bytes):
                     decoded_val = value.decode(self.encoding, self.encodingErrors)
                 else:
@@ -3489,29 +3543,17 @@ class Writer:
         # Types of args should match *FieldData
         self,
         name: str,
-        fieldType: FieldTypeCode = "C",
+        fieldType: Union[str, FieldType] = FieldType.C,
         size: int = 50,
         decimal: int = 0,
     ) -> None:
         """Adds a dbf field descriptor to the shapefile."""
-        if fieldType == "D":
-            size = 8
-            decimal = 0
-        elif fieldType == "L":
-            size = 1
-            decimal = 0
-        elif fieldType not in {"C", "N", "F", "M"}:
-            raise ShapefileException(
-                "fieldType must be C,N,F,M,L or D. " f"Got: {fieldType=}. "
-            )
         if len(self.fields) >= 2046:
             raise ShapefileException(
                 "Shapefile Writer reached maximum number of fields: 2046."
             )
-        # A doctest in README.md used to pass in a string ('40') for size, so
-        # try to be robust for incorrect types.
-        fieldType = FIELD_TYPE_CODES.get(str(fieldType)[0].upper(), fieldType)
-        self.fields.append(FieldData(str(name), fieldType, int(size), int(decimal)))
+
+        self.fields.append(FieldData.from_unchecked(name, fieldType, size, decimal))
 
 
 # Begin Testing
