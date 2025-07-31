@@ -327,7 +327,7 @@ class GeoJSONFeatureCollectionWithBBox(GeoJSONFeatureCollection):
 
 # Helpers
 
-MISSING = {None, ""}
+MISSING = (None, "")  # Don't make a set, as user input may not be Hashable
 NODATA = -10e38  # as per the ESRI shapefile spec, only used for m-values.
 
 unpack_2_int32_be = Struct(">2i").unpack
@@ -2538,7 +2538,7 @@ class Reader:
         # parse each value
         record = []
         for (__name, typ, __size, decimal), value in zip(fieldTuples, recordContents):
-            if typ in {"N", "F"}:
+            if typ in {FieldType.N, FieldType.F}:
                 # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
                 value = value.split(b"\0")[0]
                 value = value.replace(b"*", b"")  # QGIS NULL is all '*' chars
@@ -2564,7 +2564,7 @@ class Reader:
                         except ValueError:
                             # not parseable as int, set to None
                             value = None
-            elif typ == "D":
+            elif typ is FieldType.D:
                 # date: 8 bytes - date stored as a string in the format YYYYMMDD.
                 if (
                     not value.replace(b"\x00", b"")
@@ -2582,7 +2582,7 @@ class Reader:
                     except (TypeError, ValueError):
                         # if invalid date, just return as unicode string so user can decimalde
                         value = str(value.strip())
-            elif typ == "L":
+            elif typ is FieldType.L:
                 # logical: 1 byte - initialized to 0x20 (space) otherwise T or F.
                 if value == b" ":
                     value = None  # space means missing or not yet set
@@ -3225,7 +3225,7 @@ class Writer:
 
     def record(
         self,
-        *recordList: list[RecordValue],
+        *recordList: RecordValue,
         **recordDict: RecordValue,
     ) -> None:
         """Creates a dbf attribute record. You can submit either a sequence of
@@ -3241,7 +3241,7 @@ class Writer:
         record: list[RecordValue]
         fieldCount = sum(1 for field in self.fields if field[0] != "DeletionFlag")
         if recordList:
-            record = list(*recordList)
+            record = list(recordList)
             while len(record) < fieldCount:
                 record.append("")
         elif recordDict:
@@ -3272,7 +3272,7 @@ class Writer:
             return "0" * 8  # QGIS NULL for date type
         if field_type is FieldType.L:
             return " "
-        return str(value)
+        return str(value)[:size].ljust(size)
 
     @overload
     @staticmethod
@@ -3362,20 +3362,20 @@ class Writer:
                 str_val = self._try_coerce_to_logical_str(value)
             else:
                 if isinstance(value, bytes):
-                    decoded_val = value.decode(self.encoding, self.encodingErrors)
+                    str_val = value.decode(self.encoding, self.encodingErrors)
                 else:
                     # anything else is forced to string.
-                    decoded_val = str(value)
-                # Truncate to the length of the field
-                str_val = decoded_val[:size].ljust(size)
+                    str_val = str(value)
 
-            # should be default ascii encoding
-            encoded_val = str_val.encode("ascii", self.encodingErrors)
+            # Truncate or right pad to the length of the field
+            encoded_val = str_val.encode(self.encoding, self.encodingErrors)[
+                :size
+            ].ljust(size)
 
             if len(encoded_val) != size:
                 raise ShapefileException(
-                    "Shapefile Writer unable to pack incorrect sized value"
-                    f" (size {len(encoded_val)}) into field '{fieldName}' (size {size})."
+                    f"Shapefile Writer unable to pack incorrect sized {value=!r} "
+                    f"(size {len(encoded_val)}) into field '{fieldName}' (size {size})."
                 )
             f.write(encoded_val)
 
@@ -3674,7 +3674,7 @@ def _test(args: list[str] = sys.argv[1:], verbosity: bool = False) -> int:
             new_url = _replace_remote_url(old_url)
             example.source = example.source.replace(old_url, new_url)
 
-    runner = doctest.DocTestRunner(verbose=verbosity)
+    runner = doctest.DocTestRunner(verbose=verbosity, optionflags=doctest.FAIL_FAST)
 
     if verbosity == 0:
         print(f"Running {len(tests.examples)} doctests...")
