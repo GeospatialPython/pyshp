@@ -6,10 +6,10 @@ VERSION 3.0.0-alpha
 	* Field type codes are now FieldType enum members.
 	* bbox, mbox and zbox attributes are all new Namedtuples.
 	* Writer does not mutate shapes.
-	* New custom subclasses for each shape type: Null, Multipatch, Point, Polyline, 
-	  Multipoint, and Polygon, plus the latter 4's M and Z variants (Reader and 
+	* New custom subclasses for each shape type: Null, Multipatch, Point, Polyline,
+	  Multipoint, and Polygon, plus the latter 4's M and Z variants (Reader and
 	  Writer are still compatible with their base class, Shape, as before).
-	* Shape sub classes are creatable from, and serializable to bytes streams, 
+	* Shape sub classes are creatable from, and serializable to bytes streams,
 	  as per the shapefile spec.
 
     Code quality
