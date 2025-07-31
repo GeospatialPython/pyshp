@@ -8,8 +8,8 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 
 - **Author**: [Joel Lawhead](https://github.com/GeospatialPython)
 - **Maintainers**: [Karim Bahgat](https://github.com/karimbahgat)
-- **Version**: 2.3.1
-- **Date**: 28 July, 2022
+- **Version**: 3.0.0-alpha
+- **Date**: 31 July, 2025
 - **License**: [MIT](https://github.com/GeospatialPython/pyshp/blob/master/LICENSE.TXT)
 
 ## Contents
@@ -92,6 +92,30 @@ part of your geospatial project.
 
 
 # Version Changes
+
+## 3.0.0-alpha
+
+### Breaking Changes:
+- Python 2 and Python 3.8 support dropped.
+- Field info tuple is now a namedtuple (Field) instead of a list.
+- Field type codes are now FieldType enum members.
+- bbox, mbox and zbox attributes are all new Namedtuples.
+- Writer does not mutate shapes.
+- New custom subclasses for each shape type: Null, Multipatch, Point, Polyline, 
+  Multipoint, and Polygon, plus the latter 4's M and Z variants (Reader and 
+  Writer are still compatible with their base class, Shape, as before).
+- Shape sub classes are creatable from, and serializable to bytes streams, 
+  as per the shapefile spec.
+
+### Code quality
+- Statically typed, and checked with Mypy
+- Checked with Ruff.
+- f-strings
+- Remove Python 2 specific functions.
+- Run doctests against wheels.
+- Testing of wheels before publishing them
+- pyproject.toml src layout
+- Slow test marked.
 
 ## 2.4.0
 
