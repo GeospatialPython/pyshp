@@ -8,8 +8,8 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 
 - **Author**: [Joel Lawhead](https://github.com/GeospatialPython)
 - **Maintainers**: [Karim Bahgat](https://github.com/karimbahgat)
-- **Version**: 2.3.1
-- **Date**: 28 July, 2022
+- **Version**: 3.0.0-alpha
+- **Date**: 31 July, 2025
 - **License**: [MIT](https://github.com/GeospatialPython/pyshp/blob/master/LICENSE.TXT)
 
 ## Contents
@@ -92,6 +92,30 @@ part of your geospatial project.
 
 
 # Version Changes
+
+## 3.0.0-alpha
+
+### Breaking Changes:
+- Python 2 and Python 3.8 support dropped.
+- Field info tuple is now a namedtuple (Field) instead of a list.
+- Field type codes are now FieldType enum members.
+- bbox, mbox and zbox attributes are all new Namedtuples.
+- Writer does not mutate shapes.
+- New custom subclasses for each shape type: Null, Multipatch, Point, Polyline,
+  Multipoint, and Polygon, plus the latter 4's M and Z variants (Reader and
+  Writer are still compatible with their base class, Shape, as before).
+- Shape sub classes are creatable from, and serializable to bytes streams,
+  as per the shapefile spec.
+
+### Code quality
+- Statically typed, and checked with Mypy
+- Checked with Ruff.
+- f-strings
+- Remove Python 2 specific functions.
+- Run doctests against wheels.
+- Testing of wheels before publishing them
+- pyproject.toml src layout
+- Slow test marked.
 
 ## 2.4.0
 
@@ -406,7 +430,7 @@ and the bounding box area the shapefile covers:
 	>>> len(sf)
 	663
 	>>> sf.bbox
-	(-122.515048, 37.652916, -122.327622, 37.863433)
+	BBox(xmin=-122.515048, ymin=37.652916, xmax=-122.327622, ymax=37.863433)
 
 Finally, if you would prefer to work with the entire shapefile in a different
 format, you can convert all of it to a GeoJSON dictionary, although you may lose
@@ -553,45 +577,34 @@ in the shp geometry file and the dbf attribute file.
 
 The field names of a shapefile are available as soon as you read a shapefile.
 You can call the "fields" attribute of the shapefile as a Python list. Each
-field is a Python list with the following information:
+field is a Python namedtuple (Field) with the following information:
 
-  * Field name: the name describing the data at this column index.
-  * Field type: the type of data at this column index. Types can be:
+  * name: the name describing the data at this column index (a string).
+  * field_type: a FieldType enum member determining the type of data at this column index. Names can be:
        * "C": Characters, text.
 	   * "N": Numbers, with or without decimals.
 	   * "F": Floats (same as "N").
 	   * "L": Logical, for boolean True/False values.
 	   * "D": Dates.
 	   * "M": Memo, has no meaning within a GIS and is part of the xbase spec instead.
-  * Field length: the length of the data found at this column index. Older GIS
+  * size: Field length: the length of the data found at this column index. Older GIS
 	   software may truncate this length to 8 or 11 characters for "Character"
 	   fields.
-  * Decimal length: the number of decimal places found in "Number" fields.
+  * deci: Decimal length. The number of decimal places found in "Number" fields.
+
+A new field can be created directly from the type enum member etc., or as follows:
+
+	>>> shapefile.Field.from_unchecked("Population", "N", 10,0)
+	Field(name="Population", field_type=FieldType.N, size=10, decimal=0)
+
+Using this method the conversion from string to enum is done automatically.
 
 To see the fields for the Reader object above (sf) call the "fields"
 attribute:
 
 
-	>>> fields = sf.fields
-
-	>>> assert fields == [("DeletionFlag", "C", 1, 0), ["AREA", "N", 18, 5],
-	... ["BKG_KEY", "C", 12, 0], ["POP1990", "N", 9, 0], ["POP90_SQMI", "N", 10, 1],
-	... ["HOUSEHOLDS", "N", 9, 0],
-	... ["MALES", "N", 9, 0], ["FEMALES", "N", 9, 0], ["WHITE", "N", 9, 0],
-	... ["BLACK", "N", 8, 0], ["AMERI_ES", "N", 7, 0], ["ASIAN_PI", "N", 8, 0],
-	... ["OTHER", "N", 8, 0], ["HISPANIC", "N", 8, 0], ["AGE_UNDER5", "N", 8, 0],
-	... ["AGE_5_17", "N", 8, 0], ["AGE_18_29", "N", 8, 0], ["AGE_30_49", "N", 8, 0],
-	... ["AGE_50_64", "N", 8, 0], ["AGE_65_UP", "N", 8, 0],
-	... ["NEVERMARRY", "N", 8, 0], ["MARRIED", "N", 9, 0], ["SEPARATED", "N", 7, 0],
-	... ["WIDOWED", "N", 8, 0], ["DIVORCED", "N", 8, 0], ["HSEHLD_1_M", "N", 8, 0],
-	... ["HSEHLD_1_F", "N", 8, 0], ["MARHH_CHD", "N", 8, 0],
-	... ["MARHH_NO_C", "N", 8, 0], ["MHH_CHILD", "N", 7, 0],
-	... ["FHH_CHILD", "N", 7, 0], ["HSE_UNITS", "N", 9, 0], ["VACANT", "N", 7, 0],
-	... ["OWNER_OCC", "N", 8, 0], ["RENTER_OCC", "N", 8, 0],
-	... ["MEDIAN_VAL", "N", 7, 0], ["MEDIANRENT", "N", 4, 0],
-	... ["UNITS_1DET", "N", 8, 0], ["UNITS_1ATT", "N", 7, 0], ["UNITS2", "N", 7, 0],
-	... ["UNITS3_9", "N", 8, 0], ["UNITS10_49", "N", 8, 0],
-	... ["UNITS50_UP", "N", 8, 0], ["MOBILEHOME", "N", 7, 0]]
+	>>> sf.fields
+	[Field(name="DeletionFlag", field_type=FieldType.C, size=1, decimal=0), Field(name="AREA", field_type=FieldType.N, size=18, decimal=5), Field(name="BKG_KEY", field_type=FieldType.C, size=12, decimal=0), Field(name="POP1990", field_type=FieldType.N, size=9, decimal=0), Field(name="POP90_SQMI", field_type=FieldType.N, size=10, decimal=1), Field(name="HOUSEHOLDS", field_type=FieldType.N, size=9, decimal=0), Field(name="MALES", field_type=FieldType.N, size=9, decimal=0), Field(name="FEMALES", field_type=FieldType.N, size=9, decimal=0), Field(name="WHITE", field_type=FieldType.N, size=9, decimal=0), Field(name="BLACK", field_type=FieldType.N, size=8, decimal=0), Field(name="AMERI_ES", field_type=FieldType.N, size=7, decimal=0), Field(name="ASIAN_PI", field_type=FieldType.N, size=8, decimal=0), Field(name="OTHER", field_type=FieldType.N, size=8, decimal=0), Field(name="HISPANIC", field_type=FieldType.N, size=8, decimal=0), Field(name="AGE_UNDER5", field_type=FieldType.N, size=8, decimal=0), Field(name="AGE_5_17", field_type=FieldType.N, size=8, decimal=0), Field(name="AGE_18_29", field_type=FieldType.N, size=8, decimal=0), Field(name="AGE_30_49", field_type=FieldType.N, size=8, decimal=0), Field(name="AGE_50_64", field_type=FieldType.N, size=8, decimal=0), Field(name="AGE_65_UP", field_type=FieldType.N, size=8, decimal=0), Field(name="NEVERMARRY", field_type=FieldType.N, size=8, decimal=0), Field(name="MARRIED", field_type=FieldType.N, size=9, decimal=0), Field(name="SEPARATED", field_type=FieldType.N, size=7, decimal=0), Field(name="WIDOWED", field_type=FieldType.N, size=8, decimal=0), Field(name="DIVORCED", field_type=FieldType.N, size=8, decimal=0), Field(name="HSEHLD_1_M", field_type=FieldType.N, size=8, decimal=0), Field(name="HSEHLD_1_F", field_type=FieldType.N, size=8, decimal=0), Field(name="MARHH_CHD", field_type=FieldType.N, size=8, decimal=0), Field(name="MARHH_NO_C", field_type=FieldType.N, size=8, decimal=0), Field(name="MHH_CHILD", field_type=FieldType.N, size=7, decimal=0), Field(name="FHH_CHILD", field_type=FieldType.N, size=7, decimal=0), Field(name="HSE_UNITS", field_type=FieldType.N, size=9, decimal=0), Field(name="VACANT", field_type=FieldType.N, size=7, decimal=0), Field(name="OWNER_OCC", field_type=FieldType.N, size=8, decimal=0), Field(name="RENTER_OCC", field_type=FieldType.N, size=8, decimal=0), Field(name="MEDIAN_VAL", field_type=FieldType.N, size=7, decimal=0), Field(name="MEDIANRENT", field_type=FieldType.N, size=4, decimal=0), Field(name="UNITS_1DET", field_type=FieldType.N, size=8, decimal=0), Field(name="UNITS_1ATT", field_type=FieldType.N, size=7, decimal=0), Field(name="UNITS2", field_type=FieldType.N, size=7, decimal=0), Field(name="UNITS3_9", field_type=FieldType.N, size=8, decimal=0), Field(name="UNITS10_49", field_type=FieldType.N, size=8, decimal=0), Field(name="UNITS50_UP", field_type=FieldType.N, size=8, decimal=0), Field(name="MOBILEHOME", field_type=FieldType.N, size=7, decimal=0)]
 
 The first field of a dbf file is always a 1-byte field called "DeletionFlag",
 which indicates records that have been deleted but not removed. However,
@@ -919,8 +932,8 @@ You can also add attributes using keyword arguments where the keys are field nam
 
 
 	>>> w = shapefile.Writer('shapefiles/test/dtype')
-	>>> w.field('FIRST_FLD','C','40')
-	>>> w.field('SECOND_FLD','C','40')
+	>>> w.field('FIRST_FLD','C', 40)
+	>>> w.field('SECOND_FLD','C', 40)
 	>>> w.null()
 	>>> w.null()
 	>>> w.record('First', 'Line')
@@ -1375,7 +1388,7 @@ Shapefiles containing M-values can be examined in several ways:
 	>>> r = shapefile.Reader('shapefiles/test/linem')
 
 	>>> r.mbox # the lower and upper bound of M-values in the shapefile
-	[0.0, 3.0]
+	MBox(mmin=0.0, mmax=3.0)
 
 	>>> r.shape(0).m # flat list of M-values
 	[0.0, None, 3.0, None, 0.0, None, None]
@@ -1408,7 +1421,7 @@ To examine a Z-type shapefile you can do:
 	>>> r = shapefile.Reader('shapefiles/test/linez')
 
 	>>> r.zbox # the lower and upper bound of Z-values in the shapefile
-	[0.0, 22.0]
+	ZBox(zmin=0.0, zmax=22.0)
 
 	>>> r.shape(0).z # flat list of Z-values
 	[18.0, 20.0, 22.0, 0.0, 0.0, 0.0, 0.0, 15.0, 13.0, 14.0]
