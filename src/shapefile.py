@@ -177,15 +177,16 @@ class FieldType(enum.Enum):
     # Use an ascii-encoded byte of the name, to save a decoding step.
     C = "Character"  # (str)
     D = "Date"
-    F = "Float"
+    F = "Floating point"
     L = "Logical"  # (bool)
     M = "Memo"  # Legacy. (10 digit str, starting block in an .dbt file)
     N = "Numeric"  # (int)
 
 
-class FieldData(NamedTuple):
+# Use functional syntax to have an attribute named type, a Python keyword
+class Field(NamedTuple):
     name: str
-    fieldType: FieldType
+    field_type: FieldType
     size: int
     decimal: int
 
@@ -193,29 +194,34 @@ class FieldData(NamedTuple):
     def from_unchecked(
         cls,
         name: str,
-        fieldType: Union[str, FieldType] = FieldType.C,
+        field_type: Union[str, FieldType] = FieldType.C,
         size: int = 50,
         decimal: int = 0,
     ) -> Self:
-        if isinstance(fieldType, str):
-            try:
-                fieldType = FieldType[fieldType.upper()]
-            except:
+        if isinstance(field_type, str):
+            if field_type.upper() in FieldType.__members__:
+                field_type = FieldType[field_type.upper()]
+            else:
                 raise ShapefileException(
-                    "fieldType must be C,N,F,M,L,D or a FieldType enum member. "
-                    f"Got: {fieldType=}. "
+                    "type must be C,D,F,L,M,N, or a FieldType enum member. "
+                    f"Got: {field_type=}. "
                 )
 
-        if fieldType is FieldType.D:
+        if field_type is FieldType.D:
             size = 8
             decimal = 0
-        elif fieldType is FieldType.L:
+        elif field_type is FieldType.L:
             size = 1
             decimal = 0
 
         # A doctest in README.md previously passed in a string ('40') for size,
         # so explictly convert name to str, and size and decimal to ints.
-        return cls(str(name), fieldType, int(size), int(decimal))
+        return cls(
+            name=str(name), field_type=field_type, size=int(size), decimal=int(decimal)
+        )
+
+    def __repr__(self) -> str:
+        return f'Field(name="{self.name}", field_type=FieldType.{self.field_type.name}, size={self.size}, decimal={self.decimal})'
 
 
 RecordValueNotDate = Union[bool, int, float, str, date]
@@ -325,22 +331,6 @@ MISSING = {None, ""}
 NODATA = -10e38  # as per the ESRI shapefile spec, only used for m-values.
 
 unpack_2_int32_be = Struct(">2i").unpack
-
-
-def u(
-    v: Union[str, bytes], encoding: str = "utf-8", encodingErrors: str = "strict"
-) -> str:
-    if isinstance(v, bytes):
-        # For python 3 decode bytes to str.
-        return v.decode(encoding, encodingErrors)
-    if isinstance(v, str):
-        # Already str.
-        return v
-    if v is None:
-        # Since we're dealing with text, interpret None as ""
-        return ""
-    # Force string representation.
-    return bytes(v).decode(encoding, encodingErrors)
 
 
 @overload
@@ -1818,7 +1808,7 @@ class Reader:
         self.shpLength: Optional[int] = None
         self.numRecords: Optional[int] = None
         self.numShapes: Optional[int] = None
-        self.fields: list[FieldData] = []
+        self.fields: list[Field] = []
         self.__dbfHdrLength = 0
         self.__fieldLookup: dict[str, int] = {}
         self.encoding = encoding
@@ -2430,7 +2420,7 @@ class Reader:
 
             field_type = FieldType[encoded_type_char.decode("ascii").upper()]
 
-            self.fields.append(FieldData(name, field_type, size, decimal))
+            self.fields.append(Field(name, field_type, size, decimal))
         terminator = dbf.read(1)
         if terminator != b"\r":
             raise ShapefileException(
@@ -2438,7 +2428,7 @@ class Reader:
             )
 
         # insert deletion field at start
-        self.fields.insert(0, FieldData("DeletionFlag", FieldType.C, 1, 0))
+        self.fields.insert(0, Field("DeletionFlag", FieldType.C, 1, 0))
 
         # store all field positions for easy lookups
         # note: fieldLookup gives the index position of a field inside Reader.fields
@@ -2479,7 +2469,7 @@ class Reader:
 
     def __recordFields(
         self, fields: Optional[Iterable[str]] = None
-    ) -> tuple[list[FieldData], dict[str, int], Struct]:
+    ) -> tuple[list[Field], dict[str, int], Struct]:
         """Returns the necessary info required to unpack a record's fields,
         restricted to a subset of fieldnames 'fields' if specified.
         Returns a list of field info tuples, a name-index lookup dict,
@@ -2514,13 +2504,13 @@ class Reader:
 
     def __record(
         self,
-        fieldTuples: list[FieldData],
+        fieldTuples: list[Field],
         recLookup: dict[str, int],
         recStruct: Struct,
         oid: Optional[int] = None,
     ) -> Optional[_Record]:
         """Reads and returns a dbf record row as a list of values. Requires specifying
-        a list of field info FieldData namedtuples 'fieldTuples', a record name-index dict 'recLookup',
+        a list of field info Field namedtuples 'fieldTuples', a record name-index dict 'recLookup',
         and a Struct instance 'recStruct' for unpacking these fields.
         """
         f = self.__getFileObj(self.dbf)
@@ -2547,14 +2537,14 @@ class Reader:
 
         # parse each value
         record = []
-        for (__name, typ, __size, deci), value in zip(fieldTuples, recordContents):
+        for (__name, typ, __size, decimal), value in zip(fieldTuples, recordContents):
             if typ in {"N", "F"}:
                 # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
                 value = value.split(b"\0")[0]
                 value = value.replace(b"*", b"")  # QGIS NULL is all '*' chars
                 if value == b"":
                     value = None
-                elif deci:
+                elif decimal:
                     try:
                         value = float(value)
                     except ValueError:
@@ -2590,7 +2580,7 @@ class Reader:
                         y, m, d = int(value[:4]), int(value[4:6]), int(value[6:8])
                         value = date(y, m, d)
                     except (TypeError, ValueError):
-                        # if invalid date, just return as unicode string so user can decide
+                        # if invalid date, just return as unicode string so user can decimalde
                         value = str(value.strip())
             elif typ == "L":
                 # logical: 1 byte - initialized to 0x20 (space) otherwise T or F.
@@ -2781,7 +2771,7 @@ class Writer:
     ):
         self.target = target
         self.autoBalance = autoBalance
-        self.fields: list[FieldData] = []
+        self.fields: list[Field] = []
         self.shapeType = shapeType
         self.shp: Optional[WriteSeekableBinStream] = None
         self.shx: Optional[WriteSeekableBinStream] = None
@@ -3121,7 +3111,7 @@ class Writer:
             encoded_name = field.name.encode(self.encoding, self.encodingErrors)
             encoded_name = encoded_name.replace(b" ", b"_")
             encoded_name = encoded_name[:10].ljust(11).replace(b" ", b"\x00")
-            encodedFieldType = field.fieldType.name.encode("ascii")
+            encodedFieldType = field.field_type.name.encode("ascii")
             fld = pack(
                 "<11sc4xBB14x",
                 encoded_name,
@@ -3273,31 +3263,29 @@ class Writer:
         self.__dbfRecord(record)
 
     @staticmethod
-    def _dbf_missing_placeholder(
-        value: RecordValue, fieldType: FieldType, size: int
-    ) -> str:
-        if fieldType in {FieldType.N, FieldType.F}:
+    def _dbf_missing_placeholder(value: RecordValue, type: FieldType, size: int) -> str:
+        if type in {FieldType.N, FieldType.F}:
             return "*" * size  # QGIS NULL
-        if fieldType is FieldType.D:
+        if type is FieldType.D:
             return "0" * 8  # QGIS NULL for date type
-        if fieldType is FieldType.L:
+        if type is FieldType.L:
             return " "
         return str(value)
 
     @overload
     @staticmethod
-    def _try_coerce_to_numeric_str(value: date, size: int, deci: int) -> Never: ...
+    def _try_coerce_to_numeric_str(value: date, size: int, decimal: int) -> Never: ...
     @overload
     @staticmethod
     def _try_coerce_to_numeric_str(
-        value: RecordValueNotDate, size: int, deci: int
+        value: RecordValueNotDate, size: int, decimal: int
     ) -> str: ...
     @staticmethod
-    def _try_coerce_to_numeric_str(value, size, deci):
+    def _try_coerce_to_numeric_str(value, size, decimal):
         # numeric or float: number stored as a string,
         # right justified, and padded with blanks
         # to the width of the field.
-        if not deci:
+        if not decimal:
             # force to int
             try:
                 # first try to force directly to int.
@@ -3317,7 +3305,7 @@ class Writer:
         except ValueError:
             raise ShapefileException(f"Could not form float from: {value}")
         # length capped to the field size
-        return format(f_val, f".{deci}f")[:size].rjust(size)
+        return format(f_val, f".{decimal}f")[:size].rjust(size)
 
     @staticmethod
     def _try_coerce_to_date_str(value: RecordValue) -> str:
@@ -3357,18 +3345,18 @@ class Writer:
         fields = (
             field for field in self.fields if field[0] != "DeletionFlag"
         )  # ignore deletionflag field in case it was specified
-        for (fieldName, fieldType, size, deci), value in zip(fields, record):
+        for (fieldName, type, size, decimal), value in zip(fields, record):
             # write
             size = int(size)
             str_val: str
 
             if value in MISSING:
-                str_val = self._dbf_missing_placeholder(value, fieldType, size)
-            elif fieldType in {FieldType.N, FieldType.F}:
-                str_val = self._try_coerce_to_numeric_str(value, size, deci)
-            elif fieldType is FieldType.D:
+                str_val = self._dbf_missing_placeholder(value, type, size)
+            elif type in {FieldType.N, FieldType.F}:
+                str_val = self._try_coerce_to_numeric_str(value, size, decimal)
+            elif type is FieldType.D:
                 str_val = self._try_coerce_to_date_str(value)
-            elif fieldType is FieldType.L:
+            elif type is FieldType.L:
                 str_val = self._try_coerce_to_logical_str(value)
             else:
                 if isinstance(value, bytes):
@@ -3544,10 +3532,10 @@ class Writer:
         self.shape(polyShape)
 
     def field(
-        # Types of args should match *FieldData
+        # Types of args should match *Field
         self,
         name: str,
-        fieldType: Union[str, FieldType] = FieldType.C,
+        field_type: Union[str, FieldType] = FieldType.C,
         size: int = 50,
         decimal: int = 0,
     ) -> None:
@@ -3556,8 +3544,8 @@ class Writer:
             raise ShapefileException(
                 "Shapefile Writer reached maximum number of fields: 2046."
             )
-
-        self.fields.append(FieldData.from_unchecked(name, fieldType, size, decimal))
+        field_ = Field.from_unchecked(name, field_type, size, decimal)
+        self.fields.append(field_)
 
 
 # Begin Testing
