@@ -1896,7 +1896,7 @@ class Reader:
                     # Close and delete the temporary zipfile
                     try:
                         zipfileobj.close()
-                    except:  # pylint: disable=bare-except
+                    except:  # pylint: disable=bare-except  # noqa: E722
                         pass
                     # Try to load shapefile
                     if self.shp or self.dbf:
@@ -3155,7 +3155,7 @@ class Writer:
         # Shape Type
         if self.shapeType is None and s.shapeType != NULL:
             self.shapeType = s.shapeType
-        if not s.shapeType in {NULL, self.shapeType}:
+        if s.shapeType not in {NULL, self.shapeType}:
             raise ShapefileException(
                 f"The shape's type ({s.shapeType}) must match "
                 f"the type of the shapefile ({self.shapeType})."
