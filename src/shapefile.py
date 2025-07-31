@@ -38,14 +38,13 @@ from typing import (
     TypedDict,
     TypeVar,
     Union,
-    cast,
     overload,
 )
 from urllib.error import HTTPError
 from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
 
-from typing_extensions import Never, NotRequired, Self, TypeIs, Unpack
+from typing_extensions import Never, NotRequired, Self, TypeIs
 
 # Create named logger
 logger = logging.getLogger(__name__)
@@ -3119,12 +3118,17 @@ class Writer:
         f.write(header)
         # Field descriptors
         for field in fields:
-            name, fieldType, size, decimal = field
-            encoded_name = name.encode(self.encoding, self.encodingErrors)
+            encoded_name = field.name.encode(self.encoding, self.encodingErrors)
             encoded_name = encoded_name.replace(b" ", b"_")
             encoded_name = encoded_name[:10].ljust(11).replace(b" ", b"\x00")
-            encodedFieldType = fieldType.name.encode("ascii")
-            fld = pack("<11sc4xBB14x", encoded_name, encodedFieldType, size, decimal)
+            encodedFieldType = field.fieldType.name.encode("ascii")
+            fld = pack(
+                "<11sc4xBB14x",
+                encoded_name,
+                encodedFieldType,
+                field.size,
+                field.decimal,
+            )
             f.write(fld)
         # Terminator
         f.write(b"\r")
@@ -3300,7 +3304,7 @@ class Writer:
                 # forcing a large int to float and back to int
                 # will lose information and result in wrong nr.
                 int_val = int(value)
-            except (ValueError, TypeError):
+            except ValueError:
                 # forcing directly to int failed, so was probably a float.
                 int_val = int(float(value))
             except TypeError:
