@@ -695,7 +695,7 @@ def test_reader_fields():
 
         field = fields[0]
         assert isinstance(field[0], str)  # field name
-        assert field[1] in ["C", "N", "F", "L", "D", "M"]  # field type
+        assert field[1].name in ["C", "N", "F", "L", "D", "M"]  # field type
         assert isinstance(field[2], int)  # field length
         assert isinstance(field[3], int)  # decimal length
 
