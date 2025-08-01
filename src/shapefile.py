@@ -123,22 +123,25 @@ Coords = list[Coord]
 PointT = Union[Point2D, PointMT, PointZT]
 PointsT = list[PointT]
 
+BBox = tuple[float, float, float, float]
+MBox = tuple[float, float]
+ZBox = tuple[float, float]
 
-class BBox(NamedTuple):
-    xmin: float
-    ymin: float
-    xmax: float
-    ymax: float
-
-
-class MBox(NamedTuple):
-    mmin: Optional[float]
-    mmax: Optional[float]
+# class BBox(NamedTuple):
+#     xmin: float
+#     ymin: float
+#     xmax: float
+#     ymax: float
 
 
-class ZBox(NamedTuple):
-    zmin: float
-    zmax: float
+# class MBox(NamedTuple):
+#     mmin: Optional[float]
+#     mmax: Optional[float]
+
+
+# class ZBox(NamedTuple):
+#     zmin: float
+#     zmax: float
 
 
 class WriteableBinStream(Protocol):
@@ -415,8 +418,9 @@ def rewind(coords: Reversible[PointT]) -> PointsT:
 def ring_bbox(coords: PointsT) -> BBox:
     """Calculates and returns the bounding box of a ring."""
     xs, ys = map(list, list(zip(*coords))[:2])  # ignore any z or m values
-    bbox = BBox(xmin=min(xs), ymin=min(ys), xmax=max(xs), ymax=max(ys))
-    return bbox
+    # bbox = BBox(xmin=min(xs), ymin=min(ys), xmax=max(xs), ymax=max(ys))
+    # return bbox
+    return min(xs), min(ys), max(xs), max(ys)
 
 
 def bbox_overlap(bbox1: BBox, bbox2: BBox) -> bool:
@@ -998,7 +1002,7 @@ class _CanHaveBBox(Shape):
     bbox: Optional[BBox] = None
 
     def _get_set_bbox_from_byte_stream(self, b_io: ReadableBinStream) -> BBox:
-        self.bbox: BBox = BBox(*_Array[float]("d", unpack("<4d", b_io.read(32))))
+        self.bbox: BBox = tuple(*_Array[float]("d", unpack("<4d", b_io.read(32))))
         return self.bbox
 
     @staticmethod
@@ -1218,7 +1222,7 @@ class Point(Shape):
         if bbox is not None:
             # create bounding box for Point by duplicating coordinates
             # skip shape if no overlap with bounding box
-            if not bbox_overlap(bbox, BBox(x, y, x, y)):
+            if not bbox_overlap(bbox, (x, y, x, y)):
                 return None
 
         shape.points = [(x, y)]
@@ -2233,18 +2237,21 @@ class Reader:
         shp.seek(32)
         self.shapeType = unpack("<i", shp.read(4))[0]
         # The shapefile's bounding box (lower left, upper right)
-        xmin, ymin, xmax, ymax = unpack("<4d", shp.read(32))
-        self.bbox = BBox(xmin=xmin, ymin=ymin, xmax=xmax, ymax=ymax)
+        self.bbox: BBox = tuple(_Array("d", unpack("<4d", shp.read(32))))
+        # xmin, ymin, xmax, ymax = unpack("<4d", shp.read(32))
+        # self.bbox = BBox(xmin=xmin, ymin=ymin, xmax=xmax, ymax=ymax)
         # Elevation
-        zmin, zmax = unpack("<2d", shp.read(16))
-        self.zbox = ZBox(zmin=zmin, zmax=zmax)
+        self.zbox = _Array("d", unpack("<2d", shp.read(16)))
+        # zmin, zmax = unpack("<2d", shp.read(16))
+        # self.zbox = ZBox(zmin=zmin, zmax=zmax)
         # Measure
         # Measure values less than -10e38 are nodata values according to the spec
         m_bounds = [
             float(m_bound) if m_bound >= NODATA else None
             for m_bound in unpack("<2d", shp.read(16))
         ]
-        self.mbox = MBox(mmin=m_bounds[0], mmax=m_bounds[1])
+        # self.mbox = MBox(mmin=m_bounds[0], mmax=m_bounds[1])
+        self.mbox = (m_bounds[0], m_bounds[1])
 
     def __shape(
         self, oid: Optional[int] = None, bbox: Optional[BBox] = None
@@ -2953,10 +2960,10 @@ class Writer:
         y: list[float] = []
 
         if self._bbox:
-            x.append(self._bbox.xmin)
-            y.append(self._bbox.ymin)
-            x.append(self._bbox.xmax)
-            y.append(self._bbox.ymax)
+            x.append(self._bbox[0])
+            y.append(self._bbox.[1])
+            x.append(self._bbox.[2])
+            y.append(self._bbox.[3])
 
         if len(s.points) > 0:
             px, py = list(zip(*s.points))[:2]
@@ -2970,7 +2977,8 @@ class Writer:
                 "Cannot create bbox. Expected a valid shape with at least one point. "
                 f"Got a shape of type '{s.shapeType}' and 0 points."
             )
-        self._bbox = BBox(xmin=min(x), ymin=min(y), xmax=max(x), ymax=max(y))
+        # self._bbox = BBox(xmin=min(x), ymin=min(y), xmax=max(x), ymax=max(y))
+        self._bbox = (min(x), min(y), max(x), max(y))
         return self._bbox
 
     def __zbox(self, s) -> ZBox:
@@ -2988,7 +2996,8 @@ class Writer:
 
         # Original self._zbox bounds (if any) are the first two entries.
         # Set zbox for the first, and all later times
-        self._zbox = ZBox(zmin=min(z), zmax=max(z))
+        # self._zbox = ZBox(zmin=min(z), zmax=max(z))
+        self._zbox = (min(z), max(z))
         return self._zbox
 
     def __mbox(self, s) -> MBox:
@@ -3012,7 +3021,8 @@ class Writer:
 
         # Original self._mbox bounds (if any) are the first two entries.
         # Set mbox for the first, and all later times
-        self._mbox = MBox(mmin=min(m), mmax=max(m))
+        # self._mbox = MBox(mmin=min(m), mmax=max(m))
+        self._mbox = (min(m), max(m))
         return self._mbox
 
     @property
@@ -3064,7 +3074,8 @@ class Writer:
                     # In such cases of empty shapefiles, ESRI spec says the bbox values are 'unspecified'.
                     # Not sure what that means, so for now just setting to 0s, which is the same behavior as in previous versions.
                     # This would also make sense since the Z and M bounds are similarly set to 0 for non-Z/M type shapefiles.
-                    bbox = BBox(0, 0, 0, 0)
+                    # bbox = BBox(0, 0, 0, 0)
+                    bbox = (0, 0, 0, 0)
                 f.write(pack("<4d", *bbox))
             except error:
                 raise ShapefileException(
@@ -3078,20 +3089,24 @@ class Writer:
             zbox = self.zbox()
             if zbox is None:
                 # means we have empty shapefile/only null geoms (see commentary on bbox above)
-                zbox = ZBox(0, 0)
+                # zbox = ZBox(0, 0)
+                zbox = (0, 0)
         else:
             # As per the ESRI shapefile spec, the zbox for non-Z type shapefiles are set to 0s
-            zbox = ZBox(0, 0)
+            # zbox = ZBox(0, 0)
+            zbox = (0, 0)
         # Measure
         if self.shapeType in PointM._shapeTypes | _HasM._shapeTypes:
             # M values are present in M or Z type
             mbox = self.mbox()
             if mbox is None:
                 # means we have empty shapefile/only null geoms (see commentary on bbox above)
-                mbox = MBox(0, 0)
+                # mbox = MBox(0, 0)
+                mbox = (0, 0)
         else:
             # As per the ESRI shapefile spec, the mbox for non-M type shapefiles are set to 0s
-            mbox = MBox(0, 0)
+            # mbox = MBox(0, 0)
+            mbox = (0, 0)
         # Try writing
         try:
             f.write(pack("<4d", zbox[0], zbox[1], mbox[0], mbox[1]))
