@@ -12,7 +12,6 @@ __version__ = "3.0.0-alpha"
 
 import array
 import doctest
-import enum
 import io
 import logging
 import os
@@ -26,7 +25,9 @@ from typing import (
     IO,
     Any,
     Container,
+    Final,
     Generic,
+    Hashable,
     Iterable,
     Iterator,
     Literal,
@@ -38,6 +39,7 @@ from typing import (
     TypedDict,
     TypeVar,
     Union,
+    cast,
     overload,
 )
 from urllib.error import HTTPError
@@ -171,22 +173,34 @@ class ReadWriteSeekableBinStream(Protocol):
 BinaryFileT = Union[str, IO[bytes]]
 BinaryFileStreamT = Union[IO[bytes], io.BytesIO, WriteSeekableBinStream]
 
+FieldTypeT = Literal["C", "D", "F", "L", "M", "N"]
+
 
 # https://en.wikipedia.org/wiki/.dbf#Database_records
-class FieldType(enum.Enum):
-    # Use an ascii-encoded byte of the name, to save a decoding step.
-    C = "Character"  # (str)
-    D = "Date"
-    F = "Floating point"
-    L = "Logical"  # (bool)
-    M = "Memo"  # Legacy. (10 digit str, starting block in an .dbt file)
-    N = "Numeric"  # (int)
+class FieldType:
+    """A bare bones 'enum', as the enum library noticeably slows performance."""
+
+    # __slots__ = ["C", "D", "F", "L", "M", "N", "__members__"]
+
+    C: Final = "C"  # Character"  # (str)
+    D: Final = "D"  # "Date"
+    F: Final = "F"  # "Floating point"
+    L: Final = "L"  # "Logical"  # (bool)
+    M: Final = "M"  # "Memo"  # Legacy. (10 digit str, starting block in an .dbt file)
+    N: Final = "N"  # "Numeric"  # (int)
+    __members__ = {"C", "D", "F", "L", "M", "N"}  # set(__slots__) - {"__members__"}
+
+    def raise_if_invalid(field_type: Hashable):
+        if field_type not in FieldType.__members__:
+            raise ShapefileException(
+                f"field_type must be in {{FieldType.__members__}}. Got: {field_type=}. "
+            )
 
 
 # Use functional syntax to have an attribute named type, a Python keyword
 class Field(NamedTuple):
     name: str
-    field_type: FieldType
+    field_type: FieldTypeT
     size: int
     decimal: int
 
@@ -194,18 +208,12 @@ class Field(NamedTuple):
     def from_unchecked(
         cls,
         name: str,
-        field_type: Union[str, FieldType] = FieldType.C,
+        field_type: FieldTypeT = "C",
         size: int = 50,
         decimal: int = 0,
     ) -> Self:
-        if isinstance(field_type, str):
-            if field_type.upper() in FieldType.__members__:
-                field_type = FieldType[field_type.upper()]
-            else:
-                raise ShapefileException(
-                    "type must be C,D,F,L,M,N, or a FieldType enum member. "
-                    f"Got: {field_type=}. "
-                )
+        field_type = cast(FieldTypeT, field_type.upper())
+        FieldType.raise_if_invalid(field_type)
 
         if field_type is FieldType.D:
             size = 8
@@ -221,7 +229,7 @@ class Field(NamedTuple):
         )
 
     def __repr__(self) -> str:
-        return f'Field(name="{self.name}", field_type=FieldType.{self.field_type.name}, size={self.size}, decimal={self.decimal})'
+        return f'Field(name="{self.name}", field_type=FieldType.{self.field_type}, size={self.size}, decimal={self.decimal})'
 
 
 RecordValueNotDate = Union[bool, int, float, str, date]
@@ -1977,7 +1985,7 @@ class Reader:
         if hasattr(file_, "read"):
             # Copy if required
             try:
-                file_.seek(0)  # type: ignore
+                file_.seek(0)
                 return file_
             except (NameError, io.UnsupportedOperation):
                 return io.BytesIO(file_.read())
@@ -2418,7 +2426,8 @@ class Reader:
             name = encoded_name.decode(self.encoding, self.encodingErrors)
             name = name.lstrip()
 
-            field_type = FieldType[encoded_type_char.decode("ascii").upper()]
+            field_type = cast(FieldTypeT, encoded_type_char.decode("ascii").upper())
+            FieldType.raise_if_invalid(field_type)
 
             self.fields.append(Field(name, field_type, size, decimal))
         terminator = dbf.read(1)
@@ -2632,7 +2641,9 @@ class Reader:
         f = self.__getFileObj(self.dbf)
         f.seek(self.__dbfHdrLength)
         fieldTuples, recLookup, recStruct = self.__recordFields(fields)
-        for i in range(self.numRecords):  # type: ignore
+        # self.__dbfHeader() sets self.numRecords, so it's fine to cast it to int
+        # (to tell mypy it's not None).
+        for i in range(cast(int, self.numRecords)):
             r = self.__record(
                 oid=i, fieldTuples=fieldTuples, recLookup=recLookup, recStruct=recStruct
             )
@@ -3111,7 +3122,7 @@ class Writer:
             encoded_name = field.name.encode(self.encoding, self.encodingErrors)
             encoded_name = encoded_name.replace(b" ", b"_")
             encoded_name = encoded_name[:10].ljust(11).replace(b" ", b"\x00")
-            encodedFieldType = field.field_type.name.encode("ascii")
+            encodedFieldType = field.field_type.encode("ascii")
             fld = pack(
                 "<11sc4xBB14x",
                 encoded_name,
@@ -3266,7 +3277,7 @@ class Writer:
 
     @staticmethod
     def _dbf_missing_placeholder(
-        value: RecordValue, field_type: FieldType, size: int
+        value: RecordValue, field_type: FieldTypeT, size: int
     ) -> str:
         if field_type is FieldType.N or field_type is FieldType.F:
             return "*" * size  # QGIS NULL
@@ -3539,7 +3550,7 @@ class Writer:
         # Types of args should match *Field
         self,
         name: str,
-        field_type: Union[str, FieldType] = FieldType.C,
+        field_type: FieldTypeT = "C",
         size: int = 50,
         decimal: int = 0,
     ) -> None:
