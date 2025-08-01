@@ -229,11 +229,12 @@ class Field(NamedTuple):
         size: int = 50,
         decimal: int = 0,
     ) -> Self:
-        if field_type not in FIELD_TYPE_ALIASES:
+        try:
+            type_ = FIELD_TYPE_ALIASES[field_type]
+        except KeyError:
             raise ShapefileException(
                 f"field_type must be in {{FieldType.__members__}}. Got: {field_type=}. "
             )
-        type_ = FIELD_TYPE_ALIASES[field_type]
 
         if type_ is FieldType.D:
             size = 8
@@ -3444,30 +3445,6 @@ class Writer:
                 )
             f.write(encoded_val)
 
-    def _original_coerce_to_numeric_str(self, value, size, deci):
-        # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
-        if value in MISSING:
-            return b"*" * size  # QGIS NULL
-        if not deci:
-            # force to int
-            if not isinstance(value, int):
-                try:
-                    # first try to force directly to int.
-                    # forcing a large int to float and back to int
-                    # will lose information and result in wrong nr.
-                    value = int(value)
-                except ValueError:
-                    # forcing directly to int failed, so was probably a float.
-                    value = int(float(value))
-            return format(value, "d")[:size].rjust(
-                size
-            )  # caps the size if exceeds the field size
-        if not isinstance(value, float):
-            value = float(value)
-        return format(value, f".{deci}f")[:size].rjust(
-            size
-        )  # caps the size if exceeds the field size
-
     def __dbfRecord(self, record):
         """Writes the dbf records."""
         f = self.__getFileObj(self.dbf)
@@ -3485,39 +3462,40 @@ class Writer:
         )  # ignore deletionflag field in case it was specified
         for (fieldName, fieldType, size, deci), value in zip(fields, record):
             # write
-            fieldType = fieldType.upper()
-            size = int(size)
+            # fieldName, fieldType, size and deci were already checked
+            # when their Field instance was created and added to self.fields
+            str_val: Optional[str] = None
+
             if fieldType in ("N", "F"):
-                value = self._original_coerce_to_numeric_str(value, size, deci)
-                # # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
-                # if value in MISSING:
-                #     value = b"*" * size  # QGIS NULL
-                # elif not deci:
-                #     # force to int
-                #     try:
-                #         # first try to force directly to int.
-                #         # forcing a large int to float and back to int
-                #         # will lose information and result in wrong nr.
-                #         value = int(value)
-                #     except ValueError:
-                #         # forcing directly to int failed, so was probably a float.
-                #         value = int(float(value))
-                #     value = format(value, "d")[:size].rjust(
-                #         size
-                #     )  # caps the size if exceeds the field size
-                # else:
-                #     value = float(value)
-                #     value = format(value, f".{deci}f")[:size].rjust(
-                #         size
-                #     )  # caps the size if exceeds the field size
+                # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
+                if value in MISSING:
+                    str_val = "*" * size  # QGIS NULL
+                elif not deci:
+                    # force to int
+                    try:
+                        # first try to force directly to int.
+                        # forcing a large int to float and back to int
+                        # will lose information and result in wrong nr.
+                        num_val = int(value)
+                    except ValueError:
+                        # forcing directly to int failed, so was probably a float.
+                        num_val = int(float(value))
+                    str_val = format(num_val, "d")[:size].rjust(
+                        size
+                    )  # caps the size if exceeds the field size
+                else:
+                    f_val = float(value)
+                    str_val = format(f_val, f".{deci}f")[:size].rjust(
+                        size
+                    )  # caps the size if exceeds the field size
             elif fieldType == "D":
                 # date: 8 bytes - date stored as a string in the format YYYYMMDD.
                 if isinstance(value, date):
-                    value = f"{value.year:04d}{value.month:02d}{value.day:02d}"
+                    str_val = f"{value.year:04d}{value.month:02d}{value.day:02d}"
                 elif isinstance(value, list) and len(value) == 3:
-                    value = f"{value[0]:04d}{value[1]:02d}{value[2]:02d}"
+                    str_val = f"{value[0]:04d}{value[1]:02d}{value[2]:02d}"
                 elif value in MISSING:
-                    value = b"0" * 8  # QGIS NULL for date type
+                    str_val = "0" * 8  # QGIS NULL for date type
                 elif isinstance(value, str) and len(value) == 8:
                     pass  # value is already a date string
                 else:
@@ -3527,33 +3505,38 @@ class Writer:
             elif fieldType == "L":
                 # logical: 1 byte - initialized to 0x20 (space) otherwise T or F.
                 if value in MISSING:
-                    value = b" "  # missing is set to space
+                    str_val = " "  # missing is set to space
                 elif value in [True, 1]:
-                    value = b"T"
+                    str_val = "T"
                 elif value in [False, 0]:
-                    value = b"F"
+                    str_val = "F"
                 else:
-                    value = b" "  # unknown is set to space
-            else:
-                # anything else is forced to string, truncated to the length of the field
-                # value = b(value, self.encoding, self.encodingErrors)[:size].ljust(size)
-                value = (
+                    str_val = " "  # unknown is set to space
+
+            if str_val is None:
+                # Types C and M, and anything else, value is forced to string,
+                # encoded by the codec specified to the Writer (utf-8 by default),
+                # then the resulting bytes are padded and truncated to the length
+                # of the field
+                encoded = (
                     str(value)
                     .encode(self.encoding, self.encodingErrors)[:size]
                     .ljust(size)
                 )
-            if not isinstance(value, bytes):
-                # just in case some of the numeric format() and date strftime() results are still in unicode (Python 3 only)
-                # value = b(
-                #     value, "ascii", self.encodingErrors
-                # )  # should be default ascii encoding
-                value = value.encode("ascii", self.encodingErrors)
-            if len(value) != size:
+            else:
+                # str_val was given a not-None string value
+                # under the checks for fieldTypes "N", "F", "D", or "L" above
+                # Numeric, logical, and date numeric types are ascii already, but
+                # for Shapefile or dbf spec reasons
+                # "should be default ascii encoding"
+                encoded = str_val.encode("ascii", self.encodingErrors)
+
+            if len(encoded) != size:
                 raise ShapefileException(
-                    "Shapefile Writer unable to pack incorrect sized value"
-                    f" (size {len(value)}) into field '{fieldName}' (size {size})."
+                    f"Shapefile Writer unable to pack incorrect sized {value=}"
+                    f" (encoded as {len(encoded)}B) into field '{fieldName}' ({size}B)."
                 )
-            f.write(value)
+            f.write(encoded)
 
     def balance(self) -> None:
         """Adds corresponding empty attributes or null geometry records depending
