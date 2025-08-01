@@ -1327,7 +1327,7 @@ class _HasM(_CanHaveBBox):
                 f"Failed to write measure extremes for record {i}. Expected floats"
             )
         try:
-            if hasattr(s, "m"):
+            if getattr(s, "m", False):
                 # if m values are stored in attribute
                 ms = [m if m is not None else NODATA for m in s.m]
 
@@ -1335,12 +1335,9 @@ class _HasM(_CanHaveBBox):
                 # if m values are stored as 3rd/4th dimension
                 # 0-index position of m value is 3 if z type (x,y,z,m), or 2 if m type (x,y,m)
                 mpos = 3 if s.shapeType in _HasZ._shapeTypes else 2
-                ms = []
-                for p in s.points:
-                    if len(p) > mpos and p[mpos] is not None:
-                        ms.append(p[mpos])
-                    else:
-                        ms.append(NODATA)
+                ms = [p[mpos] if len(p) > mpos and p[mpos] is not None else NODATA
+                      for p in s.points
+                     ]  
 
             num_bytes_written += b_io.write(pack(f"<{len(ms)}d", *ms))
 
@@ -1388,7 +1385,7 @@ class _HasZ(_CanHaveBBox):
                 f"Failed to write elevation extremes for record {i}. Expected floats."
             )
         try:
-            if hasattr(s, "z"):
+            if getattr(s, "z", False):
                 # if z values are stored in attribute
                 zs = s.z
             else:
@@ -1444,16 +1441,13 @@ class PointM(Point):
         # Write a single M value
         # Note: missing m values are autoset to NODATA.
 
-        if hasattr(s, "m"):
+        if hasattr(s, "m", False):
             # if m values are stored in attribute
             try:
                 # if not s.m or s.m[0] is None:
                 #     s.m = (NODATA,)
                 # m = s.m[0]
-                if s.m and s.m[0] is not None:
-                    m = s.m[0]
-                else:
-                    m = NODATA
+                m = s.m[0] if s.m and s.m[0] is not None else NODATA                    
             except error:
                 raise ShapefileException(
                     f"Failed to write measure value for record {i}. Expected floats."
