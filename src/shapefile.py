@@ -124,7 +124,7 @@ PointT = Union[Point2D, PointMT, PointZT]
 PointsT = list[PointT]
 
 BBox = tuple[float, float, float, float]
-MBox = tuple[Optional[float], Optional[float]]
+MBox = tuple[float, float]
 ZBox = tuple[float, float]
 
 # class BBox(NamedTuple):
@@ -727,8 +727,8 @@ class Shape:
         # Preserve previous behaviour for anyone who set self.shapeType = None
         if not isinstance(shapeType, _NoShapeTypeSentinel):
             self.shapeType = shapeType
-        self.points = points or []
-        self.parts = parts or []
+        self.points: PointsT = points or []
+        self.parts: Sequence[int] = parts or []
         if partTypes:
             self.partTypes = partTypes
 
@@ -2254,7 +2254,7 @@ class Reader:
             for m_bound in unpack("<2d", shp.read(16))
         ]
         # self.mbox = MBox(mmin=m_bounds[0], mmax=m_bounds[1])
-        self.mbox: MBox = (m_bounds[0], m_bounds[1])
+        self.mbox: tuple[Optional[float], Optional[float]] = (m_bounds[0], m_bounds[1])
 
     def __shape(
         self, oid: Optional[int] = None, bbox: Optional[BBox] = None
@@ -2959,41 +2959,47 @@ class Writer:
         return size
 
     def __bbox(self, s: Shape) -> BBox:
-        x: list[float] = []
-        y: list[float] = []
+        xs: list[float] = []
+        ys: list[float] = []
 
-        if self._bbox:
-            x.append(self._bbox[0])
-            y.append(self._bbox[1])
-            x.append(self._bbox[2])
-            y.append(self._bbox[3])
-
-        if len(s.points) > 0:
-            px, py = list(zip(*s.points))[:2]
-            x.extend(px)
-            y.extend(py)
-        else:
+        if not s.points:
             # this should not happen.
             # any shape that is not null should have at least one point, and only those should be sent here.
             # could also mean that earlier code failed to add points to a non-null shape.
-            raise ValueError(
+            raise ShapefileException(
                 "Cannot create bbox. Expected a valid shape with at least one point. "
-                f"Got a shape of type '{s.shapeType}' and 0 points."
+                f"Got a shape of type {s.shapeType=} and 0 points."
             )
-        # self._bbox = BBox(xmin=min(x), ymin=min(y), xmax=max(x), ymax=max(y))
-        self._bbox = (min(x), min(y), max(x), max(y))
-        return self._bbox
+
+        for point in s.points:
+            xs.append(point[0])
+            ys.append(point[1])
+
+        shape_bbox = (min(xs), min(ys), max(xs), max(ys))
+        # update global
+        if self._bbox:
+            # compare with existing
+            self._bbox = (
+                min(shape_bbox[0], self._bbox[0]),
+                min(shape_bbox[1], self._bbox[1]),
+                max(shape_bbox[2], self._bbox[2]),
+                max(shape_bbox[3], self._bbox[3]),
+            )
+        else:
+            # first time bbox is being set
+            self._bbox = shape_bbox
+        return shape_bbox
 
     def __zbox(self, s: Union[_HasZ, PointZ]) -> ZBox:
-        z: list[float] = []
-        for p in s.points:
-            try:
-                z.append(p[2])
-            except IndexError:
-                # point did not have z value
-                # setting it to 0 is probably ok, since it means all are on the same elevation
-                z.append(0)
-        zbox = (min(z), max(z))
+        shape_zs: list[float] = []
+        if s.z:
+            shape_zs.extend(s.z)
+        else:
+            for p in s.points:
+                # On a ShapeZ type, M is at index 4, and the point can be a 3-tuple or 4-tuple.
+                z = p[2] if len(p) >= 3 and p[2] is not None else 0
+                shape_zs.append(z)
+        zbox = (min(shape_zs), max(shape_zs))
         # update global
         if self._zbox:
             # compare with existing
@@ -3004,22 +3010,20 @@ class Writer:
         return zbox
 
     def __mbox(self, s: Union[_HasM, PointM]) -> MBox:
-        mpos = 3 if s.shapeType in _HasZ._shapeTypes | PointZ.shapeTypes else 2
-        m: list[float] = []
+        mpos = 3 if s.shapeType in _HasZ._shapeTypes | PointZ._shapeTypes else 2
+        shape_ms: list[float] = []
+        if s.m:
+            shape_ms.extend(m for m in s.m if m is not None)
+        else:
+            for p in s.points:
+                m = p[mpos] if len(p) >= mpos + 1 else None
+                if m is not None:
+                    shape_ms.append(m)
 
-        for p in s.points:
-            try:
-                if p[mpos] is not None:
-                    # mbox should only be calculated on valid m values
-                    m.append(p[mpos])
-            except IndexError:
-                # point did not have m value so is missing
-                # mbox should only be calculated on valid m values
-                pass
-        if not m:
+        if not shape_ms:
             # only if none of the shapes had m values, should mbox be set to missing m values
-            m.append(NODATA)
-        mbox = (min(m), max(m))
+            shape_ms.append(NODATA)
+        mbox = (min(shape_ms), max(shape_ms))
         # update global
         if self._mbox:
             # compare with existing
@@ -3028,7 +3032,6 @@ class Writer:
             # first time mbox is being set
             self._mbox = mbox
         return mbox
-
 
     @property
     def shapeTypeName(self) -> str:
@@ -3210,17 +3213,17 @@ class Writer:
 
         # For both single point and multiple-points non-null shapes,
         # update bbox, mbox and zbox of the whole shapefile
-        new_bbox = self.__bbox(s) if s.shapeType != NULL else None
-        new_mbox = (
-            self.__mbox(s)
-            if s.shapeType in PointM._shapeTypes | _HasM._shapeTypes
-            else None
-        )
-        new_zbox = (
-            self.__zbox(s)
-            if s.shapeType in PointZ._shapeTypes | _HasZ._shapeTypes
-            else None
-        )
+        shape_bbox = self.__bbox(s) if s.shapeType != NULL else None
+
+        if s.shapeType in PointM._shapeTypes | _HasM._shapeTypes:
+            shape_mbox = self.__mbox(cast(Union[_HasM, PointM], s))
+        else:
+            shape_mbox = None
+
+        if s.shapeType in PointZ._shapeTypes | _HasZ._shapeTypes:
+            shape_zbox = self.__zbox(cast(Union[_HasZ, PointZ], s))
+        else:
+            shape_zbox = None
 
         # Create an in-memory binary buffer to avoid
         # unnecessary seeks to files on disk
@@ -3243,9 +3246,9 @@ class Writer:
             b_io=b_io,
             s=s,
             i=self.shpNum,
-            bbox=new_bbox,
-            mbox=new_mbox,
-            zbox=new_zbox,
+            bbox=shape_bbox,
+            mbox=shape_mbox,
+            zbox=shape_zbox,
         )
 
         # Finalize record length as 16-bit words
