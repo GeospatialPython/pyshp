@@ -3155,7 +3155,7 @@ class Writer:
         # Shape Type
         if self.shapeType is None and s.shapeType != NULL:
             self.shapeType = s.shapeType
-        if s.shapeType != NULL and s.shapeType != self.shapeType:
+        if s.shapeType not in (NULL, self.shapeType):
             raise ShapefileException(
                 f"The shape's type ({s.shapeType}) must match "
                 f"the type of the shapefile ({self.shapeType})."
