@@ -3347,11 +3347,10 @@ class Writer:
             return format(value, "d")[:size].rjust(
                 size
             )  # caps the size if exceeds the field size
-        else:
-            value = float(value)
-            return format(value, f".{decimal}f")[:size].rjust(
-                size
-            )  # caps the size if exceeds the field size
+        value = float(value)
+        return format(value, f".{decimal}f")[:size].rjust(
+            size
+        )  # caps the size if exceeds the field size
 
         # if not decimal:
         #     # force to int
@@ -3397,10 +3396,6 @@ class Writer:
         if value == 0:  # False == 0
             return "F"
         return " "  # unknown is set to space
-
-
-
-
 
     def __newdbfRecord(self, record: list[RecordValue]) -> None:
         """Writes the dbf records."""
@@ -3449,7 +3444,28 @@ class Writer:
                 )
             f.write(encoded_val)
 
-
+    def _original_coerce_to_numeric_str(self, value, size, deci):
+        # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
+        if value in MISSING:
+            return b"*" * size  # QGIS NULL
+        if not deci:
+            # force to int
+            try:
+                # first try to force directly to int.
+                # forcing a large int to float and back to int
+                # will lose information and result in wrong nr.
+                value = int(value)
+            except ValueError:
+                # forcing directly to int failed, so was probably a float.
+                value = int(float(value))
+            return format(value, "d")[:size].rjust(
+                size
+            )  # caps the size if exceeds the field size
+            
+        value = float(value)
+        return format(value, f".{deci}f")[:size].rjust(
+            size
+        )  # caps the size if exceeds the field size
 
     def __dbfRecord(self, record):
         """Writes the dbf records."""
@@ -3471,27 +3487,28 @@ class Writer:
             fieldType = fieldType.upper()
             size = int(size)
             if fieldType in ("N", "F"):
-                # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
-                if value in MISSING:
-                    value = b"*" * size  # QGIS NULL
-                elif not deci:
-                    # force to int
-                    try:
-                        # first try to force directly to int.
-                        # forcing a large int to float and back to int
-                        # will lose information and result in wrong nr.
-                        value = int(value)
-                    except ValueError:
-                        # forcing directly to int failed, so was probably a float.
-                        value = int(float(value))
-                    value = format(value, "d")[:size].rjust(
-                        size
-                    )  # caps the size if exceeds the field size
-                else:
-                    value = float(value)
-                    value = format(value, f".{deci}f")[:size].rjust(
-                        size
-                    )  # caps the size if exceeds the field size
+                value = self._original_coerce_to_numeric_str(value, size, deci)
+                # # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
+                # if value in MISSING:
+                #     value = b"*" * size  # QGIS NULL
+                # elif not deci:
+                #     # force to int
+                #     try:
+                #         # first try to force directly to int.
+                #         # forcing a large int to float and back to int
+                #         # will lose information and result in wrong nr.
+                #         value = int(value)
+                #     except ValueError:
+                #         # forcing directly to int failed, so was probably a float.
+                #         value = int(float(value))
+                #     value = format(value, "d")[:size].rjust(
+                #         size
+                #     )  # caps the size if exceeds the field size
+                # else:
+                #     value = float(value)
+                #     value = format(value, f".{deci}f")[:size].rjust(
+                #         size
+                #     )  # caps the size if exceeds the field size
             elif fieldType == "D":
                 # date: 8 bytes - date stored as a string in the format YYYYMMDD.
                 if isinstance(value, date):
@@ -3500,7 +3517,7 @@ class Writer:
                     value = f"{value[0]:04d}{value[1]:02d}{value[2]:02d}"
                 elif value in MISSING:
                     value = b"0" * 8  # QGIS NULL for date type
-                elif is_string(value) and len(value) == 8:
+                elif isinstance(value, str) and len(value) == 8:
                     pass  # value is already a date string
                 else:
                     raise ShapefileException(
@@ -3519,20 +3536,23 @@ class Writer:
             else:
                 # anything else is forced to string, truncated to the length of the field
                 # value = b(value, self.encoding, self.encodingErrors)[:size].ljust(size)
-                value = str(value).encode(self.encoding, self.encodingErrors)[:size].ljust(size)
+                value = (
+                    str(value)
+                    .encode(self.encoding, self.encodingErrors)[:size]
+                    .ljust(size)
+                )
             if not isinstance(value, bytes):
                 # just in case some of the numeric format() and date strftime() results are still in unicode (Python 3 only)
                 # value = b(
                 #     value, "ascii", self.encodingErrors
                 # )  # should be default ascii encoding
-                value = value.encode('ascii', self.encodingErrors)
+                value = value.encode("ascii", self.encodingErrors)
             if len(value) != size:
                 raise ShapefileException(
                     "Shapefile Writer unable to pack incorrect sized value"
                     f" (size {len(value)}) into field '{fieldName}' (size {size})."
                 )
             f.write(value)
-
 
     def balance(self) -> None:
         """Adds corresponding empty attributes or null geometry records depending
