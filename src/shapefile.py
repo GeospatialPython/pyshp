@@ -2961,9 +2961,9 @@ class Writer:
 
         if self._bbox:
             x.append(self._bbox[0])
-            y.append(self._bbox.[1])
-            x.append(self._bbox.[2])
-            y.append(self._bbox.[3])
+            y.append(self._bbox[1])
+            x.append(self._bbox[2])
+            y.append(self._bbox[3])
 
         if len(s.points) > 0:
             px, py = list(zip(*s.points))[:2]
