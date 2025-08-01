@@ -3398,7 +3398,11 @@ class Writer:
             return "F"
         return " "  # unknown is set to space
 
-    def __dbfRecord(self, record: list[RecordValue]) -> None:
+
+
+
+
+    def __newdbfRecord(self, record: list[RecordValue]) -> None:
         """Writes the dbf records."""
         f = self.__getFileObj(self.dbf)
         if self.recNum == 0:
@@ -3444,6 +3448,91 @@ class Writer:
                     f"(size {len(encoded_val)}) into field '{fieldName}' (size {size})."
                 )
             f.write(encoded_val)
+
+
+
+    def __dbfRecord(self, record):
+        """Writes the dbf records."""
+        f = self.__getFileObj(self.dbf)
+        if self.recNum == 0:
+            # first records, so all fields should be set
+            # allowing us to write the dbf header
+            # cannot change the fields after this point
+            self.__dbfHeader()
+        # first byte of the record is deletion flag, always disabled
+        f.write(b" ")
+        # begin
+        self.recNum += 1
+        fields = (
+            field for field in self.fields if field[0] != "DeletionFlag"
+        )  # ignore deletionflag field in case it was specified
+        for (fieldName, fieldType, size, deci), value in zip(fields, record):
+            # write
+            fieldType = fieldType.upper()
+            size = int(size)
+            if fieldType in ("N", "F"):
+                # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
+                if value in MISSING:
+                    value = b"*" * size  # QGIS NULL
+                elif not deci:
+                    # force to int
+                    try:
+                        # first try to force directly to int.
+                        # forcing a large int to float and back to int
+                        # will lose information and result in wrong nr.
+                        value = int(value)
+                    except ValueError:
+                        # forcing directly to int failed, so was probably a float.
+                        value = int(float(value))
+                    value = format(value, "d")[:size].rjust(
+                        size
+                    )  # caps the size if exceeds the field size
+                else:
+                    value = float(value)
+                    value = format(value, f".{deci}f")[:size].rjust(
+                        size
+                    )  # caps the size if exceeds the field size
+            elif fieldType == "D":
+                # date: 8 bytes - date stored as a string in the format YYYYMMDD.
+                if isinstance(value, date):
+                    value = f"{value.year:04d}{value.month:02d}{value.day:02d}"
+                elif isinstance(value, list) and len(value) == 3:
+                    value = f"{value[0]:04d}{value[1]:02d}{value[2]:02d}"
+                elif value in MISSING:
+                    value = b"0" * 8  # QGIS NULL for date type
+                elif is_string(value) and len(value) == 8:
+                    pass  # value is already a date string
+                else:
+                    raise ShapefileException(
+                        "Date values must be either a datetime.date object, a list, a YYYYMMDD string, or a missing value."
+                    )
+            elif fieldType == "L":
+                # logical: 1 byte - initialized to 0x20 (space) otherwise T or F.
+                if value in MISSING:
+                    value = b" "  # missing is set to space
+                elif value in [True, 1]:
+                    value = b"T"
+                elif value in [False, 0]:
+                    value = b"F"
+                else:
+                    value = b" "  # unknown is set to space
+            else:
+                # anything else is forced to string, truncated to the length of the field
+                # value = b(value, self.encoding, self.encodingErrors)[:size].ljust(size)
+                value = str(value).encode(self.encoding, self.encodingErrors)[:size].ljust(size)
+            if not isinstance(value, bytes):
+                # just in case some of the numeric format() and date strftime() results are still in unicode (Python 3 only)
+                # value = b(
+                #     value, "ascii", self.encodingErrors
+                # )  # should be default ascii encoding
+                value = value.encode('ascii', self.encodingErrors)
+            if len(value) != size:
+                raise ShapefileException(
+                    "Shapefile Writer unable to pack incorrect sized value"
+                    f" (size {len(value)}) into field '{fieldName}' (size {size})."
+                )
+            f.write(value)
+
 
     def balance(self) -> None:
         """Adds corresponding empty attributes or null geometry records depending
