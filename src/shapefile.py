@@ -1291,6 +1291,10 @@ class _HasM(_CanHaveBBox):
     )
     m: Sequence[Optional[float]]
 
+    def __init__(self, *args, **kwargs):
+        self.z = []
+        super().__init__(*args, **kwargs)
+
     def _set_ms_from_byte_stream(
         self, b_io: ReadSeekableBinStream, nPoints: int, next_shape: int
     ):
@@ -1359,6 +1363,10 @@ class _HasZ(_CanHaveBBox):
         ]
     )
     z: Sequence[float]
+
+    def __init__(self, *args, **kwargs):
+        self.z = []
+        super().__init__(*args, **kwargs)
 
     def _set_zs_from_byte_stream(self, b_io: ReadableBinStream, nPoints: int):
         __zmin, __zmax = unpack("<2d", b_io.read(16))  # pylint: disable=unused-private-member
