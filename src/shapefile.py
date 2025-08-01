@@ -2538,7 +2538,7 @@ class Reader:
         # parse each value
         record = []
         for (__name, typ, __size, decimal), value in zip(fieldTuples, recordContents):
-            if typ in {FieldType.N, FieldType.F}:
+            if typ is FieldType.N or typ is FieldType.F:
                 # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
                 value = value.split(b"\0")[0]
                 value = value.replace(b"*", b"")  # QGIS NULL is all '*' chars
@@ -3046,7 +3046,7 @@ class Writer:
         else:
             f.write(pack("<4d", 0, 0, 0, 0))
         # Elevation
-        if self.shapeType in {POINTZ} | _HasZ._shapeTypes:
+        if self.shapeType in PointZ._shapeTypes | _HasZ._shapeTypes:
             # Z values are present in Z type
             zbox = self.zbox()
             if zbox is None:
@@ -3056,7 +3056,7 @@ class Writer:
             # As per the ESRI shapefile spec, the zbox for non-Z type shapefiles are set to 0s
             zbox = ZBox(0, 0)
         # Measure
-        if self.shapeType in {POINTM, POINTZ} | _HasM._shapeTypes:
+        if self.shapeType in PointM._shapeTypes | _HasM._shapeTypes:
             # M values are present in M or Z type
             mbox = self.mbox()
             if mbox is None:
@@ -3155,7 +3155,7 @@ class Writer:
         # Shape Type
         if self.shapeType is None and s.shapeType != NULL:
             self.shapeType = s.shapeType
-        if s.shapeType not in {NULL, self.shapeType}:
+        if s.shapeType != NULL and s.shapeType != self.shapeType:
             raise ShapefileException(
                 f"The shape's type ({s.shapeType}) must match "
                 f"the type of the shapefile ({self.shapeType})."
@@ -3166,11 +3166,11 @@ class Writer:
         new_bbox = self.__bbox(s) if s.shapeType != NULL else None
         new_mbox = (
             self.__mbox(s)
-            if s.shapeType in {POINTM, POINTZ} | _HasM._shapeTypes
+            if s.shapeType in _PointM._shapeTypes | _HasM._shapeTypes
             else None
         )
         new_zbox = (
-            self.__zbox(s) if s.shapeType in {POINTZ} | _HasZ._shapeTypes else None
+            self.__zbox(s) if s.shapeType in _PointZ._shapeTypes | _HasZ._shapeTypes else None
         )
 
         # Create an in-memory binary buffer to avoid
@@ -3266,7 +3266,7 @@ class Writer:
     def _dbf_missing_placeholder(
         value: RecordValue, field_type: FieldType, size: int
     ) -> str:
-        if field_type in {FieldType.N, FieldType.F}:
+        if field_type is FieldType.N or field_type is FieldType.F:
             return "*" * size  # QGIS NULL
         if field_type is FieldType.D:
             return "0" * 8  # QGIS NULL for date type
@@ -3354,7 +3354,7 @@ class Writer:
 
             if value in MISSING:
                 str_val = self._dbf_missing_placeholder(value, type_, size)
-            elif type_ in {FieldType.N, FieldType.F}:
+            elif type_ is FieldType.N or type_ is FieldType.F:
                 str_val = self._try_coerce_to_numeric_str(value, size, decimal)
             elif type_ is FieldType.D:
                 str_val = self._try_coerce_to_date_str(value)
