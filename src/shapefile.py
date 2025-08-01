@@ -1292,7 +1292,7 @@ class _HasM(_CanHaveBBox):
     m: Sequence[Optional[float]]
 
     def __init__(self, *args, **kwargs):
-        self.z = []
+        self.m = []
         super().__init__(*args, **kwargs)
 
     def _set_ms_from_byte_stream(
