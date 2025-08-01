@@ -19,7 +19,6 @@ import sys
 import tempfile
 import time
 import zipfile
-from collections.abc import Hashable
 from datetime import date
 from struct import Struct, calcsize, error, pack, unpack
 from typing import (
@@ -183,7 +182,7 @@ FieldTypeT = Literal["C", "D", "F", "L", "M", "N"]
 class FieldType:
     """A bare bones 'enum', as the enum library noticeably slows performance."""
 
-    # __slots__ = ["C", "D", "F", "L", "M", "N", "__members__", "raise_if_invalid", "is_numeric"]
+    # __slots__ = ["C", "D", "F", "L", "M", "N", "__members__"]
 
     C: Final = "C"  # "Character"  # (str)
     D: Final = "D"  # "Date"
@@ -200,6 +199,11 @@ class FieldType:
         "N",
     }  # set(__slots__) - {"__members__"}
 
+    # def raise_if_invalid(field_type: Hashable):
+    #     if field_type not in FieldType.__members__:
+    #         raise ShapefileException(
+    #             f"field_type must be in {{FieldType.__members__}}. Got: {field_type=}. "
+    #         )
 
 
 FIELD_TYPE_ALIASES: dict[Union[str, bytes], FieldTypeT] = {}
@@ -210,7 +214,7 @@ for c in FieldType.__members__:
     FIELD_TYPE_ALIASES[c.encode("ascii").upper()] = c
 
 
-
+# Use functional syntax to have an attribute named type, a Python keyword
 class Field(NamedTuple):
     name: str
     field_type: FieldTypeT
@@ -2569,7 +2573,7 @@ class Reader:
         # parse each value
         record = []
         for (__name, typ, __size, decimal), value in zip(fieldTuples, recordContents):
-            if FieldType.is_numeric(typ):
+            if typ is FieldType.N or typ is FieldType.F:
                 # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
                 value = value.split(b"\0")[0]
                 value = value.replace(b"*", b"")  # QGIS NULL is all '*' chars
@@ -2595,7 +2599,7 @@ class Reader:
                         except ValueError:
                             # not parseable as int, set to None
                             value = None
-            elif typ == FieldType.D:
+            elif typ is FieldType.D:
                 # date: 8 bytes - date stored as a string in the format YYYYMMDD.
                 if (
                     not value.replace(b"\x00", b"")
@@ -2613,7 +2617,7 @@ class Reader:
                     except (TypeError, ValueError):
                         # if invalid date, just return as unicode string so user can decimalde
                         value = str(value.strip())
-            elif typ == FieldType.L:
+            elif typ is FieldType.L:
                 # logical: 1 byte - initialized to 0x20 (space) otherwise T or F.
                 if value == b" ":
                     value = None  # space means missing or not yet set
@@ -3325,8 +3329,6 @@ class Writer:
             # fieldName, fieldType, size and deci were already checked
             # when their Field instance was created and added to self.fields
             str_val: Optional[str] = None
-
-
 
             if fieldType in ("N", "F"):
                 # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
