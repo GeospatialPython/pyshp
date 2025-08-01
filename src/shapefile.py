@@ -3333,27 +3333,47 @@ class Writer:
         # numeric or float: number stored as a string,
         # right justified, and padded with blanks
         # to the width of the field.
+
         if not decimal:
             # force to int
             try:
                 # first try to force directly to int.
                 # forcing a large int to float and back to int
                 # will lose information and result in wrong nr.
-                int_val = int(value)
+                value = int(value)
             except ValueError:
                 # forcing directly to int failed, so was probably a float.
-                int_val = int(float(value))
-            except TypeError:
-                raise ShapefileException(f"Could not form int from: {value}")
-            # length capped to the field size
-            return format(int_val, "d")[:size].rjust(size)
+                value = int(float(value))
+            return = format(value, "d")[:size].rjust(
+                size
+            )  # caps the size if exceeds the field size
+        else:
+            value = float(value)
+            return format(value, f".{deci}f")[:size].rjust(
+                size
+            )  # caps the size if exceeds the field size
 
-        try:
-            f_val = float(value)
-        except ValueError:
-            raise ShapefileException(f"Could not form float from: {value}")
-        # length capped to the field size
-        return format(f_val, f".{decimal}f")[:size].rjust(size)
+        # if not decimal:
+        #     # force to int
+        #     try:
+        #         # first try to force directly to int.
+        #         # forcing a large int to float and back to int
+        #         # will lose information and result in wrong nr.
+        #         int_val = int(value)
+        #     except ValueError:
+        #         # forcing directly to int failed, so was probably a float.
+        #         int_val = int(float(value))
+        #     except TypeError:
+        #         raise ShapefileException(f"Could not form int from: {value}")
+        #     # length capped to the field size
+        #     return format(int_val, "d")[:size].rjust(size)
+
+        # try:
+        #     f_val = float(value)
+        # except ValueError:
+        #     raise ShapefileException(f"Could not form float from: {value}")
+        # # length capped to the field size
+        # return format(f_val, f".{decimal}f")[:size].rjust(size)
 
     @staticmethod
     def _try_coerce_to_date_str(value: RecordValue) -> str:
