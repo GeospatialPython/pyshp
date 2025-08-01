@@ -27,7 +27,6 @@ from typing import (
     Container,
     Final,
     Generic,
-    Hashable,
     Iterable,
     Iterator,
     Literal,
@@ -182,19 +181,34 @@ class FieldType:
 
     # __slots__ = ["C", "D", "F", "L", "M", "N", "__members__"]
 
-    C: Final = "C"  # Character"  # (str)
+    C: Final = "C"  # "Character"  # (str)
     D: Final = "D"  # "Date"
     F: Final = "F"  # "Floating point"
     L: Final = "L"  # "Logical"  # (bool)
     M: Final = "M"  # "Memo"  # Legacy. (10 digit str, starting block in an .dbt file)
     N: Final = "N"  # "Numeric"  # (int)
-    __members__ = {"C", "D", "F", "L", "M", "N"}  # set(__slots__) - {"__members__"}
+    __members__: set[FieldTypeT] = {
+        "C",
+        "D",
+        "F",
+        "L",
+        "M",
+        "N",
+    }  # set(__slots__) - {"__members__"}
 
-    def raise_if_invalid(field_type: Hashable):
-        if field_type not in FieldType.__members__:
-            raise ShapefileException(
-                f"field_type must be in {{FieldType.__members__}}. Got: {field_type=}. "
-            )
+    # def raise_if_invalid(field_type: Hashable):
+    #     if field_type not in FieldType.__members__:
+    #         raise ShapefileException(
+    #             f"field_type must be in {{FieldType.__members__}}. Got: {field_type=}. "
+    #         )
+
+
+FIELD_TYPE_ALIASES: dict[Union[str, bytes], FieldTypeT] = {}
+for c in FieldType.__members__:
+    FIELD_TYPE_ALIASES[c.upper()] = c
+    FIELD_TYPE_ALIASES[c.lower()] = c
+    FIELD_TYPE_ALIASES[c.encode("ascii").lower()] = c
+    FIELD_TYPE_ALIASES[c.encode("ascii").upper()] = c
 
 
 # Use functional syntax to have an attribute named type, a Python keyword
@@ -208,24 +222,27 @@ class Field(NamedTuple):
     def from_unchecked(
         cls,
         name: str,
-        field_type: FieldTypeT = "C",
+        field_type: Union[str, bytes, FieldTypeT] = "C",
         size: int = 50,
         decimal: int = 0,
     ) -> Self:
-        field_type = cast(FieldTypeT, field_type.upper())
-        FieldType.raise_if_invalid(field_type)
+        if field_type not in FIELD_TYPE_ALIASES:
+            raise ShapefileException(
+                f"field_type must be in {{FieldType.__members__}}. Got: {field_type=}. "
+            )
+        type_ = FIELD_TYPE_ALIASES[field_type]
 
-        if field_type is FieldType.D:
+        if type_ is FieldType.D:
             size = 8
             decimal = 0
-        elif field_type is FieldType.L:
+        elif type_ is FieldType.L:
             size = 1
             decimal = 0
 
         # A doctest in README.md previously passed in a string ('40') for size,
         # so explictly convert name to str, and size and decimal to ints.
         return cls(
-            name=str(name), field_type=field_type, size=int(size), decimal=int(decimal)
+            name=str(name), field_type=type_, size=int(size), decimal=int(decimal)
         )
 
     def __repr__(self) -> str:
@@ -2426,8 +2443,7 @@ class Reader:
             name = encoded_name.decode(self.encoding, self.encodingErrors)
             name = name.lstrip()
 
-            field_type = cast(FieldTypeT, encoded_type_char.decode("ascii").upper())
-            FieldType.raise_if_invalid(field_type)
+            field_type = FIELD_TYPE_ALIASES[encoded_type_char]
 
             self.fields.append(Field(name, field_type, size, decimal))
         terminator = dbf.read(1)
