@@ -430,7 +430,7 @@ and the bounding box area the shapefile covers:
 	>>> len(sf)
 	663
 	>>> sf.bbox
-	BBox(xmin=-122.515048, ymin=37.652916, xmax=-122.327622, ymax=37.863433)
+	(-122.515048, 37.652916, -122.327622, 37.863433)
 
 Finally, if you would prefer to work with the entire shapefile in a different
 format, you can convert all of it to a GeoJSON dictionary, although you may lose
@@ -1388,7 +1388,7 @@ Shapefiles containing M-values can be examined in several ways:
 	>>> r = shapefile.Reader('shapefiles/test/linem')
 
 	>>> r.mbox # the lower and upper bound of M-values in the shapefile
-	MBox(mmin=0.0, mmax=3.0)
+	(0.0, 3.0)
 
 	>>> r.shape(0).m # flat list of M-values
 	[0.0, None, 3.0, None, 0.0, None, None]
@@ -1421,7 +1421,7 @@ To examine a Z-type shapefile you can do:
 	>>> r = shapefile.Reader('shapefiles/test/linez')
 
 	>>> r.zbox # the lower and upper bound of Z-values in the shapefile
-	ZBox(zmin=0.0, zmax=22.0)
+	(0.0, 22.0)
 
 	>>> r.shape(0).z # flat list of Z-values
 	[18.0, 20.0, 22.0, 0.0, 0.0, 0.0, 0.0, 15.0, 13.0, 14.0]
