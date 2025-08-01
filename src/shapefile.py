@@ -3349,7 +3349,7 @@ class Writer:
             )  # caps the size if exceeds the field size
         else:
             value = float(value)
-            return format(value, f".{deci}f")[:size].rjust(
+            return format(value, f".{decimal}f")[:size].rjust(
                 size
             )  # caps the size if exceeds the field size
 
