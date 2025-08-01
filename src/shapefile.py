@@ -3450,19 +3450,20 @@ class Writer:
             return b"*" * size  # QGIS NULL
         if not deci:
             # force to int
-            try:
-                # first try to force directly to int.
-                # forcing a large int to float and back to int
-                # will lose information and result in wrong nr.
-                value = int(value)
-            except ValueError:
-                # forcing directly to int failed, so was probably a float.
-                value = int(float(value))
+            if not isinstance(value, int):
+                try:
+                    # first try to force directly to int.
+                    # forcing a large int to float and back to int
+                    # will lose information and result in wrong nr.
+                    value = int(value)
+                except ValueError:
+                    # forcing directly to int failed, so was probably a float.
+                    value = int(float(value))
             return format(value, "d")[:size].rjust(
                 size
             )  # caps the size if exceeds the field size
-            
-        value = float(value)
+        if not isinstance(value, float):
+            value = float(value)
         return format(value, f".{deci}f")[:size].rjust(
             size
         )  # caps the size if exceeds the field size
