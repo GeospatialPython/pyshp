@@ -1218,11 +1218,11 @@ class Point(Shape):
         n = Point._write_x_y_to_byte_stream(b_io, x, y, i)
 
         # Write a single Z value
-        if s.shapeType == POINTZ:
+        if compatible_with(s, PointZ):
             n += PointZ._write_single_point_z_to_byte_stream(b_io, s, i)
 
         # Write a single M value
-        if s.shapeType in {POINTM, POINTZ}:
+        if compatible_with(s, PointM):
             n += PointM._write_single_point_m_to_byte_stream(b_io, s, i)
 
         return n
