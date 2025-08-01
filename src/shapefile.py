@@ -19,6 +19,7 @@ import sys
 import tempfile
 import time
 import zipfile
+from collections.abc import Hashable
 from datetime import date
 from struct import Struct, calcsize, error, pack, unpack
 from typing import (
@@ -27,7 +28,6 @@ from typing import (
     Container,
     Final,
     Generic,
-    Hashable,
     Iterable,
     Iterator,
     Literal,
@@ -180,7 +180,7 @@ FieldTypeT = Literal["C", "D", "F", "L", "M", "N"]
 class FieldType:
     """A bare bones 'enum', as the enum library noticeably slows performance."""
 
-    # __slots__ = ["C", "D", "F", "L", "M", "N", "__members__"]
+    # __slots__ = ["C", "D", "F", "L", "M", "N", "__members__", "raise_if_invalid", "is_numeric"]
 
     C: Final = "C"  # Character"  # (str)
     D: Final = "D"  # "Date"
@@ -190,11 +190,16 @@ class FieldType:
     N: Final = "N"  # "Numeric"  # (int)
     __members__ = {"C", "D", "F", "L", "M", "N"}  # set(__slots__) - {"__members__"}
 
+    @staticmethod
     def raise_if_invalid(field_type: Hashable):
         if field_type not in FieldType.__members__:
             raise ShapefileException(
                 f"field_type must be in {{FieldType.__members__}}. Got: {field_type=}. "
             )
+
+    @classmethod
+    def is_numeric(cls, member: FieldTypeT):
+        return member in (cls.F, cls.N)
 
 
 # Use functional syntax to have an attribute named type, a Python keyword
@@ -215,10 +220,10 @@ class Field(NamedTuple):
         field_type = cast(FieldTypeT, field_type.upper())
         FieldType.raise_if_invalid(field_type)
 
-        if field_type is FieldType.D:
+        if field_type == FieldType.D:
             size = 8
             decimal = 0
-        elif field_type is FieldType.L:
+        elif field_type == FieldType.L:
             size = 1
             decimal = 0
 
@@ -2426,7 +2431,8 @@ class Reader:
             name = encoded_name.decode(self.encoding, self.encodingErrors)
             name = name.lstrip()
 
-            field_type = cast(FieldTypeT, encoded_type_char.decode("ascii").upper())
+            decoded_type_char = encoded_type_char.upper().decode("ascii")
+            field_type: FieldTypeT = getattr(FieldType, decoded_type_char)
             FieldType.raise_if_invalid(field_type)
 
             self.fields.append(Field(name, field_type, size, decimal))
@@ -2547,7 +2553,7 @@ class Reader:
         # parse each value
         record = []
         for (__name, typ, __size, decimal), value in zip(fieldTuples, recordContents):
-            if typ is FieldType.N or typ is FieldType.F:
+            if FieldType.is_numeric(typ):
                 # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
                 value = value.split(b"\0")[0]
                 value = value.replace(b"*", b"")  # QGIS NULL is all '*' chars
@@ -2573,7 +2579,7 @@ class Reader:
                         except ValueError:
                             # not parseable as int, set to None
                             value = None
-            elif typ is FieldType.D:
+            elif typ == FieldType.D:
                 # date: 8 bytes - date stored as a string in the format YYYYMMDD.
                 if (
                     not value.replace(b"\x00", b"")
@@ -2591,7 +2597,7 @@ class Reader:
                     except (TypeError, ValueError):
                         # if invalid date, just return as unicode string so user can decimalde
                         value = str(value.strip())
-            elif typ is FieldType.L:
+            elif typ == FieldType.L:
                 # logical: 1 byte - initialized to 0x20 (space) otherwise T or F.
                 if value == b" ":
                     value = None  # space means missing or not yet set
@@ -3279,11 +3285,11 @@ class Writer:
     def _dbf_missing_placeholder(
         value: RecordValue, field_type: FieldTypeT, size: int
     ) -> str:
-        if field_type is FieldType.N or field_type is FieldType.F:
+        if FieldType.is_numeric(field_type):
             return "*" * size  # QGIS NULL
-        if field_type is FieldType.D:
+        if field_type == FieldType.D:
             return "0" * 8  # QGIS NULL for date type
-        if field_type is FieldType.L:
+        if field_type == FieldType.L:
             return " "
         return str(value)[:size].ljust(size)
 
@@ -3367,11 +3373,11 @@ class Writer:
 
             if value in MISSING:
                 str_val = self._dbf_missing_placeholder(value, type_, size)
-            elif type_ is FieldType.N or type_ is FieldType.F:
+            elif FieldType.is_numeric(type_):
                 str_val = self._try_coerce_to_numeric_str(value, size, decimal)
-            elif type_ is FieldType.D:
+            elif type_ == FieldType.D:
                 str_val = self._try_coerce_to_date_str(value)
-            elif type_ is FieldType.L:
+            elif type_ == FieldType.L:
                 str_val = self._try_coerce_to_logical_str(value)
             else:
                 if isinstance(value, bytes):
