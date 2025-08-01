@@ -175,43 +175,43 @@ class ReadWriteSeekableBinStream(Protocol):
 BinaryFileT = Union[str, IO[bytes]]
 BinaryFileStreamT = Union[IO[bytes], io.BytesIO, WriteSeekableBinStream]
 
-# https://en.wikipedia.org/wiki/.dbf#Database_records
 FieldTypeT = Literal["C", "D", "F", "L", "M", "N"]
 
 
-# class FieldType:
-#     """A bare bones 'enum', as the enum library noticeably slows performance."""
+# https://en.wikipedia.org/wiki/.dbf#Database_records
+class FieldType:
+    """A bare bones 'enum', as the enum library noticeably slows performance."""
 
-#     # __slots__ = ["C", "D", "F", "L", "M", "N", "__members__"]
+    # __slots__ = ["C", "D", "F", "L", "M", "N", "__members__"]
 
-#     C: Final = "C"  # "Character"  # (str)
-#     D: Final = "D"  # "Date"
-#     F: Final = "F"  # "Floating point"
-#     L: Final = "L"  # "Logical"  # (bool)
-#     M: Final = "M"  # "Memo"  # Legacy. (10 digit str, starting block in an .dbt file)
-#     N: Final = "N"  # "Numeric"  # (int)
-#     __members__: set[FieldTypeT] = {
-#         "C",
-#         "D",
-#         "F",
-#         "L",
-#         "M",
-#         "N",
-#     }  # set(__slots__) - {"__members__"}
+    C: Final = "C"  # "Character"  # (str)
+    D: Final = "D"  # "Date"
+    F: Final = "F"  # "Floating point"
+    L: Final = "L"  # "Logical"  # (bool)
+    M: Final = "M"  # "Memo"  # Legacy. (10 digit str, starting block in an .dbt file)
+    N: Final = "N"  # "Numeric"  # (int)
+    __members__: set[FieldTypeT] = {
+        "C",
+        "D",
+        "F",
+        "L",
+        "M",
+        "N",
+    }  # set(__slots__) - {"__members__"}
 
-#     # def raise_if_invalid(field_type: Hashable):
-#     #     if field_type not in FieldType.__members__:
-#     #         raise ShapefileException(
-#     #             f"field_type must be in {{FieldType.__members__}}. Got: {field_type=}. "
-#     #         )
+    # def raise_if_invalid(field_type: Hashable):
+    #     if field_type not in FieldType.__members__:
+    #         raise ShapefileException(
+    #             f"field_type must be in {{FieldType.__members__}}. Got: {field_type=}. "
+    #         )
 
-FIELD_TYPE_ALIASES = dict.fromkeys("CDFLMN")
-# FIELD_TYPE_ALIASES: dict[Union[str, bytes], FieldTypeT] = {}
-# for c in FieldType.__members__:
-#     FIELD_TYPE_ALIASES[c.upper()] = c
-#     FIELD_TYPE_ALIASES[c.lower()] = c
-#     FIELD_TYPE_ALIASES[c.encode("ascii").lower()] = c
-#     FIELD_TYPE_ALIASES[c.encode("ascii").upper()] = c
+
+FIELD_TYPE_ALIASES: dict[Union[str, bytes], FieldTypeT] = {}
+for c in FieldType.__members__:
+    FIELD_TYPE_ALIASES[c.upper()] = c
+    FIELD_TYPE_ALIASES[c.lower()] = c
+    FIELD_TYPE_ALIASES[c.encode("ascii").lower()] = c
+    FIELD_TYPE_ALIASES[c.encode("ascii").upper()] = c
 
 
 # Use functional syntax to have an attribute named type, a Python keyword
@@ -231,25 +231,25 @@ class Field(NamedTuple):
     ) -> Self:
         if field_type not in FIELD_TYPE_ALIASES:
             raise ShapefileException(
-                f"field_type must be in {FIELD_TYPE_ALIASES}. Got: {field_type=}. "
+                f"field_type must be in {{FieldType.__members__}}. Got: {field_type=}. "
             )
-        # type_ = FIELD_TYPE_ALIASES[field_type]
+        type_ = FIELD_TYPE_ALIASES[field_type]
 
-        if field_type == "D":
+        if type_ is FieldType.D:
             size = 8
             decimal = 0
-        elif field_type == "L":
+        elif type_ is FieldType.L:
             size = 1
             decimal = 0
 
         # A doctest in README.md previously passed in a string ('40') for size,
         # so explictly convert name to str, and size and decimal to ints.
         return cls(
-            name=str(name), field_type=field_type, size=int(size), decimal=int(decimal)
+            name=str(name), field_type=type_, size=int(size), decimal=int(decimal)
         )
 
     def __repr__(self) -> str:
-        return f'Field(name="{self.name}", field_type="{self.field_type}", size={self.size}, decimal={self.decimal})'
+        return f'Field(name="{self.name}", field_type=FieldType.{self.field_type}, size={self.size}, decimal={self.decimal})'
 
 
 RecordValueNotDate = Union[bool, int, float, str, date]
@@ -2452,8 +2452,7 @@ class Reader:
             name = encoded_name.decode(self.encoding, self.encodingErrors)
             name = name.lstrip()
 
-            # field_type = FIELD_TYPE_ALIASES[encoded_type_char]
-            field_type = encoded_type_char.decode("ascii")
+            field_type = FIELD_TYPE_ALIASES[encoded_type_char]
 
             self.fields.append(Field(name, field_type, size, decimal))
         terminator = dbf.read(1)
@@ -2463,7 +2462,7 @@ class Reader:
             )
 
         # insert deletion field at start
-        self.fields.insert(0, Field("DeletionFlag", "C", 1, 0))
+        self.fields.insert(0, Field("DeletionFlag", FieldType.C, 1, 0))
 
         # store all field positions for easy lookups
         # note: fieldLookup gives the index position of a field inside Reader.fields
@@ -2573,7 +2572,7 @@ class Reader:
         # parse each value
         record = []
         for (__name, typ, __size, decimal), value in zip(fieldTuples, recordContents):
-            if typ in ("N", "F"): #typ is FieldType.F:
+            if typ is FieldType.N or typ is FieldType.F:
                 # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
                 value = value.split(b"\0")[0]
                 value = value.replace(b"*", b"")  # QGIS NULL is all '*' chars
@@ -2599,7 +2598,7 @@ class Reader:
                         except ValueError:
                             # not parseable as int, set to None
                             value = None
-            elif typ == "D":
+            elif typ is FieldType.D:
                 # date: 8 bytes - date stored as a string in the format YYYYMMDD.
                 if (
                     not value.replace(b"\x00", b"")
@@ -2617,7 +2616,7 @@ class Reader:
                     except (TypeError, ValueError):
                         # if invalid date, just return as unicode string so user can decimalde
                         value = str(value.strip())
-            elif typ == "L":
+            elif typ is FieldType.L:
                 # logical: 1 byte - initialized to 0x20 (space) otherwise T or F.
                 if value == b" ":
                     value = None  # space means missing or not yet set
@@ -3313,11 +3312,11 @@ class Writer:
     def _dbf_missing_placeholder(
         value: RecordValue, field_type: FieldTypeT, size: int
     ) -> str:
-        if field_type in ("N", "F"): #field_type is FieldType.F:
+        if field_type is FieldType.N or field_type is FieldType.F:
             return "*" * size  # QGIS NULL
-        if field_type == "D":
+        if field_type is FieldType.D:
             return "0" * 8  # QGIS NULL for date type
-        if field_type == "L":
+        if field_type is FieldType.L:
             return " "
         return str(value)[:size].ljust(size)
 
@@ -3401,11 +3400,11 @@ class Writer:
 
             if value in MISSING:
                 str_val = self._dbf_missing_placeholder(value, type_, size)
-            elif type_ in ("N", "F"): #type_ is FieldType.F:
+            elif type_ is FieldType.N or type_ is FieldType.F:
                 str_val = self._try_coerce_to_numeric_str(value, size, decimal)
-            elif type_ == "D":
+            elif type_ is FieldType.D:
                 str_val = self._try_coerce_to_date_str(value)
-            elif type_ == "L":
+            elif type_ is FieldType.L:
                 str_val = self._try_coerce_to_logical_str(value)
             else:
                 if isinstance(value, bytes):
