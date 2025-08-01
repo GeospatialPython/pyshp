@@ -124,7 +124,7 @@ PointT = Union[Point2D, PointMT, PointZT]
 PointsT = list[PointT]
 
 BBox = tuple[float, float, float, float]
-MBox = tuple[float, float]
+MBox = tuple[Optional[float], Optional[float]]
 ZBox = tuple[float, float]
 
 # class BBox(NamedTuple):
@@ -1002,7 +1002,7 @@ class _CanHaveBBox(Shape):
     bbox: Optional[BBox] = None
 
     def _get_set_bbox_from_byte_stream(self, b_io: ReadableBinStream) -> BBox:
-        self.bbox: BBox = tuple(_Array[float]("d", unpack("<4d", b_io.read(32))))
+        self.bbox: BBox = unpack("<4d", b_io.read(32))
         return self.bbox
 
     @staticmethod
@@ -1192,7 +1192,7 @@ class Point(Shape):
     @staticmethod
     def _x_y_from_byte_stream(b_io: ReadableBinStream):
         # Unpack _Array too
-        x, y = _Array[float]("d", unpack("<2d", b_io.read(16)))
+        x, y = unpack("<2d", b_io.read(16))
         # Convert to tuple
         return x, y
 
@@ -1298,7 +1298,7 @@ class _HasM(_CanHaveBBox):
         # Measure values less than -10e38 are nodata values according to the spec
         if next_shape - b_io.tell() >= nPoints * 8:
             self.m = []
-            for m in _Array[float]("d", unpack(f"<{nPoints}d", b_io.read(nPoints * 8))):
+            for m in unpack(f"<{nPoints}d", b_io.read(nPoints * 8)):
                 if m > NODATA:
                     self.m.append(m)
                 else:
@@ -2237,11 +2237,13 @@ class Reader:
         shp.seek(32)
         self.shapeType = unpack("<i", shp.read(4))[0]
         # The shapefile's bounding box (lower left, upper right)
-        self.bbox: BBox = tuple(_Array("d", unpack("<4d", shp.read(32))))
+        # self.bbox: BBox = tuple(_Array("d", unpack("<4d", shp.read(32))))
+        self.bbox: BBox = unpack("<4d", shp.read(32))
         # xmin, ymin, xmax, ymax = unpack("<4d", shp.read(32))
         # self.bbox = BBox(xmin=xmin, ymin=ymin, xmax=xmax, ymax=ymax)
         # Elevation
-        self.zbox = _Array("d", unpack("<2d", shp.read(16)))
+        # self.zbox: ZBox = tuple(_Array("d", unpack("<2d", shp.read(16))))
+        self.zbox: ZBox = unpack("<2d", shp.read(16))
         # zmin, zmax = unpack("<2d", shp.read(16))
         # self.zbox = ZBox(zmin=zmin, zmax=zmax)
         # Measure
@@ -2251,7 +2253,7 @@ class Reader:
             for m_bound in unpack("<2d", shp.read(16))
         ]
         # self.mbox = MBox(mmin=m_bounds[0], mmax=m_bounds[1])
-        self.mbox = (m_bounds[0], m_bounds[1])
+        self.mbox: MBox = (m_bounds[0], m_bounds[1])
 
     def __shape(
         self, oid: Optional[int] = None, bbox: Optional[BBox] = None
