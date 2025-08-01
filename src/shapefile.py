@@ -3309,8 +3309,6 @@ class Writer:
             record = ["" for _ in range(fieldCount)]
         self.__dbfRecord(record)
 
-
-
     def __dbfRecord(self, record):
         """Writes the dbf records."""
         f = self.__getFileObj(self.dbf)
