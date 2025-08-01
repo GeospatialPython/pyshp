@@ -1002,7 +1002,7 @@ class _CanHaveBBox(Shape):
     bbox: Optional[BBox] = None
 
     def _get_set_bbox_from_byte_stream(self, b_io: ReadableBinStream) -> BBox:
-        self.bbox: BBox = tuple(*_Array[float]("d", unpack("<4d", b_io.read(32))))
+        self.bbox: BBox = tuple(_Array[float]("d", unpack("<4d", b_io.read(32))))
         return self.bbox
 
     @staticmethod
