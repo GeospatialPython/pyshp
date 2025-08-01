@@ -3166,11 +3166,13 @@ class Writer:
         new_bbox = self.__bbox(s) if s.shapeType != NULL else None
         new_mbox = (
             self.__mbox(s)
-            if s.shapeType in _PointM._shapeTypes | _HasM._shapeTypes
+            if s.shapeType in PointM._shapeTypes | _HasM._shapeTypes
             else None
         )
         new_zbox = (
-            self.__zbox(s) if s.shapeType in _PointZ._shapeTypes | _HasZ._shapeTypes else None
+            self.__zbox(s)
+            if s.shapeType in PointZ._shapeTypes | _HasZ._shapeTypes
+            else None
         )
 
         # Create an in-memory binary buffer to avoid
