@@ -3344,7 +3344,7 @@ class Writer:
             except ValueError:
                 # forcing directly to int failed, so was probably a float.
                 value = int(float(value))
-            return = format(value, "d")[:size].rjust(
+            return format(value, "d")[:size].rjust(
                 size
             )  # caps the size if exceeds the field size
         else:
