@@ -1162,7 +1162,7 @@ class _CanHaveParts(_CanHaveBBox):
         return unpack("<i", b_io.read(4))[0]
 
     @staticmethod
-    def _write_nparts_to_byte_stream(b_io: WriteableBinStream, s) -> int:
+    def _write_nparts_to_byte_stream(b_io: WriteableBinStream, s: _CanHaveParts) -> int:
         return b_io.write(pack("<i", len(s.parts)))
 
     def _set_parts_from_byte_stream(self, b_io: ReadableBinStream, nParts: int):
@@ -2984,11 +2984,8 @@ class Writer:
         self._bbox = (min(x), min(y), max(x), max(y))
         return self._bbox
 
-    def __zbox(self, s) -> ZBox:
+    def __zbox(self, s: Union[_HasZ, PointZ]) -> ZBox:
         z: list[float] = []
-        if self._zbox:
-            z.extend(self._zbox)
-
         for p in s.points:
             try:
                 z.append(p[2])
@@ -2996,18 +2993,19 @@ class Writer:
                 # point did not have z value
                 # setting it to 0 is probably ok, since it means all are on the same elevation
                 z.append(0)
+        zbox = (min(z), max(z))
+        # update global
+        if self._zbox:
+            # compare with existing
+            self._zbox = (min(zbox[0], self._zbox[0]), max(zbox[1], self._zbox[1]))
+        else:
+            # first time zbox is being set
+            self._zbox = zbox
+        return zbox
 
-        # Original self._zbox bounds (if any) are the first two entries.
-        # Set zbox for the first, and all later times
-        # self._zbox = ZBox(zmin=min(z), zmax=max(z))
-        self._zbox = (min(z), max(z))
-        return self._zbox
-
-    def __mbox(self, s) -> MBox:
-        mpos = 3 if s.shapeType in _HasZ._shapeTypes else 2
+    def __mbox(self, s: Union[_HasM, PointM]) -> MBox:
+        mpos = 3 if s.shapeType in _HasZ._shapeTypes | PointZ.shapeTypes else 2
         m: list[float] = []
-        if self._mbox:
-            m.extend(m_bound for m_bound in self._mbox if m_bound is not None)
 
         for p in s.points:
             try:
@@ -3021,12 +3019,16 @@ class Writer:
         if not m:
             # only if none of the shapes had m values, should mbox be set to missing m values
             m.append(NODATA)
+        mbox = (min(m), max(m))
+        # update global
+        if self._mbox:
+            # compare with existing
+            self._mbox = (min(mbox[0], self._mbox[0]), max(mbox[1], self._mbox[1]))
+        else:
+            # first time mbox is being set
+            self._mbox = mbox
+        return mbox
 
-        # Original self._mbox bounds (if any) are the first two entries.
-        # Set mbox for the first, and all later times
-        # self._mbox = MBox(mmin=min(m), mmax=max(m))
-        self._mbox = (min(m), max(m))
-        return self._mbox
 
     @property
     def shapeTypeName(self) -> str:
