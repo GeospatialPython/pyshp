@@ -98,14 +98,17 @@ part of your geospatial project.
 ### Breaking Changes:
 - Python 2 and Python 3.8 support dropped.
 - Field info tuple is now a namedtuple (Field) instead of a list.
-- Field type codes are now FieldType enum members.
+- Field type codes are now FieldType 'enum' members.
 - bbox, mbox and zbox attributes are all new Namedtuples.
-- Writer does not mutate shapes.
+- Writer does not mutate Shapes.
 - New custom subclasses for each shape type: Null, Multipatch, Point, Polyline,
   Multipoint, and Polygon, plus the latter 4's M and Z variants (Reader and
   Writer are still compatible with their base class, Shape, as before).
 - Shape sub classes are creatable from, and serializable to bytes streams,
   as per the shapefile spec.
+
+### Improvements:
+- Speeded up writing shapefiles by up to another ~27% (on top of the recent ~39% improvement in 2.4.1).
 
 ### Code quality
 - Statically typed, and checked with Mypy
