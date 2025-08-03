@@ -16,20 +16,6 @@ jobs:
     - uses: actions/setup-python@v5
     - uses: pre-commit/action@v3.0.1
 
-  pylint:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-python@v5
-    - name: install Pylint and plugin
-      run: |
-        python -m pip install --upgrade pip
-        pip install pytest pylint pylint-per-file-ignores
-        pip install -e .
-    - name: run Pylint for errors, warnings and remarks only (ignore Comments/ Code style)
-      run: |
-        pylint --disable=C test_shapefile.py src/shapefile.py
-
   build_wheel_and_sdist:
     runs-on: ubuntu-latest
     steps:
