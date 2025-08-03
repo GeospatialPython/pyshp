@@ -466,6 +466,8 @@ index which is 7.
 
 
 	>>> s = sf.shape(7)
+	>>> s
+	Polygon #7
 
 
 	>>> # Read the bbox of the 8th shape to verify
