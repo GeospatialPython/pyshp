@@ -44,7 +44,6 @@ VERSION 2.4.1
 	* If this negatively impacts your project, all feedback about this decision is welcome
 	  on our [the discussion page](https://github.com/GeospatialPython/pyshp/discussions/290).
 
-
 VERSION 2.4.0
 
 2025-07-21
@@ -58,7 +57,6 @@ VERSION 2.4.0
 	* Code quality tools (Ruff format) run on PyShp
 	* Network, non-network, or all doctests selectable via command line args
 	* Network tests made runnable on localhost.
-
 
 VERSION 2.3.1
 
