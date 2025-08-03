@@ -2327,6 +2327,10 @@ class Reader:
                     # Close and delete the temporary zipfile
                     try:
                         zipfileobj.close()
+                        # TODO Does catching all possible exceptions really increase
+                        # the chances of closing the zipfile successully, or does it
+                        # just mean .close() failures will still fail, but fail
+                        # silently?
                     except:  # noqa: E722
                         pass
                     # Try to load shapefile
@@ -3550,15 +3554,16 @@ class Writer:
         # Check is shape or import from geojson
         if not isinstance(s, Shape):
             if hasattr(s, "__geo_interface__"):
-                s = s.__geo_interface__  # type: ignore [assignment]
+                shape_dict = cast(dict, s.__geo_interface__)
             if isinstance(s, dict):
-                s = Shape._from_geojson(s)
+                shape_dict = s
             else:
                 raise TypeError(
                     "Can only write Shape objects, GeoJSON dictionaries, "
                     "or objects with the __geo_interface__, "
                     f"not: {s}"
                 )
+            s = Shape._from_geojson(shape_dict)
         # Write to file
         offset, length = self.__shpRecord(s)
         if self.shx:
