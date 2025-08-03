@@ -1,7 +1,56 @@
 [build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
+[project]
+name = "pyshp"
+authors = [
+    {name = "Joel Lawhead", email = "jlawhead@geospatialpython.com"},
+]
+maintainers = [
+    {name = "Karim Bahgat", email = "karim.bahgat.norway@gmail.com"}
+]
+readme = "README.md"
+keywords = ["gis", "geospatial", "geographic", "shapefile", "shapefiles"]
+description = "Pure Python read/write support for ESRI Shapefile format"
+license = "MIT"
+license-files = ["LICENSE.TXT"]
+dynamic = ["version"]
+requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Scientific/Engineering :: GIS",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+]
+
+[project.optional-dependencies]
+dev = ["pyshp[test]", "pre-commit", "ruff"]
+test = ["pytest"]
+
+[project.urls]
+Repository = "https://github.com/GeospatialPython/pyshp"
+
+[tool.hatch.build.targets.sdist]
+only-include = ["src", "shapefiles", "test_shapefile.py"]
+
+[tool.hatch.build.targets.wheel]
+only-include = ["src"]
+sources = {"src" = ""}  # move from "src" directory for wheel
+
+[tool.hatch.version]
+path = "src/shapefile.py"
+
+[tool.pytest.ini_options]
+markers = [
+    "network: marks tests requiring network access",
+    "slow: marks other tests that cause bottlenecks",
+]
 
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.
@@ -39,7 +88,7 @@ line-length = 88
 indent-width = 4
 
 # Assume Python 3.9
-target-version = "py37"
+target-version = "py39"
 
 [tool.ruff.lint]
 # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
@@ -67,23 +116,3 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 
 
-
-[tool.pylint.MASTER]
-load-plugins=[
-    "pylint_per_file_ignores",
-]
-
-[tool.pylint.'MESSAGES CONTROL']
-# Silence warning: shapefile.py:2076:20: W0212: Access to a protected
-#                  member _from_geojson of a client class (protected-access)
-#
-# Silence warnings: test_shapefile.py:{783,786,799,803,06,1195}:19:
-#                   W0212: Access to a protected member _offsets of a
-#                   client class (protected-access)
-#
-# Toml multi-line string used instead of array due to:
-# https://github.com/christopherpickering/pylint-per-file-ignores/issues/160
-per-file-ignores = """
-    shapefile.py:W0212
-    test_shapefile.py:W0212
-"""

@@ -8,7 +8,17 @@ on:
 
 jobs:
 
+
+  build_wheel_and_sdist:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+    - name: Build wheel from the project repo
+      uses: ./.github/actions/build_wheel_and_sdist
+
   run_speed_tests:
+    needs: build_wheel_and_sdist
     strategy:
       fail-fast: false
       matrix:
@@ -28,17 +38,23 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
+    - name: Download wheel and sdist (built in previous job)
+      uses: actions/download-artifact@v4
+      with:
+        name: PyShp_wheel_and_sdist
+        path: dist
+
+    - name: Install PyShp + test deps from the wheel (downloaded in prev step)
+      shell: bash
+      working-directory: dist/
+      run: |
+        WHEEL_NAME=$(ls pyshp-*py3-none-any.whl)
+        python -m pip install $WHEEL_NAME[test]
 
     - uses: actions/checkout@v4
       with:
         path: ./Pyshp
 
-    - name: Install PyShp + test deps
-      shell: bash
-      working-directory: ./Pyshp
-      run: |
-        python -m pip install -r requirements.test.txt
-        python -m pip install -e .
 
 
     - name: Checkout shapefiles and zip file artefacts repo
@@ -50,7 +66,7 @@ jobs:
     - name: Run Speed tests.
       env:
         PYSHP_TEST_REPO: ./PyShp_test_shapefile
-      run: python Pyshp/run_benchmarks.py
+      run: python ./Pyshp/run_benchmarks.py
 
 
 

@@ -5,7 +5,6 @@ name: Run pre-commit hooks and tests
 on:
   push:
   pull_request:
-    branches: [ master, ]
   workflow_call:
   workflow_dispatch:
 
@@ -17,55 +16,16 @@ jobs:
     - uses: actions/setup-python@v5
     - uses: pre-commit/action@v3.0.1
 
-  pylint:
+  build_wheel_and_sdist:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
-    - name: install Pylint and plugin
-      run: |
-        python -m pip install --upgrade pip
-        pip install pytest pylint pylint-per-file-ignores
-    - name: run Pylint for errors and warnings only, on test_shapefile.py
-      run: |
-        pylint --disable=R,C test_shapefile.py
-
-  test_on_EOL_Pythons:
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: [
-            "2.7",
-            "3.5",
-            "3.6",
-            "3.7",
-            "3.8",
-        ]
-
-    runs-on: ubuntu-latest
-    container:
-      image: python:${{ matrix.python-version }}
-
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        path: ./Pyshp
-
-    - name: Non-network tests
-      uses: ./Pyshp/.github/actions/test
-      with:
-        pyshp_repo_directory: ./Pyshp
-        python-version: ${{ matrix.python-version }}
-
-    - name: Network tests
-      uses: ./Pyshp/.github/actions/test
-      with:
-        extra_args: '-m network'
-        replace_remote_urls_with_localhost: 'yes'
-        pyshp_repo_directory: ./Pyshp
-        python-version: ${{ matrix.python-version }}
+    - name: Build wheel from the project repo
+      uses: ./.github/actions/build_wheel_and_sdist
 
   test_on_supported_Pythons:
+    needs: build_wheel_and_sdist
     strategy:
       fail-fast: false
       matrix:
@@ -98,12 +58,11 @@ jobs:
       uses: ./Pyshp/.github/actions/test
       with:
         pyshp_repo_directory: ./Pyshp
-        python-version: ${{ matrix.python-version }}
 
     - name: Network tests
       uses: ./Pyshp/.github/actions/test
       with:
         extra_args: '-m network'
         replace_remote_urls_with_localhost: 'yes'
+        # Checkout to ./PyShp, as the test job also needs to check out the artefact repo
         pyshp_repo_directory: ./Pyshp
-        python-version: ${{ matrix.python-version }}

@@ -41,7 +41,7 @@ def benchmark(
     time_taken = timeit.timeit(func, number=run_count)
     print("\b" * len(placeholder), end="")
     time_suffix = " s"
-    print(f"{time_taken:{col_widths[1]-len(time_suffix)}.3g}{time_suffix}", end="")
+    print(f"{time_taken:{col_widths[1] - len(time_suffix)}.3g}{time_suffix}", end="")
     print()
     return time_taken
 

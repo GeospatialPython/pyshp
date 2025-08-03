@@ -1,3 +1,33 @@
+VERSION 3.0.0-alpha
+
+2025-08-03
+	Breaking Changes:
+	* Python 2 and Python 3.8 support dropped.
+	* Field info tuple is now a namedtuple (Field) instead of a list.
+	* Field type codes are now FieldType 'enum' members.
+	* bbox, mbox and zbox attributes are all new Namedtuples.
+	* Writer does not mutate Shapes.
+	* New custom subclasses for each shape type: Null, Multipatch, Point, Polyline,
+	  Multipoint, and Polygon, plus the latter 4's M and Z variants (Reader and
+	  Writer are still compatible with their base class, Shape, as before).
+	* Shape sub classes are creatable from, and serializable to bytes streams,
+	  as per the shapefile spec.
+
+    Code quality
+	* Statically typed and checked with Mypy
+	* Checked with Ruff.
+    * Type hints
+	* f-strings
+	* Remove Python 2 specific functions.
+	* Run doctests against wheels.
+	* Testing of wheels before publishing them
+	* pyproject.toml src layout
+	* Slow test marked.
+
+	Improvements:
+	* Speeded up writing shapefiles by up to another ~27% (on top of the recent ~39% improvement in 2.4.1).
+
+
 VERSION 2.4.1
 
 2025-07-30
