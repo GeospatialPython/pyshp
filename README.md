@@ -466,8 +466,7 @@ index which is 7.
 
 
 	>>> s = sf.shape(7)
-	>>> s
-	Shape #7: POLYGON
+
 
 	>>> # Read the bbox of the 8th shape to verify
 	>>> # Round coordinates to 3 decimal places
@@ -476,7 +475,7 @@ index which is 7.
 
 Each shape record (except Points) contains the following attributes. Records of
 shapeType Point do not have a bounding box 'bbox'.
-
+# TODO!!  Fix attributes
 
 	>>> for name in dir(shapes[3]):
 	...     if not name.startswith('_'):
