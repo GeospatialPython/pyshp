@@ -323,7 +323,10 @@ class GeoJSONFeatureCollection(TypedDict):
 
 
 class GeoJSONFeatureCollectionWithBBox(GeoJSONFeatureCollection):
-    # bbox is technically optional under the spec
+    # bbox is technically optional under the spec but this seems
+    # a very minor improvement that would require NotRequired
+    # from the typing-extensions backport for Python 3.9
+    # (PyShp's resisted having any other dependencies so far!)
     bbox: list[float]
 
 
@@ -717,6 +720,11 @@ class Shape:
         are designated by their starting index in geometry record's
         list of shapes. For MultiPatch geometry, partTypes designates
         the patch type of each of the parts.
+        Lines allows the points-lists and parts to be denoted together
+        in one argument.  It is intended for multiple point shapes
+        (polylines, polygons and multipatches) but if used as a length-1
+        nested list for a multipoint (instead of points for some reason)
+        PyShp will not complain, as multipoints only have 1 part internally.
         """
 
         # Preserve previous behaviour for anyone who set self.shapeType = None
@@ -732,7 +740,6 @@ class Shape:
         default_points: PointsT = []
         default_parts: list[int] = []
 
-        # Make sure polygon rings (parts) are closed
         if lines is not None:
             if self.shapeType in Polygon_shapeTypes:
                 lines = list(lines)
@@ -1055,7 +1062,7 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
 class NullShape(Shape):
     # Shape.shapeType = NULL already,
     # to preserve handling of default args in Shape.__init__
-    # Repeated for clarity.
+    # Repeated for the avoidance of doubt.
     def __init__(
         self,
         oid: Optional[int] = None,
@@ -1100,8 +1107,8 @@ _CanHaveBBox_shapeTypes = frozenset(
 
 class _CanHaveBBox(Shape):
     """As well as setting bounding boxes, we also utilize the
-    fact that this mixin applies to all the shapes that are
-    not a single point.
+    fact that this mixin only applies to all the shapes that are
+    not a single point (polylines, polygons, multipatches and multipoints).
     """
 
     @staticmethod
@@ -1185,10 +1192,6 @@ class _CanHaveBBox(Shape):
                     b_io, nParts
                 )
 
-        # else:
-        #     parts = None
-        #     partTypes = None
-
         if nPoints:
             kwargs["points"] = cast(
                 PointsT, cls._read_points_from_byte_stream(b_io, nPoints)
@@ -1204,25 +1207,7 @@ class _CanHaveBBox(Shape):
                     b_io, nPoints, next_shape
                 )
 
-        # else:
-        #     points = None
-        #     zbox, zs = None, None
-        #     mbox, ms = None, None
-
         return ShapeClass(**kwargs)
-        # return ShapeClass(
-        #     shapeType=shapeType,
-        #     # Mypy 1.17.1 doesn't figure out that an Optional[list[Point2D]] is an Optional[list[PointT]]
-        #     points=cast(Optional[PointsT], points),
-        #     parts=parts,
-        #     partTypes=partTypes,
-        #     oid=oid,
-        #     m=ms,
-        #     z=zs,
-        #     bbox=shape_bbox,
-        #     mbox=mbox,
-        #     zbox=zbox,
-        # )
 
     @staticmethod
     def write_to_byte_stream(
@@ -1231,7 +1216,7 @@ class _CanHaveBBox(Shape):
         i: int,
     ) -> int:
         # We use static methods here and below,
-        # to support s only being an instance of a the
+        # to support s only being an instance of the
         # Shape base class (with shapeType set)
         # i.e. not necessarily one of our newer shape specific
         # sub classes.
@@ -2327,6 +2312,10 @@ class Reader:
                     # Close and delete the temporary zipfile
                     try:
                         zipfileobj.close()
+                        # TODO Does catching all possible exceptions really increase
+                        # the chances of closing the zipfile successully, or does it
+                        # just mean .close() failures will still fail, but fail
+                        # silently?
                     except:  # noqa: E722
                         pass
                     # Try to load shapefile
@@ -3550,15 +3539,16 @@ class Writer:
         # Check is shape or import from geojson
         if not isinstance(s, Shape):
             if hasattr(s, "__geo_interface__"):
-                s = s.__geo_interface__  # type: ignore [assignment]
+                shape_dict = cast(dict, s.__geo_interface__)
             if isinstance(s, dict):
-                s = Shape._from_geojson(s)
+                shape_dict = s
             else:
                 raise TypeError(
                     "Can only write Shape objects, GeoJSON dictionaries, "
                     "or objects with the __geo_interface__, "
                     f"not: {s}"
                 )
+            s = Shape._from_geojson(shape_dict)
         # Write to file
         offset, length = self.__shpRecord(s)
         if self.shx:
@@ -3600,7 +3590,8 @@ class Writer:
         # Record number, Content length place holder
         b_io.write(pack(">2i", self.shpNum, -1))
 
-        # Track number of content bytes written.  Excluding self.shpNum and length t.b.c.
+        # Track number of content bytes written, excluding
+        # self.shpNum and length (t.b.c.)
         n = 0
 
         n += b_io.write(pack("<i", s.shapeType))
@@ -3962,7 +3953,7 @@ def _filter_network_doctests(
 
 def _replace_remote_url(
     old_url: str,
-    # Default port of Python http.server and Python 2's SimpleHttpServer
+    # Default port of Python http.server
     port: int = 8000,
     scheme: str = "http",
     netloc: str = "localhost",
