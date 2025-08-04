@@ -37,6 +37,7 @@ from typing import (
     Protocol,
     Reversible,
     Sequence,
+    SupportsIndex,
     TypedDict,
     TypeVar,
     Union,
@@ -231,7 +232,7 @@ class Field(NamedTuple):
         return f'Field(name="{self.name}", field_type=FieldType.{self.field_type}, size={self.size}, decimal={self.decimal})'
 
 
-RecordValueNotDate = Union[bool, int, float, str, date]
+RecordValueNotDate = Union[bool, int, float, str]
 
 # A Possible value in a Shapefile dbf record, i.e. L, N, M, F, C, or D types
 RecordValue = Union[RecordValueNotDate, date]
@@ -2033,7 +2034,15 @@ class _Record(list[RecordValue]):
         except KeyError:
             raise AttributeError(f"{key} is not a field name")
 
-    def __getitem__(self, item):
+    @overload
+    def __getitem__(self, i: SupportsIndex) -> RecordValue: ...
+    @overload
+    def __getitem__(self, s: slice) -> list[RecordValue]: ...
+    @overload
+    def __getitem__(self, s: str) -> RecordValue: ...
+    def __getitem__(
+        self, item: Union[SupportsIndex, slice, str]
+    ) -> Union[RecordValue, list[RecordValue]]:
         """
         Extends the normal list item access with
         access using a fieldname
@@ -2043,10 +2052,10 @@ class _Record(list[RecordValue]):
         :return: the value of the field
         """
         try:
-            return list.__getitem__(self, item)
+            return list.__getitem__(self, item)  # type: ignore[index]
         except TypeError:
             try:
-                index = self.__field_positions[item]
+                index = self.__field_positions[item]  # type: ignore[index]
             except KeyError:
                 index = None
         if index is not None:
@@ -2054,7 +2063,17 @@ class _Record(list[RecordValue]):
 
         raise IndexError(f'"{item}" is not a field name and not an int')
 
-    def __setitem__(self, key, value) -> None:
+    @overload
+    def __setitem__(self, key: SupportsIndex, value: RecordValue) -> None: ...
+    @overload
+    def __setitem__(self, key: slice, value: Iterable[RecordValue]) -> None: ...
+    @overload
+    def __setitem__(self, key: str, value: RecordValue) -> None: ...
+    def __setitem__(
+        self,
+        key: Union[SupportsIndex, slice, str],
+        value: Union[RecordValue, Iterable[RecordValue]],
+    ) -> None:
         """
         Extends the normal list item access with
         access using a fieldname
@@ -2064,11 +2083,11 @@ class _Record(list[RecordValue]):
         :param value: the new value of the field
         """
         try:
-            return list.__setitem__(self, key, value)
+            return list.__setitem__(self, key, value)  # type: ignore[misc,assignment]
         except TypeError:
-            index = self.__field_positions.get(key)
+            index = self.__field_positions.get(key)  # type: ignore[arg-type]
             if index is not None:
-                return list.__setitem__(self, index, value)
+                return list.__setitem__(self, index, value)  # type: ignore[misc]
 
             raise IndexError(f"{key} is not a field name and not an int")
 
