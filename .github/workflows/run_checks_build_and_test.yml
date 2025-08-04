@@ -16,7 +16,6 @@ jobs:
     - uses: pre-commit/action@v3.0.1
 
   mypy-strict:
-    continue-on-error: true
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
