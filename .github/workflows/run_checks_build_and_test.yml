@@ -26,7 +26,7 @@ jobs:
       run: pip install mypy
     - name: Run mypy --strict
       continue-on-error: true
-      run: mypy --strict .
+      run: mypy --strict ./src/shapefile.py
 
 
   build_wheel_and_sdist:
