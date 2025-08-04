@@ -2507,7 +2507,7 @@ class Reader:
     def shapeTypeName(self) -> str:
         return SHAPETYPE_LOOKUP[self.shapeType]
 
-    def load(self, shapefile=None) -> None:
+    def load(self, shapefile: Optional[str]=None) -> None:
         """Opens a shapefile from a filename or file-like
         object. Normally this method would be called by the
         constructor with the file name as an argument."""
@@ -2569,19 +2569,19 @@ class Reader:
             self._files_to_close.append(shp_dbf_or_dhx_file)
         return shp_dbf_or_dhx_file
 
-    def load_shp(self, shapefile_name) -> None:
+    def load_shp(self, shapefile_name: str) -> None:
         """
         Attempts to load file with .shp extension as both lower and upper case
         """
         self.shp = self._load_constituent_file(shapefile_name, "shp")
 
-    def load_shx(self, shapefile_name) -> None:
+    def load_shx(self, shapefile_name: str) -> None:
         """
         Attempts to load file with .shx extension as both lower and upper case
         """
         self.shx = self._load_constituent_file(shapefile_name, "shx")
 
-    def load_dbf(self, shapefile_name) -> None:
+    def load_dbf(self, shapefile_name: str) -> None:
         """
         Attempts to load file with .dbf extension as both lower and upper case
         """
@@ -3207,7 +3207,7 @@ class Writer:
         shx: Optional[WriteSeekableBinStream] = None,
         dbf: Optional[WriteSeekableBinStream] = None,
         # Keep kwargs even though unused, to preserve PyShp 2.4 API
-        **kwargs,
+        **kwargs: Any,
     ):
         self.target = target
         self.autoBalance = autoBalance
