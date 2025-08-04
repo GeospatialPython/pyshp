@@ -1,3 +1,7 @@
+VERSION WIP
+	Improvements:
+	* LICENSE.TXT re-encoded in UTF-8 (@musicinmybrain)
+
 VERSION 3.0.0
 
 2025-08-03
@@ -15,13 +19,13 @@ VERSION 3.0.0
 
     Code quality
 	* Statically typed and checked with Mypy
-	* Checked with Ruff.
+	* Checked with Ruff. (@mwtoews)
     * Type hints
 	* f-strings
 	* Remove Python 2 specific functions.
 	* Run doctests against wheels.
 	* Testing of wheels before publishing them
-	* pyproject.toml src layout
+	* Updated metadata, changed build backend to Hatch, and restructured repor into pyproject.toml src layout (@mwtoews)
 	* Slow test marked.
 
 	Improvements:
