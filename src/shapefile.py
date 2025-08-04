@@ -352,10 +352,12 @@ def fsdecode_if_pathlike(path: Any) -> Any:
 
 # Begin
 
-ARR_TYPE = TypeVar("ARR_TYPE", int, float)  # Literal["i"], Literal["d"])
+# ARR_TYPE = TypeVar("ARR_TYPE", int, float)
+ARR_TYPE = TypeVar("ARR_TYPE", Literal['i'], Literal['d']) #int, float)
 
-
-class _Array(array.array[ARR_TYPE], Generic[ARR_TYPE]):
+# In Python 3.12 we can do:
+# class _Array(array.array[ARR_TYPE], Generic[ARR_TYPE]): 
+class _Array(array.array, Generic[ARR_TYPE]): #
     """Converts python tuples to lists of the appropriate type.
     Used to unpack different shapefile header parts."""
 
@@ -1319,7 +1321,6 @@ class Point(Shape):
 
     @staticmethod
     def _x_y_from_byte_stream(b_io: ReadableBinStream) -> tuple[float, float]:
-        # Unpack _Array too
         x, y = unpack("<2d", b_io.read(16))
         # Convert to tuple
         return x, y
