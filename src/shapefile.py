@@ -352,12 +352,12 @@ def fsdecode_if_pathlike(path: Any) -> Any:
 
 # Begin
 
-# ARR_TYPE = TypeVar("ARR_TYPE", int, float)
-ARR_TYPE = TypeVar("ARR_TYPE", Literal['i'], Literal['d']) #int, float)
+ARR_TYPE = TypeVar("ARR_TYPE", int, float)
+
 
 # In Python 3.12 we can do:
-# class _Array(array.array[ARR_TYPE], Generic[ARR_TYPE]): 
-class _Array(array.array, Generic[ARR_TYPE]): #
+# class _Array(array.array[ARR_TYPE], Generic[ARR_TYPE]):
+class _Array(array.array, Generic[ARR_TYPE]):  # type: ignore[type-arg]
     """Converts python tuples to lists of the appropriate type.
     Used to unpack different shapefile header parts."""
 
