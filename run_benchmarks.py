@@ -9,7 +9,7 @@ import timeit
 from collections.abc import Callable
 from pathlib import Path
 from tempfile import TemporaryFile as TempF
-from typing import Union
+from typing import Iterable, Union, cast
 
 import shapefile
 
@@ -63,8 +63,9 @@ def write_shapefile_with_PyShp(target: Union[str, os.PathLike]):
             for field_info_tuple in fields[target]:
                 w.field(*field_info_tuple)
             for shapeRecord in shapeRecords[target]:
-                w.shape(shapeRecord.shape)
-                w.record(*shapeRecord.record)
+                w.shape(cast(shapefile.Shape, shapeRecord.shape))
+                record = cast(Iterable, shapeRecord.record)
+                w.record(*record)
 
 
 SHAPEFILES = {
