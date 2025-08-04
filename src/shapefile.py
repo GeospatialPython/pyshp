@@ -982,7 +982,7 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
         )
 
     @staticmethod
-    def _from_geojson(geoj) -> Shape:
+    def _from_geojson(geoj: GeoJSONHomogeneousGeometryObject) -> Shape:
         # create empty shape
         # set shapeType
         geojType = geoj["type"] if geoj else "Null"
@@ -991,18 +991,26 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
         else:
             raise GeoJSON_Error(f"Cannot create Shape from GeoJSON type '{geojType}'")
 
+        coordinates = geoj["coordinates"]
+
+        if coordinates == ():
+            raise GeoJSON_Error(f"Cannot create non-Null Shape from: {coordinates=}")
+
+        points: PointsT
+        parts: list[int]
+
         # set points and parts
         if geojType == "Point":
-            points = [geoj["coordinates"]]
+            points = [cast(PointT, coordinates)]
             parts = [0]
         elif geojType in ("MultiPoint", "LineString"):
-            points = geoj["coordinates"]
+            points = cast(PointsT, coordinates)
             parts = [0]
         elif geojType == "Polygon":
             points = []
             parts = []
             index = 0
-            for i, ext_or_hole in enumerate(geoj["coordinates"]):
+            for i, ext_or_hole in enumerate(cast(list[PointsT], coordinates)):
                 # although the latest GeoJSON spec states that exterior rings should have
                 # counter-clockwise orientation, we explicitly check orientation since older
                 # GeoJSONs might not enforce this.
@@ -1019,7 +1027,7 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
             points = []
             parts = []
             index = 0
-            for linestring in geoj["coordinates"]:
+            for linestring in cast(list[PointsT], coordinates):
                 points.extend(linestring)
                 parts.append(index)
                 index += len(linestring)
@@ -1027,7 +1035,7 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
             points = []
             parts = []
             index = 0
-            for polygon in geoj["coordinates"]:
+            for polygon in cast(list[list[PointsT]], coordinates):
                 for i, ext_or_hole in enumerate(polygon):
                     # although the latest GeoJSON spec states that exterior rings should have
                     # counter-clockwise orientation, we explicitly check orientation since older
@@ -3604,7 +3612,7 @@ class Writer:
             if hasattr(s, "__geo_interface__"):
                 s = s.__geo_interface__  # type: ignore [assignment]
             if isinstance(s, dict):
-                s = Shape._from_geojson(s)
+                s = Shape._from_geojson(cast(GeoJSONHomogeneousGeometryObject, s))
             else:
                 raise TypeError(
                     "Can only write Shape objects, GeoJSON dictionaries, "
