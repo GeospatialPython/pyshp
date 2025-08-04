@@ -2107,8 +2107,8 @@ class _Record(list[RecordValue]):
         )  # plus field names (random order if Python version < 3.6)
         return default + fnames
 
-    def __eq__(self, other) -> bool:
-        if isinstance(other, self.__class__):
+    def __eq__(self, other: Any) -> bool:
+        if isinstance(other, _Record):
             if self.__field_positions != other.__field_positions:
                 return False
         return list.__eq__(self, other)
