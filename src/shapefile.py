@@ -21,6 +21,7 @@ import time
 import zipfile
 from datetime import date
 from struct import Struct, calcsize, error, pack, unpack
+from types import TracebackType
 from typing import (
     IO,
     Any,
@@ -339,10 +340,10 @@ unpack_2_int32_be = Struct(">2i").unpack
 
 
 @overload
-def fsdecode_if_pathlike(path: os.PathLike) -> str: ...
+def fsdecode_if_pathlike(path: os.PathLike[Any]) -> str: ...
 @overload
 def fsdecode_if_pathlike(path: T) -> T: ...
-def fsdecode_if_pathlike(path):
+def fsdecode_if_pathlike(path: Any) -> Any:
     if isinstance(path, os.PathLike):
         return os.fsdecode(path)  # str
 
@@ -351,12 +352,13 @@ def fsdecode_if_pathlike(path):
 
 # Begin
 
+ARR_TYPE = TypeVar("ARR_TYPE", int, float) #Literal["i"], Literal["d"])
 
-class _Array(array.array, Generic[T]):
+class _Array(array.array[ARR_TYPE], Generic[ARR_TYPE]):
     """Converts python tuples to lists of the appropriate type.
     Used to unpack different shapefile header parts."""
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return str(self.tolist())
 
 
@@ -372,7 +374,7 @@ def signed_area(
     xs, ys = map(list, list(zip(*coords))[:2])  # ignore any z or m values
     xs.append(xs[1])
     ys.append(ys[1])
-    area2 = sum(xs[i] * (ys[i + 1] - ys[i - 1]) for i in range(1, len(coords)))
+    area2: float = sum(xs[i] * (ys[i + 1] - ys[i - 1]) for i in range(1, len(coords)))
     if fast:
         return area2
 
@@ -474,7 +476,7 @@ def ring_sample(coords: PointsT, ccw: bool = False) -> Point2D:
     """
     triplet = []
 
-    def itercoords():
+    def itercoords() -> Iterator[PointT]:
         # iterate full closed ring
         yield from coords
         # finally, yield the second coordinate to the end to allow checking the last triplet
@@ -658,6 +660,7 @@ class _NoShapeTypeSentinel:
     preserve old behaviour for anyone who explictly
     called Shape(shapeType=None).
     """
+_NO_SHAPE_TYPE_SENTINEL: Final = _NoShapeTypeSentinel()
 
 
 def _m_from_point(point: Union[PointMT, PointZT], mpos: int) -> Optional[float]:
@@ -697,7 +700,7 @@ class CanHaveBboxNoLinesKwargs(TypedDict, total=False):
 class Shape:
     def __init__(
         self,
-        shapeType: Union[int, _NoShapeTypeSentinel] = _NoShapeTypeSentinel(),
+        shapeType: Union[int, _NoShapeTypeSentinel] = _NO_SHAPE_TYPE_SENTINEL,
         points: Optional[PointsT] = None,
         parts: Optional[Sequence[int]] = None,  # index of start point of each part
         lines: Optional[list[PointsT]] = None,
@@ -728,8 +731,8 @@ class Shape:
         """
 
         # Preserve previous behaviour for anyone who set self.shapeType = None
-        if not isinstance(shapeType, _NoShapeTypeSentinel):
-            self.shapeType = shapeType
+        if shapeType is not _NO_SHAPE_TYPE_SENTINEL:
+            self.shapeType = cast(int, shapeType)
         else:
             class_name = self.__class__.__name__
             self.shapeType = SHAPETYPENUM_LOOKUP.get(class_name.upper(), NULL)
@@ -1050,7 +1053,7 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
     def shapeTypeName(self) -> str:
         return SHAPETYPE_LOOKUP[self.shapeType]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         class_name = self.__class__.__name__
         if class_name == "Shape":
             return f"Shape #{self.__oid}: {self.shapeTypeName}"
@@ -1130,7 +1133,8 @@ class _CanHaveBBox(Shape):
 
     @staticmethod
     def _read_npoints_from_byte_stream(b_io: ReadableBinStream) -> int:
-        return unpack("<i", b_io.read(4))[0]
+        (nPoints,) = unpack("<i", b_io.read(4))
+        return cast(int, nPoints)
 
     @staticmethod
     def _write_npoints_to_byte_stream(b_io: WriteableBinStream, s: _CanHaveBBox) -> int:
@@ -1275,7 +1279,8 @@ class _CanHaveParts(_CanHaveBBox):
 
     @staticmethod
     def _read_nparts_from_byte_stream(b_io: ReadableBinStream) -> int:
-        return unpack("<i", b_io.read(4))[0]
+        (nParts,) = unpack("<i", b_io.read(4))
+        return cast(int, nParts)
 
     @staticmethod
     def _write_nparts_to_byte_stream(b_io: WriteableBinStream, s: _CanHaveParts) -> int:
@@ -1310,7 +1315,7 @@ class Point(Shape):
         Shape.__init__(self, points=[(x, y)], oid=oid)
 
     @staticmethod
-    def _x_y_from_byte_stream(b_io: ReadableBinStream):
+    def _x_y_from_byte_stream(b_io: ReadableBinStream) -> tuple[float, float]:
         # Unpack _Array too
         x, y = unpack("<2d", b_io.read(16))
         # Convert to tuple
@@ -1949,7 +1954,7 @@ SHAPE_CLASS_FROM_SHAPETYPE: dict[int, type[Union[NullShape, Point, _CanHaveBBox]
 }
 
 
-class _Record(list):
+class _Record(list[RecordValue]):
     """
     A class to hold a record. Subclasses list to ensure compatibility with
     former work and to reuse all the optimizations of the builtin list.
@@ -2008,7 +2013,7 @@ class _Record(list):
                 f"{item} found as a field but not enough values available."
             )
 
-    def __setattr__(self, key: str, value: RecordValue):
+    def __setattr__(self, key: str, value: RecordValue) -> None:
         """
         Sets a value of a field attribute
         :param key: The field name
@@ -2045,7 +2050,7 @@ class _Record(list):
 
         raise IndexError(f'"{item}" is not a field name and not an int')
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key, value) -> None:
         """
         Extends the normal list item access with
         access using a fieldname
@@ -2080,7 +2085,7 @@ class _Record(list):
                     dct[k] = f"{v.year:04d}{v.month:02d}{v.day:02d}"
         return dct
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Record #{self.__oid}: {list(self)}"
 
     def __dir__(self) -> list[str]:
@@ -2098,7 +2103,7 @@ class _Record(list):
         )  # plus field names (random order if Python version < 3.6)
         return default + fnames
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         if isinstance(other, self.__class__):
             if self.__field_positions != other.__field_positions:
                 return False
@@ -2132,7 +2137,7 @@ class Shapes(list[Optional[Shape]]):
     In addition to the list interface, this also provides the GeoJSON __geo_interface__
     to return a GeometryCollection dictionary."""
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Shapes: {list(self)}"
 
     @property
@@ -2152,7 +2157,7 @@ class ShapeRecords(list[ShapeRecord]):
     In addition to the list interface, this also provides the GeoJSON __geo_interface__
     to return a FeatureCollection dictionary."""
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"ShapeRecords: {list(self)}"
 
     @property
@@ -2173,7 +2178,7 @@ class _NoShpSentinel:
     in the **kwargs dict) in case someone explictly
     called Reader(shp=None) to load self.shx.
     """
-
+_NO_SHP_SENTINEL = _NoShpSentinel()
 
 class Reader:
     """Reads the three files of a shapefile as a unit or
@@ -2199,21 +2204,21 @@ class Reader:
     CONSTITUENT_FILE_EXTS = ["shp", "shx", "dbf"]
     assert all(ext.islower() for ext in CONSTITUENT_FILE_EXTS)
 
-    def _assert_ext_is_supported(self, ext: str):
+    def _assert_ext_is_supported(self, ext: str) -> None:
         assert ext in self.CONSTITUENT_FILE_EXTS
 
     def __init__(
         self,
-        shapefile_path: Union[str, os.PathLike] = "",
+        shapefile_path: Union[str, os.PathLike[Any]] = "",
         /,
         *,
         encoding: str = "utf-8",
         encodingErrors: str = "strict",
-        shp: Union[_NoShpSentinel, Optional[BinaryFileT]] = _NoShpSentinel(),
+        shp: Union[_NoShpSentinel, Optional[BinaryFileT]] = _NO_SHP_SENTINEL,
         shx: Optional[BinaryFileT] = None,
         dbf: Optional[BinaryFileT] = None,
         # Keep kwargs even though unused, to preserve PyShp 2.4 API
-        **kwargs,
+        **kwargs: Any,
     ):
         self.shp = None
         self.shx = None
@@ -2248,7 +2253,7 @@ class Reader:
                         zpath = path[: path.find(".zip") + 4]
                         shapefile = path[path.find(".zip") + 4 + 1 :]
 
-                    zipfileobj: Union[tempfile._TemporaryFileWrapper, io.BufferedReader]
+                    zipfileobj: Union[tempfile._TemporaryFileWrapper[bytes], io.BufferedReader]
                     # Create a zip file handle
                     if zpath.startswith("http"):
                         # Zipfile is from a url
@@ -2369,7 +2374,8 @@ class Reader:
                 self.load(path)
                 return
 
-        if not isinstance(shp, _NoShpSentinel):
+        if shp is not _NO_SHP_SENTINEL:
+            shp = cast(Union[str, IO[bytes], None], shp)
             self.shp = self.__seek_0_on_file_obj_wrap_or_open_from_name("shp", shp)
             self.shx = self.__seek_0_on_file_obj_wrap_or_open_from_name("shx", shx)
 
@@ -2406,7 +2412,7 @@ class Reader:
             f"Could not load shapefile constituent file from: {file_}"
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         """
         Use some general info on the shapefile as __str__
         """
@@ -2419,26 +2425,32 @@ class Reader:
             info.append(f"    {len(self)} records ({len(self.fields)} fields)")
         return "\n".join(info)
 
-    def __enter__(self):
+    def __enter__(self) -> Reader:
         """
         Enter phase of context manager.
         """
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    # def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(self,
+             exc_type: Optional[BaseException],
+             exc_val: Optional[BaseException],
+             exc_tb: Optional[TracebackType]) -> Optional[bool]:
         """
         Exit phase of context manager, close opened files.
         """
         self.close()
+        return None
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Returns the number of shapes/records in the shapefile."""
         if self.dbf:
             # Preferably use dbf record count
             if self.numRecords is None:
                 self.__dbfHeader()
 
-            return self.numRecords
+            # .__dbfHeader sets self.numRecords or raises Exception
+            return cast(int, self.numRecords)
 
         if self.shp:
             # Otherwise use shape count
@@ -2446,7 +2458,8 @@ class Reader:
                 if self.numShapes is None:
                     self.__shxHeader()
 
-                return self.numShapes
+                # .__shxHeader sets self.numShapes or raises Exception
+                return cast(int, self.numShapes)
 
             # Index file not available, iterate all shapes to get total count
             if self.numShapes is None:
@@ -2477,7 +2490,7 @@ class Reader:
         # No file loaded yet, treat as 'empty' shapefile
         return 0
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[ShapeRecord]:
         """Iterates through the shapes/records in the shapefile."""
         yield from self.iterShapeRecords()
 
@@ -2494,7 +2507,7 @@ class Reader:
     def shapeTypeName(self) -> str:
         return SHAPETYPE_LOOKUP[self.shapeType]
 
-    def load(self, shapefile=None):
+    def load(self, shapefile=None) -> None:
         """Opens a shapefile from a filename or file-like
         object. Normally this method would be called by the
         constructor with the file name as an argument."""
@@ -2510,7 +2523,7 @@ class Reader:
                 )
         self._try_to_set_constituent_file_headers()
 
-    def _try_to_set_constituent_file_headers(self):
+    def _try_to_set_constituent_file_headers(self) -> None:
         if self.shp:
             self.__shpHeader()
         if self.dbf:
@@ -2556,28 +2569,28 @@ class Reader:
             self._files_to_close.append(shp_dbf_or_dhx_file)
         return shp_dbf_or_dhx_file
 
-    def load_shp(self, shapefile_name):
+    def load_shp(self, shapefile_name) -> None:
         """
         Attempts to load file with .shp extension as both lower and upper case
         """
         self.shp = self._load_constituent_file(shapefile_name, "shp")
 
-    def load_shx(self, shapefile_name):
+    def load_shx(self, shapefile_name) -> None:
         """
         Attempts to load file with .shx extension as both lower and upper case
         """
         self.shx = self._load_constituent_file(shapefile_name, "shx")
 
-    def load_dbf(self, shapefile_name):
+    def load_dbf(self, shapefile_name) -> None:
         """
         Attempts to load file with .dbf extension as both lower and upper case
         """
         self.dbf = self._load_constituent_file(shapefile_name, "dbf")
 
-    def __del__(self):
+    def __del__(self) -> None:
         self.close()
 
-    def close(self):
+    def close(self) -> None:
         # Close any files that the reader opened (but not those given by user)
         for attribute in self._files_to_close:
             if hasattr(attribute, "close"):
@@ -2681,7 +2694,7 @@ class Reader:
 
         return shape
 
-    def __shxHeader(self):
+    def __shxHeader(self) -> None:
         """Reads the header information from a .shx file."""
         shx = self.shx
         if not shx:
@@ -2693,7 +2706,7 @@ class Reader:
         shxRecordLength = (unpack(">i", shx.read(4))[0] * 2) - 100
         self.numShapes = shxRecordLength // 8
 
-    def __shxOffsets(self):
+    def __shxOffsets(self) -> None:
         """Reads the shape offset positions from a .shx file"""
         shx = self.shx
         if not shx:
@@ -3184,7 +3197,7 @@ class Writer:
 
     def __init__(
         self,
-        target: Union[str, os.PathLike, None] = None,
+        target: Union[str, os.PathLike[Any], None] = None,
         shapeType: Optional[int] = None,
         autoBalance: bool = False,
         *,
@@ -3241,28 +3254,32 @@ class Writer:
         self.encoding = encoding
         self.encodingErrors = encodingErrors
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Returns the current number of features written to the shapefile.
         If shapes and records are unbalanced, the length is considered the highest
         of the two."""
         return max(self.recNum, self.shpNum)
 
-    def __enter__(self):
+    def __enter__(self) -> Writer:
         """
         Enter phase of context manager.
         """
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self,
+             exc_type: Optional[BaseException],
+             exc_val: Optional[BaseException],
+             exc_tb: Optional[TracebackType]) -> Optional[bool]:
         """
         Exit phase of context manager, finish writing and close the files.
         """
         self.close()
+        return None
 
-    def __del__(self):
+    def __del__(self) -> None:
         self.close()
 
-    def close(self):
+    def close(self) -> None:
         """
         Write final shp, shx, and dbf headers, close opened files.
         """
@@ -3316,7 +3333,7 @@ class Writer:
     def __getFileObj(self, f: None) -> NoReturn: ...
     @overload
     def __getFileObj(self, f: WriteSeekableBinStream) -> WriteSeekableBinStream: ...
-    def __getFileObj(self, f):
+    def __getFileObj(self, f: Union[str,None,WriteSeekableBinStream]) -> WriteSeekableBinStream:
         """Safety handler to verify file-like objects"""
         if not f:
             raise ShapefileException("No file-like object available.")
@@ -3348,7 +3365,7 @@ class Writer:
         shp.seek(start)
         return size
 
-    def _update_file_bbox(self, s: Shape):
+    def _update_file_bbox(self, s: Shape) -> None:
         if s.shapeType == NULL:
             shape_bbox = None
         elif s.shapeType in _CanHaveBBox_shapeTypes:
@@ -3358,7 +3375,7 @@ class Writer:
             shape_bbox = (x, y, x, y)
 
         if shape_bbox is None:
-            return
+            return None
 
         if self._bbox:
             # compare with existing
@@ -3371,8 +3388,9 @@ class Writer:
         else:
             # first time bbox is being set
             self._bbox = shape_bbox
+        return None
 
-    def _update_file_zbox(self, s: Union[_HasZ, PointZ]):
+    def _update_file_zbox(self, s: Union[_HasZ, PointZ]) -> None:
         if self._zbox:
             # compare with existing
             self._zbox = (min(s.zbox[0], self._zbox[0]), max(s.zbox[1], self._zbox[1]))
@@ -3380,7 +3398,7 @@ class Writer:
             # first time zbox is being set
             self._zbox = s.zbox
 
-    def _update_file_mbox(self, s: Union[_HasM, PointM]):
+    def _update_file_mbox(self, s: Union[_HasM, PointM]) -> None:
         mbox = s.mbox
         if self._mbox:
             # compare with existing
@@ -3531,7 +3549,7 @@ class Writer:
 
     def shape(
         self,
-        s: Union[Shape, HasGeoInterface, dict],
+        s: Union[Shape, HasGeoInterface, dict[str,PointsT]],
     ) -> None:
         # Balance if already not balanced
         if self.autoBalance and self.recNum < self.shpNum:
@@ -3969,7 +3987,7 @@ def _replace_remote_url(
     if path is None:
         path = old_parsed.path.rpartition("/")[2]
 
-    if port not in (None, ""):
+    if port not in (None, ""): # type: ignore[comparison-overlap]
         netloc = f"{netloc}:{port}"
 
     new_parsed = old_parsed._replace(
@@ -4034,7 +4052,7 @@ def _test(args: list[str] = sys.argv[1:], verbosity: bool = False) -> int:
     return failure_count
 
 
-def main():
+def main() -> None:
     """
     Doctests are contained in the file 'README.md', and are tested using the built-in
     testing libraries.
