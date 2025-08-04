@@ -13,14 +13,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-python@v5
     - uses: pre-commit/action@v3.0.1
+
+  mypy-strict:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+    - name: Install mypy
+      run: pip install mypy
+    - name: Run mypy --strict
+      continue-on-error: true
+      run: mypy --strict .
+
 
   build_wheel_and_sdist:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
     - name: Build wheel from the project repo
       uses: ./.github/actions/build_wheel_and_sdist
 
