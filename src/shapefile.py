@@ -349,7 +349,8 @@ def fsdecode_if_pathlike(path: Any) -> Any:
 
 # Begin
 
-ARR_TYPE = TypeVar("ARR_TYPE", int, float) #Literal["i"], Literal["d"])
+ARR_TYPE = TypeVar("ARR_TYPE", int, float)  # Literal["i"], Literal["d"])
+
 
 class _Array(array.array[ARR_TYPE], Generic[ARR_TYPE]):
     """Converts python tuples to lists of the appropriate type.
@@ -657,6 +658,8 @@ class _NoShapeTypeSentinel:
     preserve old behaviour for anyone who explictly
     called Shape(shapeType=None).
     """
+
+
 _NO_SHAPE_TYPE_SENTINEL: Final = _NoShapeTypeSentinel()
 
 
@@ -2193,7 +2196,10 @@ class _NoShpSentinel:
     in the **kwargs dict) in case someone explictly
     called Reader(shp=None) to load self.shx.
     """
+
+
 _NO_SHP_SENTINEL = _NoShpSentinel()
+
 
 class Reader:
     """Reads the three files of a shapefile as a unit or
@@ -2268,7 +2274,9 @@ class Reader:
                         zpath = path[: path.find(".zip") + 4]
                         shapefile = path[path.find(".zip") + 4 + 1 :]
 
-                    zipfileobj: Union[tempfile._TemporaryFileWrapper[bytes], io.BufferedReader]
+                    zipfileobj: Union[
+                        tempfile._TemporaryFileWrapper[bytes], io.BufferedReader
+                    ]
                     # Create a zip file handle
                     if zpath.startswith("http"):
                         # Zipfile is from a url
@@ -2443,10 +2451,12 @@ class Reader:
         return self
 
     # def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-    def __exit__(self,
-             exc_type: Optional[BaseException],
-             exc_val: Optional[BaseException],
-             exc_tb: Optional[TracebackType]) -> Optional[bool]:
+    def __exit__(
+        self,
+        exc_type: Optional[BaseException],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> Optional[bool]:
         """
         Exit phase of context manager, close opened files.
         """
@@ -2518,7 +2528,7 @@ class Reader:
     def shapeTypeName(self) -> str:
         return SHAPETYPE_LOOKUP[self.shapeType]
 
-    def load(self, shapefile: Optional[str]=None) -> None:
+    def load(self, shapefile: Optional[str] = None) -> None:
         """Opens a shapefile from a filename or file-like
         object. Normally this method would be called by the
         constructor with the file name as an argument."""
@@ -3277,10 +3287,12 @@ class Writer:
         """
         return self
 
-    def __exit__(self,
-             exc_type: Optional[BaseException],
-             exc_val: Optional[BaseException],
-             exc_tb: Optional[TracebackType]) -> Optional[bool]:
+    def __exit__(
+        self,
+        exc_type: Optional[BaseException],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> Optional[bool]:
         """
         Exit phase of context manager, finish writing and close the files.
         """
@@ -3344,7 +3356,9 @@ class Writer:
     def __getFileObj(self, f: None) -> NoReturn: ...
     @overload
     def __getFileObj(self, f: WriteSeekableBinStream) -> WriteSeekableBinStream: ...
-    def __getFileObj(self, f: Union[str,None,WriteSeekableBinStream]) -> WriteSeekableBinStream:
+    def __getFileObj(
+        self, f: Union[str, None, WriteSeekableBinStream]
+    ) -> WriteSeekableBinStream:
         """Safety handler to verify file-like objects"""
         if not f:
             raise ShapefileException("No file-like object available.")
@@ -3560,7 +3574,7 @@ class Writer:
 
     def shape(
         self,
-        s: Union[Shape, HasGeoInterface, dict[str,PointsT]],
+        s: Union[Shape, HasGeoInterface, dict[str, PointsT]],
     ) -> None:
         # Balance if already not balanced
         if self.autoBalance and self.recNum < self.shpNum:
@@ -3996,7 +4010,7 @@ def _replace_remote_url(
     if path is None:
         path = old_parsed.path.rpartition("/")[2]
 
-    if port not in (None, ""): # type: ignore[comparison-overlap]
+    if port not in (None, ""):  # type: ignore[comparison-overlap]
         netloc = f"{netloc}:{port}"
 
     new_parsed = old_parsed._replace(
