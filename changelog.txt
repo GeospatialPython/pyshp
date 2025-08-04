@@ -1,7 +1,8 @@
+VERSION Next
 	Improvements:
 	* LICENSE.TXT re-encoded in UTF-8 (@musicinmybrain)
 
-VERSION 3.0.0-alpha
+VERSION 3.0.0
 
 2025-08-03
 	Breaking Changes:
