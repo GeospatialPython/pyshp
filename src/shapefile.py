@@ -240,7 +240,7 @@ RecordValue = Union[RecordValueNotDate, date]
 
 class HasGeoInterface(Protocol):
     @property
-    def __geo_interface__(self) -> Any: ...
+    def __geo_interface__(self) -> GeoJSONHomogeneousGeometryObject: ...
 
 
 class GeoJSONPoint(TypedDict):
@@ -3591,7 +3591,7 @@ class Writer:
 
     def shape(
         self,
-        s: Union[Shape, HasGeoInterface, dict[str, PointsT]],
+        s: Union[Shape, HasGeoInterface, GeoJSONHomogeneousGeometryObject],
     ) -> None:
         # Balance if already not balanced
         if self.autoBalance and self.recNum < self.shpNum:
@@ -3599,9 +3599,10 @@ class Writer:
         # Check is shape or import from geojson
         if not isinstance(s, Shape):
             if hasattr(s, "__geo_interface__"):
-                shape_dict = cast(GeoJSONHomogeneousGeometryObject, s.__geo_interface__)
-            if isinstance(s, dict):
-                shape_dict = cast(GeoJSONHomogeneousGeometryObject, s)
+                s = cast(HasGeoInterface, s)
+                shape_dict = s.__geo_interface__
+            elif isinstance(s, dict):  # TypedDict is a dict at runtime
+                shape_dict = s
             else:
                 raise TypeError(
                     "Can only write Shape objects, GeoJSON dictionaries, "
