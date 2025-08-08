@@ -7,12 +7,6 @@ repos:
       args: [ --fix ]
     # Run the formatter
     - id: ruff-format
-- repo: https://github.com/pycqa/isort
-  rev: 6.0.1
-  hooks:
-    - id: isort
-      name: isort (python)
-      args: ["--profile", "black"]
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: v5.0.0
   hooks:
