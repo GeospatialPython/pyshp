@@ -7,6 +7,7 @@ import functools
 import os
 import timeit
 from collections.abc import Callable
+from os import PathLike
 from pathlib import Path
 from tempfile import TemporaryFile as TempF
 from typing import Iterable, Union, cast
@@ -50,14 +51,14 @@ fields = {}
 shapeRecords = collections.defaultdict(list)
 
 
-def open_shapefile_with_PyShp(target: Union[str, os.PathLike]):
+def open_shapefile_with_PyShp(target: Union[str, PathLike]):
     with shapefile.Reader(target) as r:
         fields[target] = r.fields
         for shapeRecord in r.iterShapeRecords():
             shapeRecords[target].append(shapeRecord)
 
 
-def write_shapefile_with_PyShp(target: Union[str, os.PathLike]):
+def write_shapefile_with_PyShp(target: Union[str, PathLike]):
     with TempF("wb") as shp, TempF("wb") as dbf, TempF("wb") as shx:
         with shapefile.Writer(shp=shp, dbf=dbf, shx=shx) as w:  # type: ignore [arg-type]
             for field_info_tuple in fields[target]:

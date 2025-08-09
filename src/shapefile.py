@@ -20,6 +20,7 @@ import tempfile
 import time
 import zipfile
 from datetime import date
+from os import PathLike
 from struct import Struct, calcsize, error, pack, unpack
 from types import TracebackType
 from typing import (
@@ -159,7 +160,7 @@ class ReadWriteSeekableBinStream(Protocol):
 
 
 # File name, file object or anything with a read() method that returns bytes.
-BinaryFileT = Union[str, IO[bytes]]
+BinaryFileT = Union[str, PathLike[Any], IO[bytes]]
 BinaryFileStreamT = Union[IO[bytes], io.BytesIO, WriteSeekableBinStream]
 
 FieldTypeT = Literal["C", "D", "F", "L", "M", "N"]
@@ -341,11 +342,11 @@ unpack_2_int32_be = Struct(">2i").unpack
 
 
 @overload
-def fsdecode_if_pathlike(path: os.PathLike[Any]) -> str: ...
+def fsdecode_if_pathlike(path: PathLike[Any]) -> str: ...
 @overload
 def fsdecode_if_pathlike(path: T) -> T: ...
 def fsdecode_if_pathlike(path: Any) -> Any:
-    if isinstance(path, os.PathLike):
+    if isinstance(path, PathLike):
         return os.fsdecode(path)  # str
 
     return path
@@ -2243,7 +2244,7 @@ class Reader:
 
     def __init__(
         self,
-        shapefile_path: Union[str, os.PathLike[Any]] = "",
+        shapefile_path: Union[str, PathLike[Any]] = "",
         /,
         *,
         encoding: str = "utf-8",
@@ -2411,7 +2412,7 @@ class Reader:
                 return
 
         if shp is not _NO_SHP_SENTINEL:
-            shp = cast(Union[str, IO[bytes], None], shp)
+            shp = cast(Union[str, PathLike[Any], IO[bytes], None], shp)
             self.shp = self.__seek_0_on_file_obj_wrap_or_open_from_name("shp", shp)
             self.shx = self.__seek_0_on_file_obj_wrap_or_open_from_name("shx", shx)
 
@@ -2432,7 +2433,7 @@ class Reader:
         if file_ is None:
             return None
 
-        if isinstance(file_, str):
+        if isinstance(file_, (str, PathLike)):
             baseName, __ = os.path.splitext(file_)
             return self._load_constituent_file(baseName, ext)
 
@@ -3235,7 +3236,7 @@ class Writer:
 
     def __init__(
         self,
-        target: Union[str, os.PathLike[Any], None] = None,
+        target: Union[str, PathLike[Any], None] = None,
         shapeType: Optional[int] = None,
         autoBalance: bool = False,
         *,

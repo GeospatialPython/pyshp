@@ -13,6 +13,8 @@ import pytest
 # our imports
 import shapefile
 
+shapefiles_dir = Path(__file__).parent / "shapefiles"
+
 # define various test shape tuples of (type, points, parts indexes, and expected geo interface output)
 geo_interface_tests = [
     (
@@ -719,8 +721,7 @@ def test_reader_pathlike():
     """
     Assert that path-like objects can be read.
     """
-    base = Path("shapefiles")
-    with shapefile.Reader(base / "blockgroups") as sf:
+    with shapefile.Reader(shapefiles_dir / "blockgroups") as sf:
         assert len(sf) == 663
 
 
@@ -736,6 +737,18 @@ def test_reader_dbf_only():
         assert record[1:3] == ["060750601001", 4715]
 
 
+def test_reader_dbf_only_from_Path():
+    """
+    Assert that specifying just the
+    dbf argument to the shapefile reader as a Path
+    reads just the dbf file.
+    """
+    with shapefile.Reader(dbf=shapefiles_dir / "blockgroups.dbf") as sf:
+        assert len(sf) == 663
+        record = sf.record(3)
+        assert record[1:3] == ["060750601001", 4715]
+
+
 def test_reader_shp_shx_only():
     """
     Assert that specifying just the
@@ -744,6 +757,20 @@ def test_reader_shp_shx_only():
     """
     with shapefile.Reader(
         shp="shapefiles/blockgroups.shp", shx="shapefiles/blockgroups.shx"
+    ) as sf:
+        assert len(sf) == 663
+        shape = sf.shape(3)
+        assert len(shape.points) == 173
+
+
+def test_reader_shp_shx_only_from_Paths():
+    """
+    Assert that specifying just the
+    shp and shx argument to the shapefile reader as Paths
+    reads just the shp and shx file.
+    """
+    with shapefile.Reader(
+        shp=shapefiles_dir / "blockgroups.shp", shx=shapefiles_dir / "blockgroups.shx"
     ) as sf:
         assert len(sf) == 663
         shape = sf.shape(3)
@@ -766,6 +793,22 @@ def test_reader_shp_dbf_only():
         assert record[1:3] == ["060750601001", 4715]
 
 
+def test_reader_shp_dbf_only_from_Paths():
+    """
+    Assert that specifying just the
+    shp and shx argument to the shapefile reader as Paths
+    reads just the shp and dbf file.
+    """
+    with shapefile.Reader(
+        shp=shapefiles_dir / "blockgroups.shp", dbf=shapefiles_dir / "blockgroups.dbf"
+    ) as sf:
+        assert len(sf) == 663
+        shape = sf.shape(3)
+        assert len(shape.points) == 173
+        record = sf.record(3)
+        assert record[1:3] == ["060750601001", 4715]
+
+
 def test_reader_shp_only():
     """
     Assert that specifying just the
@@ -773,6 +816,18 @@ def test_reader_shp_only():
     reads just the shp file (shx optional).
     """
     with shapefile.Reader(shp="shapefiles/blockgroups.shp") as sf:
+        assert len(sf) == 663
+        shape = sf.shape(3)
+        assert len(shape.points) == 173
+
+
+def test_reader_shp_only_from_Path():
+    """
+    Assert that specifying just the
+    shp argument to the shapefile reader as a Path
+    reads just the shp file (shx optional).
+    """
+    with shapefile.Reader(shp=shapefiles_dir / "blockgroups.shp") as sf:
         assert len(sf) == 663
         shape = sf.shape(3)
         assert len(shape.points) == 173
