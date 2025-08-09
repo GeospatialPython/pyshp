@@ -808,6 +808,7 @@ def test_reader_shp_dbf_only_from_Paths():
         record = sf.record(3)
         assert record[1:3] == ["060750601001", 4715]
 
+
 def test_reader_shp_only():
     """
     Assert that specifying just the
@@ -1129,7 +1130,6 @@ def test_shape_oid_no_shx():
                 assert (
                     shaperec.shape.__geo_interface__ == shape_expected.__geo_interface__
                 )
-
 
 
 def test_reader_offsets():
