@@ -93,6 +93,17 @@ part of your geospatial project.
 
 # Version Changes
 
+## 3.0.1
+
+### Improvements
+- Reader(shp=, dbf=, shx=) now support pathlib.Paths, and any pathlike object (@mwtoews).
+### Bug fixes
+- PyShp 3 no longer modifies the global doctest module (@JamesParrott).
+### Code quality
+- isort replaced by Ruff check's I rule (@mwtoews).
+- mypy --strict used in CI (@JamesParrott).
+- LICENSE.TXT re-encoded in UTF-8 (@musicinmybrain).
+
 ## 3.0.0
 
 ### Breaking Changes:

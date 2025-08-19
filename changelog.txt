@@ -1,6 +1,15 @@
-VERSION WIP
+VERSION 3.0.1
+
+2025-08-19
 	Improvements:
+	* Reader(shp=, dbf=, shx=) now support pathlib.Paths, and any pathlike object (@mwtoews).
+	Bug fixes:
+	* PyShp 3 no longer modifies the global doctest module (@JamesParrott).
+	Code quality:
+	* isort replaced by Ruff check's I rule (@mwtoews).
+	* mypy --strict used in CI (@JamesParrott).
 	* LICENSE.TXT re-encoded in UTF-8 (@musicinmybrain)
+
 
 VERSION 3.0.0
 
