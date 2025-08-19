@@ -52,8 +52,6 @@ from urllib.request import Request, urlopen
 # Create named logger
 logger = logging.getLogger(__name__)
 
-doctest.NORMALIZE_WHITESPACE = 1
-
 # Module settings
 VERBOSE = True
 
