@@ -19,6 +19,7 @@ import sys
 import tempfile
 import time
 import zipfile
+from collections.abc import Container, Iterable, Iterator, Reversible, Sequence
 from datetime import date
 from os import PathLike
 from struct import Struct, calcsize, error, pack, unpack
@@ -26,18 +27,13 @@ from types import TracebackType
 from typing import (
     IO,
     Any,
-    Container,
     Final,
     Generic,
-    Iterable,
-    Iterator,
     Literal,
     NamedTuple,
     NoReturn,
     Optional,
     Protocol,
-    Reversible,
-    Sequence,
     SupportsIndex,
     TypedDict,
     TypeVar,
@@ -184,7 +180,7 @@ class FieldType:
     }
 
 
-FIELD_TYPE_ALIASES: dict[Union[str, bytes], FieldTypeT] = {}
+FIELD_TYPE_ALIASES: dict[str | bytes, FieldTypeT] = {}
 for c in FieldType.__members__:
     FIELD_TYPE_ALIASES[c.upper()] = c
     FIELD_TYPE_ALIASES[c.lower()] = c
@@ -203,7 +199,7 @@ class Field(NamedTuple):
     def from_unchecked(
         cls,
         name: str,
-        field_type: Union[str, bytes, FieldTypeT] = "C",
+        field_type: str | bytes | FieldTypeT = "C",
         size: int = 50,
         decimal: int = 0,
     ) -> Field:
@@ -249,7 +245,7 @@ class GeoJSONPoint(TypedDict):
     # elements.  "
     # RFC7946 also requires long/lat easting/northing which we do not enforce,
     # and despite the SHOULD NOT, we may use a 4th element for Shapefile M Measures.
-    coordinates: Union[PointT, tuple[()]]
+    coordinates: PointT | tuple[()]
 
 
 class GeoJSONMultiPoint(TypedDict):
@@ -312,10 +308,10 @@ GeoJSONObject = Union[GeoJSONHomogeneousGeometryObject, GeoJSONGeometryCollectio
 
 class GeoJSONFeature(TypedDict):
     type: Literal["Feature"]
-    properties: Optional[
-        dict[str, Any]
-    ]  # RFC7946 3.2 "(any JSON object or a JSON null value)"
-    geometry: Optional[GeoJSONObject]
+    properties: (
+        dict[str, Any] | None
+    )  # RFC7946 3.2 "(any JSON object or a JSON null value)"
+    geometry: GeoJSONObject | None
 
 
 class GeoJSONFeatureCollection(TypedDict):
@@ -527,7 +523,7 @@ def ring_contains_ring(coords1: PointsT, coords2: list[PointT]) -> bool:
 
 
 def organize_polygon_rings(
-    rings: Iterable[PointsT], return_errors: Optional[dict[str, int]] = None
+    rings: Iterable[PointsT], return_errors: dict[str, int] | None = None
 ) -> list[list[PointsT]]:
     """Organize a list of coordinate rings into one or more polygons with holes.
     Returns a list of polygons, where each polygon is composed of a single exterior
@@ -668,15 +664,15 @@ class _NoShapeTypeSentinel:
 _NO_SHAPE_TYPE_SENTINEL: Final = _NoShapeTypeSentinel()
 
 
-def _m_from_point(point: Union[PointMT, PointZT], mpos: int) -> Optional[float]:
+def _m_from_point(point: PointMT | PointZT, mpos: int) -> float | None:
     if len(point) > mpos and point[mpos] is not None:
         return cast(float, point[mpos])
     return None
 
 
 def _ms_from_points(
-    points: Union[list[PointMT], list[PointZT]], mpos: int
-) -> Iterator[Optional[float]]:
+    points: list[PointMT] | list[PointZT], mpos: int
+) -> Iterator[float | None]:
     return (_m_from_point(p, mpos) for p in points)
 
 
@@ -691,32 +687,32 @@ def _zs_from_points(points: Iterable[PointZT]) -> Iterator[float]:
 
 
 class CanHaveBboxNoLinesKwargs(TypedDict, total=False):
-    oid: Optional[int]
-    points: Optional[PointsT]
-    parts: Optional[Sequence[int]]  # index of start point of each part
-    partTypes: Optional[Sequence[int]]
-    bbox: Optional[BBox]
-    m: Optional[Sequence[Optional[float]]]
-    z: Optional[Sequence[float]]
-    mbox: Optional[MBox]
-    zbox: Optional[ZBox]
+    oid: int | None
+    points: PointsT | None
+    parts: Sequence[int] | None  # index of start point of each part
+    partTypes: Sequence[int] | None
+    bbox: BBox | None
+    m: Sequence[float | None] | None
+    z: Sequence[float] | None
+    mbox: MBox | None
+    zbox: ZBox | None
 
 
 class Shape:
     def __init__(
         self,
-        shapeType: Union[int, _NoShapeTypeSentinel] = _NO_SHAPE_TYPE_SENTINEL,
-        points: Optional[PointsT] = None,
-        parts: Optional[Sequence[int]] = None,  # index of start point of each part
-        lines: Optional[list[PointsT]] = None,
-        partTypes: Optional[Sequence[int]] = None,
-        oid: Optional[int] = None,
+        shapeType: int | _NoShapeTypeSentinel = _NO_SHAPE_TYPE_SENTINEL,
+        points: PointsT | None = None,
+        parts: Sequence[int] | None = None,  # index of start point of each part
+        lines: list[PointsT] | None = None,
+        partTypes: Sequence[int] | None = None,
+        oid: int | None = None,
         *,
-        m: Optional[Sequence[Optional[float]]] = None,
-        z: Optional[Sequence[float]] = None,
-        bbox: Optional[BBox] = None,
-        mbox: Optional[MBox] = None,
-        zbox: Optional[ZBox] = None,
+        m: Sequence[float | None] | None = None,
+        z: Sequence[float] | None = None,
+        bbox: BBox | None = None,
+        mbox: MBox | None = None,
+        zbox: ZBox | None = None,
     ):
         """Stores the geometry of the different shape types
         specified in the Shapefile spec. Shape types are
@@ -787,7 +783,7 @@ class Shape:
 
         ms_found = True
         if m:
-            self.m: Sequence[Optional[float]] = m
+            self.m: Sequence[float | None] = m
         elif self.shapeType in _HasM_shapeTypes:
             mpos = 3 if self.shapeType in _HasZ_shapeTypes | PointZ_shapeTypes else 2
             points_m_z = cast(Union[list[PointMT], list[PointZT]], self.points)
@@ -1081,7 +1077,7 @@ class NullShape(Shape):
     # Repeated for the avoidance of doubt.
     def __init__(
         self,
-        oid: Optional[int] = None,
+        oid: int | None = None,
     ):
         Shape.__init__(self, shapeType=NULL, oid=oid)
 
@@ -1090,8 +1086,8 @@ class NullShape(Shape):
         shapeType: int,
         b_io: ReadSeekableBinStream,
         next_shape: int,
-        oid: Optional[int] = None,
-        bbox: Optional[BBox] = None,
+        oid: int | None = None,
+        bbox: BBox | None = None,
     ) -> NullShape:
         # Shape.__init__ sets self.points = points or []
         return NullShape(oid=oid)
@@ -1133,7 +1129,7 @@ class _CanHaveBBox(Shape):
 
     @staticmethod
     def _write_bbox_to_byte_stream(
-        b_io: WriteableBinStream, i: int, bbox: Optional[BBox]
+        b_io: WriteableBinStream, i: int, bbox: BBox | None
     ) -> int:
         if not bbox or len(bbox) != 4:
             raise ShapefileException(f"Four numbers required for bbox. Got: {bbox}")
@@ -1180,9 +1176,9 @@ class _CanHaveBBox(Shape):
         shapeType: int,
         b_io: ReadSeekableBinStream,
         next_shape: int,
-        oid: Optional[int] = None,
-        bbox: Optional[BBox] = None,
-    ) -> Optional[Shape]:
+        oid: int | None = None,
+        bbox: BBox | None = None,
+    ) -> Shape | None:
         ShapeClass = cast(type[_CanHaveBBox], SHAPE_CLASS_FROM_SHAPETYPE[shapeType])
 
         kwargs: CanHaveBboxNoLinesKwargs = {"oid": oid}  # "shapeType": shapeType}
@@ -1194,7 +1190,7 @@ class _CanHaveBBox(Shape):
             # next shape after we return (as done in f.seek(next_shape))
             return None
 
-        nParts: Optional[int] = (
+        nParts: int | None = (
             _CanHaveParts._read_nparts_from_byte_stream(b_io)
             if shapeType in _CanHaveParts_shapeTypes
             else None
@@ -1323,7 +1319,7 @@ class Point(Shape):
         self,
         x: float,
         y: float,
-        oid: Optional[int] = None,
+        oid: int | None = None,
     ):
         Shape.__init__(self, points=[(x, y)], oid=oid)
 
@@ -1350,9 +1346,9 @@ class Point(Shape):
         shapeType: int,
         b_io: ReadSeekableBinStream,
         next_shape: int,
-        oid: Optional[int] = None,
-        bbox: Optional[BBox] = None,
-    ) -> Optional[Shape]:
+        oid: int | None = None,
+        bbox: BBox | None = None,
+    ) -> Shape | None:
         x, y = cls._x_y_from_byte_stream(b_io)
 
         if bbox is not None:
@@ -1398,11 +1394,11 @@ class Polyline(_CanHaveParts):
     def __init__(
         self,
         *args: PointsT,
-        lines: Optional[list[PointsT]] = None,
-        points: Optional[PointsT] = None,
-        parts: Optional[list[int]] = None,
-        bbox: Optional[BBox] = None,
-        oid: Optional[int] = None,
+        lines: list[PointsT] | None = None,
+        points: PointsT | None = None,
+        parts: list[int] | None = None,
+        bbox: BBox | None = None,
+        oid: int | None = None,
     ):
         if args:
             if lines:
@@ -1430,11 +1426,11 @@ class Polygon(_CanHaveParts):
     def __init__(
         self,
         *args: PointsT,
-        lines: Optional[list[PointsT]] = None,
-        parts: Optional[list[int]] = None,
-        points: Optional[PointsT] = None,
-        bbox: Optional[BBox] = None,
-        oid: Optional[int] = None,
+        lines: list[PointsT] | None = None,
+        parts: list[int] | None = None,
+        points: PointsT | None = None,
+        bbox: BBox | None = None,
+        oid: int | None = None,
     ):
         lines = list(args) if args else lines
         Shape.__init__(
@@ -1454,9 +1450,9 @@ class MultiPoint(_CanHaveBBox):
     def __init__(
         self,
         *args: PointT,
-        points: Optional[PointsT] = None,
-        bbox: Optional[BBox] = None,
-        oid: Optional[int] = None,
+        points: PointsT | None = None,
+        bbox: BBox | None = None,
+        oid: int | None = None,
     ):
         if args:
             if points:
@@ -1491,12 +1487,12 @@ _HasM_shapeTypes = frozenset(
 
 
 class _HasM(_CanHaveBBox):
-    m: Sequence[Optional[float]]
+    m: Sequence[float | None]
 
     @staticmethod
     def _read_ms_from_byte_stream(
         b_io: ReadSeekableBinStream, nPoints: int, next_shape: int
-    ) -> tuple[MBox, list[Optional[float]]]:
+    ) -> tuple[MBox, list[float | None]]:
         if next_shape - b_io.tell() >= 16:
             mbox = unpack("<2d", b_io.read(16))
         # Measure values less than -10e38 are nodata values according to the spec
@@ -1513,7 +1509,7 @@ class _HasM(_CanHaveBBox):
 
     @staticmethod
     def _write_ms_to_byte_stream(
-        b_io: WriteableBinStream, s: Shape, i: int, mbox: Optional[MBox]
+        b_io: WriteableBinStream, s: Shape, i: int, mbox: MBox | None
     ) -> int:
         if not mbox or len(mbox) != 2:
             raise ShapefileException(f"Two numbers required for mbox. Got: {mbox}")
@@ -1563,7 +1559,7 @@ class _HasZ(_CanHaveBBox):
 
     @staticmethod
     def _write_zs_to_byte_stream(
-        b_io: WriteableBinStream, s: Shape, i: int, zbox: Optional[ZBox]
+        b_io: WriteableBinStream, s: Shape, i: int, zbox: ZBox | None
     ) -> int:
         if not zbox or len(zbox) != 2:
             raise ShapefileException(f"Two numbers required for zbox. Got: {zbox}")
@@ -1594,16 +1590,16 @@ class MultiPatch(_HasM, _HasZ, _CanHaveParts):
     def __init__(
         self,
         *args: PointsT,
-        lines: Optional[list[PointsT]] = None,
-        partTypes: Optional[list[int]] = None,
-        z: Optional[list[float]] = None,
-        m: Optional[list[Optional[float]]] = None,
-        points: Optional[PointsT] = None,
-        parts: Optional[list[int]] = None,
-        bbox: Optional[BBox] = None,
-        mbox: Optional[MBox] = None,
-        zbox: Optional[ZBox] = None,
-        oid: Optional[int] = None,
+        lines: list[PointsT] | None = None,
+        partTypes: list[int] | None = None,
+        z: list[float] | None = None,
+        m: list[float | None] | None = None,
+        points: PointsT | None = None,
+        parts: list[int] | None = None,
+        bbox: BBox | None = None,
+        mbox: MBox | None = None,
+        zbox: ZBox | None = None,
+        oid: int | None = None,
     ):
         if args:
             if lines:
@@ -1649,15 +1645,15 @@ class PointM(Point):
         y: float,
         # same default as in Writer.__shpRecord (if s.shapeType in (11, 21):)
         # PyShp encodes None m values as NODATA
-        m: Optional[float] = None,
-        oid: Optional[int] = None,
+        m: float | None = None,
+        oid: int | None = None,
     ):
         Shape.__init__(self, points=[(x, y)], m=(m,), oid=oid)
 
     @staticmethod
     def _read_single_point_ms_from_byte_stream(
         b_io: ReadSeekableBinStream, next_shape: int
-    ) -> tuple[Optional[float]]:
+    ) -> tuple[float | None]:
         if next_shape - b_io.tell() >= 8:
             (m,) = unpack("<d", b_io.read(8))
         else:
@@ -1693,13 +1689,13 @@ class PolylineM(Polyline, _HasM):
     def __init__(
         self,
         *args: PointsT,
-        lines: Optional[list[PointsT]] = None,
-        parts: Optional[list[int]] = None,
-        m: Optional[Sequence[Optional[float]]] = None,
-        points: Optional[PointsT] = None,
-        bbox: Optional[BBox] = None,
-        mbox: Optional[MBox] = None,
-        oid: Optional[int] = None,
+        lines: list[PointsT] | None = None,
+        parts: list[int] | None = None,
+        m: Sequence[float | None] | None = None,
+        points: PointsT | None = None,
+        bbox: BBox | None = None,
+        mbox: MBox | None = None,
+        oid: int | None = None,
     ):
         if args:
             if lines:
@@ -1729,13 +1725,13 @@ class PolygonM(Polygon, _HasM):
     def __init__(
         self,
         *args: PointsT,
-        lines: Optional[list[PointsT]] = None,
-        parts: Optional[list[int]] = None,
-        m: Optional[list[Optional[float]]] = None,
-        points: Optional[PointsT] = None,
-        bbox: Optional[BBox] = None,
-        mbox: Optional[MBox] = None,
-        oid: Optional[int] = None,
+        lines: list[PointsT] | None = None,
+        parts: list[int] | None = None,
+        m: list[float | None] | None = None,
+        points: PointsT | None = None,
+        bbox: BBox | None = None,
+        mbox: MBox | None = None,
+        oid: int | None = None,
     ):
         if args:
             if lines:
@@ -1765,11 +1761,11 @@ class MultiPointM(MultiPoint, _HasM):
     def __init__(
         self,
         *args: PointT,
-        points: Optional[PointsT] = None,
-        m: Optional[Sequence[Optional[float]]] = None,
-        bbox: Optional[BBox] = None,
-        mbox: Optional[MBox] = None,
-        oid: Optional[int] = None,
+        points: PointsT | None = None,
+        m: Sequence[float | None] | None = None,
+        bbox: BBox | None = None,
+        mbox: MBox | None = None,
+        oid: int | None = None,
     ):
         if args:
             if points:
@@ -1800,8 +1796,8 @@ class PointZ(PointM):
         x: float,
         y: float,
         z: float = 0.0,
-        m: Optional[float] = None,
-        oid: Optional[int] = None,
+        m: float | None = None,
+        oid: int | None = None,
     ):
         Shape.__init__(self, points=[(x, y)], z=(z,), m=(m,), oid=oid)
 
@@ -1838,15 +1834,15 @@ class PolylineZ(PolylineM, _HasZ):
     def __init__(
         self,
         *args: PointsT,
-        lines: Optional[list[PointsT]] = None,
-        z: Optional[list[float]] = None,
-        m: Optional[list[Optional[float]]] = None,
-        points: Optional[PointsT] = None,
-        parts: Optional[list[int]] = None,
-        bbox: Optional[BBox] = None,
-        mbox: Optional[MBox] = None,
-        zbox: Optional[ZBox] = None,
-        oid: Optional[int] = None,
+        lines: list[PointsT] | None = None,
+        z: list[float] | None = None,
+        m: list[float | None] | None = None,
+        points: PointsT | None = None,
+        parts: list[int] | None = None,
+        bbox: BBox | None = None,
+        mbox: MBox | None = None,
+        zbox: ZBox | None = None,
+        oid: int | None = None,
     ):
         if args:
             if lines:
@@ -1878,15 +1874,15 @@ class PolygonZ(PolygonM, _HasZ):
     def __init__(
         self,
         *args: PointsT,
-        lines: Optional[list[PointsT]] = None,
-        parts: Optional[list[int]] = None,
-        z: Optional[list[float]] = None,
-        m: Optional[list[Optional[float]]] = None,
-        points: Optional[PointsT] = None,
-        bbox: Optional[BBox] = None,
-        mbox: Optional[MBox] = None,
-        zbox: Optional[ZBox] = None,
-        oid: Optional[int] = None,
+        lines: list[PointsT] | None = None,
+        parts: list[int] | None = None,
+        z: list[float] | None = None,
+        m: list[float | None] | None = None,
+        points: PointsT | None = None,
+        bbox: BBox | None = None,
+        mbox: MBox | None = None,
+        zbox: ZBox | None = None,
+        oid: int | None = None,
     ):
         if args:
             if lines:
@@ -1918,13 +1914,13 @@ class MultiPointZ(MultiPointM, _HasZ):
     def __init__(
         self,
         *args: PointT,
-        points: Optional[PointsT] = None,
-        z: Optional[list[float]] = None,
-        m: Optional[Sequence[Optional[float]]] = None,
-        bbox: Optional[BBox] = None,
-        mbox: Optional[MBox] = None,
-        zbox: Optional[ZBox] = None,
-        oid: Optional[int] = None,
+        points: PointsT | None = None,
+        z: list[float] | None = None,
+        m: Sequence[float | None] | None = None,
+        bbox: BBox | None = None,
+        mbox: MBox | None = None,
+        zbox: ZBox | None = None,
+        oid: int | None = None,
     ):
         if args:
             if points:
@@ -1948,7 +1944,7 @@ class MultiPointZ(MultiPointM, _HasZ):
         )
 
 
-SHAPE_CLASS_FROM_SHAPETYPE: dict[int, type[Union[NullShape, Point, _CanHaveBBox]]] = {
+SHAPE_CLASS_FROM_SHAPETYPE: dict[int, type[NullShape | Point | _CanHaveBBox]] = {
     NULL: NullShape,
     POINT: Point,
     POLYLINE: Polyline,
@@ -1986,7 +1982,7 @@ class _Record(list[RecordValue]):
         self,
         field_positions: dict[str, int],
         values: Iterable[RecordValue],
-        oid: Optional[int] = None,
+        oid: int | None = None,
     ):
         """
         A Record should be created by the Reader class
@@ -2048,8 +2044,8 @@ class _Record(list[RecordValue]):
     @overload
     def __getitem__(self, s: str) -> RecordValue: ...
     def __getitem__(
-        self, item: Union[SupportsIndex, slice, str]
-    ) -> Union[RecordValue, list[RecordValue]]:
+        self, item: SupportsIndex | slice | str
+    ) -> RecordValue | list[RecordValue]:
         """
         Extends the normal list item access with
         access using a fieldname
@@ -2078,8 +2074,8 @@ class _Record(list[RecordValue]):
     def __setitem__(self, key: str, value: RecordValue) -> None: ...
     def __setitem__(
         self,
-        key: Union[SupportsIndex, slice, str],
-        value: Union[RecordValue, Iterable[RecordValue]],
+        key: SupportsIndex | slice | str,
+        value: RecordValue | Iterable[RecordValue],
     ) -> None:
         """
         Extends the normal list item access with
@@ -2144,7 +2140,7 @@ class ShapeRecord:
     """A ShapeRecord object containing a shape along with its attributes.
     Provides the GeoJSON __geo_interface__ to return a Feature dictionary."""
 
-    def __init__(self, shape: Optional[Shape] = None, record: Optional[_Record] = None):
+    def __init__(self, shape: Shape | None = None, record: _Record | None = None):
         self.shape = shape
         self.record = record
 
@@ -2242,14 +2238,14 @@ class Reader:
 
     def __init__(
         self,
-        shapefile_path: Union[str, PathLike[Any]] = "",
+        shapefile_path: str | PathLike[Any] = "",
         /,
         *,
         encoding: str = "utf-8",
         encodingErrors: str = "strict",
-        shp: Union[_NoShpSentinel, Optional[BinaryFileT]] = _NO_SHP_SENTINEL,
-        shx: Optional[BinaryFileT] = None,
-        dbf: Optional[BinaryFileT] = None,
+        shp: _NoShpSentinel | BinaryFileT | None = _NO_SHP_SENTINEL,
+        shx: BinaryFileT | None = None,
+        dbf: BinaryFileT | None = None,
         # Keep kwargs even though unused, to preserve PyShp 2.4 API
         **kwargs: Any,
     ):
@@ -2259,9 +2255,9 @@ class Reader:
         self._files_to_close: list[BinaryFileStreamT] = []
         self.shapeName = "Not specified"
         self._offsets: list[int] = []
-        self.shpLength: Optional[int] = None
-        self.numRecords: Optional[int] = None
-        self.numShapes: Optional[int] = None
+        self.shpLength: int | None = None
+        self.numRecords: int | None = None
+        self.numShapes: int | None = None
         self.fields: list[Field] = []
         self.__dbfHdrLength = 0
         self.__fieldLookup: dict[str, int] = {}
@@ -2286,9 +2282,9 @@ class Reader:
                         zpath = path[: path.find(".zip") + 4]
                         shapefile = path[path.find(".zip") + 4 + 1 :]
 
-                    zipfileobj: Union[
-                        tempfile._TemporaryFileWrapper[bytes], io.BufferedReader
-                    ]
+                    zipfileobj: (
+                        tempfile._TemporaryFileWrapper[bytes] | io.BufferedReader
+                    )
                     # Create a zip file handle
                     if zpath.startswith("http"):
                         # Zipfile is from a url
@@ -2423,8 +2419,8 @@ class Reader:
     def __seek_0_on_file_obj_wrap_or_open_from_name(
         self,
         ext: str,
-        file_: Optional[BinaryFileT],
-    ) -> Union[None, IO[bytes]]:
+        file_: BinaryFileT | None,
+    ) -> None | IO[bytes]:
         # assert ext in {'shp', 'dbf', 'shx'}
         self._assert_ext_is_supported(ext)
 
@@ -2469,10 +2465,10 @@ class Reader:
     # def __exit__(self, exc_type, exc_val, exc_tb) -> None:
     def __exit__(
         self,
-        exc_type: Optional[BaseException],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
-    ) -> Optional[bool]:
+        exc_type: BaseException | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> bool | None:
         """
         Exit phase of context manager, close opened files.
         """
@@ -2544,7 +2540,7 @@ class Reader:
     def shapeTypeName(self) -> str:
         return SHAPETYPE_LOOKUP[self.shapeType]
 
-    def load(self, shapefile: Optional[str] = None) -> None:
+    def load(self, shapefile: str | None = None) -> None:
         """Opens a shapefile from a filename or file-like
         object. Normally this method would be called by the
         constructor with the file name as an argument."""
@@ -2572,7 +2568,7 @@ class Reader:
         self,
         shapefile_name: str,
         ext: str,
-    ) -> Union[IO[bytes], None]:
+    ) -> IO[bytes] | None:
         """
         Attempts to open a .shp, .dbf or .shx file,
         with both lower case and upper case file extensions,
@@ -2595,7 +2591,7 @@ class Reader:
         self,
         shapefile_name: str,
         ext: str,
-    ) -> Union[IO[bytes], None]:
+    ) -> IO[bytes] | None:
         """
         Attempts to open a .shp, .dbf or .shx file, with the extension
         as both lower and upper case, and if successful append it to
@@ -2637,7 +2633,7 @@ class Reader:
                     pass
         self._files_to_close = []
 
-    def __getFileObj(self, f: Optional[T]) -> T:
+    def __getFileObj(self, f: T | None) -> T:
         """Checks to see if the requested shapefile file object is
         available. If not a ShapefileException is raised."""
         if not f:
@@ -2694,11 +2690,9 @@ class Reader:
             for m_bound in unpack("<2d", shp.read(16))
         ]
         # self.mbox = MBox(mmin=m_bounds[0], mmax=m_bounds[1])
-        self.mbox: tuple[Optional[float], Optional[float]] = (m_bounds[0], m_bounds[1])
+        self.mbox: tuple[float | None, float | None] = (m_bounds[0], m_bounds[1])
 
-    def __shape(
-        self, oid: Optional[int] = None, bbox: Optional[BBox] = None
-    ) -> Optional[Shape]:
+    def __shape(self, oid: int | None = None, bbox: BBox | None = None) -> Shape | None:
         """Returns the header info and geometry for a single shape."""
 
         f = self.__getFileObj(self.shp)
@@ -2764,7 +2758,7 @@ class Reader:
             shxRecords.byteswap()
         self._offsets = [2 * el for el in shxRecords[::2]]
 
-    def __shapeIndex(self, i: Optional[int] = None) -> Optional[int]:
+    def __shapeIndex(self, i: int | None = None) -> int | None:
         """Returns the offset in a .shp file for a shape based on information
         in the .shx index file."""
         shx = self.shx
@@ -2776,7 +2770,7 @@ class Reader:
             self.__shxOffsets()
         return self._offsets[i]
 
-    def shape(self, i: int = 0, bbox: Optional[BBox] = None) -> Optional[Shape]:
+    def shape(self, i: int = 0, bbox: BBox | None = None) -> Shape | None:
         """Returns a shape object for a shape in the geometry
         record file.
         If the 'bbox' arg is given (list or tuple of xmin,ymin,xmax,ymax),
@@ -2814,7 +2808,7 @@ class Reader:
         shp.seek(offset)
         return self.__shape(oid=i, bbox=bbox)
 
-    def shapes(self, bbox: Optional[BBox] = None) -> Shapes:
+    def shapes(self, bbox: BBox | None = None) -> Shapes:
         """Returns all shapes in a shapefile.
         To only read shapes within a given spatial region, specify the 'bbox'
         arg as a list or tuple of xmin,ymin,xmax,ymax.
@@ -2823,7 +2817,7 @@ class Reader:
         shapes.extend(self.iterShapes(bbox=bbox))
         return shapes
 
-    def iterShapes(self, bbox: Optional[BBox] = None) -> Iterator[Optional[Shape]]:
+    def iterShapes(self, bbox: BBox | None = None) -> Iterator[Shape | None]:
         """Returns a generator of shapes in a shapefile. Useful
         for handling large shapefiles.
         To only read shapes within a given spatial region, specify the 'bbox'
@@ -2918,7 +2912,7 @@ class Reader:
         self.__fullRecStruct = recStruct
         self.__fullRecLookup = recLookup
 
-    def __recordFmt(self, fields: Optional[Container[str]] = None) -> tuple[str, int]:
+    def __recordFmt(self, fields: Container[str] | None = None) -> tuple[str, int]:
         """Calculates the format and size of a .dbf record. Optional 'fields' arg
         specifies which fieldnames to unpack and which to ignore. Note that this
         always includes the DeletionFlag at index 0, regardless of the 'fields' arg.
@@ -2945,7 +2939,7 @@ class Reader:
         return (fmt, fmtSize)
 
     def __recordFields(
-        self, fields: Optional[Iterable[str]] = None
+        self, fields: Iterable[str] | None = None
     ) -> tuple[list[Field], dict[str, int], Struct]:
         """Returns the necessary info required to unpack a record's fields,
         restricted to a subset of fieldnames 'fields' if specified.
@@ -2984,8 +2978,8 @@ class Reader:
         fieldTuples: list[Field],
         recLookup: dict[str, int],
         recStruct: Struct,
-        oid: Optional[int] = None,
-    ) -> Optional[_Record]:
+        oid: int | None = None,
+    ) -> _Record | None:
         """Reads and returns a dbf record row as a list of values. Requires specifying
         a list of field info Field namedtuples 'fieldTuples', a record name-index dict 'recLookup',
         and a Struct instance 'recStruct' for unpacking these fields.
@@ -3079,9 +3073,7 @@ class Reader:
 
         return _Record(recLookup, record, oid)
 
-    def record(
-        self, i: int = 0, fields: Optional[list[str]] = None
-    ) -> Optional[_Record]:
+    def record(self, i: int = 0, fields: list[str] | None = None) -> _Record | None:
         """Returns a specific dbf record based on the supplied index.
         To only read some of the fields, specify the 'fields' arg as a
         list of one or more fieldnames.
@@ -3098,7 +3090,7 @@ class Reader:
             oid=i, fieldTuples=fieldTuples, recLookup=recLookup, recStruct=recStruct
         )
 
-    def records(self, fields: Optional[list[str]] = None) -> list[_Record]:
+    def records(self, fields: list[str] | None = None) -> list[_Record]:
         """Returns all records in a dbf file.
         To only read some of the fields, specify the 'fields' arg as a
         list of one or more fieldnames.
@@ -3121,10 +3113,10 @@ class Reader:
 
     def iterRecords(
         self,
-        fields: Optional[list[str]] = None,
+        fields: list[str] | None = None,
         start: int = 0,
-        stop: Optional[int] = None,
-    ) -> Iterator[Optional[_Record]]:
+        stop: int | None = None,
+    ) -> Iterator[_Record | None]:
         """Returns a generator of records in a dbf file.
         Useful for large shapefiles or dbf files.
         To only read some of the fields, specify the 'fields' arg as a
@@ -3165,9 +3157,9 @@ class Reader:
     def shapeRecord(
         self,
         i: int = 0,
-        fields: Optional[list[str]] = None,
-        bbox: Optional[BBox] = None,
-    ) -> Optional[ShapeRecord]:
+        fields: list[str] | None = None,
+        bbox: BBox | None = None,
+    ) -> ShapeRecord | None:
         """Returns a combination geometry and attribute record for the
         supplied record index.
         To only read some of the fields, specify the 'fields' arg as a
@@ -3184,8 +3176,8 @@ class Reader:
 
     def shapeRecords(
         self,
-        fields: Optional[list[str]] = None,
-        bbox: Optional[BBox] = None,
+        fields: list[str] | None = None,
+        bbox: BBox | None = None,
     ) -> ShapeRecords:
         """Returns a list of combination geometry/attribute records for
         all records in a shapefile.
@@ -3198,8 +3190,8 @@ class Reader:
 
     def iterShapeRecords(
         self,
-        fields: Optional[list[str]] = None,
-        bbox: Optional[BBox] = None,
+        fields: list[str] | None = None,
+        bbox: BBox | None = None,
     ) -> Iterator[ShapeRecord]:
         """Returns a generator of combination geometry/attribute records for
         all records in a shapefile.
@@ -3234,15 +3226,15 @@ class Writer:
 
     def __init__(
         self,
-        target: Union[str, PathLike[Any], None] = None,
-        shapeType: Optional[int] = None,
+        target: str | PathLike[Any] | None = None,
+        shapeType: int | None = None,
         autoBalance: bool = False,
         *,
         encoding: str = "utf-8",
         encodingErrors: str = "strict",
-        shp: Optional[WriteSeekableBinStream] = None,
-        shx: Optional[WriteSeekableBinStream] = None,
-        dbf: Optional[WriteSeekableBinStream] = None,
+        shp: WriteSeekableBinStream | None = None,
+        shx: WriteSeekableBinStream | None = None,
+        dbf: WriteSeekableBinStream | None = None,
         # Keep kwargs even though unused, to preserve PyShp 2.4 API
         **kwargs: Any,
     ):
@@ -3250,9 +3242,9 @@ class Writer:
         self.autoBalance = autoBalance
         self.fields: list[Field] = []
         self.shapeType = shapeType
-        self.shp: Optional[WriteSeekableBinStream] = None
-        self.shx: Optional[WriteSeekableBinStream] = None
-        self.dbf: Optional[WriteSeekableBinStream] = None
+        self.shp: WriteSeekableBinStream | None = None
+        self.shx: WriteSeekableBinStream | None = None
+        self.dbf: WriteSeekableBinStream | None = None
         self._files_to_close: list[BinaryFileStreamT] = []
         if target:
             target = fsdecode_if_pathlike(target)
@@ -3282,9 +3274,9 @@ class Writer:
         # Geometry record offsets and lengths for writing shx file.
         self.recNum = 0
         self.shpNum = 0
-        self._bbox: Optional[BBox] = None
-        self._zbox: Optional[ZBox] = None
-        self._mbox: Optional[MBox] = None
+        self._bbox: BBox | None = None
+        self._zbox: ZBox | None = None
+        self._mbox: MBox | None = None
         # Use deletion flags in dbf? Default is false (0). Note: Currently has no effect, records should NOT contain deletion flags.
         self.deletionFlag = 0
         # Encoding
@@ -3305,10 +3297,10 @@ class Writer:
 
     def __exit__(
         self,
-        exc_type: Optional[BaseException],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
-    ) -> Optional[bool]:
+        exc_type: BaseException | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> bool | None:
         """
         Exit phase of context manager, finish writing and close the files.
         """
@@ -3373,7 +3365,7 @@ class Writer:
     @overload
     def __getFileObj(self, f: WriteSeekableBinStream) -> WriteSeekableBinStream: ...
     def __getFileObj(
-        self, f: Union[str, None, WriteSeekableBinStream]
+        self, f: str | None | WriteSeekableBinStream
     ) -> WriteSeekableBinStream:
         """Safety handler to verify file-like objects"""
         if not f:
@@ -3431,7 +3423,7 @@ class Writer:
             self._bbox = shape_bbox
         return None
 
-    def _update_file_zbox(self, s: Union[_HasZ, PointZ]) -> None:
+    def _update_file_zbox(self, s: _HasZ | PointZ) -> None:
         if self._zbox:
             # compare with existing
             self._zbox = (min(s.zbox[0], self._zbox[0]), max(s.zbox[1], self._zbox[1]))
@@ -3439,7 +3431,7 @@ class Writer:
             # first time zbox is being set
             self._zbox = s.zbox
 
-    def _update_file_mbox(self, s: Union[_HasM, PointM]) -> None:
+    def _update_file_mbox(self, s: _HasM | PointM) -> None:
         mbox = s.mbox
         if self._mbox:
             # compare with existing
@@ -3452,23 +3444,23 @@ class Writer:
     def shapeTypeName(self) -> str:
         return SHAPETYPE_LOOKUP[self.shapeType or 0]
 
-    def bbox(self) -> Optional[BBox]:
+    def bbox(self) -> BBox | None:
         """Returns the current bounding box for the shapefile which is
         the lower-left and upper-right corners. It does not contain the
         elevation or measure extremes."""
         return self._bbox
 
-    def zbox(self) -> Optional[ZBox]:
+    def zbox(self) -> ZBox | None:
         """Returns the current z extremes for the shapefile."""
         return self._zbox
 
-    def mbox(self) -> Optional[MBox]:
+    def mbox(self) -> MBox | None:
         """Returns the current m extremes for the shapefile."""
         return self._mbox
 
     def __shapefileHeader(
         self,
-        fileObj: Optional[WriteSeekableBinStream],
+        fileObj: WriteSeekableBinStream | None,
         headerType: Literal["shp", "dbf", "shx"] = "shp",
     ) -> None:
         """Writes the specified header type to the specified file-like object.
@@ -3590,7 +3582,7 @@ class Writer:
 
     def shape(
         self,
-        s: Union[Shape, HasGeoInterface, GeoJSONHomogeneousGeometryObject],
+        s: Shape | HasGeoInterface | GeoJSONHomogeneousGeometryObject,
     ) -> None:
         # Balance if already not balanced
         if self.autoBalance and self.recNum < self.shpNum:
@@ -3745,7 +3737,7 @@ class Writer:
             # write
             # fieldName, fieldType, size and deci were already checked
             # when their Field instance was created and added to self.fields
-            str_val: Optional[str] = None
+            str_val: str | None = None
 
             if fieldType in ("N", "F"):
                 # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
@@ -3837,14 +3829,14 @@ class Writer:
         pointShape = Point(x, y)
         self.shape(pointShape)
 
-    def pointm(self, x: float, y: float, m: Optional[float] = None) -> None:
+    def pointm(self, x: float, y: float, m: float | None = None) -> None:
         """Creates a POINTM shape.
         If the m (measure) value is not set, it defaults to NoData."""
         pointShape = PointM(x, y, m)
         self.shape(pointShape)
 
     def pointz(
-        self, x: float, y: float, z: float = 0.0, m: Optional[float] = None
+        self, x: float, y: float, z: float = 0.0, m: float | None = None
     ) -> None:
         """Creates a POINTZ shape.
         If the z (elevation) value is not set, it defaults to 0.
@@ -4017,7 +4009,7 @@ def _replace_remote_url(
     port: int = 8000,
     scheme: str = "http",
     netloc: str = "localhost",
-    path: Optional[str] = None,
+    path: str | None = None,
     params: str = "",
     query: str = "",
     fragment: str = "",

@@ -94,6 +94,7 @@ select = [
     "E9",  # pycodestyle: Runtime
     "F",   # pyflakes
     "I",   # isort
+    "UP",  # pyupgrade
 ]
 ignore = []
 
