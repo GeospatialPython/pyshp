@@ -493,7 +493,7 @@ def test_reader_url():
 
         def Reader(url):
             new_url = shapefile._replace_remote_url(url)
-            print("repr(new_url): %s" % repr(new_url))
+            print(f"repr(new_url): {repr(new_url)}")
             return shapefile.Reader(new_url)
     else:
         print("Using plain Reader")
