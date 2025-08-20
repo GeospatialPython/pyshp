@@ -1,3 +1,10 @@
+VERSION Next
+
+2025-08-20
+	Code quality:
+	* Ruff check's UP rule added (mimicks PyUpgrade) (@mwtoews).
+
+
 VERSION 3.0.1
 
 2025-08-19

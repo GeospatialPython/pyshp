@@ -92,6 +92,11 @@ part of your geospatial project.
 
 
 # Version Changes
+## Next
+
+### Code quality:
+- Ruff check's UP rule added (mimicks PyUpgrade) (@mwtoews).
+
 
 ## 3.0.1
 
