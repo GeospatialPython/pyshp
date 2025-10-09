@@ -4,13 +4,18 @@ from collections.abc import Iterable
 from datetime import date
 from typing import Any, NamedTuple, Optional, SupportsIndex, overload
 
-from shapefile.constants import FIELD_TYPE_ALIASES, FieldType, ShapefileException
-from shapefile.shapes import NULL, Shape
-from shapefile.types import (
-    FieldTypeT,
+from .constants import NULL
+from .exceptions import ShapefileException
+from .geojson_types import (
     GeoJSONFeature,
     GeoJSONFeatureCollection,
     GeoJSONGeometryCollection,
+)
+from .shapes import Shape
+from .types import (
+    FIELD_TYPE_ALIASES,
+    FieldType,
+    FieldTypeT,
     RecordValue,
 )
 

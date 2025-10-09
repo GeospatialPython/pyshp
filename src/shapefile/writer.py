@@ -17,10 +17,10 @@ from typing import (
     overload,
 )
 
-from .classes import Field, RecordValue
+from .classes import Field
 from .constants import MISSING, NULL, SHAPETYPE_LOOKUP
 from .exceptions import ShapefileException
-from .geojson import GeoJSONHomogeneousGeometryObject, HasGeoInterface
+from .geojson_types import GeoJSONHomogeneousGeometryObject, HasGeoInterface
 from .helpers import fsdecode_if_pathlike
 from .shapes import (
     SHAPE_CLASS_FROM_SHAPETYPE,
@@ -54,6 +54,7 @@ from .types import (
     MBox,
     PointsT,
     ReadWriteSeekableBinStream,
+    RecordValue,
     WriteSeekableBinStream,
     ZBox,
 )

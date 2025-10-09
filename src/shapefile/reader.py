@@ -16,23 +16,22 @@ from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
 
 from .classes import (
-    FIELD_TYPE_ALIASES,
-    GeoJSONFeatureCollectionWithBBox,
+    Field,
     ShapeRecord,
     ShapeRecords,
     Shapes,
-    _Array,
     _Record,
 )
-from .constants import NODATA, SHAPE_CLASS_FROM_SHAPETYPE, SHAPETYPE_LOOKUP
+from .constants import NODATA, SHAPETYPE_LOOKUP
 from .exceptions import ShapefileException
-from .helpers import fsdecode_if_pathlike, unpack_2_int32_be
-from .shapes import Shape
+from .geojson_types import GeoJSONFeatureCollectionWithBBox
+from .helpers import _Array, fsdecode_if_pathlike, unpack_2_int32_be
+from .shapes import SHAPE_CLASS_FROM_SHAPETYPE, Shape
 from .types import (
+    FIELD_TYPE_ALIASES,
     BBox,
     BinaryFileStreamT,
     BinaryFileT,
-    Field,
     FieldType,
     ReadSeekableBinStream,
     T,
