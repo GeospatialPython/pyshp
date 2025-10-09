@@ -1496,7 +1496,7 @@ python -m pytest
 
 Additionally, all the code and examples located in this file, README.md,
 is tested and verified with the builtin doctest framework.
-A special routine for invoking the doctests against an installed PyShp wheel 
+A special routine for invoking the doctests against an installed PyShp wheel
 can be invoked (in an env with the wheel and pytest installed) from the test file:
 
 
