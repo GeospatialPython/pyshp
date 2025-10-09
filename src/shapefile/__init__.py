@@ -13,11 +13,12 @@ __all__ = [
 
 ]
 
+import logging
+import sys
+
 from .__version__ import __version__
 from ._doctest_runner import _test
 
-import logging
-import sys
 # import io
 # import os
 # import tempfile
@@ -49,41 +50,42 @@ import sys
 
 logger = logging.getLogger(__name__)
 
+from .helpers import _Array, fsdecode_if_pathlike
 from .reader import Reader
-from .helpers import fsdecode_if_pathlike, _Array
 from .shapes import (
-    Shape,
     NullShape,
     Point,
-    Polyline,
     Polygon,
     # ...add other shape classes as needed
+    Polyline,
+    Shape,
 )
 from .types import (
+    FIELD_TYPE_ALIASES,
+    BBox,
+    BinaryFileStreamT,
+    BinaryFileT,
+    Coord,
+    Coords,
+    FieldType,
+    FieldTypeT,
+    MBox,
     Point2D,
     Point3D,
     PointMT,
-    PointZT,
-    Coord,
-    Coords,
-    PointT,
     PointsT,
-    BBox,
-    MBox,
-    ZBox,
-    WriteableBinStream,
+    PointT,
+    PointZT,
     ReadableBinStream,
-    WriteSeekableBinStream,
     ReadSeekableBinStream,
     ReadWriteSeekableBinStream,
-    BinaryFileT,
-    BinaryFileStreamT,
-    FieldTypeT,
-    FieldType,
-    FIELD_TYPE_ALIASES,
-    RecordValueNotDate,
     RecordValue,
+    RecordValueNotDate,
+    WriteableBinStream,
+    WriteSeekableBinStream,
+    ZBox,
 )
+
 
 def main() -> None:
     """

@@ -1,9 +1,10 @@
 import doctest
 import sys
-from typing import Iterable, Iterator
+from collections.abc import Iterable, Iterator
 from urllib.parse import urlparse, urlunparse
 
 from .constants import REPLACE_REMOTE_URLS_WITH_LOCALHOST
+
 
 def _get_doctests() -> doctest.DocTest:
     # run tests

@@ -1,24 +1,26 @@
 from __future__ import annotations
-from typing import (Sequence, Iterator, Iterable, TypedDict, Final, cast, Union)
-from struct import pack, unpack, error
+
+from collections.abc import Iterable, Iterator, Sequence
+from struct import error, pack, unpack
+from typing import Final, TypedDict, Union, cast
 
 from .classes import _Array
 from .constants import (
-    NULL,
-    NODATA,
-    POINT,
-    POINTM,
-    POINTZ,
-    POLYLINE,
-    POLYLINEM,
-    POLYLINEZ,
-    POLYGON,
-    POLYGONM,
-    POLYGONZ,
+    MULTIPATCH,
     MULTIPOINT,
     MULTIPOINTM,
     MULTIPOINTZ,
-    MULTIPATCH,
+    NODATA,
+    NULL,
+    POINT,
+    POINTM,
+    POINTZ,
+    POLYGON,
+    POLYGONM,
+    POLYGONZ,
+    POLYLINE,
+    POLYLINEM,
+    POLYLINEZ,
     SHAPETYPE_LOOKUP,
     SHAPETYPENUM_LOOKUP,
 )
@@ -26,18 +28,19 @@ from .exceptions import ShapefileException
 from .geojson import GeoJSONSerisalizableShape
 from .geometric_calculations import bbox_overlap
 from .types import (
-    PointT,
-    Point2D,
-    Point3D,
-    PointMT,
-    PointZT,
-    PointsT,
     BBox,
     MBox,
-    ZBox,
+    Point2D,
+    PointMT,
+    PointsT,
+    PointT,
+    PointZT,
+    ReadableBinStream,
     ReadSeekableBinStream,
-    WriteableBinStream, ReadableBinStream,WriteSeekableBinStream
+    WriteableBinStream,
+    ZBox,
 )
+
 
 class _NoShapeTypeSentinel:
     """For use as a default value for Shape.__init__ to

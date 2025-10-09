@@ -1,17 +1,16 @@
+import io
+from datetime import date
+from os import PathLike
 from typing import (
+    IO,
     Any,
     Final,
-    IO,
     Literal,
     Optional,
     Protocol,
     TypeVar,
     Union,
 )
-from datetime import date
-import io
-from os import PathLike
-
 
 ## Custom type variables
 

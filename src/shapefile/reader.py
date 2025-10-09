@@ -1,26 +1,44 @@
 from __future__ import annotations
 
-from datetime import date
 import io
 import os
-from os import PathLike
-from struct import Struct, calcsize, error, pack, unpack
 import sys
 import tempfile
+import zipfile
+from collections.abc import Container, Iterable, Iterator
+from datetime import date
+from os import PathLike
+from struct import Struct, calcsize, unpack
 from types import TracebackType
-from typing import (Any, IO, Union, cast, Iterator, Container, Iterable)
+from typing import IO, Any, Union, cast
 from urllib.error import HTTPError
 from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
-import zipfile
 
-from .classes import _Record, Shapes, ShapeRecord, ShapeRecords, GeoJSONFeatureCollectionWithBBox, _Array, FIELD_TYPE_ALIASES
-from .constants import (NODATA, SHAPETYPE_LOOKUP, SHAPE_CLASS_FROM_SHAPETYPE)
+from .classes import (
+    FIELD_TYPE_ALIASES,
+    GeoJSONFeatureCollectionWithBBox,
+    ShapeRecord,
+    ShapeRecords,
+    Shapes,
+    _Array,
+    _Record,
+)
+from .constants import NODATA, SHAPE_CLASS_FROM_SHAPETYPE, SHAPETYPE_LOOKUP
 from .exceptions import ShapefileException
 from .helpers import fsdecode_if_pathlike, unpack_2_int32_be
 from .shapes import Shape
-from .types import (BBox, ZBox, BinaryFileT, BinaryFileStreamT, 
-                    Field, FieldType, T, ReadSeekableBinStream)
+from .types import (
+    BBox,
+    BinaryFileStreamT,
+    BinaryFileT,
+    Field,
+    FieldType,
+    ReadSeekableBinStream,
+    T,
+    ZBox,
+)
+
 
 class _NoShpSentinel:
     """For use as a default value for shp to preserve the

@@ -2,7 +2,7 @@ import array
 import os
 from os import PathLike
 from struct import Struct
-from typing import overload, TypeVar, Generic, Any
+from typing import Any, Generic, TypeVar, overload
 
 from .types import T
 

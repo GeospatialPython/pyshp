@@ -5,7 +5,7 @@ import os
 import time
 from datetime import date
 from os import PathLike
-from struct import calcsize, error, pack, unpack
+from struct import error, pack
 from types import TracebackType
 from typing import (
     Any,
@@ -17,21 +17,49 @@ from typing import (
     overload,
 )
 
-
 from .classes import Field, RecordValue
-from .constants import NULL, MISSING, SHAPETYPE_LOOKUP
+from .constants import MISSING, NULL, SHAPETYPE_LOOKUP
 from .exceptions import ShapefileException
-from .geojson import HasGeoInterface, GeoJSONHomogeneousGeometryObject
+from .geojson import GeoJSONHomogeneousGeometryObject, HasGeoInterface
 from .helpers import fsdecode_if_pathlike
-from .shapes import (Shape, NullShape, 
-                    Point, PointM, PointZ, 
-                     MultiPoint, MultiPointM, MultiPointZ, 
-                     Polyline, PolylineM, PolylineZ, 
-                     Polygon, PolygonM, PolygonZ,
-                     MultiPatch,
-                     Polyline_HasM, _HasZ, _HasM, _CanHaveBBox_shapeTypes, 
-                     PointM_shapeTypes, PointZ_shapeTypes, _HasM_shapeTypes, _HasZ_shapeTypes, SHAPE_CLASS_FROM_SHAPETYPE, SHAPETYPE_LOOKUP)
-from .types import (WriteSeekableBinStream, BBox, ZBox, MBox, BinaryFileStreamT, Field, ReadWriteSeekableBinStream, PointsT, FieldTypeT)
+from .shapes import (
+    SHAPE_CLASS_FROM_SHAPETYPE,
+    SHAPETYPE_LOOKUP,
+    MultiPatch,
+    MultiPoint,
+    MultiPointM,
+    MultiPointZ,
+    NullShape,
+    Point,
+    PointM,
+    PointM_shapeTypes,
+    PointZ,
+    PointZ_shapeTypes,
+    Polygon,
+    PolygonM,
+    PolygonZ,
+    Polyline,
+    PolylineM,
+    PolylineZ,
+    Shape,
+    _CanHaveBBox_shapeTypes,
+    _HasM,
+    _HasM_shapeTypes,
+    _HasZ,
+    _HasZ_shapeTypes,
+)
+from .types import (
+    BBox,
+    BinaryFileStreamT,
+    Field,
+    FieldTypeT,
+    MBox,
+    PointsT,
+    ReadWriteSeekableBinStream,
+    WriteSeekableBinStream,
+    ZBox,
+)
+
 
 class Writer:
     """Provides write support for ESRI Shapefiles."""

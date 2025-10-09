@@ -1,29 +1,28 @@
 from __future__ import annotations
 
 import logging
-from typing import (Any, TypedDict, Union, Protocol, Literal, cast, Self)
+from typing import Any, Literal, Protocol, Self, TypedDict, Union, cast
 
 from .constants import (
+    MULTIPOINT,
+    MULTIPOINTM,
+    MULTIPOINTZ,
     NULL,
     POINT,
     POINTM,
     POINTZ,
-    MULTIPOINT,
-    MULTIPOINTM,
-    MULTIPOINTZ,
-    POLYLINE,
-    POLYLINEM,
-    POLYLINEZ,
     POLYGON,
     POLYGONM,
     POLYGONZ,
+    POLYLINE,
+    POLYLINEM,
+    POLYLINEZ,
     SHAPETYPE_LOOKUP,
-    VERBOSE
+    VERBOSE,
 )
 from .exceptions import GeoJSON_Error
-from .geometric_calculations import is_cw, rewind, organize_polygon_rings
-from .types import PointT, PointsT
-
+from .geometric_calculations import is_cw, organize_polygon_rings, rewind
+from .types import PointsT, PointT
 
 logger = logging.getLogger(__name__)
     

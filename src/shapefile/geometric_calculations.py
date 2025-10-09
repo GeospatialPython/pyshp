@@ -1,7 +1,8 @@
-from typing import Reversible, Iterable, Iterator
+from collections.abc import Iterable, Iterator, Reversible
 
-from .types import PointsT, PointT, Point2D, BBox
 from .exceptions import RingSamplingError
+from .types import BBox, Point2D, PointsT, PointT
+
 
 def signed_area(
     coords: PointsT,
