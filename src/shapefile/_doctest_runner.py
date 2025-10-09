@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import doctest
 import sys
 from collections.abc import Iterable, Iterator
