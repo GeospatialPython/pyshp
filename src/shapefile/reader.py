@@ -1,7 +1,42 @@
+from __future__ import annotations
 
+import io
+import os
+import sys
+import tempfile
+import zipfile
+from collections.abc import Container, Iterable, Iterator
+from datetime import date
+from os import PathLike
+from struct import Struct, calcsize, unpack
+from types import TracebackType
+from typing import IO, Any, Union, cast
 from urllib.error import HTTPError
 from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
+
+from .classes import (
+    Field,
+    ShapeRecord,
+    ShapeRecords,
+    Shapes,
+    _Record,
+)
+from .constants import NODATA, SHAPETYPE_LOOKUP
+from .exceptions import ShapefileException
+from .geojson_types import GeoJSONFeatureCollectionWithBBox
+from .helpers import _Array, fsdecode_if_pathlike, unpack_2_int32_be
+from .shapes import SHAPE_CLASS_FROM_SHAPETYPE, Shape
+from .types import (
+    FIELD_TYPE_ALIASES,
+    BBox,
+    BinaryFileStreamT,
+    BinaryFileT,
+    FieldType,
+    ReadSeekableBinStream,
+    T,
+    ZBox,
+)
 
 
 class _NoShpSentinel:

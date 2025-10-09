@@ -1,3 +1,18 @@
+from __future__ import annotations
+
+import io
+from datetime import date
+from os import PathLike
+from typing import (
+    IO,
+    Any,
+    Final,
+    Literal,
+    Optional,
+    Protocol,
+    TypeVar,
+    Union,
+)
 
 ## Custom type variables
 
@@ -78,7 +93,6 @@ for c in FieldType.__members__:
     FIELD_TYPE_ALIASES[c.lower()] = c
     FIELD_TYPE_ALIASES[c.encode("ascii").lower()] = c
     FIELD_TYPE_ALIASES[c.encode("ascii").upper()] = c
-
 
 
 RecordValueNotDate = Union[bool, int, float, str]

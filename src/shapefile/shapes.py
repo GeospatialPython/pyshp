@@ -1,3 +1,53 @@
+from __future__ import annotations
+
+import logging
+from collections.abc import Iterable, Iterator, Sequence
+from struct import error, pack, unpack
+from typing import Final, TypedDict, Union, cast
+
+from .constants import (
+    MULTIPATCH,
+    MULTIPOINT,
+    MULTIPOINTM,
+    MULTIPOINTZ,
+    NODATA,
+    NULL,
+    POINT,
+    POINTM,
+    POINTZ,
+    POLYGON,
+    POLYGONM,
+    POLYGONZ,
+    POLYLINE,
+    POLYLINEM,
+    POLYLINEZ,
+    SHAPETYPE_LOOKUP,
+    SHAPETYPENUM_LOOKUP,
+    VERBOSE,
+)
+from .exceptions import GeoJSON_Error, ShapefileException
+from .geojson_types import (
+    GEOJSON_TO_SHAPETYPE,
+    GeoJSONHomogeneousGeometryObject,
+)
+from .geometric_calculations import bbox_overlap, is_cw, organize_polygon_rings, rewind
+from .helpers import _Array
+from .types import (
+    BBox,
+    MBox,
+    Point2D,
+    PointMT,
+    PointsT,
+    PointT,
+    PointZT,
+    ReadableBinStream,
+    ReadSeekableBinStream,
+    WriteableBinStream,
+    ZBox,
+)
+
+logger = logging.getLogger(__name__)
+
 
 class _NoShapeTypeSentinel:
     """For use as a default value for Shape.__init__ to
@@ -41,7 +91,9 @@ class CanHaveBboxNoLinesKwargs(TypedDict, total=False):
     z: Sequence[float] | None
     mbox: MBox | None
     zbox: ZBox | None
-class Shape(GeoJSONSerisalizableShape):
+
+
+class Shape:
     def __init__(
         self,
         shapeType: int | _NoShapeTypeSentinel = _NO_SHAPE_TYPE_SENTINEL,
@@ -213,8 +265,6 @@ class Shape(GeoJSONSerisalizableShape):
     def _zbox_from_zs(self) -> ZBox:
         return min(self.z), max(self.z)
 
-
-
     @property
     def oid(self) -> int:
         """The index position of the shape in the original shapefile"""
@@ -229,6 +279,189 @@ class Shape(GeoJSONSerisalizableShape):
         if class_name == "Shape":
             return f"Shape #{self.__oid}: {self.shapeTypeName}"
         return f"{class_name} #{self.__oid}"
+
+    @property
+    def __geo_interface__(self) -> GeoJSONHomogeneousGeometryObject:
+        if self.shapeType in {POINT, POINTM, POINTZ}:
+            # point
+            if len(self.points) == 0:
+                # the shape has no coordinate information, i.e. is 'empty'
+                # the geojson spec does not define a proper null-geometry type
+                # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
+                return {"type": "Point", "coordinates": ()}
+
+            return {"type": "Point", "coordinates": self.points[0]}
+
+        if self.shapeType in {MULTIPOINT, MULTIPOINTM, MULTIPOINTZ}:
+            if len(self.points) == 0:
+                # the shape has no coordinate information, i.e. is 'empty'
+                # the geojson spec does not define a proper null-geometry type
+                # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
+                return {"type": "MultiPoint", "coordinates": []}
+
+            # multipoint
+            return {
+                "type": "MultiPoint",
+                "coordinates": self.points,
+            }
+
+        if self.shapeType in {POLYLINE, POLYLINEM, POLYLINEZ}:
+            if len(self.parts) == 0:
+                # the shape has no coordinate information, i.e. is 'empty'
+                # the geojson spec does not define a proper null-geometry type
+                # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
+                return {"type": "LineString", "coordinates": []}
+
+            if len(self.parts) == 1:
+                # linestring
+                return {
+                    "type": "LineString",
+                    "coordinates": self.points,
+                }
+
+            # multilinestring
+            ps = None
+            coordinates = []
+            for part in self.parts:
+                if ps is None:
+                    ps = part
+                    continue
+
+                coordinates.append(list(self.points[ps:part]))
+                ps = part
+
+            # assert len(self.parts) > 1
+            # from previous if len(self.parts) checks so part is defined
+            coordinates.append(list(self.points[part:]))
+            return {"type": "MultiLineString", "coordinates": coordinates}
+
+        if self.shapeType in {POLYGON, POLYGONM, POLYGONZ}:
+            if len(self.parts) == 0:
+                # the shape has no coordinate information, i.e. is 'empty'
+                # the geojson spec does not define a proper null-geometry type
+                # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
+                return {"type": "Polygon", "coordinates": []}
+
+            # get all polygon rings
+            rings = []
+            for i, start in enumerate(self.parts):
+                # get indexes of start and end points of the ring
+                try:
+                    end = self.parts[i + 1]
+                except IndexError:
+                    end = len(self.points)
+
+                # extract the points that make up the ring
+                ring = list(self.points[start:end])
+                rings.append(ring)
+
+            # organize rings into list of polygons, where each polygon is defined as list of rings.
+            # the first ring is the exterior and any remaining rings are holes (same as GeoJSON).
+            polys = organize_polygon_rings(rings, self._errors)
+
+            # if VERBOSE is True, issue detailed warning about any shape errors
+            # encountered during the Shapefile to GeoJSON conversion
+            if VERBOSE and self._errors:
+                header = f"Possible issue encountered when converting Shape #{self.oid} to GeoJSON: "
+                orphans = self._errors.get("polygon_orphaned_holes", None)
+                if orphans:
+                    msg = (
+                        header
+                        + "Shapefile format requires that all polygon interior holes be contained by an exterior ring, \
+but the Shape contained interior holes (defined by counter-clockwise orientation in the shapefile format) that were \
+orphaned, i.e. not contained by any exterior rings. The rings were still included but were \
+encoded as GeoJSON exterior rings instead of holes."
+                    )
+                    logger.warning(msg)
+                only_holes = self._errors.get("polygon_only_holes", None)
+                if only_holes:
+                    msg = (
+                        header
+                        + "Shapefile format requires that polygons contain at least one exterior ring, \
+but the Shape was entirely made up of interior holes (defined by counter-clockwise orientation in the shapefile format). The rings were \
+still included but were encoded as GeoJSON exterior rings instead of holes."
+                    )
+                    logger.warning(msg)
+
+            # return as geojson
+            if len(polys) == 1:
+                return {"type": "Polygon", "coordinates": polys[0]}
+
+            return {"type": "MultiPolygon", "coordinates": polys}
+
+        raise GeoJSON_Error(
+            f'Shape type "{SHAPETYPE_LOOKUP[self.shapeType]}" cannot be represented as GeoJSON.'
+        )
+
+    @classmethod
+    def _from_geojson(cls, geoj: GeoJSONHomogeneousGeometryObject) -> Shape:
+        # create empty shape
+        # set shapeType
+        geojType = geoj["type"] if geoj else "Null"
+        if geojType in GEOJSON_TO_SHAPETYPE:
+            shapeType = GEOJSON_TO_SHAPETYPE[geojType]
+        else:
+            raise GeoJSON_Error(f"Cannot create Shape from GeoJSON type '{geojType}'")
+
+        coordinates = geoj["coordinates"]
+
+        if coordinates == ():
+            raise GeoJSON_Error(f"Cannot create non-Null Shape from: {coordinates=}")
+
+        points: PointsT
+        parts: list[int]
+
+        # set points and parts
+        if geojType == "Point":
+            points = [cast(PointT, coordinates)]
+            parts = [0]
+        elif geojType in ("MultiPoint", "LineString"):
+            points = cast(PointsT, coordinates)
+            parts = [0]
+        elif geojType == "Polygon":
+            points = []
+            parts = []
+            index = 0
+            for i, ext_or_hole in enumerate(cast(list[PointsT], coordinates)):
+                # although the latest GeoJSON spec states that exterior rings should have
+                # counter-clockwise orientation, we explicitly check orientation since older
+                # GeoJSONs might not enforce this.
+                if i == 0 and not is_cw(ext_or_hole):
+                    # flip exterior direction
+                    ext_or_hole = rewind(ext_or_hole)
+                elif i > 0 and is_cw(ext_or_hole):
+                    # flip hole direction
+                    ext_or_hole = rewind(ext_or_hole)
+                points.extend(ext_or_hole)
+                parts.append(index)
+                index += len(ext_or_hole)
+        elif geojType == "MultiLineString":
+            points = []
+            parts = []
+            index = 0
+            for linestring in cast(list[PointsT], coordinates):
+                points.extend(linestring)
+                parts.append(index)
+                index += len(linestring)
+        elif geojType == "MultiPolygon":
+            points = []
+            parts = []
+            index = 0
+            for polygon in cast(list[list[PointsT]], coordinates):
+                for i, ext_or_hole in enumerate(polygon):
+                    # although the latest GeoJSON spec states that exterior rings should have
+                    # counter-clockwise orientation, we explicitly check orientation since older
+                    # GeoJSONs might not enforce this.
+                    if i == 0 and not is_cw(ext_or_hole):
+                        # flip exterior direction
+                        ext_or_hole = rewind(ext_or_hole)
+                    elif i > 0 and is_cw(ext_or_hole):
+                        # flip hole direction
+                        ext_or_hole = rewind(ext_or_hole)
+                    points.extend(ext_or_hole)
+                    parts.append(index)
+                    index += len(ext_or_hole)
+        return cls(shapeType=shapeType, points=points, parts=parts)
 
 
 # Need unused arguments to keep the same call signature for

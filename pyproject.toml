@@ -30,11 +30,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pyshp[test]", "pre-commit", "ruff"]
+dev = ["pyshp[test]", "pre-commit", "ruff", "mypy"]
 test = ["pytest"]
 
 [project.urls]
 Repository = "https://github.com/GeospatialPython/pyshp"
+
+[project.scripts]
+shapefile="shapefile.__main__:main"
 
 [tool.hatch.build.targets.sdist]
 only-include = ["src", "shapefiles", "test_shapefile.py"]
@@ -44,7 +47,7 @@ only-include = ["src"]
 sources = {"src" = ""}  # move from "src" directory for wheel
 
 [tool.hatch.version]
-path = "src/shapefile.py"
+path = "src/shapefile/__version__.py"
 
 [tool.pytest.ini_options]
 markers = [
