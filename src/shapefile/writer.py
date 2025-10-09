@@ -1,3 +1,37 @@
+from __future__ import annotations
+
+import io
+import os
+import time
+from datetime import date
+from os import PathLike
+from struct import calcsize, error, pack, unpack
+from types import TracebackType
+from typing import (
+    Any,
+    Literal,
+    NoReturn,
+    TypeVar,
+    Union,
+    cast,
+    overload,
+)
+
+
+from .classes import Field, RecordValue
+from .constants import NULL, MISSING, SHAPETYPE_LOOKUP
+from .exceptions import ShapefileException
+from .geojson import HasGeoInterface, GeoJSONHomogeneousGeometryObject
+from .helpers import fsdecode_if_pathlike
+from .shapes import (Shape, NullShape, 
+                    Point, PointM, PointZ, 
+                     MultiPoint, MultiPointM, MultiPointZ, 
+                     Polyline, PolylineM, PolylineZ, 
+                     Polygon, PolygonM, PolygonZ,
+                     MultiPatch,
+                     Polyline_HasM, _HasZ, _HasM, _CanHaveBBox_shapeTypes, 
+                     PointM_shapeTypes, PointZ_shapeTypes, _HasM_shapeTypes, _HasZ_shapeTypes, SHAPE_CLASS_FROM_SHAPETYPE, SHAPETYPE_LOOKUP)
+from .types import (WriteSeekableBinStream, BBox, ZBox, MBox, BinaryFileStreamT, Field, ReadWriteSeekableBinStream, PointsT, FieldTypeT)
 
 class Writer:
     """Provides write support for ESRI Shapefiles."""
