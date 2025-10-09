@@ -1496,16 +1496,8 @@ python -m pytest
 
 Additionally, all the code and examples located in this file, README.md,
 is tested and verified with the builtin doctest framework.
-A special routine for invoking the doctest is run when calling directly on shapefile.py.
-In the same folder as README.md and shapefile.py, from the command line run:
-
-```shell
-python shapefile.py
-```
-
-This tests the code inside shapefile.py itself.  To test an installed PyShp wheel against
-the doctests, the same special routine can be invoked (in an env with the wheel and pytest
-installed) from the test file:
+A special routine for invoking the doctests against an installed PyShp wheel
+can be invoked (in an env with the wheel and pytest installed) from the test file:
 
 
 ```shell
