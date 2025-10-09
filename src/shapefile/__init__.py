@@ -1,5 +1,5 @@
 """
-shapefile.py
+shapefile/__init__.py
 Provides read and write support for ESRI Shapefiles.
 authors: jlawhead<at>geospatialpython.com
 maintainer: karim.bahgat.norway<at>gmail.com
@@ -8,7 +8,7 @@ Compatible with Python versions >=3.9
 
 from __future__ import annotations
 
-__version__ = "3.0.2"
+__version__ = "3.0.3-rc-option-B"
 
 import array
 import doctest
