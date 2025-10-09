@@ -12,6 +12,7 @@ import logging
 
 from .__main__ import main
 from .__version__ import __version__
+from ._doctest_runner import _replace_remote_url
 from .classes import Field, ShapeRecord, ShapeRecords, Shapes
 from .constants import (
     FIRST_RING,
@@ -41,7 +42,6 @@ from .constants import (
     TRIANGLE_FAN,
     TRIANGLE_STRIP,
 )
-from ._doctest_runner import _replace_remote_url
 from .exceptions import GeoJSON_Error, RingSamplingError, ShapefileException
 from .geometric_calculations import bbox_overlap
 from .helpers import _Array, fsdecode_if_pathlike

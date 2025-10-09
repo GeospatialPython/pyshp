@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable, Iterator, Sequence
 from struct import error, pack, unpack
-from typing import Final, Self, TypedDict, Union, cast
+from typing import Final, TypedDict, Union, cast
 
 from .constants import (
     MULTIPATCH,
@@ -394,7 +394,7 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
         )
 
     @classmethod
-    def _from_geojson(cls, geoj: GeoJSONHomogeneousGeometryObject) -> Self:
+    def _from_geojson(cls, geoj: GeoJSONHomogeneousGeometryObject) -> Shape:
         # create empty shape
         # set shapeType
         geojType = geoj["type"] if geoj else "Null"
