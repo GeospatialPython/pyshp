@@ -19,34 +19,6 @@ import sys
 from .__version__ import __version__
 from ._doctest_runner import _test
 
-# import io
-# import os
-# import tempfile
-# import time
-# import zipfile
-# from collections.abc import Container, Iterable, Iterator, Reversible, Sequence
-# from datetime import date
-# from os import PathLike
-# from struct import Struct, calcsize, error, pack, unpack
-# from types import TracebackType
-# from typing import (
-#     IO,
-#     Any,
-#     Final,
-#     Generic,
-#     Literal,
-#     NamedTuple,
-#     NoReturn,
-#     Optional,
-#     Protocol,
-#     SupportsIndex,
-#     TypedDict,
-#     TypeVar,
-#     Union,
-#     cast,
-#     overload,
-# )
-
 
 logger = logging.getLogger(__name__)
 
