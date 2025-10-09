@@ -176,5 +176,3 @@ def main() -> None:
     """
     failure_count = _test()
     sys.exit(failure_count)
-
-
