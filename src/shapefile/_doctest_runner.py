@@ -1,6 +1,10 @@
 import doctest
+import sys
+from typing import Iterable, Iterator
+from urllib.parse import urlparse, urlunparse
 
-# Begin Testing
+from .constants import REPLACE_REMOTE_URLS_WITH_LOCALHOST
+
 def _get_doctests() -> doctest.DocTest:
     # run tests
     with open("README.md", "rb") as fobj:
