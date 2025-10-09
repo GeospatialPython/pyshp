@@ -92,7 +92,10 @@ part of your geospatial project.
 
 
 # Version Changes
-## Next
+## 3.0.2
+
+### Bug fix
+- Deleted py.typed (probably temporarily).  Including the py.typed marker file with a single file package caused type checkers to type check all other libraries installed in the same directory (whether they're typed or not, enforcing type checking for all the adjacent dirs libraries, regardless of the user's intentions for the type checker) (pointed out by @dl1jbe - thanks Thomas).  Discussions will be started about a longer term fix, possibly e.g. possibly refactoring to a package, and restoring py.typed.
 
 ### Code quality:
 - Ruff check's UP rule added (mimicks PyUpgrade) (@mwtoews).
@@ -1587,6 +1590,7 @@ Razzi Abuissa
 RosBer97
 Ross Rogers
 Ryan Brideau
+Thomas Beierlein
 Tim Gates
 Tobias Megies
 Tommi Penttinen
