@@ -1,3 +1,4 @@
+import os
 
 # Module settings
 VERBOSE = True
