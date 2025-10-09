@@ -41,6 +41,7 @@ from .constants import (
     TRIANGLE_FAN,
     TRIANGLE_STRIP,
 )
+from ._doctest_runner import _replace_remote_url
 from .exceptions import GeoJSON_Error, RingSamplingError, ShapefileException
 from .geometric_calculations import bbox_overlap
 from .helpers import _Array, fsdecode_if_pathlike
@@ -184,6 +185,7 @@ __all__ = [
     "ShapeRecords",
     "bbox_overlap",
     "main",
+    "_replace_remote_url",
 ]
 
 logger = logging.getLogger(__name__)
