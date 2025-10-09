@@ -9,17 +9,22 @@ Compatible with Python versions >=3.9
 from __future__ import annotations
 
 import logging
-import sys
 
+from .__main__ import main
 from .__version__ import __version__
-from ._doctest_runner import _test
 from .classes import Field, ShapeRecord, ShapeRecords, Shapes
 from .constants import (
+    FIRST_RING,
+    INNER_RING,
+    MISSING,
     MULTIPATCH,
     MULTIPOINT,
     MULTIPOINTM,
     MULTIPOINTZ,
+    NODATA,
     NULL,
+    OUTER_RING,
+    PARTTYPE_LOOKUP,
     POINT,
     POINTM,
     POINTZ,
@@ -30,7 +35,11 @@ from .constants import (
     POLYLINEM,
     POLYLINEZ,
     REPLACE_REMOTE_URLS_WITH_LOCALHOST,
+    RING,
     SHAPETYPE_LOOKUP,
+    SHAPETYPENUM_LOOKUP,
+    TRIANGLE_FAN,
+    TRIANGLE_STRIP,
 )
 from .exceptions import GeoJSON_Error, RingSamplingError, ShapefileException
 from .geometric_calculations import bbox_overlap
@@ -106,6 +115,16 @@ __all__ = [
     "MULTIPATCH",
     "SHAPETYPE_LOOKUP",
     "REPLACE_REMOTE_URLS_WITH_LOCALHOST",
+    "SHAPETYPENUM_LOOKUP",
+    "TRIANGLE_STRIP",
+    "TRIANGLE_FAN",
+    "OUTER_RING",
+    "INNER_RING",
+    "FIRST_RING",
+    "RING",
+    "PARTTYPE_LOOKUP",
+    "MISSING",
+    "NODATA",
     "Reader",
     "Writer",
     "fsdecode_if_pathlike",
@@ -164,15 +183,7 @@ __all__ = [
     "ShapeRecord",
     "ShapeRecords",
     "bbox_overlap",
+    "main",
 ]
 
 logger = logging.getLogger(__name__)
-
-
-def main() -> None:
-    """
-    Doctests are contained in the file 'README.md', and are tested using the built-in
-    testing libraries.
-    """
-    failure_count = _test()
-    sys.exit(failure_count)

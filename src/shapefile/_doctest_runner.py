@@ -1,6 +1,7 @@
 import doctest
 import sys
 from collections.abc import Iterable, Iterator
+from pathlib import Path
 from urllib.parse import urlparse, urlunparse
 
 from .constants import REPLACE_REMOTE_URLS_WITH_LOCALHOST
@@ -8,7 +9,7 @@ from .constants import REPLACE_REMOTE_URLS_WITH_LOCALHOST
 
 def _get_doctests() -> doctest.DocTest:
     # run tests
-    with open("README.md", "rb") as fobj:
+    with Path("README.md").open("rb") as fobj:
         tests = doctest.DocTestParser().get_doctest(
             string=fobj.read().decode("utf8").replace("\r\n", "\n"),
             globs={},
