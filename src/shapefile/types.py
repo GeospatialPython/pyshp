@@ -93,7 +93,6 @@ for c in FieldType.__members__:
     FIELD_TYPE_ALIASES[c.encode("ascii").upper()] = c
 
 
-
 RecordValueNotDate = Union[bool, int, float, str]
 
 # A Possible value in a Shapefile dbf record, i.e. L, N, M, F, C, or D types

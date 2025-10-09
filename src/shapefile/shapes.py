@@ -84,6 +84,8 @@ class CanHaveBboxNoLinesKwargs(TypedDict, total=False):
     z: Sequence[float] | None
     mbox: MBox | None
     zbox: ZBox | None
+
+
 class Shape(GeoJSONSerisalizableShape):
     def __init__(
         self,
@@ -255,8 +257,6 @@ class Shape(GeoJSONSerisalizableShape):
 
     def _zbox_from_zs(self) -> ZBox:
         return min(self.z), max(self.z)
-
-
 
     @property
     def oid(self) -> int:

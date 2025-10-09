@@ -25,7 +25,8 @@ from .geometric_calculations import is_cw, organize_polygon_rings, rewind
 from .types import PointsT, PointT
 
 logger = logging.getLogger(__name__)
-    
+
+
 class HasGeoInterface(Protocol):
     @property
     def __geo_interface__(self) -> GeoJSONHomogeneousGeometryObject: ...
@@ -118,6 +119,7 @@ class GeoJSONFeatureCollectionWithBBox(GeoJSONFeatureCollection):
     # from the typing-extensions backport for Python 3.9
     # (PyShp's resisted having any other dependencies so far!)
     bbox: list[float]
+
 
 class GeoJSONSerisalizableShape:
     @property

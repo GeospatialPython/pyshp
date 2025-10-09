@@ -105,8 +105,6 @@ def ring_contains_point(coords: PointsT, p: Point2D) -> bool:
     return inside_flag
 
 
-
-
 def ring_sample(coords: PointsT, ccw: bool = False) -> Point2D:
     """Return a sample point guaranteed to be within a ring, by efficiently
     finding the first centroid of a coordinate triplet whose orientation

@@ -8,29 +8,37 @@ Compatible with Python versions >=3.9
 
 from __future__ import annotations
 
-__all__ = [
-    "__version__"
-
-]
-
 import logging
 import sys
 
 from .__version__ import __version__
 from ._doctest_runner import _test
-
-
-logger = logging.getLogger(__name__)
-
 from .helpers import _Array, fsdecode_if_pathlike
 from .reader import Reader
 from .shapes import (
+    SHAPE_CLASS_FROM_SHAPETYPE,
+    MultiPatch,
+    MultiPoint,
+    MultiPointM,
+    MultiPointZ,
     NullShape,
     Point,
+    PointM,
+    PointM_shapeTypes,
+    PointZ,
+    PointZ_shapeTypes,
     Polygon,
-    # ...add other shape classes as needed
+    PolygonM,
+    PolygonZ,
     Polyline,
+    PolylineM,
+    PolylineZ,
     Shape,
+    _CanHaveBBox_shapeTypes,
+    _HasM,
+    _HasM_shapeTypes,
+    _HasZ,
+    _HasZ_shapeTypes,
 )
 from .types import (
     FIELD_TYPE_ALIASES,
@@ -57,6 +65,61 @@ from .types import (
     WriteSeekableBinStream,
     ZBox,
 )
+
+__all__ = [
+    "__version__",
+    "Reader",
+    "fsdecode_if_pathlike",
+    "_Array",
+    "Shape",
+    "NullShape",
+    "Point",
+    "Polyline",
+    "Polygon",
+    "MultiPoint",
+    "MultiPointM",
+    "MultiPointZ",
+    "PolygonM",
+    "PolygonZ",
+    "PolylineM",
+    "PolylineZ",
+    "MultiPatch",
+    "PointM",
+    "PointZ",
+    "SHAPE_CLASS_FROM_SHAPETYPE",
+    "PointM_shapeTypes",
+    "PointZ_shapeTypes",
+    "_CanHaveBBox_shapeTypes",
+    "_HasM",
+    "_HasM_shapeTypes",
+    "_HasZ",
+    "_HasZ_shapeTypes",
+    "Point2D",
+    "Point3D",
+    "PointMT",
+    "PointZT",
+    "Coord",
+    "Coords",
+    "PointT",
+    "PointsT",
+    "BBox",
+    "MBox",
+    "ZBox",
+    "WriteableBinStream",
+    "ReadableBinStream",
+    "WriteSeekableBinStream",
+    "ReadSeekableBinStream",
+    "ReadWriteSeekableBinStream",
+    "BinaryFileT",
+    "BinaryFileStreamT",
+    "FieldTypeT",
+    "FieldType",
+    "FIELD_TYPE_ALIASES",
+    "RecordValueNotDate",
+    "RecordValue",
+]
+
+logger = logging.getLogger(__name__)
 
 
 def main() -> None:
