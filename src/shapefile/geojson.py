@@ -1,6 +1,31 @@
+from __future__ import annotations
 
-class GeoJSON_Error(Exception):
-    pass
+import logging
+from typing import (Any, TypedDict, Union, Protocol, Literal, cast, Self)
+
+from .constants import (
+    NULL,
+    POINT,
+    POINTM,
+    POINTZ,
+    MULTIPOINT,
+    MULTIPOINTM,
+    MULTIPOINTZ,
+    POLYLINE,
+    POLYLINEM,
+    POLYLINEZ,
+    POLYGON,
+    POLYGONM,
+    POLYGONZ,
+    SHAPETYPE_LOOKUP,
+    VERBOSE
+)
+from .exceptions import GeoJSON_Error
+from .geometric_calculations import is_cw, rewind, organize_polygon_rings
+from .types import PointT, PointsT
+
+
+logger = logging.getLogger(__name__)
     
 class HasGeoInterface(Protocol):
     @property
@@ -209,8 +234,8 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
             f'Shape type "{SHAPETYPE_LOOKUP[self.shapeType]}" cannot be represented as GeoJSON.'
         )
 
-    @staticmethod
-    def _from_geojson(geoj: GeoJSONHomogeneousGeometryObject) -> Shape:
+    @classmethod
+    def _from_geojson(cls, geoj: GeoJSONHomogeneousGeometryObject) -> Self:
         # create empty shape
         # set shapeType
         geojType = geoj["type"] if geoj else "Null"
@@ -277,4 +302,4 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
                     points.extend(ext_or_hole)
                     parts.append(index)
                     index += len(ext_or_hole)
-        return Shape(shapeType=shapeType, points=points, parts=parts)
+        return cls(shapeType=shapeType, points=points, parts=parts)

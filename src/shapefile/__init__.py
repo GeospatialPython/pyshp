@@ -46,7 +46,7 @@ import sys
 #     overload,
 # )
 
-# Create named logger
+
 logger = logging.getLogger(__name__)
 
 from .reader import Reader

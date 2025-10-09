@@ -1,5 +1,7 @@
-from .types import PointsT, PointT, Point2D, BBox
 from typing import Reversible, Iterable, Iterator
+
+from .types import PointsT, PointT, Point2D, BBox
+from .exceptions import RingSamplingError
 
 def signed_area(
     coords: PointsT,
@@ -102,8 +104,6 @@ def ring_contains_point(coords: PointsT, p: Point2D) -> bool:
     return inside_flag
 
 
-class RingSamplingError(Exception):
-    pass
 
 
 def ring_sample(coords: PointsT, ccw: bool = False) -> Point2D:
