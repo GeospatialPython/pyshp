@@ -1,9 +1,10 @@
-
 import array
 import os
 from os import PathLike
 from struct import Struct
 from typing import overload, TypeVar, Generic, Any
+
+from .types import T
 
 # Helpers
 
