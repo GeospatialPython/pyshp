@@ -25,7 +25,7 @@ jobs:
     - name: Install mypy
       run: pip install mypy
     - name: Run mypy --strict
-      run: mypy --strict ./src/shapefile.py
+      run: mypy --strict ./src/shapefile
 
 
   build_wheel_and_sdist:
