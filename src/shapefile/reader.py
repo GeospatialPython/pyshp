@@ -1,8 +1,26 @@
+from __future__ import annotations
 
+from datetime import date
+import io
+import os
+from os import PathLike
+from struct import Struct, calcsize, error, pack, unpack
+import sys
+import tempfile
+from types import TracebackType
+from typing import (Any, IO, Union, cast, Iterator, Container, Iterable)
 from urllib.error import HTTPError
 from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
+import zipfile
 
+from .classes import _Record, Shapes, ShapeRecord, ShapeRecords, GeoJSONFeatureCollectionWithBBox, _Array, FIELD_TYPE_ALIASES
+from .constants import (NODATA, SHAPETYPE_LOOKUP, SHAPE_CLASS_FROM_SHAPETYPE)
+from .exceptions import ShapefileException
+from .helpers import fsdecode_if_pathlike, unpack_2_int32_be
+from .shapes import Shape
+from .types import (BBox, ZBox, BinaryFileT, BinaryFileStreamT, 
+                    Field, FieldType, T, ReadSeekableBinStream)
 
 class _NoShpSentinel:
     """For use as a default value for shp to preserve the
