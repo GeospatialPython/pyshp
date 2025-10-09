@@ -49,17 +49,41 @@ import sys
 # Create named logger
 logger = logging.getLogger(__name__)
 
-
-
-
-
-
-
-
-
-
-
-
+from .reader import Reader
+from .helpers import fsdecode_if_pathlike, _Array
+from .shapes import (
+    Shape,
+    NullShape,
+    Point,
+    Polyline,
+    Polygon,
+    # ...add other shape classes as needed
+)
+from .types import (
+    Point2D,
+    Point3D,
+    PointMT,
+    PointZT,
+    Coord,
+    Coords,
+    PointT,
+    PointsT,
+    BBox,
+    MBox,
+    ZBox,
+    WriteableBinStream,
+    ReadableBinStream,
+    WriteSeekableBinStream,
+    ReadSeekableBinStream,
+    ReadWriteSeekableBinStream,
+    BinaryFileT,
+    BinaryFileStreamT,
+    FieldTypeT,
+    FieldType,
+    FIELD_TYPE_ALIASES,
+    RecordValueNotDate,
+    RecordValue,
+)
 
 def main() -> None:
     """
