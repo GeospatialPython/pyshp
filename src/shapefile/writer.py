@@ -24,7 +24,6 @@ from .geojson import GeoJSONHomogeneousGeometryObject, HasGeoInterface
 from .helpers import fsdecode_if_pathlike
 from .shapes import (
     SHAPE_CLASS_FROM_SHAPETYPE,
-    SHAPETYPE_LOOKUP,
     MultiPatch,
     MultiPoint,
     MultiPointM,
@@ -51,7 +50,6 @@ from .shapes import (
 from .types import (
     BBox,
     BinaryFileStreamT,
-    Field,
     FieldTypeT,
     MBox,
     PointsT,
