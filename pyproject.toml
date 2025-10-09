@@ -36,6 +36,9 @@ test = ["pytest"]
 [project.urls]
 Repository = "https://github.com/GeospatialPython/pyshp"
 
+[project.scripts]
+shapefile="__init__:main"
+
 [tool.hatch.build.targets.sdist]
 only-include = ["src", "shapefiles", "test_shapefile.py"]
 

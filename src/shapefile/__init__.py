@@ -13,6 +13,27 @@ import sys
 
 from .__version__ import __version__
 from ._doctest_runner import _test
+from .classes import Field, ShapeRecord, ShapeRecords, Shapes
+from .constants import (
+    MULTIPATCH,
+    MULTIPOINT,
+    MULTIPOINTM,
+    MULTIPOINTZ,
+    NULL,
+    POINT,
+    POINTM,
+    POINTZ,
+    POLYGON,
+    POLYGONM,
+    POLYGONZ,
+    POLYLINE,
+    POLYLINEM,
+    POLYLINEZ,
+    REPLACE_REMOTE_URLS_WITH_LOCALHOST,
+    SHAPETYPE_LOOKUP,
+)
+from .exceptions import GeoJSON_Error, RingSamplingError, ShapefileException
+from .geometric_calculations import bbox_overlap
 from .helpers import _Array, fsdecode_if_pathlike
 from .reader import Reader
 from .shapes import (
@@ -65,10 +86,28 @@ from .types import (
     WriteSeekableBinStream,
     ZBox,
 )
+from .writer import Writer
 
 __all__ = [
     "__version__",
+    "NULL",
+    "POINT",
+    "POLYLINE",
+    "POLYGON",
+    "MULTIPOINT",
+    "POINTZ",
+    "POLYLINEZ",
+    "POLYGONZ",
+    "MULTIPOINTZ",
+    "POINTM",
+    "POLYLINEM",
+    "POLYGONM",
+    "MULTIPOINTM",
+    "MULTIPATCH",
+    "SHAPETYPE_LOOKUP",
+    "REPLACE_REMOTE_URLS_WITH_LOCALHOST",
     "Reader",
+    "Writer",
     "fsdecode_if_pathlike",
     "_Array",
     "Shape",
@@ -117,6 +156,14 @@ __all__ = [
     "FIELD_TYPE_ALIASES",
     "RecordValueNotDate",
     "RecordValue",
+    "ShapefileException",
+    "RingSamplingError",
+    "GeoJSON_Error",
+    "Field",
+    "Shapes",
+    "ShapeRecord",
+    "ShapeRecords",
+    "bbox_overlap",
 ]
 
 logger = logging.getLogger(__name__)
@@ -131,5 +178,3 @@ def main() -> None:
     sys.exit(failure_count)
 
 
-if __name__ == "__main__":
-    main()
