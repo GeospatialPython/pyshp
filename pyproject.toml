@@ -44,7 +44,7 @@ only-include = ["src"]
 sources = {"src" = ""}  # move from "src" directory for wheel
 
 [tool.hatch.version]
-path = "src/shapefile.py"
+path = "src/shapefile/__init__.py"
 
 [tool.pytest.ini_options]
 markers = [
