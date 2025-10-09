@@ -1,6 +1,10 @@
-from typing import NamedTuple
+from __future__ import annotations
+from datetime import date
+from typing import NamedTuple, overload, SupportsIndex, Iterable, Any, Optional
 
-from shapefile.types import FieldTypeT
+from shapefile.constants import FIELD_TYPE_ALIASES, FieldType, ShapefileException
+from shapefile.types import FieldTypeT, RecordValue, RecordValueNotDate, GeoJSONFeature, GeoJSONFeatureCollection, GeoJSONGeometryCollection
+from shapefile.shapes import Shape, NULL
 
 # Use functional syntax to have an attribute named type, a Python keyword
 class Field(NamedTuple):
