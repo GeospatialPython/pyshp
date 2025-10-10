@@ -8,7 +8,7 @@ Compatible with Python versions >=3.9
 
 from __future__ import annotations
 
-__version__ = "3.0.2.post1"
+__version__ = "3.0.3.dev0"
 
 import array
 import doctest
