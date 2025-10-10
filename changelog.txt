@@ -1,7 +1,9 @@
 VERSION 3.0.2
 
 2025-10-10
-	Re-release as 3.0.2.post0 to trigger deploy job to Publish to Pypi
+	.post1.  Documentation update.  Update version at the top of README.md. (to make what PyPi users see consistent with the changelog and __version__).
+2025-10-10
+	.post0.  Re-release as 3.0.2.post0 to trigger deploy job to Publish to Pypi
 
 2025-10-09
     Bug fix:

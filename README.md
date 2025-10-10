@@ -8,8 +8,8 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 
 - **Author**: [Joel Lawhead](https://github.com/GeospatialPython)
 - **Maintainers**: [Karim Bahgat](https://github.com/karimbahgat)
-- **Version**: 3.0.0
-- **Date**: 3rd August, 2025
+- **Version**: 3.0.2.post1
+- **Date**: 10th October, 2025
 - **License**: [MIT](https://github.com/GeospatialPython/pyshp/blob/master/LICENSE.TXT)
 
 ## Contents
@@ -92,10 +92,14 @@ part of your geospatial project.
 
 
 # Version Changes
-## 3.0.2.post0
-- Re-release to trigger deploy job to Publish to Pypi
 
 ## 3.0.2
+
+## .post1
+- Update version at the top of this Readme file (to make what PyPi users see consistent with the changelog and __version__).
+
+## .post0
+- Re-release to trigger the deploy job to publish PyShp to Pypi
 
 ### Bug fix
 - Deleted py.typed (probably temporarily).  Including the py.typed marker file with a single file package caused type checkers to type check all other libraries installed in the same directory (whether they're typed or not, enforcing type checking for all the adjacent dirs libraries, regardless of the user's intentions for the type checker) (pointed out by @dl1jbe - thanks Thomas).  Discussions will be started about a longer term fix, possibly e.g. possibly refactoring to a package, and restoring py.typed.
