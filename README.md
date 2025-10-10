@@ -92,6 +92,9 @@ part of your geospatial project.
 
 
 # Version Changes
+## 3.0.2.post0
+- Re-release to trigger deploy job to Publish to Pypi
+
 ## 3.0.2
 
 ### Bug fix
