@@ -1492,7 +1492,7 @@ class _HasM(_CanHaveBBox):
     @staticmethod
     def _read_ms_from_byte_stream(
         b_io: ReadSeekableBinStream, nPoints: int, next_shape: int
-    ) -> tuple[MBox, list[float | None]]:
+    ) -> tuple[MBox | None, list[float | None]]:
         mbox = None  # Ensure mbox is always defined
         if next_shape - b_io.tell() >= 16:
             mbox = unpack("<2d", b_io.read(16))
