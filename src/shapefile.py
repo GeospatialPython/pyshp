@@ -8,7 +8,7 @@ Compatible with Python versions >=3.9
 
 from __future__ import annotations
 
-__version__ = "3.0.3.dev0"
+__version__ = "3.0.3.dev"
 
 import array
 import doctest
@@ -1492,7 +1492,8 @@ class _HasM(_CanHaveBBox):
     @staticmethod
     def _read_ms_from_byte_stream(
         b_io: ReadSeekableBinStream, nPoints: int, next_shape: int
-    ) -> tuple[MBox, list[float | None]]:
+    ) -> tuple[MBox | None, list[float | None]]:
+        mbox = None  # Ensure mbox is always defined
         if next_shape - b_io.tell() >= 16:
             mbox = unpack("<2d", b_io.read(16))
         # Measure values less than -10e38 are nodata values according to the spec
