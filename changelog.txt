@@ -1,4 +1,8 @@
-VERSION NEXT
+VERSION 3.0.3.dev
+
+2025-10-25
+	Bug fix:
+	* Prevented UnboundLocalError when reading non-single point M and Z type Shapefiles (@ekawas-vrify).
 
 2025-10-10
 	Testing:

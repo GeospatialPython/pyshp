@@ -93,10 +93,13 @@ part of your geospatial project.
 
 # Version Changes
 
-## Next
+
+## 3.0.3.dev
+### Bug fix
+- Prevented UnboundLocalError when reading non-single point M and Z type Shapefiles (@ekawas-vrify).
 
 ### Testing.
-- Test PyShp on the Python 3.14 official release (officially released this week, no longer in beta)
+- Test PyShp on the Python 3.14 official release (officially released this week, no longer in beta).
 
 ## 3.0.2
 
@@ -1572,6 +1575,7 @@ Casey Meisenzahl
 Charles Arnold
 David A. Riggs
 davidh-ssec
+Edward Kawas
 Evan Heidtmann
 ezcitron
 fiveham
