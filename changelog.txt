@@ -1,3 +1,9 @@
+VERSION NEXT
+
+2025-10-10
+	Testing:
+	* Test on the Python 3.14 official release (no longer in beta)
+
 VERSION 3.0.2
 
 2025-10-10
