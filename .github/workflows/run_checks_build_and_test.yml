@@ -38,7 +38,7 @@ jobs:
     - name: Build wheel from the project repo
       uses: ./.github/actions/build_wheel_and_sdist
 
-  test_on_supported_Pythons:
+  test_on_all_platforms:
     needs: build_wheel_and_sdist
     strategy:
       fail-fast: false
@@ -50,6 +50,7 @@ jobs:
           "3.12",
           "3.13",
           "3.14",
+          "3.15-dev",
         ]
         os: [
           "macos-latest",
