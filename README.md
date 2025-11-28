@@ -94,7 +94,12 @@ part of your geospatial project.
 # Version Changes
 
 
-## 3.0.3.dev
+## 3.0.3
+
+### Type checking
+- Add optional dependency, "stubs", containing the package "pyshp-stubs" generated with stubgen (to avoid
+including py.typed, and no longer being a single file project).
+
 ### Bug fix
 - Prevented UnboundLocalError when reading non-single point M and Z type Shapefiles (@ekawas-vrify).
 

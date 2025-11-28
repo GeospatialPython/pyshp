@@ -1,4 +1,9 @@
-VERSION 3.0.3.dev
+VERSION 3.0.3
+
+2025-11-28
+    Type checking:
+	* Add optional dependency, "stubs", containing the package "pyshp-stubs" generated with stubgen (to avoid
+	  including py.typed, and no longer being a single file project).
 
 2025-10-25
 	Bug fix:
