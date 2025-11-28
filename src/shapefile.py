@@ -46,13 +46,13 @@ from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
 
 # Create named logger
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 # Module settings
 VERBOSE = True
 
 # Test config (for the Doctest runner and test_shapefile.py)
-REPLACE_REMOTE_URLS_WITH_LOCALHOST = (
+REPLACE_REMOTE_URLS_WITH_LOCALHOST: bool = (
     os.getenv("REPLACE_REMOTE_URLS_WITH_LOCALHOST", "").lower() == "yes"
 )
 
@@ -72,7 +72,7 @@ POLYGONM = 25
 MULTIPOINTM = 28
 MULTIPATCH = 31
 
-SHAPETYPE_LOOKUP = {
+SHAPETYPE_LOOKUP: dict[int, str] = {
     NULL: "NULL",
     POINT: "POINT",
     POLYLINE: "POLYLINE",
@@ -89,7 +89,9 @@ SHAPETYPE_LOOKUP = {
     MULTIPATCH: "MULTIPATCH",
 }
 
-SHAPETYPENUM_LOOKUP = {name: code for code, name in SHAPETYPE_LOOKUP.items()}
+SHAPETYPENUM_LOOKUP: dict[str, int] = {
+    name: code for code, name in SHAPETYPE_LOOKUP.items()
+}
 
 TRIANGLE_STRIP = 0
 TRIANGLE_FAN = 1
@@ -98,7 +100,7 @@ INNER_RING = 3
 FIRST_RING = 4
 RING = 5
 
-PARTTYPE_LOOKUP = {
+PARTTYPE_LOOKUP: dict[int, str] = {
     0: "TRIANGLE_STRIP",
     1: "TRIANGLE_FAN",
     2: "OUTER_RING",
@@ -158,6 +160,8 @@ BinaryFileT = Union[str, PathLike[Any], IO[bytes]]
 BinaryFileStreamT = Union[IO[bytes], io.BytesIO, WriteSeekableBinStream]
 
 FieldTypeT = Literal["C", "D", "F", "L", "M", "N"]
+
+ShapeTypesMarkerSetT = frozenset[int]
 
 
 # https://en.wikipedia.org/wiki/.dbf#Database_records
@@ -329,7 +333,10 @@ class GeoJSONFeatureCollectionWithBBox(GeoJSONFeatureCollection):
 
 # Helpers
 
-MISSING = (None, "")  # Don't make a set, as user input may not be Hashable
+MISSING: tuple[None, str] = (
+    None,
+    "",
+)  # Don't make a set, as user input may not be Hashable
 NODATA = -10e38  # as per the ESRI shapefile spec, only used for m-values.
 
 unpack_2_int32_be = Struct(">2i").unpack
@@ -1101,7 +1108,7 @@ class NullShape(Shape):
         return 0
 
 
-_CanHaveBBox_shapeTypes = frozenset(
+_CanHaveBBox_shapeTypes: ShapeTypesMarkerSetT = frozenset(
     [
         POLYLINE,
         POLYLINEM,
@@ -1268,7 +1275,7 @@ class _CanHaveBBox(Shape):
         return n
 
 
-_CanHaveParts_shapeTypes = frozenset(
+_CanHaveParts_shapeTypes: ShapeTypesMarkerSetT = frozenset(
     [
         POLYLINE,
         POLYLINEM,
@@ -1308,7 +1315,7 @@ class _CanHaveParts(_CanHaveBBox):
         return b_io.write(pack(f"<{len(s.parts)}i", *s.parts))
 
 
-Point_shapeTypes = frozenset([POINT, POINTM, POINTZ])
+Point_shapeTypes: ShapeTypesMarkerSetT = frozenset([POINT, POINTM, POINTZ])
 
 
 class Point(Shape):
@@ -1387,7 +1394,7 @@ class Point(Shape):
         return n
 
 
-Polyline_shapeTypes = frozenset([POLYLINE, POLYLINEM, POLYLINEZ])
+Polyline_shapeTypes: ShapeTypesMarkerSetT = frozenset([POLYLINE, POLYLINEM, POLYLINEZ])
 
 
 class Polyline(_CanHaveParts):
@@ -1419,7 +1426,7 @@ class Polyline(_CanHaveParts):
         )
 
 
-Polygon_shapeTypes = frozenset([POLYGON, POLYGONM, POLYGONZ])
+Polygon_shapeTypes: ShapeTypesMarkerSetT = frozenset([POLYGON, POLYGONM, POLYGONZ])
 
 
 class Polygon(_CanHaveParts):
@@ -1443,7 +1450,9 @@ class Polygon(_CanHaveParts):
         )
 
 
-MultiPoint_shapeTypes = frozenset([MULTIPOINT, MULTIPOINTM, MULTIPOINTZ])
+MultiPoint_shapeTypes: ShapeTypesMarkerSetT = frozenset(
+    [MULTIPOINT, MULTIPOINTM, MULTIPOINTZ]
+)
 
 
 class MultiPoint(_CanHaveBBox):
@@ -1473,7 +1482,7 @@ class MultiPoint(_CanHaveBBox):
 
 
 # Not a PointM or a PointZ
-_HasM_shapeTypes = frozenset(
+_HasM_shapeTypes: ShapeTypesMarkerSetT = frozenset(
     [
         POLYLINEM,
         POLYLINEZ,
@@ -1538,7 +1547,7 @@ class _HasM(_CanHaveBBox):
 
 
 # Not a PointZ
-_HasZ_shapeTypes = frozenset(
+_HasZ_shapeTypes: ShapeTypesMarkerSetT = frozenset(
     [
         POLYLINEZ,
         POLYGONZ,
@@ -1584,7 +1593,7 @@ class _HasZ(_CanHaveBBox):
         return num_bytes_written
 
 
-MultiPatch_shapeTypes = frozenset([MULTIPATCH])
+MultiPatch_shapeTypes: ShapeTypesMarkerSetT = frozenset([MULTIPATCH])
 
 
 class MultiPatch(_HasM, _HasZ, _CanHaveParts):
@@ -1636,7 +1645,7 @@ class MultiPatch(_HasM, _HasZ, _CanHaveParts):
         return b_io.write(pack(f"<{len(s.partTypes)}i", *s.partTypes))
 
 
-PointM_shapeTypes = frozenset([POINTM, POINTZ])
+PointM_shapeTypes: ShapeTypesMarkerSetT = frozenset([POINTM, POINTZ])
 
 
 class PointM(Point):
@@ -1683,7 +1692,7 @@ class PointM(Point):
         return b_io.write(pack("<1d", m_to_encode))
 
 
-PolylineM_shapeTypes = frozenset([POLYLINEM, POLYLINEZ])
+PolylineM_shapeTypes: ShapeTypesMarkerSetT = frozenset([POLYLINEM, POLYLINEZ])
 
 
 class PolylineM(Polyline, _HasM):
@@ -1719,7 +1728,7 @@ class PolylineM(Polyline, _HasM):
         )
 
 
-PolygonM_shapeTypes = frozenset([POLYGONM, POLYGONZ])
+PolygonM_shapeTypes: ShapeTypesMarkerSetT = frozenset([POLYGONM, POLYGONZ])
 
 
 class PolygonM(Polygon, _HasM):
@@ -1755,7 +1764,7 @@ class PolygonM(Polygon, _HasM):
         )
 
 
-MultiPointM_shapeTypes = frozenset([MULTIPOINTM, MULTIPOINTZ])
+MultiPointM_shapeTypes: ShapeTypesMarkerSetT = frozenset([MULTIPOINTM, MULTIPOINTZ])
 
 
 class MultiPointM(MultiPoint, _HasM):
@@ -1788,7 +1797,7 @@ class MultiPointM(MultiPoint, _HasM):
         )
 
 
-PointZ_shapeTypes = frozenset([POINTZ])
+PointZ_shapeTypes: ShapeTypesMarkerSetT = frozenset([POINTZ])
 
 
 class PointZ(PointM):
@@ -1828,7 +1837,7 @@ class PointZ(PointM):
         return b_io.write(pack("<d", z))
 
 
-PolylineZ_shapeTypes = frozenset([POLYLINEZ])
+PolylineZ_shapeTypes: ShapeTypesMarkerSetT = frozenset([POLYLINEZ])
 
 
 class PolylineZ(PolylineM, _HasZ):
@@ -1868,7 +1877,7 @@ class PolylineZ(PolylineM, _HasZ):
         )
 
 
-PolygonZ_shapeTypes = frozenset([POLYGONZ])
+PolygonZ_shapeTypes: ShapeTypesMarkerSetT = frozenset([POLYGONZ])
 
 
 class PolygonZ(PolygonM, _HasZ):
@@ -1908,7 +1917,7 @@ class PolygonZ(PolygonM, _HasZ):
         )
 
 
-MultiPointZ_shapeTypes = frozenset([MULTIPOINTZ])
+MultiPointZ_shapeTypes: ShapeTypesMarkerSetT = frozenset([MULTIPOINTZ])
 
 
 class MultiPointZ(MultiPointM, _HasZ):
