@@ -32,6 +32,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pyshp[test]", "pre-commit", "ruff"]
 test = ["pytest"]
+stubs=["pyshp-stubs"]
 
 [project.urls]
 Repository = "https://github.com/GeospatialPython/pyshp"
