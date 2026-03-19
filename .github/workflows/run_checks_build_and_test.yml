@@ -13,7 +13,35 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v6
-    - uses: pre-commit/action@v3.0.1
+    - uses: actions/setup-python@v6
+      with:
+        python-version: "3.14"
+
+      ####################################################################
+      # "this action is in maintenance-only mode and will not be accepting new features."
+      # - uses: pre-commit/action@v3.0.1
+      #
+      # pre-commit/action does not intend to bump actions/cache from @v4:
+      # https://github.com/pre-commit/action/issues/241
+      # and has been stuck at @v3.0.1 for 2 years
+      #
+      # To bump actions/cache to v5 (to avoid the nuisance Node 20 deprecation
+      # warning) the action is vendored below:
+      #
+      # Copyright (c) 2019 Anthony Sottile.  MIT License.
+    - run: python -m pip install pre-commit
+      shell: bash
+    - run: python -m pip freeze --local
+      shell: bash
+    - uses: actions/cache@v5
+      with:
+        path: ~/.cache/pre-commit
+        key: pre-commit-3|${{ env.pythonLocation }}|${{ hashFiles('.pre-commit-config.yaml') }}
+    - run: pre-commit run --show-diff-on-failure --color=always ${{ inputs.extra_args }}
+      shell: bash
+      #
+      #
+      #####################################################################
 
   mypy-strict:
     runs-on: ubuntu-latest
