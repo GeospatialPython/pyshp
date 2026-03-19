@@ -11,7 +11,7 @@ runs:
     # The PyShp repo is required to already be checked out into .,
     # e.g. by the calling workflow using:
     # steps:
-    # - uses: actions/checkout@v4
+    # - uses: actions/checkout@v6
     #
     # and then calling this Action with:
     # - name: Run tests
@@ -21,7 +21,7 @@ runs:
     # with "python" and "pip" on the system Path
     # (so that this custom Action can be used with both reproducible
     #  Pythons from Python docker images, and more frequently deprecated Pythons
-    #  from - uses: actions/setup-python@v5)
+    #  from - uses: actions/setup-python@v6)
 
     - name: Install build (PyPA's pyproject-build)
       shell: bash
@@ -41,7 +41,7 @@ runs:
       run: python -m build
 
     - name: Upload built distributions
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: PyShp_wheel_and_sdist
         path: dist
