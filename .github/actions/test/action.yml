@@ -67,7 +67,7 @@ runs:
         sleep 4  # give server time to start
 
     - name: Download wheel and sdist (built in previous jobs)
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: PyShp_wheel_and_sdist
         path: dist
