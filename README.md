@@ -93,6 +93,11 @@ part of your geospatial project.
 
 # Version Changes
 
+## 3.0.4
+
+### Type checking
+ - Fix pyshp-stubs, and add test to it.  Remove all actual stubs from it, and replace with empty "shapefile-stubs/py.typed".  Closes Issue 382 (https://github.com/GeospatialPython/pyshp/issues/382) and discussion 371 (https://github.com/GeospatialPython/pyshp/discussions/371).  Bug originally found by Thomas Beierlein (https://github.com/GeospatialPython/pyshp/issues/367)
+
 
 ## 3.0.3
 
