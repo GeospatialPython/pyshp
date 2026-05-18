@@ -540,7 +540,7 @@ ONHM_SHAPEFILES = [
 
 
 @pytest.mark.network
-@pytest.parametrize("shp", ONHM_SHAPEFILES)
+@pytest.mark.parametrize("shp", ONHM_SHAPEFILES)
 def test_reader_url_itershaperecords_ONHM_shapefiles(shp):
     """
     Test reading a variety of Open Natural Hazard Modelling's Shapefiles.
