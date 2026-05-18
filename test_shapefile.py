@@ -549,7 +549,7 @@ def test_reader_url_itershaperecords_ONHM_shapefiles(shp):
     """
     if not shp.endswith(".shp"):
         shp = f"{shp}.shp"
-    with shapefile.Reader(f"{ONHM_URL_PREFIX}/{shp}") as sf:
+    with shapefile.Reader(f"{ONHM_URL_PREFIX}/{shp}?raw=true") as sf:
         for _shaperec in sf.iterShapeRecords():
             pass
 
