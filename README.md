@@ -98,7 +98,6 @@ part of your geospatial project.
 ### Testing:
  - Add shapefile from Open Natual Hazard Modelling ([Paula Spannring](https://github.com/PaulaSp3)
    and [Felix Oesterle, Austrian Research Centre for Forests](https://orcid.org/0000-0002-7772-6884)).
- - Test reading some of ONHM's other shapefiles via direct downloads from Github URLs.
 
 ## 3.0.5
 

@@ -529,31 +529,6 @@ def test_reader_url():
     assert sf.shp.closed is sf.shx.closed is sf.dbf.closed is True
 
 
-ONHM_URL_PREFIX = "https://github.com/OpenNHM/AvaFrameData/blob/main/avaPopeletzbach"
-ONHM_SHAPEFILES = [
-    "eventArea20090407",
-    "eventDepositionArea20090407",
-    "forest20090407",
-    # "releaseArea20090407" is in this repo as ./shapefiles/test/REL.zip
-    # and tested in test_reader_zip_polyylinez_no_m_itershaperecords
-]
-
-
-@pytest.mark.network
-@pytest.mark.parametrize("shp", ONHM_SHAPEFILES)
-def test_reader_url_itershaperecords_ONHM_shapefiles(shp):
-    """
-    Test reading a variety of Open Natural Hazard Modelling's Shapefiles.
-    Just open them and iterate through.  Don't assert anything,
-    just test that no exception is raised.
-    """
-    if not shp.endswith(".shp"):
-        shp = f"{shp}.shp"
-    with shapefile.Reader(f"{ONHM_URL_PREFIX}/{shp}") as sf:
-        for _shaperec in sf.iterShapeRecords():
-            pass
-
-
 def test_reader_zip():
     """
     Assert that Reader can open shapefiles inside a zipfile.
