@@ -1,3 +1,10 @@
+LATEST
+
+2026-05-18
+	Testing:
+	* Add shapefile from Open Natual Hazard Modelling ([Paula Spannring](https://github.com/PaulaSp3)
+	and [Felix Oesterle, Austrian Research Centre for Forests](https://orcid.org/0000-0002-7772-6884)).
+
 VERSION 3.0.5
 
 2026-05-18

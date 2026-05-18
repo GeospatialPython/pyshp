@@ -1475,6 +1475,26 @@ def test_shaperecord_record():
         assert record[1:3] == ["060750601001", 4715]
 
 
+def test_reader_zip_polyylinez_no_m_itershaperecords():
+    """
+    Make sure the M field is initialised to None (so the
+    fix from the bgu in 3.0.2 isn't regressed)!
+
+    Test Polygonz Shapes can be read, even if the m field is missing
+    (all the points in this file are 2D only, so this could also be
+    saved as a Polygon / type 5 shapefile instead of the shape type
+    15 one it currently is).
+
+    REL.zip included with permission: https://github.com/OpenNHM/AvaFrame/issues/1203#issuecomment-4477589128
+    Owner: Open Natural Hazard Modelling
+    Original source:  https://github.com/OpenNHM/AvaFrameData/blob/main/avaPopeletzbach/
+    License CC-BY-4.0
+    """
+    with shapefile.Reader("shapefiles/test/REL.zip") as sf:
+        for _shaperec in sf.iterShapeRecords():
+            pass
+
+
 def test_write_field_name_limit(tmpdir):
     """
     Abc...

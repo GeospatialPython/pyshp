@@ -8,8 +8,8 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 
 - **Author**: [Joel Lawhead](https://github.com/GeospatialPython)
 - **Maintainers**: [Karim Bahgat](https://github.com/karimbahgat)
-- **Version**: 3.0.3.dev0
-- **Date**: 10th October, 2025
+- **Version**: 3.0.5
+- **Date**: 18th May 2026
 - **License**: [MIT](https://github.com/GeospatialPython/pyshp/blob/master/LICENSE.TXT)
 
 ## Contents
@@ -92,6 +92,12 @@ part of your geospatial project.
 
 
 # Version Changes
+
+## LATEST
+
+### Testing:
+ - Add shapefile from Open Natual Hazard Modelling ([Paula Spannring](https://github.com/PaulaSp3)
+   and [Felix Oesterle, Austrian Research Centre for Forests](https://orcid.org/0000-0002-7772-6884)).
 
 ## 3.0.5
 
@@ -1594,6 +1600,7 @@ davidh-ssec
 Edward Kawas
 Evan Heidtmann
 ezcitron
+Felix Oesterle
 fiveham
 geospatialpython
 Hannes
@@ -1616,6 +1623,7 @@ Mike Toews
 Miroslav Šedivý
 Nilo
 pakoun
+Paula Spannring
 Paulo Ernesto
 Raynor Vliegendhart
 Razzi Abuissa
