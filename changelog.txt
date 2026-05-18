@@ -1,3 +1,9 @@
+VERSION 3.0.5
+
+2026-05-18
+	Project structure:
+	* Use dependency groups for dev and test instead of optional-dependencies in pyproject.toml (Mike Toews)
+
 VERSION 3.0.4
 
 2026-05-17

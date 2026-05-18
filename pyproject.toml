@@ -26,13 +26,23 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-dependencies = [
-]
 
 [project.optional-dependencies]
-dev = ["pyshp[test]", "pre-commit", "ruff"]
-test = ["pytest"]
 stubs=["pyshp-stubs"]
+
+[dependency-groups]
+dev = [
+    {include-group = "lint"},
+    {include-group = "test"}
+]
+lint = [
+    "mypy",
+    "pre-commit",
+    "ruff",
+]
+test = [
+    "pytest",
+]
 
 [project.urls]
 Repository = "https://github.com/GeospatialPython/pyshp"

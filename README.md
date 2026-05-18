@@ -93,6 +93,12 @@ part of your geospatial project.
 
 # Version Changes
 
+## 3.0.5
+
+### Project structure:
+ - Use dependency groups for dev and test instead of optional-dependencies in pyproject.toml ([Mike Toews](https://github.com/mwtoews))
+
+
 ## 3.0.4
 
 ### Type checking
