@@ -1475,6 +1475,14 @@ def test_shaperecord_record():
         assert record[1:3] == ["060750601001", 4715]
 
 
+def test_reader_zip_polyylinez_no_m_itershaperecords():
+    """
+    Test Polylinez Shapes can be read, even if the m field is missing.
+    """
+    with shapefile.Reader("../tmp/REL.zip") as sf:
+        _shaperec = next(sf.iterShapeRecords())
+
+
 def test_write_field_name_limit(tmpdir):
     """
     Abc...
