@@ -504,7 +504,9 @@ def test_reader_url():
     with Reader(url) as sf:
         for __recShape in sf.iterShapeRecords():
             pass
-    assert sf.shp.closed is sf.shx.closed is sf.dbf.closed is True
+    assert sf.shp.closed
+    assert sf._shx is None or sf.shx.closed
+    assert sf.dbf.closed
 
     # test without extension
     url = "https://github.com/nvkelso/natural-earth-vector/blob/master/110m_cultural/ne_110m_admin_0_tiny_countries?raw=true"
@@ -512,7 +514,9 @@ def test_reader_url():
         for __recShape in sf.iterShapeRecords():
             pass
         assert len(sf) > 0
-    assert sf.shp.closed is sf.shx.closed is sf.dbf.closed is True
+    assert sf.shp.closed
+    assert sf._shx is None or sf.shx.closed
+    assert sf.dbf.closed
 
     # test no files found
     url = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/README.md"
@@ -766,7 +770,7 @@ def test_reader_shp_shx_only():
 def test_reader_shp_shx_only_from_Paths():
     """
     Assert that specifying just the
-    shp and shx argument to the shapefile reader as Paths
+    shp and shx arguments to the shapefile reader as Paths
     reads just the shp and shx file.
     """
     with shapefile.Reader(
@@ -780,7 +784,7 @@ def test_reader_shp_shx_only_from_Paths():
 def test_reader_shp_dbf_only():
     """
     Assert that specifying just the
-    shp and shx argument to the shapefile reader
+    shp and dbf arguments to the shapefile reader
     reads just the shp and dbf file.
     """
     with shapefile.Reader(
@@ -796,7 +800,7 @@ def test_reader_shp_dbf_only():
 def test_reader_shp_dbf_only_from_Paths():
     """
     Assert that specifying just the
-    shp and shx argument to the shapefile reader as Paths
+    shp and dbf arguments to the shapefile reader as Paths
     reads just the shp and dbf file.
     """
     with shapefile.Reader(
@@ -891,8 +895,9 @@ def test_reader_filelike_shp_only():
 
 def test_reader_shapefile_delayed_load():
     """
-    Assert that the filename's extension is
-    ignored when reading a shapefile.
+    Assert that both:
+      i) reading a shape from an uninitialised Reader() raises ShapefileException and,
+      ii) it can still load a shapefile for reading afterwards, via .load(...).
     """
     with shapefile.Reader() as sf:
         # assert that data request raises exception, since no file has been provided yet
@@ -1535,7 +1540,7 @@ def test_write_shp_only(tmpdir):
 
     # test that can read shapes
     with shapefile.Reader(shp=filename + ".shp") as reader:
-        assert reader.shp and not reader.shx and not reader.dbf
+        assert reader._shp and not reader._shx and not reader._dbf
         assert (reader.numRecords, reader.numShapes) == (
             None,
             None,
@@ -1571,7 +1576,7 @@ def test_write_shp_shx_only(tmpdir):
 
     # test that can read shapes and offsets
     with shapefile.Reader(shp=filename + ".shp", shx=filename + ".shx") as reader:
-        assert reader.shp and reader.shx and not reader.dbf
+        assert reader.shp and reader.shx and not reader._dbf
         assert (reader.numRecords, reader.numShapes) == (None, 1)
         reader.shape(0)  # trigger reading of shx offsets
         assert len(reader._offsets) == 1
@@ -1605,7 +1610,7 @@ def test_write_shp_dbf_only(tmpdir):
 
     # test that can read records and shapes
     with shapefile.Reader(shp=filename + ".shp", dbf=filename + ".dbf") as reader:
-        assert reader.shp and not reader.shx and reader.dbf
+        assert reader.shp and not reader._shx and reader.dbf
         assert (reader.numRecords, reader.numShapes) == (
             1,
             None,

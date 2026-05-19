@@ -1,3 +1,10 @@
+VERSION 3.0.7
+
+2026-05-20
+	Testability / separation of concerns:
+	* Separate dbf only reading methods into a new dbfReader class (an instance of which is owned by the regular Shapefile Reader class).
+
+
 VERSION 3.0.6
 
 2026-05-19
