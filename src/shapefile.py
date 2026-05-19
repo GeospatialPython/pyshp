@@ -8,7 +8,7 @@ Compatible with Python versions >=3.9
 
 from __future__ import annotations
 
-__version__ = "3.0.5"
+__version__ = "3.0.6"
 
 import array
 import doctest
@@ -18,6 +18,7 @@ import os
 import sys
 import tempfile
 import time
+import warnings
 import zipfile
 from collections.abc import Container, Iterable, Iterator, Reversible, Sequence
 from datetime import date
@@ -42,7 +43,7 @@ from typing import (
     overload,
 )
 from urllib.error import HTTPError
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urlparse, urlunparse, ParseResult
 from urllib.request import Request, urlopen
 
 # Create named logger
@@ -2195,6 +2196,129 @@ class ShapeRecords(list[ShapeRecord]):
         )
 
 
+
+def _save_to_named_tmp_file(
+    bytes_stream: ReadableBinStream,
+    initial_bytes: bytes = b"",
+    suffix: str | None = None,
+    ) -> tempfile._TemporaryFileWrapper[bytes]:
+    """ Write stream to a read+write tempfile.  
+        Gets deleted when garbage collected. 
+    """
+    tmp_file_obj = tempfile.NamedTemporaryFile(
+        mode="w+b", suffix=suffix, delete=True
+    )
+    if initial_bytes:
+        tmp_file_obj.write(initial_bytes)
+    tmp_file_obj.write(bytes_stream.read())
+    tmp_file_obj.seek(0)
+    return tmp_file_obj
+
+HTML_SIGNATURES_UC = (
+    b"<!DOCTYPE",
+    b"<HTML",
+    b"<HEAD",
+    b"<BODY",
+)
+
+class UnsuccessfulFileDownload(Warning): pass
+
+SUPPORTED_URL_SCHEMES = frozenset(["http", "https"]) # must be lower case
+DEFAULT_USER_AGENT="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36"
+
+
+@overload
+def _try_to_download_binary_file(
+    urlinfo: ParseResult,
+) -> tuple[bytes, ReadableBinStream]: ...
+@overload
+def _try_to_download_binary_file(
+    urlinfo: ParseResult,
+    ext: str | None,
+    suppress_http_errors: bool,
+    user_agent: str,
+) -> tuple[bytes, ReadableBinStream | None]: ...
+@overload
+def _try_to_download_binary_file(
+    urlinfo: ParseResult,
+    ext: str | None,
+    suppress_http_errors: bool,
+) -> tuple[bytes, ReadableBinStream | None]: ...
+def _try_to_download_binary_file(
+    urlinfo: ParseResult,
+    ext: str | None = None, # LiteralString[".shp", ".dbf", ".shx"] | None = None
+    suppress_http_errors: bool = False,
+    user_agent: str = DEFAULT_USER_AGENT,
+    ) -> tuple[bytes, ReadableBinStream | None]:
+    """ Tries to open a parsed url and download a file served from it.
+        Warns if Content-Type is html and if bytes look like html
+    """
+
+
+    if ext is not None:
+        urlpath, _ = os.path.splitext(urlinfo.path) # Removes e.g. ".shp", including the "."
+        urlinfo = urlinfo._replace(path = f"{urlpath}.{ext}")
+
+    url = urlunparse(urlinfo)
+
+    req = Request(
+        url,
+        headers={
+            "User-agent": user_agent,
+        },
+        # Don't enforce method="GET", let urllib pick 
+        # whichever defaults it thinks are best,
+        # to allow possible future
+        # support for shapefiles via ftp or on local network addresses.
+    )
+
+    try:
+        resp =  urlopen(req)
+    except HTTPError as e:
+        msg = f"{e.msg}, occurred when trying to open: {url}, reason: {e.reason}. "
+        if not suppress_http_errors:
+            e.msg = msg # Add helpful info to the default abrupt 404 message.
+            raise e
+        elif ext != ".shx": 
+            # Technically the .shx is required for an ESRI Shapefile, 
+            # but it's not needed for PyShp, it only contains indices of shapes.
+            warnings.warn(msg, category=UnsuccessfulFileDownload)
+        return b"", None
+
+
+    content_type = resp.headers.get("Content-Type", "")
+    if "text/html" in content_type:
+        msg = f"Server returned HTML Content-Type: {content_type})"
+
+        # It is preferable not to add special cases for every possible 
+        # hosting service, but Github is a frequent source of frustration
+        # in our own tests, and there has literally been an issue open for 
+        # over a year to locate a shapefile downloadable from elsewhere 
+        # that nobody has yet answered.  So if someone requests support
+        # for another service hosting a public shapefile, at least that 
+        # issue can finally be closed (and James can delete his Github 
+        # test data repo).  
+        if urlinfo.netloc.lower().endswith("github.com"):
+            msg = f'{msg}\nAppend "?raw=true" after the file name to download from Github repos. '
+        warnings.warn(msg, category= UnsuccessfulFileDownload)
+        return b"", None
+
+    initial_bytes = resp.read(40)
+    if initial_bytes.upper().startswith(HTML_SIGNATURES_UC):
+        msg = f"Response body appears to be HTML despite Content-Type: '{content_type}'"
+        warnings.warn(msg, category= UnsuccessfulFileDownload)
+
+
+    # All PyShp cares about is that the response has a .read method 
+    # that returns bytes.  But at the cost of importing http.client
+    # we could type this stricter as tuple[bytes, HTTPResponse]:
+    # "For HTTP and HTTPS URLs, this function returns a 
+    # http.client.HTTPResponse object slightly modified."
+    return initial_bytes, cast(ReadableBinStream, resp)
+
+
+
+
 class ShapefileException(Exception):
     """An exception to handle shapefile specific problems."""
 
@@ -2287,25 +2411,26 @@ class Reader:
                         tempfile._TemporaryFileWrapper[bytes] | io.BufferedReader
                     )
                     # Create a zip file handle
-                    if zpath.startswith("http"):
+                    urlinfo = urlparse(zpath)
+
+                    resp: ReadableBinStream | None
+                    if urlinfo.scheme in SUPPORTED_URL_SCHEMES:
                         # Zipfile is from a url
-                        # Download to a temporary url and treat as normal zipfile
-                        req = Request(
-                            zpath,
-                            headers={
-                                "User-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36"
-                            },
+                        # Download to a temporary file and treat as normal zipfile
+                        sniffed_bytes, resp = _try_to_download_binary_file(urlinfo=urlinfo)
+
+
+                        # Use named tmp file as source for zip file data.
+                        zipfileobj = _save_to_named_tmp_file(
+                            resp,
+                            initial_bytes = sniffed_bytes,
+                            suffix=".zip",
                         )
-                        resp = urlopen(req)
-                        # write zipfile data to a read+write tempfile and use as source, gets deleted when garbage collected
-                        zipfileobj = tempfile.NamedTemporaryFile(
-                            mode="w+b", suffix=".zip", delete=True
-                        )
-                        zipfileobj.write(resp.read())
-                        zipfileobj.seek(0)
+                    
                     else:
                         # Zipfile is from a file
                         zipfileobj = open(zpath, mode="rb")
+
                     # Open the zipfile archive
                     with zipfile.ZipFile(zipfileobj, "r") as archive:
                         if not shapefile:
@@ -2336,12 +2461,8 @@ class Reader:
                             for cased_ext in [lower_ext, lower_ext.upper()]:
                                 try:
                                     member = archive.open(f"{shapefile}.{cased_ext}")
-                                    # write zipfile member data to a read+write tempfile and use as source, gets deleted on close()
-                                    fileobj = tempfile.NamedTemporaryFile(
-                                        mode="w+b", delete=True
-                                    )
-                                    fileobj.write(member.read())
-                                    fileobj.seek(0)
+                                    # Use read+write tempfile as source for member data. 
+                                    fileobj = _save_to_named_tmp_file(member)
                                     setattr(self, lower_ext, fileobj)
                                     self._files_to_close.append(fileobj)
                                 except (OSError, AttributeError, KeyError):
@@ -2369,31 +2490,19 @@ class Reader:
                     # Shapefile is from a url
                     # Download each file to temporary path and treat as normal shapefile path
                     urlinfo = urlparse(path)
-                    urlpath = urlinfo[2]
-                    urlpath, _ = os.path.splitext(urlpath)
-                    shapefile = os.path.basename(urlpath)
                     for ext in ["shp", "shx", "dbf"]:
-                        try:
-                            _urlinfo = list(urlinfo)
-                            _urlinfo[2] = urlpath + "." + ext
-                            _path = urlunparse(_urlinfo)
-                            req = Request(
-                                _path,
-                                headers={
-                                    "User-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36"
-                                },
+
+                        sniffed_bytes, resp = _try_to_download_binary_file(
+                            urlinfo=urlinfo,
+                            ext=ext,
+                            suppress_http_errors=True,
                             )
-                            resp = urlopen(req)
-                            # write url data to a read+write tempfile and use as source, gets deleted on close()
-                            fileobj = tempfile.NamedTemporaryFile(
-                                mode="w+b", delete=True
-                            )
-                            fileobj.write(resp.read())
-                            fileobj.seek(0)
-                            setattr(self, ext, fileobj)
-                            self._files_to_close.append(fileobj)
-                        except HTTPError:
-                            pass
+                        if resp is None:
+                            continue
+                        # Use tempfile as source for url data.
+                        fileobj = _save_to_named_tmp_file(resp, initial_bytes = sniffed_bytes)
+                        setattr(self, ext, fileobj)
+                        self._files_to_close.append(fileobj)
                     if self.shp or self.dbf:
                         # Load and exit early
                         self.load()
