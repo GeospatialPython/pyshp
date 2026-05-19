@@ -1,3 +1,4 @@
+import io
 import os
 import pathlib
 from struct import unpack
@@ -8,7 +9,7 @@ from urllib.request import Request, urlopen
 USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36"
 
 
-def dl(path, ext=".shp"):
+def dl(path, ext=".shp", user_agent=USER_AGENT):
     urlinfo = urlparse(path)
     urlpath = urlinfo[2]
     urlpath, _ = os.path.splitext(urlpath)
@@ -18,21 +19,89 @@ def dl(path, ext=".shp"):
     req = Request(
         _path,
         headers={
-            "User-agent": USER_AGENT,
+            "User-agent": user_agent,
         },
     )
     resp = urlopen(req)
     return resp
 
 
+HTML_SIGNATURES = (
+    b"<!DOCTYPE",
+    b"<!doctype",
+    b"<html",
+    b"<HTML",
+    b"<head",
+    b"<HEAD",
+    b"<body",
+    b"<BODY",
+)
+
+
+def is_html(data: bytes) -> bool:
+    # Skip optional BOM and leading whitespace
+    stripped = data.lstrip(b"\xef\xbb\xbf \t\r\n")
+    return stripped.startswith(HTML_SIGNATURES)
+
+
+class PeekedResponse:
+    """Wraps a response, pre-reading a prefix to allow sniffing."""
+
+    def __init__(self, resp, peek_size=512):
+        self._resp = resp
+        self._prefix = resp.read(peek_size)
+        self._stream = io.BytesIO(self._prefix)
+        self._exhausted = False
+
+    def read(self, n=-1):
+        if self._exhausted:
+            return self._resp.read(n)
+        data = self._stream.read(n)
+        if n == -1 or len(data) < n:
+            self._exhausted = True
+            data += self._resp.read() if n == -1 else self._resp.read(n - len(data))
+        return data
+
+    # Proxy everything else the parser might need
+    def __getattr__(self, name):
+        return getattr(self._resp, name)
+
+
+def sniff_first_then_dl(path, ext=".shp", user_agent=USER_AGENT):
+    urlinfo = urlparse(path)
+    urlpath, _ = os.path.splitext(urlinfo[2])
+    _urlinfo = list(urlinfo)
+    _urlinfo[2] = urlpath + "." + ext
+    _path = urlunparse(_urlinfo)
+
+    req = Request(_path, headers={"User-agent": user_agent})
+    resp = urlopen(req)
+
+    # Layer 1: Content-Type header
+    content_type = resp.headers.get("Content-Type", "")
+    if "text/html" in content_type:
+        raise ValueError(
+            f"Server returned HTML, not a binary file (Content-Type: {content_type})"
+        )
+
+    # Layer 2: Byte sniffing
+    peeked = PeekedResponse(resp)
+    if is_html(peeked._prefix):
+        raise ValueError(
+            f"Response body appears to be HTML despite Content-Type: '{content_type}'"
+        )
+
+    return peeked
+
+
 def dl_all(path):
     for ext in [
-        # "shp",
-        # "shx",
-        # "dbf",
+        "shp",
+        "shx",
+        "dbf",
     ]:
         try:
-            resp = dl(path, ext)
+            resp = sniff_first_then_dl(path, ext)
         except HTTPError as e:
             raise e
         print(resp.status)
@@ -52,8 +121,8 @@ def test_downloads():
         # "https://www.example.com",
         # "https://github.com/OpenNHM/AvaFrameData/blob/main/avaPopeletzbach/eventArea20090407.shp?raw=true",
         # "https://github.com/OpenNHM/AvaFrameData/blob/main/avaPopeletzbach/eventArea20090407.dbf",
-        # "https://github.com/nvkelso/natural-earth-vector/blob/master/110m_cultural/ne_110m_admin_0_tiny_countries.shp?raw=true"
-        "https://github.com/nvkelso/natural-earth-vector/blob/master/110m_cultural/ne_110m_admin_0_tiny_countries.dbf"
+        "https://github.com/nvkelso/natural-earth-vector/blob/master/110m_cultural/ne_110m_admin_0_tiny_countries.shp?raw=true"
+        # "https://github.com/nvkelso/natural-earth-vector/blob/master/110m_cultural/ne_110m_admin_0_tiny_countries.shp",
     ]:
         print(dl_all(url))
 
@@ -77,9 +146,9 @@ def direct_unpack():
 
 
 def main():
-    # test_downloads()
+    test_downloads()
     # test_header_parse()
-    direct_unpack()
+    # direct_unpack()
 
 
 if __name__ == "__main__":
