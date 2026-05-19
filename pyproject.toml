@@ -8,7 +8,8 @@ authors = [
     {name = "Joel Lawhead", email = "jlawhead@geospatialpython.com"},
 ]
 maintainers = [
-    {name = "Karim Bahgat", email = "karim.bahgat.norway@gmail.com"}
+    {name = "James Parrott", email = "james@jamesparrott.dev"},
+    {name = "Karim Bahgat", email = "karim.bahgat.norway@gmail.com"},
 ]
 readme = "README.md"
 keywords = ["gis", "geospatial", "geographic", "shapefile", "shapefiles"]
