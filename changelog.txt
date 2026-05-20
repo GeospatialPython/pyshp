@@ -1,3 +1,9 @@
+VERSION 3.0.8
+
+2026-05-20
+	Testability / separation of concerns:
+	* Separate dbf only writing methods into a new dbfWriter class (an instance of which is owned by the regular Shapefile Writer class).
+
 VERSION 3.0.7
 
 2026-05-20
