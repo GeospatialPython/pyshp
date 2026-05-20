@@ -11,7 +11,6 @@ from __future__ import annotations
 __version__ = "3.0.7"
 
 import array
-import contextlib
 import doctest
 import functools
 import io
@@ -23,6 +22,7 @@ import time
 import warnings
 import zipfile
 from collections.abc import Container, Iterable, Iterator, Reversible, Sequence
+from contextlib import AbstractContextManager, ExitStack
 from datetime import date
 from os import PathLike
 from struct import Struct, calcsize, error, pack, unpack
@@ -34,7 +34,6 @@ from typing import (
     Generic,
     Literal,
     NamedTuple,
-    NoReturn,
     Optional,
     Protocol,
     SupportsIndex,
@@ -45,8 +44,11 @@ from typing import (
     overload,
 )
 from urllib.error import HTTPError
-from urllib.parse import urlparse, urlunparse, ParseResult
+from urllib.parse import ParseResult, urlparse, urlunparse
 from urllib.request import Request, urlopen
+
+# Preserve error in namespace in case a user imported it from PyShp
+StructError = error
 
 # Create named logger
 logger = logging.getLogger(__name__)
@@ -1138,7 +1140,7 @@ class _CanHaveBBox(Shape):
             raise ShapefileException(f"Four numbers required for bbox. Got: {bbox}")
         try:
             return b_io.write(pack("<4d", *bbox))
-        except error:
+        except StructError:
             raise ShapefileException(
                 f"Failed to write bounding box for record {i}. Expected floats."
             )
@@ -1168,7 +1170,7 @@ class _CanHaveBBox(Shape):
             x_ys.extend(point[:2])
         try:
             return b_io.write(pack(f"<{len(x_ys)}d", *x_ys))
-        except error:
+        except StructError:
             raise ShapefileException(
                 f"Failed to write points for record {i}. Expected floats."
             )
@@ -1338,7 +1340,7 @@ class Point(Shape):
     ) -> int:
         try:
             return b_io.write(pack("<2d", x, y))
-        except error:
+        except StructError:
             raise ShapefileException(
                 f"Failed to write point for record {i}. Expected floats."
             )
@@ -1522,7 +1524,7 @@ class _HasM(_CanHaveBBox):
         # Note: missing m values are autoset to NODATA.
         try:
             num_bytes_written = b_io.write(pack("<2d", *mbox))
-        except error:
+        except StructError:
             raise ShapefileException(
                 f"Failed to write measure extremes for record {i}. Expected floats"
             )
@@ -1532,7 +1534,7 @@ class _HasM(_CanHaveBBox):
             ms_to_encode = [m if m is not None else NODATA for m in ms]
 
             num_bytes_written += b_io.write(pack(f"<{len(ms)}d", *ms_to_encode))
-        except error:
+        except StructError:
             raise ShapefileException(
                 f"Failed to write measure values for record {i}. Expected floats"
             )
@@ -1572,14 +1574,14 @@ class _HasZ(_CanHaveBBox):
         # Note: missing z values are autoset to 0, but not sure if this is ideal.
         try:
             num_bytes_written = b_io.write(pack("<2d", *zbox))
-        except error:
+        except StructError:
             raise ShapefileException(
                 f"Failed to write elevation extremes for record {i}. Expected floats."
             )
         try:
             zs = cast(_HasZ, s).z
             num_bytes_written += b_io.write(pack(f"<{len(zs)}d", *zs))
-        except error:
+        except StructError:
             raise ShapefileException(
                 f"Failed to write elevation values for record {i}. Expected floats."
             )
@@ -1647,7 +1649,7 @@ class PointM(Point):
         self,
         x: float,
         y: float,
-        # same default as in Writer.__shpRecord (if s.shapeType in (11, 21):)
+        # same default as in Writer._shp_record (if s.shapeType in (11, 21):)
         # PyShp encodes None m values as NODATA
         m: float | None = None,
         oid: int | None = None,
@@ -1675,7 +1677,7 @@ class PointM(Point):
         try:
             s = cast(_HasM, s)
             m = s.m[0] if s.m else None
-        except error:
+        except StructError:
             raise ShapefileException(
                 f"Failed to write measure value for record {i}. Expected floats."
             )
@@ -1805,7 +1807,7 @@ class PointZ(PointM):
     ):
         Shape.__init__(self, points=[(x, y)], z=(z,), m=(m,), oid=oid)
 
-    # same default as in Writer.__shpRecord (if s.shapeType == 11:)
+    # same default as in Writer._shp_record (if s.shapeType == 11:)
     z: Sequence[float] = (0.0,)
 
     @staticmethod
@@ -1823,7 +1825,7 @@ class PointZ(PointM):
         try:
             if s.z:
                 z = s.z[0]
-        except error:
+        except StructError:
             raise ShapefileException(
                 f"Failed to write elevation value for record {i}. Expected floats."
             )
@@ -2198,23 +2200,21 @@ class ShapeRecords(list[ShapeRecord]):
         )
 
 
-
 def _save_to_named_tmp_file(
     bytes_stream: ReadableBinStream,
     initial_bytes: bytes = b"",
     suffix: str | None = None,
-    ) -> tempfile._TemporaryFileWrapper[bytes]:
-    """ Write stream to a read+write tempfile.  
-        Gets deleted when garbage collected. 
+) -> tempfile._TemporaryFileWrapper[bytes]:
+    """Write stream to a read+write tempfile.
+    Gets deleted when garbage collected.
     """
-    tmp_file_obj = tempfile.NamedTemporaryFile(
-        mode="w+b", suffix=suffix, delete=True
-    )
+    tmp_file_obj = tempfile.NamedTemporaryFile(mode="w+b", suffix=suffix, delete=True)
     if initial_bytes:
         tmp_file_obj.write(initial_bytes)
     tmp_file_obj.write(bytes_stream.read())
     tmp_file_obj.seek(0)
     return tmp_file_obj
+
 
 HTML_SIGNATURES_UC = (
     b"<!DOCTYPE",
@@ -2223,10 +2223,12 @@ HTML_SIGNATURES_UC = (
     b"<BODY",
 )
 
-class UnsuccessfulFileDownload(Warning): pass
 
-SUPPORTED_URL_SCHEMES = ("http", "https") # must be lower case
-DEFAULT_USER_AGENT="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36"
+class UnsuccessfulFileDownload(Warning): ...
+
+
+SUPPORTED_URL_SCHEMES = ("http", "https")  # must be lower case
+DEFAULT_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36"
 
 
 @overload
@@ -2248,18 +2250,19 @@ def _try_to_download_binary_file(
 ) -> tuple[bytes, ReadableBinStream | None]: ...
 def _try_to_download_binary_file(
     urlinfo: ParseResult,
-    ext: str | None = None, # LiteralString[".shp", ".dbf", ".shx"] | None = None
+    ext: str | None = None,
     suppress_http_errors: bool = False,
     user_agent: str = DEFAULT_USER_AGENT,
-    ) -> tuple[bytes, ReadableBinStream | None]:
-    """ Tries to open a parsed url and download a file served from it.
-        Warns if Content-Type is html and if bytes look like html
+) -> tuple[bytes, ReadableBinStream | None]:
+    """Tries to open a parsed url and download a file served from it.
+    Warns if Content-Type is html and if bytes look like html
     """
 
-
     if ext is not None:
-        urlpath, _ = os.path.splitext(urlinfo.path) # Removes e.g. ".shp", including the "."
-        urlinfo = urlinfo._replace(path = f"{urlpath}.{ext}")
+        urlpath, _ = os.path.splitext(
+            urlinfo.path
+        )  # Removes e.g. ".shp", including the "."
+        urlinfo = urlinfo._replace(path=f"{urlpath}.{ext}")
 
     url = urlunparse(urlinfo)
 
@@ -2268,66 +2271,58 @@ def _try_to_download_binary_file(
         headers={
             "User-agent": user_agent,
         },
-        # Don't enforce method="GET", let urllib pick 
+        # Don't enforce method="GET", let urllib pick
         # whichever defaults it thinks are best,
         # to allow possible future
         # support for shapefiles via ftp or on local network addresses.
     )
 
     try:
-        resp =  urlopen(req)
+        resp = urlopen(req)
     except HTTPError as e:
         msg = f"{e.msg}, {e.code} occurred when trying to open: {url}, reason: {e.reason}. "
         if not suppress_http_errors:
-            e.msg = msg # Add helpful info to the default abrupt 404 message.
+            e.msg = msg  # Add helpful info to the default abrupt 404 message.
             raise e
-        elif ext != ".shx": 
-            # Technically the .shx is required for an ESRI Shapefile, 
+        elif ext != ".shx":
+            # Technically the .shx is required for an ESRI Shapefile,
             # but it's not needed for PyShp, it only contains indices of shapes.
             warnings.warn(msg, category=UnsuccessfulFileDownload)
         return b"", None
-
 
     content_type = resp.headers.get("Content-Type", "")
     if "text/html" in content_type:
         msg = f"Server returned HTML Content-Type: {content_type})"
 
-        # It is preferable not to add special cases for every possible 
+        # It is preferable not to add special cases for every possible
         # hosting service, but Github is a frequent source of frustration
-        # in our own tests, and there has literally been an issue open for 
-        # over a year to locate a shapefile downloadable from elsewhere 
+        # in our own tests, and there has literally been an issue open for
+        # over a year to locate a shapefile downloadable from elsewhere
         # that nobody has yet answered.  So if someone requests support
-        # for another service hosting a public shapefile, at least that 
-        # issue can finally be closed (and James can delete his Github 
-        # test data repo).  
+        # for another service hosting a public shapefile, at least that
+        # issue can finally be closed (and James can delete his Github
+        # test data repo).
         if urlinfo.netloc.lower().endswith("github.com"):
             msg = f'{msg}\nAppend "?raw=true" after the file name to download from Github repos. '
-        warnings.warn(msg, category= UnsuccessfulFileDownload)
+        warnings.warn(msg, category=UnsuccessfulFileDownload)
         return b"", None
 
     initial_bytes = resp.read(40)
     if initial_bytes.upper().startswith(HTML_SIGNATURES_UC):
         msg = f"Response body appears to be HTML despite Content-Type: '{content_type}'"
-        warnings.warn(msg, category= UnsuccessfulFileDownload)
+        warnings.warn(msg, category=UnsuccessfulFileDownload)
 
-
-    # All PyShp cares about is that the response has a .read method 
+    # All PyShp cares about is that the response has a .read method
     # that returns bytes.  But at the cost of importing http.client
     # we could type this stricter as tuple[bytes, HTTPResponse]:
-    # "For HTTP and HTTPS URLs, this function returns a 
+    # "For HTTP and HTTPS URLs, this function returns a
     # http.client.HTTPResponse object slightly modified."
     return initial_bytes, cast(ReadableBinStream, resp)
 
 
-CONSTITUENT_FILE_EXTS = ["shp", "shx", "dbf"]
-assert all(ext.islower() for ext in CONSTITUENT_FILE_EXTS)
-
-def _assert_ext_is_supported(ext: str) -> None:
-    assert ext in CONSTITUENT_FILE_EXTS
-
 def _try_get_open_constituent_file(
     shapefile_name: str,
-    ext: str,
+    ext: Literal["shp", "shx", "dbf"],
 ) -> IO[bytes] | None:
     """
     Attempts to open a .shp, .dbf or .shx file,
@@ -2337,7 +2332,6 @@ def _try_get_open_constituent_file(
     # typing.LiteralString is only available from Python 3.11 onwards.
     # https://docs.python.org/3/library/typing.html#typing.LiteralString
     # assert ext in {'shp', 'dbf', 'shx'}
-    _assert_ext_is_supported(ext)
 
     exts = {ext, ext.upper(), ext.lower()}
 
@@ -2354,9 +2348,7 @@ def ensure_within_bounds(i: int, num_records: int) -> int:
     error message if the index is out of bounds."""
     rmax = num_records - 1
     if abs(i) > rmax:
-        raise IndexError(
-            f"Shape or Record index: {i} out of range.  Max index: {rmax}"
-        )
+        raise IndexError(f"Shape or Record index: {i} out of range.  Max index: {rmax}")
     if i < 0:
         i = range(num_records)[i]
     return i
@@ -2369,11 +2361,12 @@ class DbfReader:
 
     def __init__(
         self,
-        file_: IO[bytes],
+        *,
+        file_obj: IO[bytes],
         encoding: str = "utf-8",
         encodingErrors: str = "strict",
     ):
-        self._file = file_
+        self._file = file_obj
         self.fields: list[Field] = []
         self.__fieldLookup: dict[str, int] = {}
         self.encoding = encoding
@@ -2381,14 +2374,13 @@ class DbfReader:
 
         self._dbfHeader()
 
-
     @property
     def dbf(self) -> IO[bytes]:
         if not self._file:
             raise dbfFileException(
                 f"DbfReader requires a .dbf file or file-like object. Got: {self._file}"
             )
-        return self._file   
+        return self._file
 
     def __len__(self) -> int:
         """Returns the number of records in the .dbf file."""
@@ -2398,13 +2390,12 @@ class DbfReader:
     def _dbfHeader(self) -> None:
         """Reads a dbf header. Xbase-related code borrows heavily from ActiveState Python Cookbook Recipe 362715 by Raymond Hettinger"""
 
-
         dbf = self.dbf
         # read relevant header parts
         dbf.seek(0)
-        self.numRecords, self.__dbfHdrLength, self._record_length = cast(tuple[int, int, int], unpack(
-            "<xxxxLHH20x", dbf.read(32)
-        ))
+        self.numRecords, self.__dbfHdrLength, self._record_length = cast(
+            tuple[int, int, int], unpack("<xxxxLHH20x", dbf.read(32))
+        )
 
         # read fields
         numFields = (self.__dbfHdrLength - 33) // 32
@@ -2680,12 +2671,13 @@ class DbfReader:
                 yield r
 
 
-
 class ShapefileException(Exception):
     """An exception to handle shapefile specific problems."""
 
+
 class dbfFileException(ShapefileException):
-    """ Indicates a problem with the .dbf file. """
+    """Indicates a problem with the .dbf file."""
+
 
 class _NoShpSentinel:
     """For use as a default value for shp to preserve the
@@ -2719,7 +2711,6 @@ class Reader:
     but they can be.
     """
 
-
     def __init__(
         self,
         shapefile_path: str | PathLike[Any] = "",
@@ -2742,7 +2733,7 @@ class Reader:
         self._offsets: list[int] = []
         self.shpLength: int | None = None
         self.numShapes: int | None = None
-        self._exit_stack = contextlib.ExitStack()
+        self._exit_stack = ExitStack()
         # See if a shapefile name was passed as the first argument
         if shapefile_path:
             path = fsdecode_if_pathlike(shapefile_path)
@@ -2758,12 +2749,11 @@ class Reader:
                     # Raises if not self._shp or self._dbf
                     return
 
-
                 # Local file path to a shapefile
                 # Load and exit early
                 self.load(path)
-                
-                    # Raises if not self._shp or self._dbf
+
+                # Raises if not self._shp or self._dbf
                 return
 
         if shp is not _NO_SHP_SENTINEL:
@@ -2788,9 +2778,9 @@ class Reader:
                 "Shapefile DbfReader requires a .dbf file or file-like object."
             )
         return DbfReader(
-            file_=self._dbf,
-            encoding = self.encoding,
-            encodingErrors = self.encodingErrors,
+            file_obj=self._dbf,
+            encoding=self.encoding,
+            encodingErrors=self.encodingErrors,
         )
 
     @property
@@ -2804,13 +2794,15 @@ class Reader:
                 "Shapefile Reader requires a .shp shapefile or file-like object."
             )
         return self._shp
+
     @functools.cached_property
     def shx(self) -> IO[bytes]:
         if self._shx is None:
             raise ShapefileException(
                 "Shapefile Reader shx use requires a .shx shapefile or file-like object."
             )
-        return self._shx    
+        return self._shx
+
     @property
     def dbf(self) -> IO[bytes]:
         return self.dbf_reader.dbf
@@ -2841,12 +2833,9 @@ class Reader:
 
     def _seek_0_on_file_obj_wrap_or_open_from_name(
         self,
-        ext: str,
+        ext: Literal["shp", "shx", "dbf"],
         file_: BinaryFileT | None,
     ) -> None | IO[bytes]:
-        # assert ext in {'shp', 'dbf', 'shx'}
-        _assert_ext_is_supported(ext)
-
         if file_ is None:
             return None
 
@@ -2854,7 +2843,7 @@ class Reader:
             baseName, __ = os.path.splitext(file_)
             file_obj = _try_get_open_constituent_file(baseName, ext)
             if file_obj is not None:
-                self._exit_stack.push(file_obj.__exit__)
+                self._exit_stack.enter_context(file_obj)
             return file_obj
 
         if hasattr(file_, "read"):
@@ -2869,26 +2858,23 @@ class Reader:
             f"Could not load shapefile constituent file from: {file_}"
         )
 
-
-
     def _load_from_url(self, url: str) -> None:
         # Shapefile is from a url
         # Download each file to temporary path and treat as normal shapefile path
         urlinfo = urlparse(url)
         shp_or_dbf_downloaded = False
-        for ext in CONSTITUENT_FILE_EXTS:
-
+        for ext in ["shp", "shx", "dbf"]:
             sniffed_bytes, resp = _try_to_download_binary_file(
                 urlinfo=urlinfo,
                 ext=ext,
                 suppress_http_errors=True,
-                )
+            )
             if resp is None:
                 continue
             if ext != "shx":
                 shp_or_dbf_downloaded = True
             # Use tempfile as source for url data.
-            fileobj = _save_to_named_tmp_file(resp, initial_bytes = sniffed_bytes)
+            fileobj = _save_to_named_tmp_file(resp, initial_bytes=sniffed_bytes)
             setattr(self, f"_{ext}", fileobj)
             self._exit_stack.enter_context(fileobj)
         if not shp_or_dbf_downloaded:
@@ -2909,9 +2895,7 @@ class Reader:
             zpath = path[: path.find(".zip") + 4]
             shapefile = path[path.find(".zip") + 4 + 1 :]
 
-        zipfileobj: (
-            tempfile._TemporaryFileWrapper[bytes] | io.BufferedReader
-        )
+        zipfileobj: tempfile._TemporaryFileWrapper[bytes] | io.BufferedReader
         # Create a zip file handle
         urlinfo = urlparse(zpath)
 
@@ -2921,14 +2905,13 @@ class Reader:
             # Download to a temporary file and treat as normal zipfile
             sniffed_bytes, resp = _try_to_download_binary_file(urlinfo=urlinfo)
 
-
             # Use named tmp file as source for zip file data.
             zipfileobj = _save_to_named_tmp_file(
                 resp,
-                initial_bytes = sniffed_bytes,
+                initial_bytes=sniffed_bytes,
                 suffix=".zip",
             )
-        
+
         else:
             # Zipfile is from a file
             zipfileobj = open(zpath, mode="rb")
@@ -2945,9 +2928,7 @@ class Reader:
                 ]
                 # The zipfile must contain exactly one shapefile
                 if len(shapefiles) == 0:
-                    raise ShapefileException(
-                        "Zipfile does not contain any shapefiles"
-                    )
+                    raise ShapefileException("Zipfile does not contain any shapefiles")
                 if len(shapefiles) == 1:
                     shapefile = shapefiles[0]
                 else:
@@ -2956,14 +2937,12 @@ class Reader:
                         "Please specify the full path to the shapefile you would like to open."
                     )
             # Try to extract file-like objects from zipfile
-            shapefile = os.path.splitext(shapefile)[
-                0
-            ]  # root shapefile name
-            for ext in CONSTITUENT_FILE_EXTS:
+            shapefile = os.path.splitext(shapefile)[0]  # root shapefile name
+            for ext in ["shp", "shx", "dbf"]:
                 for cased_ext in {ext.lower(), ext.upper(), ext}:
                     try:
                         member = archive.open(f"{shapefile}.{cased_ext}")
-                        # Use read+write tempfile as source for member data. 
+                        # Use read+write tempfile as source for member data.
                         fileobj = _save_to_named_tmp_file(member)
                         setattr(self, f"_{ext.lower()}", fileobj)
                         self._exit_stack.enter_context(fileobj)
@@ -2979,7 +2958,6 @@ class Reader:
         except:  # noqa: E722
             pass
 
-
     def load(self, shapefile: str | None = None) -> None:
         """Opens a shapefile from a filename or file-like
         object. Normally this method would be called by the
@@ -2994,7 +2972,6 @@ class Reader:
             raise ShapefileException(
                 f"Unable to open {shapeName}.dbf or {shapeName}.shp."
             )
-
 
     def load_shp(self, shapefile_name: str) -> None:
         """
@@ -3022,11 +2999,6 @@ class Reader:
         if self._dbf:
             self._exit_stack.enter_context(self._dbf)
             self._get_dbf_reader()
-
-
-
-
-
 
     def __len__(self) -> int:
         """Returns the number of shapes/records in the shapefile."""
@@ -3182,7 +3154,6 @@ class Reader:
         #         except OSError:
         #             pass
 
-
     def __str__(self) -> str:
         """
         Use some general info on the shapefile as __str__
@@ -3197,9 +3168,6 @@ class Reader:
         return "\n".join(info)
 
     def __enter__(self) -> Reader:
-        """
-        Enter phase of context manager.
-        """
         self._exit_stack.__enter__()
         return self
 
@@ -3209,9 +3177,6 @@ class Reader:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> bool | None:
-        """
-        Exit phase of context manager, close opened files.
-        """
         self.close()
         return None
 
@@ -3245,7 +3210,6 @@ class Reader:
         # f.seek(next_shape)
 
         return shape
-
 
     def shape(self, i: int = 0, bbox: BBox | None = None) -> Shape | None:
         """Returns a shape object for a shape in the geometry
@@ -3351,7 +3315,9 @@ class Reader:
         returns None if the shape is not within that region.
         """
         if self.numRecords is None:
-            raise ShapefileException("A .dbf file is required to read Records, for ShapeRecords")
+            raise ShapefileException(
+                "A .dbf file is required to read Records, for ShapeRecords"
+            )
         i = ensure_within_bounds(i, self.numRecords)
         shape = self.shape(i, bbox=bbox)
         if shape:
@@ -3404,320 +3370,142 @@ class Reader:
                     yield ShapeRecord(shape=shape, record=record)
 
 
-class Writer:
-    """Provides write support for ESRI Shapefiles."""
+def _ensure_file_obj(
+    f: str | WriteSeekableBinStream | None,
+    exit_stack: ExitStack,
+    file_mode: str = "wb+",
+    ExceptionClass: type[ShapefileException] = ShapefileException,
+) -> WriteSeekableBinStream:
+    """Safety handler to verify file-like objects"""
+    if not f:
+        raise ExceptionClass("No file-like object available.")
+    if isinstance(f, str):
+        pth = os.path.split(f)[0]
+        if pth and not os.path.exists(pth):
+            os.makedirs(pth)
+        fp = open(f, file_mode)
+        exit_stack.enter_context(fp)
+        return fp
 
-    W = TypeVar("W", bound=WriteSeekableBinStream)
+    if hasattr(f, "write"):
+        return f
+    raise ExceptionClass(f"Unsupported file-like object: {f}")
+
+
+def _is_file_obj_open(f: WriteSeekableBinStream | str | None) -> bool:
+    if not f:
+        return False
+    return not getattr(f, "closed", False)
+
+
+def _try_to_flush_file_obj(f: WriteSeekableBinStream | str | None) -> None:
+    if not f or not hasattr(f, "flush"):
+        return
+    if getattr(f, "closed", False):
+        return
+    try:
+        f.flush()
+    except OSError:
+        pass
+
+
+class DbfWriter(AbstractContextManager["DbfWriter", None]):
+    """Writes .dbf files (dBASE database files), in particular those of Shapefiles."""
 
     def __init__(
         self,
-        target: str | PathLike[Any] | None = None,
-        shapeType: int | None = None,
-        autoBalance: bool = False,
+        path: str | PathLike[Any] | None = None,
+        dbf: str | WriteSeekableBinStream | None = None,
         *,
         encoding: str = "utf-8",
         encodingErrors: str = "strict",
-        shp: WriteSeekableBinStream | None = None,
-        shx: WriteSeekableBinStream | None = None,
-        dbf: WriteSeekableBinStream | None = None,
+        max_num_fields: int = 2046,
         # Keep kwargs even though unused, to preserve PyShp 2.4 API
         **kwargs: Any,
     ):
-        self.target = target
-        self.autoBalance = autoBalance
+        self.path = fsdecode_if_pathlike(path)
+        self._dbf: str | WriteSeekableBinStream
         self.fields: list[Field] = []
-        self.shapeType = shapeType
-        self.shp: WriteSeekableBinStream | None = None
-        self.shx: WriteSeekableBinStream | None = None
-        self.dbf: WriteSeekableBinStream | None = None
-        self._files_to_close: list[BinaryFileStreamT] = []
-        if target:
-            target = fsdecode_if_pathlike(target)
-            if not isinstance(target, str):
-                raise TypeError(
-                    f"The target filepath {target!r} must be of type str/unicode or path-like, not {type(target)}."
-                )
-            self.shp = self.__getFileObj(os.path.splitext(target)[0] + ".shp")
-            self.shx = self.__getFileObj(os.path.splitext(target)[0] + ".shx")
-            self.dbf = self.__getFileObj(os.path.splitext(target)[0] + ".dbf")
-        elif shp or shx or dbf:
-            if shp:
-                self.shp = self.__getFileObj(shp)
-            if shx:
-                self.shx = self.__getFileObj(shx)
-            if dbf:
-                self.dbf = self.__getFileObj(dbf)
-        else:
-            raise TypeError(
-                "Either the target filepath, or any of shp, shx, or dbf must be set to create a shapefile."
-            )
-        # Initiate with empty headers, to be finalized upon closing
-        if self.shp:
-            self.shp.write(b"9" * 100)
-        if self.shx:
-            self.shx.write(b"9" * 100)
-        # Geometry record offsets and lengths for writing shx file.
-        self.recNum = 0
-        self.shpNum = 0
-        self._bbox: BBox | None = None
-        self._zbox: ZBox | None = None
-        self._mbox: MBox | None = None
-        # Use deletion flags in dbf? Default is false (0). Note: Currently has no effect, records should NOT contain deletion flags.
-        self.deletionFlag = 0
+        self.max_num_fields = max_num_fields
         # Encoding
         self.encoding = encoding
         self.encodingErrors = encodingErrors
+        if self.path:
+            if not isinstance(self.path, str):
+                raise TypeError(
+                    f"Path {self.path!r} must be of type str or path-like, not {type(self.path)}."
+                )
+            self._dbf = os.path.splitext(self.path)[0] + ".dbf"
+        elif dbf:
+            self._dbf = dbf
+        else:
+            raise TypeError(
+                "Either the target filepath, or dbf must be set to create a .dbf file."
+            )
 
-    def __len__(self) -> int:
-        """Returns the current number of features written to the shapefile.
-        If shapes and records are unbalanced, the length is considered the highest
-        of the two."""
-        return max(self.recNum, self.shpNum)
+        self.recNum = 0
+        self.deletionFlag = 0
 
-    def __enter__(self) -> Writer:
-        """
-        Enter phase of context manager.
-        """
+        # Support not closing opened file objects passed in e.g.(handled by some
+        # external context manager, or the caller manually calling .close).
+        #
+        # This will only ever hold at most one context manager.
+        # But an ExitStack is the right tool for the job
+        # when the number of context manager(s) depends on user input.
+        self._exit_stack = ExitStack()
+
+    @functools.cached_property
+    def dbf(self) -> WriteSeekableBinStream:
+        return _ensure_file_obj(
+            self._dbf,
+            exit_stack=self._exit_stack,
+            ExceptionClass=dbfFileException,
+        )
+
+    def __enter__(self) -> DbfWriter:
         return self
 
     def __exit__(
         self,
-        exc_type: BaseException | None,
+        exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
-    ) -> bool | None:
-        """
-        Exit phase of context manager, finish writing and close the files.
-        """
+    ) -> None:
         self.close()
         return None
-
-    def __del__(self) -> None:
-        self.close()
 
     def close(self) -> None:
         """
-        Write final shp, shx, and dbf headers, close opened files.
+        Write final dbf header, close opened files.
         """
-        # Check if any of the files have already been closed
-        shp_open = self.shp and not (hasattr(self.shp, "closed") and self.shp.closed)
-        shx_open = self.shx and not (hasattr(self.shx, "closed") and self.shx.closed)
-        dbf_open = self.dbf and not (hasattr(self.dbf, "closed") and self.dbf.closed)
-
-        # Balance if already not balanced
-        if self.shp and shp_open and self.dbf and dbf_open:
-            if self.autoBalance:
-                self.balance()
-            if self.recNum != self.shpNum:
-                raise ShapefileException(
-                    "When saving both the dbf and shp file, "
-                    f"the number of records ({self.recNum}) must correspond "
-                    f"with the number of shapes ({self.shpNum})"
-                )
-        # Fill in the blank headers
-        if self.shp and shp_open:
-            self._shapefileHeader(self.shp, headerType="shp")
-        if self.shx and shx_open:
-            self._shapefileHeader(self.shx, headerType="shx")
 
         # Update the dbf header with final length etc
-        if self.dbf and dbf_open:
+        if _is_file_obj_open(self.dbf):
             self._dbfHeader()
 
-        # Flush files
-        for attribute in (self.shp, self.shx, self.dbf):
-            if attribute is None:
-                continue
-            if hasattr(attribute, "flush") and not getattr(attribute, "closed", False):
-                try:
-                    attribute.flush()
-                except OSError:
-                    pass
+        _try_to_flush_file_obj(self.dbf)
 
-        # Close any files that the writer opened (but not those given by user)
-        for attribute in self._files_to_close:
-            if hasattr(attribute, "close"):
-                try:
-                    attribute.close()
-                except OSError:
-                    pass
-        self._files_to_close = []
+        self._exit_stack.close()
 
-    @overload
-    def __getFileObj(self, f: str) -> WriteSeekableBinStream: ...
-    @overload
-    def __getFileObj(self, f: None) -> NoReturn: ...
-    @overload
-    def __getFileObj(self, f: WriteSeekableBinStream) -> WriteSeekableBinStream: ...
-    def __getFileObj(
-        self, f: str | None | WriteSeekableBinStream
-    ) -> WriteSeekableBinStream:
-        """Safety handler to verify file-like objects"""
-        if not f:
-            raise ShapefileException("No file-like object available.")
-        if isinstance(f, str):
-            pth = os.path.split(f)[0]
-            if pth and not os.path.exists(pth):
-                os.makedirs(pth)
-            fp = open(f, "wb+")
-            self._files_to_close.append(fp)
-            return fp
-
-        if hasattr(f, "write"):
-            return f
-        raise ShapefileException(f"Unsupported file-like object: {f}")
-
-    def _shp_file_length_B(self) -> int:
-        """Calculates the file length of the shp file."""
-        shp = self.__getFileObj(self.shp)
-
-        # Remember starting position
-
-        start = shp.tell()
-        # Calculate size of all shapes
-        shp.seek(0, 2)
-        size = shp.tell()
-        # Calculate size as 16-bit words
-        size //= 2
-        # Return to start
-        shp.seek(start)
-        return size
-
-    def _update_file_bbox(self, s: Shape) -> None:
-        if s.shapeType == NULL:
-            shape_bbox = None
-        elif s.shapeType in _CanHaveBBox_shapeTypes:
-            shape_bbox = s.bbox
-        else:
-            x, y = s.points[0][:2]
-            shape_bbox = (x, y, x, y)
-
-        if shape_bbox is None:
-            return None
-
-        if self._bbox:
-            # compare with existing
-            self._bbox = (
-                min(shape_bbox[0], self._bbox[0]),
-                min(shape_bbox[1], self._bbox[1]),
-                max(shape_bbox[2], self._bbox[2]),
-                max(shape_bbox[3], self._bbox[3]),
-            )
-        else:
-            # first time bbox is being set
-            self._bbox = shape_bbox
-        return None
-
-    def _update_file_zbox(self, s: _HasZ | PointZ) -> None:
-        if self._zbox:
-            # compare with existing
-            self._zbox = (min(s.zbox[0], self._zbox[0]), max(s.zbox[1], self._zbox[1]))
-        else:
-            # first time zbox is being set
-            self._zbox = s.zbox
-
-    def _update_file_mbox(self, s: _HasM | PointM) -> None:
-        mbox = s.mbox
-        if self._mbox:
-            # compare with existing
-            self._mbox = (min(mbox[0], self._mbox[0]), max(mbox[1], self._mbox[1]))
-        else:
-            # first time mbox is being set
-            self._mbox = mbox
-
-    @property
-    def shapeTypeName(self) -> str:
-        return SHAPETYPE_LOOKUP[self.shapeType or 0]
-
-    def bbox(self) -> BBox | None:
-        """Returns the current bounding box for the shapefile which is
-        the lower-left and upper-right corners. It does not contain the
-        elevation or measure extremes."""
-        return self._bbox
-
-    def zbox(self) -> ZBox | None:
-        """Returns the current z extremes for the shapefile."""
-        return self._zbox
-
-    def mbox(self) -> MBox | None:
-        """Returns the current m extremes for the shapefile."""
-        return self._mbox
-
-    def _shapefileHeader(
+    def field(
+        # Types of args should match *Field
         self,
-        fileObj: WriteSeekableBinStream | None,
-        headerType: Literal["shp", "dbf", "shx"] = "shp",
+        name: str,
+        field_type: FieldTypeT = "C",
+        size: int = 50,
+        decimal: int = 0,
     ) -> None:
-        """Writes the specified header type to the specified file-like object.
-        Several of the shapefile formats are so similar that a single generic
-        method to read or write them is warranted."""
-
-        f = self.__getFileObj(fileObj)
-        f.seek(0)
-        # File code, Unused bytes
-        f.write(pack(">6i", 9994, 0, 0, 0, 0, 0))
-        # File length (Bytes / 2 = 16-bit words)
-        if headerType == "shp":
-            f.write(pack(">i", self._shp_file_length_B()))
-        elif headerType == "shx":
-            f.write(pack(">i", ((100 + (self.shpNum * 8)) // 2)))
-        # Version, Shape type
-        if self.shapeType is None:
-            self.shapeType = NULL
-        f.write(pack("<2i", 1000, self.shapeType))
-        # The shapefile's bounding box (lower left, upper right)
-        if self.shapeType != 0:
-            try:
-                bbox = self.bbox()
-                if bbox is None:
-                    # The bbox is initialized with None, so this would mean the shapefile contains no valid geometries.
-                    # In such cases of empty shapefiles, ESRI spec says the bbox values are 'unspecified'.
-                    # Not sure what that means, so for now just setting to 0s, which is the same behavior as in previous versions.
-                    # This would also make sense since the Z and M bounds are similarly set to 0 for non-Z/M type shapefiles.
-                    # bbox = BBox(0, 0, 0, 0)
-                    bbox = (0, 0, 0, 0)
-                f.write(pack("<4d", *bbox))
-            except error:
-                raise ShapefileException(
-                    "Failed to write shapefile bounding box. Floats required."
-                )
-        else:
-            f.write(pack("<4d", 0, 0, 0, 0))
-        # Elevation
-        if self.shapeType in PointZ_shapeTypes | _HasZ_shapeTypes:
-            # Z values are present in Z type
-            zbox = self.zbox()
-            if zbox is None:
-                # means we have empty shapefile/only null geoms (see commentary on bbox above)
-                # zbox = ZBox(0, 0)
-                zbox = (0, 0)
-        else:
-            # As per the ESRI shapefile spec, the zbox for non-Z type shapefiles are set to 0s
-            # zbox = ZBox(0, 0)
-            zbox = (0, 0)
-        # Measure
-        if self.shapeType in PointM_shapeTypes | _HasM_shapeTypes:
-            # M values are present in M or Z type
-            mbox = self.mbox()
-            if mbox is None:
-                # means we have empty shapefile/only null geoms (see commentary on bbox above)
-                # mbox = MBox(0, 0)
-                mbox = (0, 0)
-        else:
-            # As per the ESRI shapefile spec, the mbox for non-M type shapefiles are set to 0s
-            # mbox = MBox(0, 0)
-            mbox = (0, 0)
-        # Try writing
-        try:
-            f.write(pack("<4d", zbox[0], zbox[1], mbox[0], mbox[1]))
-        except error:
-            raise ShapefileException(
-                "Failed to write shapefile elevation and measure values. Floats required."
+        """Adds a dbf field descriptor to the shapefile."""
+        if len(self.fields) >= self.max_num_fields:
+            raise dbfFileException(
+                f".dbf Shapefile Writer reached maximum number of fields: {self.max_num_fields}."
             )
+        field_ = Field.from_unchecked(name, field_type, size, decimal)
+        self.fields.append(field_)
 
     def _dbfHeader(self) -> None:
         """Writes the dbf header and field descriptors."""
-        f = self.__getFileObj(self.dbf)
+        f = self.dbf
         f.seek(0)
         version = 3
         year, month, day = time.localtime()[:3]
@@ -3765,105 +3553,6 @@ class Writer:
         # Terminator
         f.write(b"\r")
 
-    def shape(
-        self,
-        s: Shape | HasGeoInterface | GeoJSONHomogeneousGeometryObject,
-    ) -> None:
-        # Balance if already not balanced
-        if self.autoBalance and self.recNum < self.shpNum:
-            self.balance()
-        # Check is shape or import from geojson
-        if not isinstance(s, Shape):
-            if hasattr(s, "__geo_interface__"):
-                s = cast(HasGeoInterface, s)
-                shape_dict = s.__geo_interface__
-            elif isinstance(s, dict):  # TypedDict is a dict at runtime
-                shape_dict = s
-            else:
-                raise TypeError(
-                    "Can only write Shape objects, GeoJSON dictionaries, "
-                    "or objects with the __geo_interface__, "
-                    f"not: {s}"
-                )
-            s = Shape._from_geojson(shape_dict)
-        # Write to file
-        offset, length = self.__shpRecord(s)
-        if self.shx:
-            self.__shxRecord(offset, length)
-
-    def __shpRecord(self, s: Shape) -> tuple[int, int]:
-        f: WriteSeekableBinStream = self.__getFileObj(self.shp)
-        offset = f.tell()
-        self.shpNum += 1
-
-        # Shape Type
-        if self.shapeType is None and s.shapeType != NULL:
-            self.shapeType = s.shapeType
-        if s.shapeType not in (NULL, self.shapeType):
-            raise ShapefileException(
-                f"The shape's type ({s.shapeType}) must match "
-                f"the type of the shapefile ({self.shapeType})."
-            )
-
-        # For both single point and multiple-points non-null shapes,
-        # update bbox, mbox and zbox of the whole shapefile
-        if s.shapeType != NULL:
-            self._update_file_bbox(s)
-
-        if s.shapeType in PointM_shapeTypes | _HasM_shapeTypes:
-            self._update_file_mbox(cast(Union[_HasM, PointM], s))
-
-        if s.shapeType in PointZ_shapeTypes | _HasZ_shapeTypes:
-            self._update_file_zbox(cast(Union[_HasZ, PointZ], s))
-
-        # Create an in-memory binary buffer to avoid
-        # unnecessary seeks to files on disk
-        # (other ops are already buffered until .seek
-        # or .flush is called if not using RawIOBase).
-        # https://docs.python.org/3/library/io.html#id2
-        # https://docs.python.org/3/library/io.html#io.BufferedWriter
-        b_io: ReadWriteSeekableBinStream = io.BytesIO()
-
-        # Record number, Content length place holder
-        b_io.write(pack(">2i", self.shpNum, -1))
-
-        # Track number of content bytes written, excluding
-        # self.shpNum and length (t.b.c.)
-        n = 0
-
-        n += b_io.write(pack("<i", s.shapeType))
-
-        ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[s.shapeType]
-        n += ShapeClass.write_to_byte_stream(
-            b_io=b_io,
-            s=s,
-            i=self.shpNum,
-        )
-
-        # Finalize record length as 16-bit words
-        length = n // 2
-
-        # 4 bytes in is the content length field
-        b_io.seek(4)
-        b_io.write(pack(">i", length))
-
-        # Flush to file.
-        b_io.seek(0)
-        f.write(b_io.read())
-        return offset, length
-
-    def __shxRecord(self, offset: int, length: int) -> None:
-        """Writes the shx records."""
-
-        f = self.__getFileObj(self.shx)
-        try:
-            f.write(pack(">i", offset // 2))
-        except error:
-            raise ShapefileException(
-                "The .shp file has reached its file size limit > 4294967294 bytes (4.29 GB). To fix this, break up your file into multiple smaller ones."
-            )
-        f.write(pack(">i", length))
-
     def record(
         self,
         *recordList: RecordValue,
@@ -3876,9 +3565,6 @@ class Writer:
         extra ones won't be added. In the case of using keyword arguments to specify
         field/value pairs only fields matching the already registered fields
         will be added."""
-        # Balance if already not balanced
-        if self.autoBalance and self.recNum > self.shpNum:
-            self.balance()
         record: list[RecordValue]
         fieldCount = sum(1 for field in self.fields if field[0] != "DeletionFlag")
         if recordList:
@@ -3905,7 +3591,7 @@ class Writer:
 
     def __dbfRecord(self, record: list[RecordValue]) -> None:
         """Writes the dbf records."""
-        f = self.__getFileObj(self.dbf)
+        f = self.dbf
         if self.recNum == 0:
             # first records, so all fields should be set
             # allowing us to write the dbf header
@@ -3996,13 +3682,440 @@ class Writer:
                 )
             f.write(encoded)
 
+
+class Writer:
+    """Provides write support for ESRI Shapefiles."""
+
+    W = TypeVar("W", bound=WriteSeekableBinStream)
+
+    def __init__(
+        self,
+        target: str | PathLike[Any] | None = None,
+        shapeType: int | None = None,
+        autoBalance: bool = False,
+        *,
+        encoding: str = "utf-8",
+        encodingErrors: str = "strict",
+        shp: WriteSeekableBinStream | None = None,
+        shx: WriteSeekableBinStream | None = None,
+        dbf: WriteSeekableBinStream | None = None,
+        # Keep kwargs even though unused, to preserve PyShp 2.4 API
+        **kwargs: Any,
+    ):
+        target = fsdecode_if_pathlike(target)
+        self.target = target
+
+        # User settable - see ### Geometry and Record Balancing in README.md
+        self.autoBalance = autoBalance
+
+        self.encoding = encoding
+        self.encodingErrors = encodingErrors
+
+        # User settable - see #### Setting the Shape Type in README.md
+        self.shapeType = shapeType
+
+        self._shp: str | WriteSeekableBinStream | None = shp
+        self._shx: str | WriteSeekableBinStream | None = shx
+        self._dbf: str | WriteSeekableBinStream | None = dbf
+        self._dbf_writer: DbfWriter | None = None
+        self._exit_stack = ExitStack()
+        if target:
+            if not isinstance(target, str):
+                raise TypeError(
+                    f"The target filepath {target!r} must be of type str/unicode or path-like, not {type(target)}."
+                )
+            self._shp = os.path.splitext(target)[0] + ".shp"
+            self._shx = os.path.splitext(target)[0] + ".shx"
+            self._dbf = os.path.splitext(target)[0] + ".dbf"
+        elif not (shp or shx or dbf):
+            raise TypeError(
+                "Either the target filepath, or any of shp, shx, or dbf must be set to create a shapefile."
+            )
+        if self._dbf:
+            self._dbf_writer = DbfWriter(
+                target=target,
+                dbf=self._dbf,
+                encoding=encoding,
+                encodingErrors=encodingErrors,
+            )
+        # Initiate with empty headers, to be finalized upon closing
+        if self._shp:
+            self.shp.write(b"9" * 100)
+        if self._shx:
+            self.shx.write(b"9" * 100)
+        # Geometry record offsets and lengths for writing shx file.
+        self.shpNum = 0
+        self._bbox: BBox | None = None
+        self._zbox: ZBox | None = None
+        self._mbox: MBox | None = None
+        # Use deletion flags in dbf? Default is false (0). Note: Currently has no effect, records should NOT contain deletion flags.
+        self.deletionFlag = 0
+
+    @functools.cached_property
+    def shp(self) -> WriteSeekableBinStream:
+        return _ensure_file_obj(
+            self._shp,
+            exit_stack=self._exit_stack,
+        )
+
+    @functools.cached_property
+    def shx(self) -> WriteSeekableBinStream:
+        return _ensure_file_obj(
+            self._shx,
+            exit_stack=self._exit_stack,
+        )
+
+    @functools.cached_property
+    def dbf_writer(self) -> DbfWriter:
+        if self._dbf_writer is None:
+            raise dbfFileException(
+                f"No dbf file.  Got target: {self.target} & dbf: {self._dbf}"
+            )
+        self._exit_stack.enter_context(self._dbf_writer)
+        return self._dbf_writer
+
+    @property
+    def dbf(self) -> WriteSeekableBinStream:
+        return self.dbf_writer.dbf
+
+    @property
+    def fields(self) -> list[Field]:
+        return self.dbf_writer.fields
+
+    @fields.setter
+    def fields(self, value: list[Field]) -> None:
+        self.dbf_writer.fields = value
+
+    @property
+    def recNum(self) -> int:
+        if not self._dbf_writer:
+            return 0
+        return self.dbf_writer.recNum
+
+    def __len__(self) -> int:
+        """Returns the current number of features written to the shapefile.
+        If shapes and records are unbalanced, the length is considered the highest
+        of the two."""
+        if not self._dbf_writer:
+            return self.shpNum
+        return max(self.dbf_writer.recNum, self.shpNum)
+
+    def __enter__(self) -> Writer:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: BaseException | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> bool | None:
+        self.close()
+        return None
+
+    def __del__(self) -> None:
+        self.close()
+
+    def close(self) -> None:
+        """
+        Write final shp, shx, and dbf headers, close opened files.
+        """
+
+        # Check if user supplied shp or dbf file objects have
+        # already been closed by the user for some reason.
+        #
+        # TODO: Do we really need to support this?  A user who supplies
+        # custom file objects for shp and dbf, opens a Writer
+        # to partially write the Shapefile, manually closes the .shp object
+        # but uses the context manager or calls .close expecting
+        # Writer to create the dbf's header?  Really?
+        shp_open = self._shp and _is_file_obj_open(self.shp)
+        dbf_open = (
+            False
+            if self._dbf_writer is None
+            else _is_file_obj_open(self.dbf_writer.dbf)
+        )
+
+        # Balance if already not balanced
+        if shp_open and dbf_open:
+            if self.autoBalance:
+                self.balance()
+            if self.dbf_writer.recNum != self.shpNum:
+                raise ShapefileException(
+                    "When saving both the dbf and shp file, "
+                    f"the number of records ({self.dbf_writer.recNum}) must correspond "
+                    f"with the number of shapes ({self.shpNum})"
+                )
+
+        # Fill in the blank headers and flush files
+        if shp_open:
+            self._shp_or_shx_header(self.shp, headerType="shp")
+            _try_to_flush_file_obj(self.shp)
+
+        if self._shx and _is_file_obj_open(self.shx):
+            self._shp_or_shx_header(self.shx, headerType="shx")
+            _try_to_flush_file_obj(self.shx)
+
+        # Ensure any files that the writer opened are closed.
+        # (contains self.dbf_writer, which is triggered to
+        #  writes its header here, but should not contain
+        #  user-supplied, already opened file objects that
+        #  might be closed by an outer context manager).
+        # Idempotent.
+        self._exit_stack.close()
+
+    def _shp_file_length_B(self) -> int:
+        """Calculates the file length of the shp file."""
+        # Remember starting position
+        start_B = self.shp.tell()
+
+        # Calculate size of all shapes
+        self.shp.seek(0, 2)
+        size_16b_words = self.shp.tell()
+        # Calculate size as 16-bit words
+        size_B = size_16b_words // 2
+        # Return to start
+        self.shp.seek(start_B)
+        return size_B
+
+    def _update_file_bbox(self, s: Shape) -> None:
+        if s.shapeType == NULL:
+            shape_bbox = None
+        elif s.shapeType in _CanHaveBBox_shapeTypes:
+            shape_bbox = s.bbox
+        else:
+            x, y = s.points[0][:2]
+            shape_bbox = (x, y, x, y)
+
+        if shape_bbox is None:
+            return None
+
+        if self._bbox:
+            # compare with existing
+            self._bbox = (
+                min(shape_bbox[0], self._bbox[0]),
+                min(shape_bbox[1], self._bbox[1]),
+                max(shape_bbox[2], self._bbox[2]),
+                max(shape_bbox[3], self._bbox[3]),
+            )
+        else:
+            # first time bbox is being set
+            self._bbox = shape_bbox
+        return None
+
+    def _update_file_zbox(self, s: _HasZ | PointZ) -> None:
+        if self._zbox:
+            # compare with existing
+            self._zbox = (min(s.zbox[0], self._zbox[0]), max(s.zbox[1], self._zbox[1]))
+        else:
+            # first time zbox is being set
+            self._zbox = s.zbox
+
+    def _update_file_mbox(self, s: _HasM | PointM) -> None:
+        mbox = s.mbox
+        if self._mbox:
+            # compare with existing
+            self._mbox = (min(mbox[0], self._mbox[0]), max(mbox[1], self._mbox[1]))
+        else:
+            # first time mbox is being set
+            self._mbox = mbox
+
+    @property
+    def shapeTypeName(self) -> str:
+        return SHAPETYPE_LOOKUP[self.shapeType or 0]
+
+    def bbox(self) -> BBox | None:
+        """Returns the current bounding box for the shapefile which is
+        the lower-left and upper-right corners. It does not contain the
+        elevation or measure extremes."""
+        return self._bbox
+
+    def zbox(self) -> ZBox | None:
+        """Returns the current z extremes for the shapefile."""
+        return self._zbox
+
+    def mbox(self) -> MBox | None:
+        """Returns the current m extremes for the shapefile."""
+        return self._mbox
+
+    def _shp_or_shx_header(
+        self,
+        f: WriteSeekableBinStream,
+        headerType: Literal["shp", "shx"],
+    ) -> None:
+        """Writes the specified header type to the specified file-like object.
+        Several of the shapefile formats are so similar that a single generic
+        method to read or write them is warranted."""
+
+        f.seek(0)
+        # File code, Unused bytes
+        f.write(pack(">6i", 9994, 0, 0, 0, 0, 0))
+        # File length (Bytes / 2 = 16-bit words)
+        if headerType == "shp":
+            f.write(pack(">i", self._shp_file_length_B()))
+        elif headerType == "shx":
+            f.write(pack(">i", ((100 + (self.shpNum * 8)) // 2)))
+        # Version, Shape type
+        if self.shapeType is None:
+            self.shapeType = NULL
+        f.write(pack("<2i", 1000, self.shapeType))
+
+        # BBox, the shapefile's bounding box (lower left, upper right)
+        # In such cases of empty shapefiles, ESRI spec says the bbox values are 'unspecified'.
+        # Not sure what that means, so for now just setting to 0s, which is the same behavior as in previous versions.
+        # This would also make sense since the Z and M bounds are similarly set to 0 for non-Z/M type shapefiles.
+        # bbox: BBox = (0, 0, 0, 0)
+        bbox = self.bbox() or (0, 0, 0, 0)
+        try:
+            f.write(pack("<4d", *bbox))
+        except StructError:
+            raise ShapefileException(
+                "Failed to write shapefile bounding box. Floats required."
+            )
+
+        # Elevation
+        # As per the ESRI shapefile spec, the zbox for non-Z type shapefiles are set to 0s
+        # zbox : ZBox = (0, 0).  We also do this for empty shapefiles and null-shapes only files.
+        zbox = self.zbox() or (0, 0)
+
+        # Ms
+        # As per the ESRI shapefile spec, the mbox for non-M type shapefiles are set to 0s
+        # mbox: Mbox = (0, 0).  We also do this for empty shapefiles and null-shapes only files.
+        mbox = self.mbox() or (0, 0)
+
+        # Try writing
+        try:
+            f.write(pack("<4d", *zbox, *mbox))
+        except StructError:
+            raise ShapefileException(
+                "Failed to write shapefile elevation and measure values. Floats required."
+            )
+
+    def shape(
+        self,
+        s: Shape | HasGeoInterface | GeoJSONHomogeneousGeometryObject,
+    ) -> None:
+        # Balance if already not balanced
+        if self.autoBalance and self.dbf_writer.recNum < self.shpNum:
+            self.balance()
+        # Check is shape or import from geojson
+        if not isinstance(s, Shape):
+            if hasattr(s, "__geo_interface__"):
+                s = cast(HasGeoInterface, s)
+                shape_dict = s.__geo_interface__
+            elif isinstance(s, dict):  # TypedDict is a dict at runtime
+                shape_dict = s
+            else:
+                raise TypeError(
+                    "Can only write Shape objects, GeoJSON dictionaries, "
+                    "or objects with the __geo_interface__, "
+                    f"not: {s}"
+                )
+            s = Shape._from_geojson(shape_dict)
+        # Write to file
+        offset, length = self._shp_record(s)
+        if self._shx:
+            self._shx_record(offset, length)
+
+    def _shp_record(self, s: Shape) -> tuple[int, int]:
+        f = self.shp
+        offset = f.tell()
+        self.shpNum += 1
+
+        # Shape Type
+        if self.shapeType is None and s.shapeType != NULL:
+            self.shapeType = s.shapeType
+        if s.shapeType not in (NULL, self.shapeType):
+            raise ShapefileException(
+                f"The shape's type ({s.shapeType}) must match "
+                f"the type of the shapefile ({self.shapeType})."
+            )
+
+        # For both single point and multiple-points non-null shapes,
+        # update bbox, mbox and zbox of the whole shapefile
+        if s.shapeType != NULL:
+            self._update_file_bbox(s)
+
+        if s.shapeType in PointM_shapeTypes | _HasM_shapeTypes:
+            self._update_file_mbox(cast(Union[_HasM, PointM], s))
+
+        if s.shapeType in PointZ_shapeTypes | _HasZ_shapeTypes:
+            self._update_file_zbox(cast(Union[_HasZ, PointZ], s))
+
+        # Create an in-memory binary buffer to avoid
+        # unnecessary seeks to files on disk
+        # (other ops are already buffered until .seek
+        # or .flush is called if not using RawIOBase).
+        # https://docs.python.org/3/library/io.html#id2
+        # https://docs.python.org/3/library/io.html#io.BufferedWriter
+        b_io: ReadWriteSeekableBinStream = io.BytesIO()
+
+        # Record number, Content length place holder
+        b_io.write(pack(">2i", self.shpNum, -1))
+
+        # Track number of content bytes written, excluding
+        # self.shpNum and length (t.b.c.)
+        n = 0
+
+        n += b_io.write(pack("<i", s.shapeType))
+
+        ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[s.shapeType]
+        n += ShapeClass.write_to_byte_stream(
+            b_io=b_io,
+            s=s,
+            i=self.shpNum,
+        )
+
+        # Finalize record length as 16-bit words
+        length = n // 2
+
+        # 4 bytes in is the content length field
+        b_io.seek(4)
+        b_io.write(pack(">i", length))
+
+        # Flush to file.
+        b_io.seek(0)
+        f.write(b_io.read())
+        return offset, length
+
+    def _shx_record(self, offset: int, length: int) -> None:
+        """Writes the shx records."""
+
+        f = self.shx
+        try:
+            f.write(pack(">i", offset // 2))
+        except StructError:
+            raise ShapefileException(
+                "The .shp file has reached its file size limit > 4294967294 bytes (4.29 GB). To fix this, break up your file into multiple smaller ones."
+            )
+        f.write(pack(">i", length))
+
+    def record(
+        self,
+        *recordList: RecordValue,
+        **recordDict: RecordValue,
+    ) -> None:
+        # Balance if already not balanced
+        if self.autoBalance and self.dbf_writer.recNum > self.shpNum:
+            self.balance()
+        self.dbf_writer.record(*recordList, **recordDict)
+
+    def field(
+        # Types of args should match *Field
+        self,
+        name: str,
+        field_type: FieldTypeT = "C",
+        size: int = 50,
+        decimal: int = 0,
+    ) -> None:
+        self.dbf_writer.field(name, field_type, size, decimal)
+
     def balance(self) -> None:
         """Adds corresponding empty attributes or null geometry records depending
         on which type of record was created to make sure all three files
         are in synch."""
-        while self.recNum > self.shpNum:
+        while self.dbf_writer.recNum > self.shpNum:
             self.null()
-        while self.recNum < self.shpNum:
+        while self.dbf_writer.recNum < self.shpNum:
             self.record()
 
     def null(self) -> None:
@@ -4111,22 +4224,6 @@ class Writer:
         If the m (measure) value is not included, it defaults to None (NoData)."""
         shape = MultiPatch(lines=parts, partTypes=partTypes)
         self.shape(shape)
-
-    def field(
-        # Types of args should match *Field
-        self,
-        name: str,
-        field_type: FieldTypeT = "C",
-        size: int = 50,
-        decimal: int = 0,
-    ) -> None:
-        """Adds a dbf field descriptor to the shapefile."""
-        if len(self.fields) >= 2046:
-            raise ShapefileException(
-                "Shapefile Writer reached maximum number of fields: 2046."
-            )
-        field_ = Field.from_unchecked(name, field_type, size, decimal)
-        self.fields.append(field_)
 
 
 # Begin Testing

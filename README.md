@@ -8,7 +8,7 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 
 - **Author**: [Joel Lawhead](https://github.com/GeospatialPython)
 - **Maintainers**: [James Parrott](https://github.com/JamesParrott) & [Karim Bahgat](https://github.com/karimbahgat)
-- **Version**: 3.0.7
+- **Version**: 3.0.8
 - **Date**: 20th May 2026
 - **License**: [MIT](https://github.com/GeospatialPython/pyshp/blob/master/LICENSE.TXT)
 
@@ -92,6 +92,11 @@ part of your geospatial project.
 
 
 # Version Changes
+
+## 3.0.8
+
+### Testability / separation of concerns.
+ - Separate dbf only writing methods into a new dbfWriter class (an instance of which is owned by the regular Shapefile Writer class).
 
 ## 3.0.7
 

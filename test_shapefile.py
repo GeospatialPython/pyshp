@@ -1530,7 +1530,7 @@ def test_write_shp_only(tmpdir):
     filename = tmpdir.join("test").strpath
     with shapefile.Writer(shp=filename + ".shp") as writer:
         writer.point(1, 1)
-    assert writer.shp and not writer.shx and not writer.dbf
+    assert writer.shp and not writer._shx and not writer._dbf
     assert writer.shpNum == 1
     assert len(writer) == 1
     assert writer.shp.closed is True
@@ -1563,7 +1563,7 @@ def test_write_shp_shx_only(tmpdir):
     filename = tmpdir.join("test").strpath
     with shapefile.Writer(shp=filename + ".shp", shx=filename + ".shx") as writer:
         writer.point(1, 1)
-    assert writer.shp and writer.shx and not writer.dbf
+    assert writer.shp and writer.shx and not writer._dbf
     assert writer.shpNum == 1
     assert len(writer) == 1
     assert writer.shp.closed is writer.shx.closed is True
@@ -1597,7 +1597,7 @@ def test_write_shp_dbf_only(tmpdir):
         writer.field("field1", "C")  # required to create a valid dbf file
         writer.record("value")
         writer.point(1, 1)
-    assert writer.shp and not writer.shx and writer.dbf
+    assert writer.shp and not writer._shx and writer.dbf
     assert writer.shpNum == writer.recNum == 1
     assert len(writer) == 1
     assert writer.shp.closed is writer.dbf.closed is True
@@ -1632,7 +1632,7 @@ def test_write_dbf_only(tmpdir):
     with shapefile.Writer(dbf=filename + ".dbf") as writer:
         writer.field("field1", "C")  # required to create a valid dbf file
         writer.record("value")
-    assert not writer.shp and not writer.shx and writer.dbf
+    assert not writer._shp and not writer._shx and writer.dbf
     assert writer.recNum == 1
     assert len(writer) == 1
     assert writer.dbf.closed is True
@@ -1642,7 +1642,7 @@ def test_write_dbf_only(tmpdir):
 
     # test that can read records
     with shapefile.Reader(dbf=filename + ".dbf") as reader:
-        assert not writer.shp and not writer.shx and writer.dbf
+        assert not reader._shp and not reader._shx and reader.dbf
         assert (reader.numRecords, reader.numShapes) == (1, None)
         assert len(reader.records()) == 1
 
