@@ -47,8 +47,10 @@ def benchmark(
     return time_taken
 
 
-fields = {}
-shapeRecords = collections.defaultdict(list)
+fields: dict[str | PathLike, list[shapefile.Field]] = {}
+shapeRecords: dict[str | PathLike, list[shapefile.shapeRecord]] = (
+    collections.defaultdict(list)
+)
 
 
 def open_shapefile_with_PyShp(target: str | PathLike):

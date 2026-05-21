@@ -108,7 +108,7 @@ part of your geospatial project.
 
 ### URL Downloading
  - Unify tempfile creation and shapefile download logic.
- - Check "Content-Type" header and sniff initial bytes 
+ - Check "Content-Type" header and sniff initial bytes
    of response in order to possibly reject html responses, before parsing as a shapefile, to give a more useful error to users.
  - Special case shapefiles hosted in Github repos to suggest appending the query string `?raw=true`.
 
