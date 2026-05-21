@@ -37,7 +37,7 @@ dev = [
     {include-group = "test"}
 ]
 lint = [
-    "mypy",
+    "mypy>=2.1.0",
     "pre-commit",
     "ruff",
 ]
@@ -47,6 +47,19 @@ test = [
 
 [project.urls]
 Repository = "https://github.com/GeospatialPython/pyshp"
+
+
+
+[tool.mypy]
+files=["src/shapefile.py"]
+mypy_path = "src"
+explicit_package_bases = true
+exclude_gitignore = true
+exclude=[
+    'test_shapefile\.py',
+    'run_benchmarks\.py',
+]
+
 
 [tool.hatch.build.targets.sdist]
 only-include = ["src", "shapefiles", "test_shapefile.py"]
