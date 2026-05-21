@@ -21,7 +21,7 @@ jobs:
         python-version: "3.14"
 
     - name: uv Sync project, asserting locked with dev dependency group
-      run: uv sync --locked --group lint
+      run: uv sync --frozen --group lint
     - run: uv run pre-commit run --all-files --show-diff-on-failure --color=always ${{ inputs.extra_args }}
       shell: bash
 
