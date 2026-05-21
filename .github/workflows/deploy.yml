@@ -13,13 +13,13 @@ on:
     types: [published]
 
 jobs:
-  format_type_check_lint_build_and_test:
+  run_checks_build_and_test:
     # Builds and uploads wheel and sdist
     uses: ./.github/workflows/run_checks_build_and_test.yml
 
   deploy:
     # Prevent deployment of releases that fail any tests or checks (e.g. linting).
-    needs: format_type_check_lint_build_and_test
+    needs: run_checks_build_and_test
     runs-on: ubuntu-latest
 
     steps:

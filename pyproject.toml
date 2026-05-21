@@ -37,7 +37,7 @@ dev = [
     {include-group = "test"}
 ]
 lint = [
-    "mypy>=2.1.0",
+    "mypy==1.19.1", # last to support Python 3.9
     "pre-commit",
     "ruff",
 ]
@@ -48,14 +48,16 @@ test = [
 [project.urls]
 Repository = "https://github.com/GeospatialPython/pyshp"
 
-
+[tool.uv]
+exclude-newer = "1 week"
+exclude-newer-package = {pyshp = false, pyshp-stubs = false}
 
 [tool.mypy]
 files=["src/shapefile.py"]
 mypy_path = "src"
 explicit_package_bases = true
 exclude_gitignore = true
-exclude=[
+exclude=[  # Mypy requires regexes, not globs:
     'test_shapefile\.py',
     'run_benchmarks\.py',
 ]
