@@ -48,10 +48,6 @@ test = [
 [project.urls]
 Repository = "https://github.com/GeospatialPython/pyshp"
 
-[tool.uv]
-exclude-newer = "1 week"
-exclude-newer-package = {pyshp = false, pyshp-stubs = false}
-
 [tool.mypy]
 files=["src/shapefile.py"]
 mypy_path = "src"
