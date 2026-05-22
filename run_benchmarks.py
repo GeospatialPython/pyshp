@@ -85,11 +85,14 @@ SHAPEFILES = {
 for file_path in SHAPEFILES.values():
     file_path.read_bytes()
 
+COLS_WIDTHS = (22, 10)
+
 reader_benchmarks = [
     functools.partial(
         benchmark,
         name=f"Read {test_name}",
         func=functools.partial(open_shapefile_with_PyShp, target=target),
+        col_widths=COLS_WIDTHS,
     )
     for test_name, target in SHAPEFILES.items()
 ]
@@ -101,13 +104,17 @@ writer_benchmarks = [
         benchmark,
         name=f"Write {test_name}",
         func=functools.partial(write_shapefile_with_PyShp, target=target),
+        col_widths=COLS_WIDTHS,
     )
     for test_name, target in SHAPEFILES.items()
 ]
 
 
-def run(run_count: int, benchmarks: list[Callable[[], None]]) -> None:
-    col_widths = (22, 10)
+def run(
+    run_count: int,
+    benchmarks: list[Callable[[], None]],
+    col_widths: tuple[int, int] = COLS_WIDTHS,
+) -> None:
     col_head = ("parser", "exec time", "performance (more is better)")
     print(f"Running benchmarks {run_count} times:")
     print("-" * col_widths[0] + "---" + "-" * col_widths[1])
@@ -116,7 +123,6 @@ def run(run_count: int, benchmarks: list[Callable[[], None]]) -> None:
     for benchmark in benchmarks:
         benchmark(  # type: ignore [call-arg]
             run_count=run_count,
-            col_widths=col_widths,
         )
 
 
