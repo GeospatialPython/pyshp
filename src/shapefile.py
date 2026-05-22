@@ -2402,8 +2402,6 @@ class _HasExitStack(AbstractContextManager["_HasExitStack", None]):
 FileProtoT = TypeVar("FileProtoT")
 
 
-
-
 class _FileChecker(_HasExitStack, Generic[FileProtoT]):
     @property
     @abc.abstractmethod
@@ -2445,13 +2443,13 @@ class _FileChecker(_HasExitStack, Generic[FileProtoT]):
     @functools.cached_property
     def file(self) -> FileProtoT:
         return self._ensure_file_obj()
-            # f=self._file,
-            # FileProto=self.FileProto,
-            # exit_stack=self.exit_stack,
-            # new_file_mode="rb",
-            # ExceptionClass=dbfFileException,
-        #)
-    
+        # f=self._file,
+        # FileProto=self.FileProto,
+        # exit_stack=self.exit_stack,
+        # new_file_mode="rb",
+        # ExceptionClass=dbfFileException,
+        # )
+
     def _ensure_file_obj(
         self,
         f: str | FileProtoT | None = None,
@@ -2467,7 +2465,6 @@ class _FileChecker(_HasExitStack, Generic[FileProtoT]):
         FileProto = self.FileProto
         new_file_mode = self.new_file_mode
         ExceptionClass = self.ExceptionClass
-        
 
         if not f:
             raise ExceptionClass(f"No file-like object received. Got: {f}")
@@ -2485,6 +2482,7 @@ class _FileChecker(_HasExitStack, Generic[FileProtoT]):
         if isinstance(f, FileProto):
             return f
         raise ExceptionClass(f"Unsupported file-like object: {f}")
+
 
 class DbfReader(_FileChecker[ReadSeekableBinStream]):
     """Reads a dbf file.  You can instantiate a DbfReader without specifying a shapefile."""
