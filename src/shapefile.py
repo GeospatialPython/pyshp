@@ -3425,9 +3425,7 @@ class Reader(_FileChecker[ReadSeekableBinStream]):
         To only read shapes within a given spatial region, specify the 'bbox'
         arg as a list or tuple of xmin,ymin,xmax,ymax.
         """
-        shapes = Shapes()
-        shapes.extend(self.iterShapes(bbox=bbox))
-        return shapes
+        return Shapes(self.iterShapes(bbox=bbox))
 
     def iterShapes(self, bbox: BBox | None = None) -> Iterator[Shape | None]:
         """Returns a generator of shapes in a shapefile. Useful
