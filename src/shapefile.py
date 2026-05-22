@@ -10,6 +10,7 @@ from __future__ import annotations
 
 __version__ = "3.0.9.dev"
 
+import abc
 import array
 import doctest
 import functools
@@ -42,6 +43,7 @@ from typing import (
     Union,
     cast,
     overload,
+    runtime_checkable,
 )
 from urllib.error import HTTPError
 from urllib.parse import ParseResult, urlparse, urlunparse
@@ -139,12 +141,14 @@ class ReadableBinStream(Protocol):
     def read(self, size: int = -1) -> bytes: ...
 
 
+@runtime_checkable
 class WriteSeekableBinStream(Protocol):
     def write(self, b: bytes) -> int: ...
     def seek(self, offset: int, whence: int = 0) -> int: ...
     def tell(self) -> int: ...
 
 
+@runtime_checkable
 class ReadSeekableBinStream(Protocol):
     def seek(self, offset: int, whence: int = 0) -> int: ...
     def tell(self) -> int: ...
@@ -2216,6 +2220,16 @@ def _save_to_named_tmp_file(
     return tmp_file_obj
 
 
+# Minor hack.  Relies on Protocols being ABC subclasses.
+# They are currently ABCs anyway, so why not use that
+# for something useful like this?
+#
+# tempfile.NamedTemporaryFile is a dynamic wrapper
+# https://github.com/python/cpython/blob/2dd91d2b92a6c74d78cd3385ede328190cd8eaa9/Lib/tempfile.py#L510
+# so normal (naive) isinstance checks of tempfile.NamedTemporaryFiles
+# against @runtime_checkable Protocols are not possible.
+ReadSeekableBinStream.register(tempfile._TemporaryFileWrapper)
+
 HTML_SIGNATURES_UC = (
     b"<!DOCTYPE",
     b"<HTML",
@@ -2354,54 +2368,152 @@ def ensure_within_bounds(i: int, num_records: int) -> int:
     return i
 
 
-class DbfReader:
-    """Reads a dbf file.  You can instantiate a DbfReader without specifying a shapefile
-    and then specify one later with the load() method.
-    """
+class ShapefileException(Exception):
+    """An exception to handle shapefile specific problems."""
+
+
+class dbfFileException(ShapefileException):
+    """Indicates a problem with the .dbf file."""
+
+
+# Use ExitStack to Support not closing opened file objects passed in e.g.(handled by some
+# external context manager, or the caller manually calling .close).
+#
+# This will only ever hold at most one context manager.
+# But an ExitStack is the right tool for the job
+# when the number of context manager(s) depends on user input.
+class _HasExitStack(AbstractContextManager["_HasExitStack", None]):
+    def __init__(self) -> None:
+        self.exit_stack = ExitStack()
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        self.close()
+
+    def close(self) -> None:
+        self.exit_stack.close()
+
+
+# TODO:  bound to @runtime_checkable Protocols
+FileProtoT = TypeVar("FileProtoT")
+
+
+def _ensure_file_obj(
+    f: str | FileProtoT | None,
+    FileProto: type[FileProtoT],
+    exit_stack: ExitStack,
+    new_file_mode: Literal["rb", "wb+"] = "wb+",
+    ExceptionClass: type[ShapefileException] = ShapefileException,
+) -> FileProtoT:
+    """Safety handler to verify file-like objects"""
+    if not f:
+        raise ExceptionClass(f"No file-like object recieved. Got: {f}")
+    if isinstance(f, str):
+        pth = os.path.split(f)[0]
+        if pth and not os.path.exists(pth):
+            os.makedirs(pth)
+        fp = open(f, new_file_mode)
+
+        # Only push files created here to the exit stack.
+        # The user must close their own file objects.
+        exit_stack.enter_context(fp)
+        return cast(FileProtoT, fp)
+
+    if isinstance(f, FileProto):
+        return f
+    raise ExceptionClass(f"Unsupported file-like object: {f}")
+
+
+class _FileChecker(_HasExitStack, Generic[FileProtoT]):
+    @property
+    @abc.abstractmethod
+    def FileProto(self) -> type[FileProtoT]: ...
+
+    @property
+    @abc.abstractmethod
+    def new_file_mode(self) -> Literal["rb", "wb+"]: ...
+
+    @property
+    @abc.abstractmethod
+    def ext(self) -> Literal[".shp", ".shx", ".dbf"]: ...
 
     def __init__(
         self,
-        *,
-        file_obj: IO[bytes],
+        file: str | PathLike[Any] | FileProtoT,
         encoding: str = "utf-8",
         encodingErrors: str = "strict",
     ):
-        self._file = file_obj
-        self.fields: list[Field] = []
-        self.__fieldLookup: dict[str, int] = {}
+        super().__init__()
+
+        file = fsdecode_if_pathlike(file)
+        self._file: str | FileProtoT
+        if isinstance(file, str):
+            self._file = f"{os.path.splitext(file)[0]}{self.ext}"
+        elif file:
+            self._file = file
+        else:
+            raise TypeError(
+                f"file must be set to a str, Path or file-like object.  Got: {file}"
+            )
+
+        # Encoding
         self.encoding = encoding
         self.encodingErrors = encodingErrors
 
+
+class DbfReader(_FileChecker[ReadSeekableBinStream]):
+    """Reads a dbf file.  You can instantiate a DbfReader without specifying a shapefile."""
+
+    FileProto = ReadSeekableBinStream
+    new_file_mode = "rb"
+    ext = ".dbf"
+
+    def __init__(
+        self,
+        dbf: str | PathLike[Any] | ReadSeekableBinStream,
+        *,
+        encoding: str = "utf-8",
+        encodingErrors: str = "strict",
+    ):
+        super().__init__(file=dbf, encoding=encoding, encodingErrors=encodingErrors)
+
+        self.fields: list[Field] = []
+        self.__fieldLookup: dict[str, int] = {}
+
         self._dbfHeader()
 
-    @property
-    def dbf(self) -> IO[bytes]:
-        if not self._file:
-            raise dbfFileException(
-                f"DbfReader requires a .dbf file or file-like object. Got: {self._file}"
-            )
-        return self._file
+    @functools.cached_property
+    def dbf(self) -> ReadSeekableBinStream:
+        return _ensure_file_obj(
+            f=self._file,
+            FileProto=self.FileProto,
+            exit_stack=self.exit_stack,
+            new_file_mode="rb",
+            ExceptionClass=dbfFileException,
+        )
 
     def __len__(self) -> int:
         """Returns the number of records in the .dbf file."""
-
         return self.numRecords
 
     def _dbfHeader(self) -> None:
         """Reads a dbf header. Xbase-related code borrows heavily from ActiveState Python Cookbook Recipe 362715 by Raymond Hettinger"""
 
-        dbf = self.dbf
         # read relevant header parts
-        dbf.seek(0)
+        self.dbf.seek(0)
         self.numRecords, self.__dbfHdrLength, self._record_length = cast(
-            tuple[int, int, int], unpack("<xxxxLHH20x", dbf.read(32))
+            tuple[int, int, int], unpack("<xxxxLHH20x", self.dbf.read(32))
         )
 
         # read fields
         numFields = (self.__dbfHdrLength - 33) // 32
         for __field in range(numFields):
             encoded_field_tuple: tuple[bytes, bytes, int, int] = unpack(
-                "<11sc4xBB14x", dbf.read(32)
+                "<11sc4xBB14x", self.dbf.read(32)
             )
             encoded_name, encoded_type_char, size, decimal = encoded_field_tuple
 
@@ -2416,7 +2528,7 @@ class DbfReader:
             field_type = FIELD_TYPE_ALIASES[encoded_type_char]
 
             self.fields.append(Field(name, field_type, size, decimal))
-        terminator = dbf.read(1)
+        terminator = self.dbf.read(1)
         if terminator != b"\r":
             raise ShapefileException(
                 "Shapefile dbf header lacks expected terminator. (likely corrupt?)"
@@ -2671,14 +2783,6 @@ class DbfReader:
                 yield r
 
 
-class ShapefileException(Exception):
-    """An exception to handle shapefile specific problems."""
-
-
-class dbfFileException(ShapefileException):
-    """Indicates a problem with the .dbf file."""
-
-
 class _NoShpSentinel:
     """For use as a default value for shp to preserve the
     behaviour (from when all keyword args were gathered
@@ -2690,7 +2794,7 @@ class _NoShpSentinel:
 _NO_SHP_SENTINEL = _NoShpSentinel()
 
 
-class Reader:
+class Reader(_HasExitStack):
     """Reads the three files of a shapefile as a unit or
     separately.  If one of the three files (.shp, .shx,
     .dbf) is missing no exception is thrown until you try
@@ -2733,7 +2837,7 @@ class Reader:
         self._offsets: list[int] = []
         self.shpLength: int | None = None
         self.numShapes: int | None = None
-        self._exit_stack = ExitStack()
+        self.exit_stack = ExitStack()
         # See if a shapefile name was passed as the first argument
         if shapefile_path:
             path = fsdecode_if_pathlike(shapefile_path)
@@ -2778,7 +2882,7 @@ class Reader:
                 "Shapefile DbfReader requires a .dbf file or file-like object."
             )
         return DbfReader(
-            file_obj=self._dbf,
+            dbf=self._dbf,
             encoding=self.encoding,
             encodingErrors=self.encodingErrors,
         )
@@ -2788,23 +2892,25 @@ class Reader:
         return self._get_dbf_reader()
 
     @functools.cached_property
-    def shp(self) -> IO[bytes]:
-        if self._shp is None:
-            raise ShapefileException(
-                "Shapefile Reader requires a .shp shapefile or file-like object."
-            )
-        return self._shp
+    def shp(self) -> ReadSeekableBinStream:
+        return _ensure_file_obj(
+            f=self._shp,
+            FileProto=ReadSeekableBinStream,
+            exit_stack=self.exit_stack,
+            new_file_mode="rb",
+        )
 
     @functools.cached_property
-    def shx(self) -> IO[bytes]:
-        if self._shx is None:
-            raise ShapefileException(
-                "Shapefile Reader shx use requires a .shx shapefile or file-like object."
-            )
-        return self._shx
+    def shx(self) -> ReadSeekableBinStream:
+        return _ensure_file_obj(
+            f=self._shx,
+            FileProto=ReadSeekableBinStream,
+            exit_stack=self.exit_stack,
+            new_file_mode="rb",
+        )
 
     @property
-    def dbf(self) -> IO[bytes]:
+    def dbf(self) -> ReadableBinStream:
         return self.dbf_reader.dbf
 
     @property
@@ -2843,7 +2949,7 @@ class Reader:
             baseName, __ = os.path.splitext(file_)
             file_obj = _try_get_open_constituent_file(baseName, ext)
             if file_obj is not None:
-                self._exit_stack.enter_context(file_obj)
+                self.exit_stack.enter_context(file_obj)
             return file_obj
 
         if hasattr(file_, "read"):
@@ -2876,7 +2982,7 @@ class Reader:
             # Use tempfile as source for url data.
             fileobj = _save_to_named_tmp_file(resp, initial_bytes=sniffed_bytes)
             setattr(self, f"_{ext}", fileobj)
-            self._exit_stack.enter_context(fileobj)
+            self.exit_stack.enter_context(fileobj)
         if not shp_or_dbf_downloaded:
             raise ShapefileException(f"Failed to download .shp or .dbf from: {url}")
 
@@ -2945,7 +3051,7 @@ class Reader:
                         # Use read+write tempfile as source for member data.
                         fileobj = _save_to_named_tmp_file(member)
                         setattr(self, f"_{ext.lower()}", fileobj)
-                        self._exit_stack.enter_context(fileobj)
+                        self.exit_stack.enter_context(fileobj)
                     except (OSError, AttributeError, KeyError):
                         pass
         # Close and delete the temporary zipfile
@@ -2979,7 +3085,7 @@ class Reader:
         """
         self._shp = _try_get_open_constituent_file(shapefile_name, "shp")
         if self._shp:
-            self._exit_stack.enter_context(self._shp)
+            self.exit_stack.enter_context(self._shp)
             self._shpHeader()
 
     def load_shx(self, shapefile_name: str) -> None:
@@ -2988,7 +3094,7 @@ class Reader:
         """
         self._shx = _try_get_open_constituent_file(shapefile_name, "shx")
         if self._shx:
-            self._exit_stack.enter_context(self._shx)
+            self.exit_stack.enter_context(self._shx)
             self._shxHeader()
 
     def load_dbf(self, shapefile_name: str) -> None:
@@ -2997,7 +3103,7 @@ class Reader:
         """
         self._dbf = _try_get_open_constituent_file(shapefile_name, "dbf")
         if self._dbf:
-            self._exit_stack.enter_context(self._dbf)
+            self.exit_stack.enter_context(self._dbf)
             self._get_dbf_reader()
 
     def __len__(self) -> int:
@@ -3142,7 +3248,7 @@ class Reader:
         self.close()
 
     def close(self) -> None:
-        self._exit_stack.close()
+        self.exit_stack.close()
         # Close any files that the reader opened (but not those given by user)
         # for file_ in [self._shp, self._dbf, self._shx]:
         #     if file_ is None:
@@ -3167,18 +3273,13 @@ class Reader:
             info.append(f"    {len(self)} records ({len(self.fields)} fields)")
         return "\n".join(info)
 
-    def __enter__(self) -> Reader:
-        self._exit_stack.__enter__()
-        return self
-
     def __exit__(
         self,
-        exc_type: BaseException | None,
+        exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
-    ) -> bool | None:
+    ) -> None:
         self.close()
-        return None
 
     def _shape(self, oid: int | None = None, bbox: BBox | None = None) -> Shape | None:
         """Returns the header info and geometry for a single shape."""
@@ -3370,28 +3471,6 @@ class Reader:
                     yield ShapeRecord(shape=shape, record=record)
 
 
-def _ensure_file_obj(
-    f: str | WriteSeekableBinStream | None,
-    exit_stack: ExitStack,
-    file_mode: str = "wb+",
-    ExceptionClass: type[ShapefileException] = ShapefileException,
-) -> WriteSeekableBinStream:
-    """Safety handler to verify file-like objects"""
-    if not f:
-        raise ExceptionClass("No file-like object available.")
-    if isinstance(f, str):
-        pth = os.path.split(f)[0]
-        if pth and not os.path.exists(pth):
-            os.makedirs(pth)
-        fp = open(f, file_mode)
-        exit_stack.enter_context(fp)
-        return fp
-
-    if hasattr(f, "write"):
-        return f
-    raise ExceptionClass(f"Unsupported file-like object: {f}")
-
-
 def _is_file_obj_open(f: WriteSeekableBinStream | str | None) -> bool:
     if not f:
         return False
@@ -3409,13 +3488,16 @@ def _try_to_flush_file_obj(f: WriteSeekableBinStream | str | None) -> None:
         pass
 
 
-class DbfWriter(AbstractContextManager["DbfWriter", None]):
+class DbfWriter(_FileChecker[WriteSeekableBinStream]):
     """Writes .dbf files (dBASE database files), in particular those of Shapefiles."""
+
+    FileProto = WriteSeekableBinStream
+    new_file_mode = "wb+"
+    ext = ".dbf"
 
     def __init__(
         self,
-        path: str | PathLike[Any] | None = None,
-        dbf: str | WriteSeekableBinStream | None = None,
+        dbf: str | PathLike[Any] | WriteSeekableBinStream,
         *,
         encoding: str = "utf-8",
         encodingErrors: str = "strict",
@@ -3423,28 +3505,19 @@ class DbfWriter(AbstractContextManager["DbfWriter", None]):
         # Keep kwargs even though unused, to preserve PyShp 2.4 API
         **kwargs: Any,
     ):
-        self.path = fsdecode_if_pathlike(path)
+        dbf = fsdecode_if_pathlike(dbf)
         self._dbf: str | WriteSeekableBinStream
-        self.fields: list[Field] = []
-        self.max_num_fields = max_num_fields
         # Encoding
         self.encoding = encoding
         self.encodingErrors = encodingErrors
-        if self.path:
-            if not isinstance(self.path, str):
-                raise TypeError(
-                    f"Path {self.path!r} must be of type str or path-like, not {type(self.path)}."
-                )
-            self._dbf = os.path.splitext(self.path)[0] + ".dbf"
+        if isinstance(dbf, str):
+            self._dbf = os.path.splitext(dbf)[0] + ".dbf"
         elif dbf:
             self._dbf = dbf
         else:
             raise TypeError(
-                "Either the target filepath, or dbf must be set to create a .dbf file."
+                f"dbf must be set to a str, Path or file-like object.  Got: {dbf}"
             )
-
-        self.recNum = 0
-        self.deletionFlag = 0
 
         # Support not closing opened file objects passed in e.g.(handled by some
         # external context manager, or the caller manually calling .close).
@@ -3452,27 +3525,22 @@ class DbfWriter(AbstractContextManager["DbfWriter", None]):
         # This will only ever hold at most one context manager.
         # But an ExitStack is the right tool for the job
         # when the number of context manager(s) depends on user input.
-        self._exit_stack = ExitStack()
+        self.exit_stack = ExitStack()
+
+        self.fields: list[Field] = []
+        self.max_num_fields = max_num_fields
+        self.recNum = 0
+        self.deletionFlag = 0
 
     @functools.cached_property
     def dbf(self) -> WriteSeekableBinStream:
         return _ensure_file_obj(
-            self._dbf,
-            exit_stack=self._exit_stack,
+            f=self._dbf,
+            FileProto=WriteSeekableBinStream,
+            exit_stack=self.exit_stack,
+            new_file_mode="wb+",
             ExceptionClass=dbfFileException,
         )
-
-    def __enter__(self) -> DbfWriter:
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: TracebackType | None,
-    ) -> None:
-        self.close()
-        return None
 
     def close(self) -> None:
         """
@@ -3485,7 +3553,7 @@ class DbfWriter(AbstractContextManager["DbfWriter", None]):
 
         _try_to_flush_file_obj(self.dbf)
 
-        self._exit_stack.close()
+        super().close()
 
     def field(
         # Types of args should match *Field
@@ -3718,7 +3786,7 @@ class Writer:
         self._shx: str | WriteSeekableBinStream | None = shx
         self._dbf: str | WriteSeekableBinStream | None = dbf
         self._dbf_writer: DbfWriter | None = None
-        self._exit_stack = ExitStack()
+        self.exit_stack = ExitStack()
         if target:
             if not isinstance(target, str):
                 raise TypeError(
@@ -3754,15 +3822,19 @@ class Writer:
     @functools.cached_property
     def shp(self) -> WriteSeekableBinStream:
         return _ensure_file_obj(
-            self._shp,
-            exit_stack=self._exit_stack,
+            f=self._shp,
+            FileProto=WriteSeekableBinStream,
+            exit_stack=self.exit_stack,
+            new_file_mode="wb+",
         )
 
     @functools.cached_property
     def shx(self) -> WriteSeekableBinStream:
         return _ensure_file_obj(
-            self._shx,
-            exit_stack=self._exit_stack,
+            f=self._shx,
+            FileProto=WriteSeekableBinStream,
+            exit_stack=self.exit_stack,
+            new_file_mode="wb+",
         )
 
     @functools.cached_property
@@ -3771,7 +3843,7 @@ class Writer:
             raise dbfFileException(
                 f"No dbf file.  Got target: {self.target} & dbf: {self._dbf}"
             )
-        self._exit_stack.enter_context(self._dbf_writer)
+        self.exit_stack.enter_context(self._dbf_writer)
         return self._dbf_writer
 
     @property
@@ -3805,12 +3877,11 @@ class Writer:
 
     def __exit__(
         self,
-        exc_type: BaseException | None,
+        exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
-    ) -> bool | None:
+    ) -> None:
         self.close()
-        return None
 
     def __del__(self) -> None:
         self.close()
@@ -3861,7 +3932,7 @@ class Writer:
         #  user-supplied, already opened file objects that
         #  might be closed by an outer context manager).
         # Idempotent.
-        self._exit_stack.close()
+        self.exit_stack.close()
 
     def _shp_file_length_B(self) -> int:
         """Calculates the file length of the shp file."""
