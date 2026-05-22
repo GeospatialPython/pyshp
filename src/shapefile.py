@@ -43,6 +43,7 @@ from typing import (
     Union,
     cast,
     overload,
+    runtime_checkable,
 )
 from urllib.error import HTTPError
 from urllib.parse import ParseResult, urlparse, urlunparse
@@ -140,12 +141,14 @@ class ReadableBinStream(Protocol):
     def read(self, size: int = -1) -> bytes: ...
 
 
+@runtime_checkable
 class WriteSeekableBinStream(Protocol):
     def write(self, b: bytes) -> int: ...
     def seek(self, offset: int, whence: int = 0) -> int: ...
     def tell(self) -> int: ...
 
 
+@runtime_checkable
 class ReadSeekableBinStream(Protocol):
     def seek(self, offset: int, whence: int = 0) -> int: ...
     def tell(self) -> int: ...
@@ -2465,17 +2468,32 @@ class _FileChecker(_HasExitStack, Generic[FileProtoT]):
             exit_stack.enter_context(fp)
             return cast(FileProtoT, fp)
 
-        # Ugly, but we need to apply this to TemporaryFiles, and tempfile
-        # is a platform-inconsistent stick mess of dynamic wrappers,
-        # leading to weird Python 3.14 specific bug in run_benchmarks.py
-        # on Windows
-        attrs = FileProto.__protocol_attrs__  # type: ignore[attr-defined]
-
-        if all(hasattr(f, attr) for attr in attrs):
+        # See Minor hack below.
+        if isinstance(f, FileProto):
             return f
+
+        # Ugly, but perhaps needed to avoid weird Python 3.14
+        # specific bug in run_benchmarks.py on Windows
+        # if (
+        #     (attrs := getattr(FileProto, "__protocol_attrs__", None))
+        #     and all(hasattr(f, attr) for attr in attrs)
+        # ):
+        #     return f
         raise ExceptionClass(
             f"Unsupported file-like object: {f}.  Must satisfy: {FileProto}"
         )
+
+
+# Minor hack.  Relies on Protocols being ABC subclasses.
+# They are currently ABCs anyway, so why not use that
+# for something useful?
+#
+# tempfile.NamedTemporaryFile is a dynamic wrapper
+# https://github.com/python/cpython/blob/2dd91d2b92a6c74d78cd3385ede328190cd8eaa9/Lib/tempfile.py#L510
+# so normal (naive) isinstance checks of tempfile.NamedTemporaryFiles
+# against @runtime_checkable Protocols are not possible.
+ReadSeekableBinStream.register(tempfile._TemporaryFileWrapper)
+WriteSeekableBinStream.register(tempfile._TemporaryFileWrapper)
 
 
 class DbfReader(_FileChecker[ReadSeekableBinStream]):
