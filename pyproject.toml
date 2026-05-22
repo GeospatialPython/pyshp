@@ -38,7 +38,7 @@ dev = [
 ]
 lint = [
     "mypy==1.19.1", # last to support Python 3.9
-    "pre-commit",
+    'pre-commit; python_version >= "3.10"',
     "ruff",
 ]
 test = [
