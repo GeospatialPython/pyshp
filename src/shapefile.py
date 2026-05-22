@@ -2650,6 +2650,8 @@ class DbfReader(_FileChecker[ReadSeekableBinStream]):
         """Reads and returns a dbf record row as a list of values. Requires specifying
         a list of field info Field namedtuples 'fieldTuples', a record name-index dict 'recLookup',
         and a Struct instance 'recStruct' for unpacking these fields.
+
+        None is returned for 'deleted' records (those with their deletion flag marked).
         """
         f = self.file
 
@@ -2744,6 +2746,9 @@ class DbfReader(_FileChecker[ReadSeekableBinStream]):
         """Returns a specific dbf record based on the supplied index.
         To only read some of the fields, specify the 'fields' arg as a
         list of one or more fieldnames.
+
+
+        Returns None if record's deletion flag is marked.
         """
         f = self.file
 
@@ -2756,30 +2761,37 @@ class DbfReader(_FileChecker[ReadSeekableBinStream]):
             oid=i, fieldTuples=fieldTuples, recLookup=recLookup, recStruct=recStruct
         )
 
-    def records(self, fields: list[str] | None = None) -> list[_Record]:
-        """Returns all records in a dbf file.
+    def records(
+        self,
+        fields: list[str] | None = None,
+        start: int = 0,
+        stop: int | None = None,
+        deleted_as_None: bool = False,
+    ) -> list[_Record | None]:
+        """Returns a list of records in a dbf file.
         To only read some of the fields, specify the 'fields' arg as a
         list of one or more fieldnames.
+        By default returns all records.  Otherwise, specify start
+        (default: 0) or stop (default: number_of_records)
+        to only yield record numbers i, where
+        start <= i < stop, (or
+        start <= i < number_of_records + stop
+        if stop < 0).
+
+        Excludes 'deleted' records (those whose deletion flag is marked).
+        Set deleted_as_None=True to insert None for these, to preserve
+        the indexing, as for DbfReader.record
         """
-        f = self.file
-
-        records = []
-        f.seek(self.__dbfHdrLength)
-        fieldTuples, recLookup, recStruct = self._record_fields(fields)
-
-        for i in range(self.numRecords):
-            r = self._record(
-                oid=i, fieldTuples=fieldTuples, recLookup=recLookup, recStruct=recStruct
-            )
-            if r:
-                records.append(r)
-        return records
+        return [
+            record for record in self.iterRecords(fields, start, stop, deleted_as_None)
+        ]
 
     def iterRecords(
         self,
         fields: list[str] | None = None,
         start: int = 0,
         stop: int | None = None,
+        deleted_as_None: bool = False,
     ) -> Iterator[_Record | None]:
         """Returns a generator of records in a dbf file.
         Useful for large shapefiles or dbf files.
@@ -2791,6 +2803,10 @@ class DbfReader(_FileChecker[ReadSeekableBinStream]):
         start <= i < stop, (or
         start <= i < number_of_records + stop
         if stop < 0).
+
+        Excludes 'deleted' records (those whose deletion flag is marked).
+        Set deleted_as_None=True to insert None for these, to preserve
+        the indexing, as for DbfReader.record
         """
         f = self.file
 
@@ -2798,6 +2814,11 @@ class DbfReader(_FileChecker[ReadSeekableBinStream]):
             raise ShapefileException(
                 "Error when reading number of Records in dbf file header"
             )
+
+        # Exit early if there are no records
+        if self.numRecords == 0:
+            return
+
         start = ensure_within_bounds(start, self.numRecords)
         if stop is None:
             stop = self.numRecords
@@ -2814,7 +2835,7 @@ class DbfReader(_FileChecker[ReadSeekableBinStream]):
             r = self._record(
                 oid=i, fieldTuples=fieldTuples, recLookup=recLookup, recStruct=recStruct
             )
-            if r:
+            if r is not None or deleted_as_None:
                 yield r
 
 
@@ -2966,16 +2987,23 @@ class Reader(_FileChecker[ReadSeekableBinStream]):
     def record(self, i: int = 0, fields: list[str] | None = None) -> _Record | None:
         return self.dbf_reader.record(i, fields)
 
-    def records(self, fields: list[str] | None = None) -> list[_Record]:
-        return self.dbf_reader.records(fields)
+    def records(
+        self,
+        fields: list[str] | None = None,
+        start: int = 0,
+        stop: int | None = None,
+        deleted_as_None: bool = False,
+    ) -> list[_Record | None]:
+        return self.dbf_reader.records(fields, start, stop, deleted_as_None)
 
     def iterRecords(
         self,
         fields: list[str] | None = None,
         start: int = 0,
         stop: int | None = None,
+        deleted_as_None: bool = False,
     ) -> Iterator[_Record | None]:
-        return self.dbf_reader.iterRecords(fields, start, stop)
+        return self.dbf_reader.iterRecords(fields, start, stop, deleted_as_None)
 
     def _seek_0_on_file_obj_wrap_or_open_from_name(
         self,

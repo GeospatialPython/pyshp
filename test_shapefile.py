@@ -1923,6 +1923,8 @@ def test_write_empty_shapefile(tmpdir, shape_type):
         # test length 0
         assert len(r) == r.numRecords == r.numShapes == 0
         # test records are empty
+        for record in r.iterRecords():
+            pass
         assert len(r.records()) == 0
         # test shapes are empty
         assert len(r.shapes()) == 0
