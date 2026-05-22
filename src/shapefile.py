@@ -2395,7 +2395,7 @@ class _FileChecker(_HasExitStack, Generic[FileProtoT]):
 
     @property
     @abc.abstractmethod
-    def new_file_mode(self) -> Literal["rb", "wb+"]: ...
+    def new_file_mode(self) -> Literal["rb", "w+b"]: ...
 
     @property
     @abc.abstractmethod
@@ -2441,7 +2441,7 @@ class _FileChecker(_HasExitStack, Generic[FileProtoT]):
         f: str | FileProtoT | None = None,
         # FileProto: type[FileProtoT],
         # exit_stack: ExitStack,
-        # new_file_mode: Literal["rb", "wb+"] = "wb+",
+        # new_file_mode: Literal["rb", "w+b"] = "w+b",
         # ExceptionClass: type[ShapefileException] = ShapefileException,
     ) -> FileProtoT:
         """Safety handler to verify file-like objects"""
@@ -3514,7 +3514,7 @@ class DbfWriter(_FileChecker[WriteSeekableBinStream]):
     """Writes .dbf files (dBASE database files), in particular those of Shapefiles."""
 
     FileProto = WriteSeekableBinStream
-    new_file_mode = "wb+"
+    new_file_mode = "w+b"
     ext = ".dbf"
 
     def __init__(
@@ -3562,7 +3562,7 @@ class DbfWriter(_FileChecker[WriteSeekableBinStream]):
             # f=self._dbf,
             # FileProto=WriteSeekableBinStream,
             # exit_stack=self.exit_stack,
-            # new_file_mode="wb+",
+            # new_file_mode="w+b",
             # ExceptionClass=dbfFileException,
         )
 
@@ -3781,7 +3781,7 @@ class Writer(_FileChecker[WriteSeekableBinStream]):
     # W = TypeVar("W", bound=WriteSeekableBinStream)
 
     FileProto = WriteSeekableBinStream
-    new_file_mode = "wb+"
+    new_file_mode = "w+b"
     ext = ".shp"
     ExceptionClass = ShapefileException
 
@@ -3854,7 +3854,7 @@ class Writer(_FileChecker[WriteSeekableBinStream]):
             f=self._shp,
             # FileProto=WriteSeekableBinStream,
             # exit_stack=self.exit_stack,
-            # new_file_mode="wb+",
+            # new_file_mode="w+b",
         )
 
     @functools.cached_property
@@ -3863,7 +3863,7 @@ class Writer(_FileChecker[WriteSeekableBinStream]):
             f=self._shx,
             # FileProto=WriteSeekableBinStream,
             # exit_stack=self.exit_stack,
-            # new_file_mode="wb+",
+            # new_file_mode="w+b",
         )
 
     @functools.cached_property
