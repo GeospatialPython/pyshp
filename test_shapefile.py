@@ -1117,7 +1117,9 @@ def test_shape_oid_no_shx():
                 shape = sf.shape(i)
                 assert shape.oid == i
                 shape_expected = sf_expected.shape(i)
-                assert shape.__geo_interface__ == shape_expected.__geo_interface__
+                assert shape.__geo_interface__ == shape_expected.__geo_interface__, (
+                    f"{i=}"
+                )
 
             for i, shape in enumerate(sf.shapes()):
                 assert shape.oid == i
@@ -1145,10 +1147,10 @@ def test_reader_offsets():
     basename = "shapefiles/blockgroups"
     with shapefile.Reader(basename) as sf:
         # shx offsets should not be read during loading
-        assert not sf._offsets
-        # reading a shape index should trigger reading offsets from shx file
+        assert sf.shx_reader._shxRecords_16bw is None
+        # reading a shape index should trigger reading all offsets from shx file
         sf.shape(3)
-        assert len(sf._offsets) == len(sf.shapes())
+        assert len(sf.shx_reader.offsets) == len(sf.shapes())
 
 
 def test_reader_offsets_no_shx():
@@ -1161,14 +1163,16 @@ def test_reader_offsets_no_shx():
     dbf = open(basename + ".dbf", "rb")
     with shapefile.Reader(shp=shp, dbf=dbf) as sf:
         # offsets should not be built during loading
-        assert not sf._offsets
+        with pytest.raises(shapefile.ShapefileException):
+            sf.shx_reader
         # reading a shape index should iterate to the shape
         # but the list of offsets should remain empty
         sf.shape(3)
-        assert not sf._offsets
-        # reading all the shapes should build the list of offsets
+        with pytest.raises(shapefile.ShapefileException):
+            sf.shx_reader
+        # reading all the shapes should build the list of shape headers
         shapes = sf.shapes()
-        assert len(sf._offsets) == len(shapes)
+        assert len(sf.shp_reader.headers_cache) == len(shapes)
 
 
 def test_reader_numshapes():
@@ -1195,7 +1199,7 @@ def test_reader_numshapes_no_shx():
     dbf = open(basename + ".dbf", "rb")
     with shapefile.Reader(shp=shp, dbf=dbf) as sf:
         # numShapes should be unknown due to missing shx file
-        assert sf.numShapes is None
+        assert not sf.numShapes
         # numShapes should be set after reading all the shapes
         shapes = sf.shapes()
         assert sf.numShapes == len(shapes)
@@ -1273,23 +1277,24 @@ def test_reader_corrupt_files():
         w.shp.write(b"12345")
 
     # read the corrupt shapefile and assert that it reads correctly
-    with shapefile.Reader(basename) as sf:
-        # assert correct shapefile length metadata
-        assert len(sf) == sf.numRecords == sf.numShapes == 10
-        # assert that records are read without error
-        assert len(sf.records()) == 10
-        # assert that didn't read the extra junk data
-        stopped = sf.dbf.tell()
-        sf.dbf.seek(0, 2)
-        end = sf.dbf.tell()
-        assert (end - stopped) == 5
-        # assert that shapes are read without error
-        assert len(sf.shapes()) == 10
-        # assert that didn't read the extra junk data
-        stopped = sf.shp.tell()
-        sf.shp.seek(0, 2)
-        end = sf.shp.tell()
-        assert (end - stopped) == 5
+    with pytest.warns(shapefile.PossiblyCorruptFileHeader):
+        with shapefile.Reader(basename) as sf:
+            # assert correct shapefile length metadata
+            assert len(sf) == sf.numRecords == sf.numShapes == 10
+            # assert that records are read without error
+            assert len(sf.records()) == 10
+            # assert that didn't read the extra junk data
+            stopped = sf.dbf.tell()
+            sf.dbf.seek(0, 2)
+            end = sf.dbf.tell()
+            assert (end - stopped) == 5
+            # assert that shapes are read without error
+            assert len(sf.shapes()) == 10
+            # assert that didn't read the extra junk data
+            stopped = sf.shp.tell()
+            sf.shp.seek(0, 2)
+            end = sf.shp.tell()
+            assert (end - stopped) == 5
 
 
 def test_bboxfilter_shape():
@@ -1541,10 +1546,8 @@ def test_write_shp_only(tmpdir):
     # test that can read shapes
     with shapefile.Reader(shp=filename + ".shp") as reader:
         assert reader._shp and not reader._shx and not reader._dbf
-        assert (reader.numRecords, reader.numShapes) == (
-            None,
-            None,
-        )  # numShapes is unknown in the absence of shx file
+        assert (reader.numRecords, reader.numShapes) == (None, 0)
+        # numShapes is unknown in the absence of shx file
         assert len(reader.shapes()) == 1
 
     # assert test.shx does not exist
@@ -1579,7 +1582,7 @@ def test_write_shp_shx_only(tmpdir):
         assert reader.shp and reader.shx and not reader._dbf
         assert (reader.numRecords, reader.numShapes) == (None, 1)
         reader.shape(0)  # trigger reading of shx offsets
-        assert len(reader._offsets) == 1
+        assert len(reader.shx_reader.offsets) == 1
         assert len(reader.shapes()) == 1
 
     # assert test.dbf does not exist
@@ -1611,10 +1614,8 @@ def test_write_shp_dbf_only(tmpdir):
     # test that can read records and shapes
     with shapefile.Reader(shp=filename + ".shp", dbf=filename + ".dbf") as reader:
         assert reader.shp and not reader._shx and reader.dbf
-        assert (reader.numRecords, reader.numShapes) == (
-            1,
-            None,
-        )  # numShapes is unknown in the absence of shx file
+        assert (reader.numRecords, reader.numShapes) == (1, 0)
+        # numShapes is unknown in the absence of shx file
         assert len(reader.records()) == 1
         assert len(reader.shapes()) == 1
 
@@ -1643,7 +1644,7 @@ def test_write_dbf_only(tmpdir):
     # test that can read records
     with shapefile.Reader(dbf=filename + ".dbf") as reader:
         assert not reader._shp and not reader._shx and reader.dbf
-        assert (reader.numRecords, reader.numShapes) == (1, None)
+        assert (reader.numRecords, reader.numShapes) == (1, 0)
         assert len(reader.records()) == 1
 
     # assert test.shp does not exist
@@ -1928,6 +1929,42 @@ def test_write_empty_shapefile(tmpdir, shape_type):
         assert len(r.records()) == 0
         # test shapes are empty
         assert len(r.shapes()) == 0
+
+
+def test_write_multipatch(tmpdir):
+    """Duplicates one of the doctests that gets filtered out"""
+    w = shapefile.Writer(tmpdir / "multipatch")
+    w.field("name", "C")
+
+    w.multipatch(
+        [
+            [
+                [0, 0, 0],
+                [0, 0, 3],
+                [5, 0, 0],
+                [5, 0, 3],
+                [5, 5, 0],
+                [5, 5, 3],
+                [0, 5, 0],
+                [0, 5, 3],
+                [0, 0, 0],
+                [0, 0, 3],
+            ],  # TRIANGLE_STRIP for house walls
+            [
+                [2.5, 2.5, 5],
+                [0, 0, 3],
+                [5, 0, 3],
+                [5, 5, 3],
+                [0, 5, 3],
+                [0, 0, 3],
+            ],  # TRIANGLE_FAN for pointed house roof
+        ],
+        partTypes=[shapefile.TRIANGLE_STRIP, shapefile.TRIANGLE_FAN],
+    )  # one type for each part
+
+    w.record("house1")
+
+    w.close()
 
 
 # This allows a PyShp wheel installed in the env to be tested

@@ -128,9 +128,48 @@ Coords = list[Coord]
 PointT = Union[Point2D, PointMT, PointZT]
 PointsT = list[PointT]
 
-BBox = tuple[float, float, float, float]
-MBox = tuple[float, float]
-ZBox = tuple[float, float]
+
+class BBox(NamedTuple):
+    xmin: float
+    ymin: float
+    xmax: float
+    ymax: float
+    # = tuple[float, float, float, float]
+
+
+def _min_not_None(m1: float | None, m2: float | None) -> float | None:
+    if m1 is None:
+        return m2
+    if m2 is None:
+        return m1
+    return min(m1, m2)
+
+
+def _max_not_None(m1: float | None, m2: float | None) -> float | None:
+    if m1 is None:
+        return m2
+    if m2 is None:
+        return m1
+    return max(m1, m2)
+
+
+class MBox(NamedTuple):
+    mmin: float | None
+    mmax: float | None
+
+    def expand(self, other: MBox) -> MBox:
+        return MBox(
+            _min_not_None(self.mmin, other.mmin),
+            _max_not_None(self.mmax, other.mmax),
+        )
+
+    # = tuple[float, float]
+
+
+class ZBox(NamedTuple):
+    zmin: float
+    zmax: float
+    # = tuple[float, float]
 
 
 class WriteableBinStream(Protocol):
@@ -339,9 +378,10 @@ class GeoJSONFeatureCollectionWithBBox(GeoJSONFeatureCollection):
 # Helpers
 
 MISSING = (None, "")  # Don't make a set, as user input may not be Hashable
-NODATA = -10e38  # as per the ESRI shapefile spec, only used for m-values.
-
-unpack_2_int32_be = Struct(">2i").unpack
+ISDATA_LOWER_BOUND = -1e38  # as per the ESRI shapefile spec, only used for m-values.
+NODATA = (
+    10 * ISDATA_LOWER_BOUND
+)  # value to encode m=None as.  Must be < ISDATA_LOWER_BOUND
 
 
 @overload
@@ -360,8 +400,6 @@ def fsdecode_if_pathlike(path: Any) -> Any:
 ARR_TYPE = TypeVar("ARR_TYPE", int, float)
 
 
-# In Python 3.12 we can do:
-# class _Array(array.array[ARR_TYPE], Generic[ARR_TYPE]):
 class _Array(array.array, Generic[ARR_TYPE]):  # type: ignore[type-arg]
     """Converts python tuples to lists of the appropriate type.
     Used to unpack different shapefile header parts."""
@@ -407,7 +445,7 @@ def ring_bbox(coords: PointsT) -> BBox:
     xs, ys = map(list, list(zip(*coords))[:2])  # ignore any z or m values
     # bbox = BBox(xmin=min(xs), ymin=min(ys), xmax=max(xs), ymax=max(ys))
     # return bbox
-    return min(xs), min(ys), max(xs), max(ys)
+    return BBox(min(xs), min(ys), max(xs), max(ys))
 
 
 def bbox_overlap(bbox1: BBox, bbox2: BBox) -> bool:
@@ -865,19 +903,20 @@ class Shape:
             xs.append(point[0])
             ys.append(point[1])
 
-        return min(xs), min(ys), max(xs), max(ys)
+        return BBox(min(xs), min(ys), max(xs), max(ys))
 
     def _mbox_from_ms(self) -> MBox:
         ms: list[float] = [m for m in self.m if m is not None]
 
         if not ms:
-            # only if none of the shapes had m values, should mbox be set to missing m values
-            ms.append(NODATA)
+            return MBox(None, None)
+            # # only if none of the shapes had m values, should mbox be set to missing m values
+            # ms.append(NODATA)
 
-        return min(ms), max(ms)
+        return MBox(min(ms), max(ms))
 
     def _zbox_from_zs(self) -> ZBox:
-        return min(self.z), max(self.z)
+        return ZBox(min(self.z), max(self.z))
 
     @property
     def __geo_interface__(self) -> GeoJSONHomogeneousGeometryObject:
@@ -1094,7 +1133,7 @@ class NullShape(Shape):
     def from_byte_stream(
         shapeType: int,
         b_io: ReadSeekableBinStream,
-        next_shape: int,
+        next_shape_pos: int,
         oid: int | None = None,
         bbox: BBox | None = None,
     ) -> NullShape:
@@ -1134,7 +1173,7 @@ class _CanHaveBBox(Shape):
 
     @staticmethod
     def _read_bbox_from_byte_stream(b_io: ReadableBinStream) -> BBox:
-        return unpack("<4d", b_io.read(32))
+        return BBox(*unpack("<4d", b_io.read(32)))
 
     @staticmethod
     def _write_bbox_to_byte_stream(
@@ -1184,7 +1223,7 @@ class _CanHaveBBox(Shape):
         cls,
         shapeType: int,
         b_io: ReadSeekableBinStream,
-        next_shape: int,
+        next_shape_pos: int,
         oid: int | None = None,
         bbox: BBox | None = None,
     ) -> Shape | None:
@@ -1196,7 +1235,7 @@ class _CanHaveBBox(Shape):
         # if bbox specified and no overlap, skip this shape
         if bbox is not None and not bbox_overlap(bbox, shape_bbox):
             # because we stop parsing this shape, caller must skip to beginning of
-            # next shape after we return (as done in f.seek(next_shape))
+            # next shape after we return (as done in f.seek(next_shape_pos))
             return None
 
         nParts: int | None = (
@@ -1226,7 +1265,7 @@ class _CanHaveBBox(Shape):
 
             if shapeType in _HasM_shapeTypes:
                 kwargs["mbox"], kwargs["m"] = _HasM._read_ms_from_byte_stream(
-                    b_io, nPoints, next_shape
+                    b_io, nPoints, next_shape_pos
                 )
 
         return ShapeClass(**kwargs)
@@ -1354,7 +1393,7 @@ class Point(Shape):
         cls,
         shapeType: int,
         b_io: ReadSeekableBinStream,
-        next_shape: int,
+        next_shape_pos: int,
         oid: int | None = None,
         bbox: BBox | None = None,
     ) -> Shape | None:
@@ -1363,7 +1402,7 @@ class Point(Shape):
         if bbox is not None:
             # create bounding box for Point by duplicating coordinates
             # skip shape if no overlap with bounding box
-            if not bbox_overlap(bbox, (x, y, x, y)):
+            if not bbox_overlap(bbox, BBox(x, y, x, y)):
                 return None
         elif shapeType == POINT:
             return Point(x=x, y=y, oid=oid)
@@ -1371,7 +1410,7 @@ class Point(Shape):
         if shapeType == POINTZ:
             z = PointZ._read_single_point_zs_from_byte_stream(b_io)[0]
 
-        m = PointM._read_single_point_ms_from_byte_stream(b_io, next_shape)[0]
+        m = PointM._read_single_point_ms_from_byte_stream(b_io, next_shape_pos)[0]
 
         if shapeType == POINTZ:
             return PointZ(x=x, y=y, z=z, m=m, oid=oid)
@@ -1495,21 +1534,25 @@ _HasM_shapeTypes = frozenset(
 )
 
 
+def replace_None_with_NODATA(ms: Iterable[float | None]) -> list[float]:
+    return [m if m is not None else NODATA for m in ms]
+
+
 class _HasM(_CanHaveBBox):
     m: Sequence[float | None]
 
     @staticmethod
     def _read_ms_from_byte_stream(
-        b_io: ReadSeekableBinStream, nPoints: int, next_shape: int
+        b_io: ReadSeekableBinStream, nPoints: int, next_shape_pos: int
     ) -> tuple[MBox | None, list[float | None]]:
         mbox = None  # Ensure mbox is always defined
-        if next_shape - b_io.tell() >= 16:
-            mbox = unpack("<2d", b_io.read(16))
+        if next_shape_pos - b_io.tell() >= 16:
+            mbox = MBox(*unpack("<2d", b_io.read(16)))
         # Measure values less than -10e38 are nodata values according to the spec
-        if next_shape - b_io.tell() >= nPoints * 8:
+        if next_shape_pos - b_io.tell() >= nPoints * 8:
             ms = []
             for m in unpack(f"<{nPoints}d", b_io.read(nPoints * 8)):
-                if m > NODATA:
+                if m >= ISDATA_LOWER_BOUND:
                     ms.append(m)
                 else:
                     ms.append(None)
@@ -1527,7 +1570,7 @@ class _HasM(_CanHaveBBox):
         # When reading a file, pyshp converts NODATA m values to None, so here we make sure to convert them back to NODATA
         # Note: missing m values are autoset to NODATA.
         try:
-            num_bytes_written = b_io.write(pack("<2d", *mbox))
+            num_bytes_written = b_io.write(pack("<2d", *replace_None_with_NODATA(mbox)))
         except StructError:
             raise ShapefileException(
                 f"Failed to write measure extremes for record {i}. Expected floats"
@@ -1535,7 +1578,7 @@ class _HasM(_CanHaveBBox):
         try:
             ms = cast(_HasM, s).m
 
-            ms_to_encode = [m if m is not None else NODATA for m in ms]
+            ms_to_encode = replace_None_with_NODATA(ms)
 
             num_bytes_written += b_io.write(pack(f"<{len(ms)}d", *ms_to_encode))
         except StructError:
@@ -1564,7 +1607,7 @@ class _HasZ(_CanHaveBBox):
     def _read_zs_from_byte_stream(
         b_io: ReadableBinStream, nPoints: int
     ) -> tuple[ZBox, Sequence[float]]:
-        zbox = unpack("<2d", b_io.read(16))
+        zbox = ZBox(*unpack("<2d", b_io.read(16)))
         return zbox, _Array[float]("d", unpack(f"<{nPoints}d", b_io.read(nPoints * 8)))
 
     @staticmethod
@@ -1662,14 +1705,14 @@ class PointM(Point):
 
     @staticmethod
     def _read_single_point_ms_from_byte_stream(
-        b_io: ReadSeekableBinStream, next_shape: int
+        b_io: ReadSeekableBinStream, next_shape_pos: int
     ) -> tuple[float | None]:
-        if next_shape - b_io.tell() >= 8:
+        if next_shape_pos - b_io.tell() >= 8:
             (m,) = unpack("<d", b_io.read(8))
         else:
             m = NODATA
         # Measure values less than -10e38 are nodata values according to the spec
-        if m > NODATA:
+        if m >= ISDATA_LOWER_BOUND:
             return (m,)
         else:
             return (None,)
@@ -2231,6 +2274,9 @@ HTML_SIGNATURES_UC = (
 class UnsuccessfulFileDownload(Warning): ...
 
 
+class PossiblyCorruptFileHeader(Warning): ...
+
+
 SUPPORTED_URL_SCHEMES = ("http", "https")  # must be lower case
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36"
 
@@ -2391,14 +2437,14 @@ class _HasExitStack(AbstractContextManager["_HasExitStack", None]):
 FileProtoT = TypeVar("FileProtoT")
 
 
-class _FileChecker(_HasExitStack, Generic[FileProtoT]):
+class _FileObjChecker(_HasExitStack, Generic[FileProtoT]):
     @property
     @abc.abstractmethod
     def FileProto(self) -> type[FileProtoT]: ...
 
     @property
     @abc.abstractmethod
-    def new_file_mode(self) -> Literal["rb", "w+b"]: ...
+    def new_file_obj_mode(self) -> Literal["rb", "w+b"]: ...
 
     @property
     @abc.abstractmethod
@@ -2409,25 +2455,19 @@ class _FileChecker(_HasExitStack, Generic[FileProtoT]):
     def __init__(
         self,
         file: str | PathLike[Any] | FileProtoT,
-        encoding: str = "utf-8",
-        encodingErrors: str = "strict",
     ):
         super().__init__()
 
         file = fsdecode_if_pathlike(file)
         self._file: str | FileProtoT
-        if isinstance(file, str):
-            self._file = f"{os.path.splitext(file)[0]}{self.ext}"
-        elif file:
-            self._file = file
-        else:
+        if not file:
             raise TypeError(
                 f"file must be set to a str, Path or file-like object.  Got: {file}"
             )
-
-        # Encoding
-        self.encoding = encoding
-        self.encodingErrors = encodingErrors
+        elif isinstance(file, str):
+            self._file = f"{os.path.splitext(file)[0]}{self.ext}"
+        else:
+            self._file = file
 
     @functools.cached_property
     def file(self) -> FileProtoT:
@@ -2435,52 +2475,45 @@ class _FileChecker(_HasExitStack, Generic[FileProtoT]):
         # f=self._file,
         # FileProto=self.FileProto,
         # exit_stack=self.exit_stack,
-        # new_file_mode="rb",
+        # new_file_obj_mode="rb",
         # ExceptionClass=dbfFileException,
         # )
 
     def _ensure_file_obj(
         self,
         f: str | FileProtoT | None = None,
-        # FileProto: type[FileProtoT],
-        # exit_stack: ExitStack,
-        # new_file_mode: Literal["rb", "w+b"] = "w+b",
-        # ExceptionClass: type[ShapefileException] = ShapefileException,
     ) -> FileProtoT:
         """Safety handler to verify file-like objects"""
 
         f = f or self._file
-        exit_stack = self.exit_stack
-        FileProto = self.FileProto
-        new_file_mode = self.new_file_mode
-        ExceptionClass = self.ExceptionClass
 
         if not f:
-            raise ExceptionClass(f"No file-like object received. Got: {f}")
+            raise self.ExceptionClass(f"No file-like object received. Got: {f}")
         if isinstance(f, str):
             pth = os.path.split(f)[0]
             if pth and not os.path.exists(pth):
                 os.makedirs(pth)
-            fp = open(f, new_file_mode)
+            fp = open(f, self.new_file_obj_mode)
 
             # Only push files created here to the exit stack.
             # The user must close their own file objects.
-            exit_stack.enter_context(fp)
+            self.exit_stack.enter_context(fp)
             return cast(FileProtoT, fp)
 
         # See Minor hack below.
-        if isinstance(f, FileProto):
+        if isinstance(f, self.FileProto):
             return f
 
         # Ugly, but perhaps needed to avoid weird Python 3.14
         # specific bug in run_benchmarks.py on Windows
         # if (
-        #     (attrs := getattr(FileProto, "__protocol_attrs__", None))
+        #     (attrs := getattr(self.FileProto, "__protocol_attrs__", None))
         #     and all(hasattr(f, attr) for attr in attrs)
         # ):
         #     return f
-        raise ExceptionClass(
-            f"Unsupported file-like object: {f}.  Must satisfy: {FileProto}"
+
+        raise self.ExceptionClass(
+            f"Unsupported file-like object: {f}.  Must satisfy: {self.FileProto}"
         )
 
 
@@ -2496,11 +2529,21 @@ ReadSeekableBinStream.register(tempfile._TemporaryFileWrapper)
 WriteSeekableBinStream.register(tempfile._TemporaryFileWrapper)
 
 
-class DbfReader(_FileChecker[ReadSeekableBinStream]):
-    """Reads a dbf file.  You can instantiate a DbfReader without specifying a shapefile."""
+class _HasCheckedReadableFile(_FileObjChecker[ReadSeekableBinStream]):
+    def __init__(self, file: str | PathLike[Any] | ReadSeekableBinStream):
+
+        super().__init__(file)
+
+        self.file.seek(0, 2)  # offset=0, whence = 2 => EOF
+        self.file_size_B = self.file.tell()
+        self.file.seek(0)
+
+
+class DbfReader(_HasCheckedReadableFile):
+    """Reads a dbf file's fields and records."""
 
     FileProto = ReadSeekableBinStream
-    new_file_mode = "rb"
+    new_file_obj_mode = "rb"
     ext = ".dbf"
     ExceptionClass = dbfFileException
 
@@ -2511,7 +2554,10 @@ class DbfReader(_FileChecker[ReadSeekableBinStream]):
         encoding: str = "utf-8",
         encodingErrors: str = "strict",
     ):
-        super().__init__(file=dbf, encoding=encoding, encodingErrors=encodingErrors)
+        super().__init__(file=dbf)
+
+        self.encoding = encoding
+        self.encodingErrors = encodingErrors
 
         self.fields: list[Field] = []
         self.__fieldLookup: dict[str, int] = {}
@@ -2524,7 +2570,7 @@ class DbfReader(_FileChecker[ReadSeekableBinStream]):
     #         # f=self._file,
     #         # FileProto=self.FileProto,
     #         # exit_stack=self.exit_stack,
-    #         # new_file_mode="rb",
+    #         # new_file_obj_mode="rb",
     #         # ExceptionClass=dbfFileException,
     #     )
 
@@ -2535,18 +2581,17 @@ class DbfReader(_FileChecker[ReadSeekableBinStream]):
     def _dbfHeader(self) -> None:
         """Reads a dbf header. Xbase-related code borrows heavily from ActiveState Python Cookbook Recipe 362715 by Raymond Hettinger"""
 
-        dbf = self.file
         # read relevant header parts
-        dbf.seek(0)
+        self.file.seek(0)
         self.numRecords, self.__dbfHdrLength, self._record_length = cast(
-            tuple[int, int, int], unpack("<xxxxLHH20x", dbf.read(32))
+            tuple[int, int, int], unpack("<xxxxLHH20x", self.file.read(32))
         )
 
         # read fields
         numFields = (self.__dbfHdrLength - 33) // 32
         for __field in range(numFields):
             encoded_field_tuple: tuple[bytes, bytes, int, int] = unpack(
-                "<11sc4xBB14x", dbf.read(32)
+                "<11sc4xBB14x", self.file.read(32)
             )
             encoded_name, encoded_type_char, size, decimal = encoded_field_tuple
 
@@ -2561,7 +2606,7 @@ class DbfReader(_FileChecker[ReadSeekableBinStream]):
             field_type = FIELD_TYPE_ALIASES[encoded_type_char]
 
             self.fields.append(Field(name, field_type, size, decimal))
-        terminator = dbf.read(1)
+        terminator = self.file.read(1)
         if terminator != b"\r":
             raise ShapefileException(
                 "Shapefile dbf header lacks expected terminator. (likely corrupt?)"
@@ -2653,12 +2698,10 @@ class DbfReader(_FileChecker[ReadSeekableBinStream]):
 
         None is returned for 'deleted' records (those with their deletion flag marked).
         """
-        f = self.file
-
         # The only format chars in from self._record_fmt, in recStruct from _record_fields,
         # are s and x (ascii encoded str and pad byte) so everything in recordContents is bytes
         # https://docs.python.org/3/library/struct.html#format-characters
-        recordContents = recStruct.unpack(f.read(recStruct.size))
+        recordContents = recStruct.unpack(self.file.read(recStruct.size))
 
         # deletion flag field is always unpacked as first value (see _record_fmt)
         if recordContents[0] != b" ":
@@ -2750,12 +2793,10 @@ class DbfReader(_FileChecker[ReadSeekableBinStream]):
 
         Returns None if record's deletion flag is marked.
         """
-        f = self.file
-
         i = ensure_within_bounds(i, self.numRecords)
         recSize = self._record_length
-        f.seek(0)
-        f.seek(self.__dbfHdrLength + (i * recSize))
+        self.file.seek(0)
+        self.file.seek(self.__dbfHdrLength + (i * recSize))
         fieldTuples, recLookup, recStruct = self._record_fields(fields)
         return self._record(
             oid=i, fieldTuples=fieldTuples, recLookup=recLookup, recStruct=recStruct
@@ -2808,8 +2849,6 @@ class DbfReader(_FileChecker[ReadSeekableBinStream]):
         Set deleted_as_None=True to insert None for these, to preserve
         the indexing, as for DbfReader.record
         """
-        f = self.file
-
         if not isinstance(self.numRecords, int):
             raise ShapefileException(
                 "Error when reading number of Records in dbf file header"
@@ -2829,7 +2868,7 @@ class DbfReader(_FileChecker[ReadSeekableBinStream]):
         elif stop < 0:
             stop = range(self.numRecords)[stop]
         recSize = self._record_length
-        f.seek(self.__dbfHdrLength + (start * recSize))
+        self.file.seek(self.__dbfHdrLength + (start * recSize))
         fieldTuples, recLookup, recStruct = self._record_fields(fields)
         for i in range(start, stop):
             r = self._record(
@@ -2837,6 +2876,279 @@ class DbfReader(_FileChecker[ReadSeekableBinStream]):
             )
             if r is not None or deleted_as_None:
                 yield r
+
+
+class ShxReader(_HasCheckedReadableFile):
+    """Reads an shx file (a file of file positions
+    of shapes in a .shp file).
+    """
+
+    FileProto = ReadSeekableBinStream
+    new_file_obj_mode = "rb"
+    ext = ".shx"
+
+    def __init__(
+        self,
+        shx: str | PathLike[Any] | ReadSeekableBinStream,
+    ):
+        super().__init__(file=shx)
+        self.numShapes: int
+        self._shxHeader()
+        self._shxRecords_16bw: _Array[int] | None = None
+
+    def _shxHeader(self) -> None:
+        """Reads the header information from a .shx file."""
+        # File length (16-bit word * 2 = bytes) - header length
+        self.file.seek(24)
+        shx_records_length_B = (unpack(">i", self.file.read(4))[0] * 2) - 100
+        self.numShapes = shx_records_length_B // 8
+
+    @functools.cache
+    def _read_shxRecords(self) -> None:
+        """Reads the shape offset positions from a .shx file"""
+        # Jump to the first record.
+        self.file.seek(100)
+        # Each index record consists of two nums.  We only want the first one
+        self._shxRecords_16bw = _Array[int]("i", self.file.read(2 * self.numShapes * 4))
+        if sys.byteorder != "big":
+            self._shxRecords_16bw.byteswap()
+
+    # Only read .shx file body lazily
+    @functools.cached_property
+    def offsets(self) -> list[int]:
+        self._read_shxRecords()
+        # Convert from offsets in 16b Words to Bytes (8b).
+        offsets_ = [2 * el for el in cast(_Array[int], self._shxRecords_16bw)[::2]]
+        assert len(offsets_) == self.numShapes, f"{self.numShapes=}, {len(offsets_)=}"
+        return offsets_
+
+    @functools.cached_property
+    def shape_lengths_B(self) -> list[int]:
+        self._read_shxRecords()
+        return [2 * x for x in cast(_Array[int], self._shxRecords_16bw)[1::2]]
+
+
+ShapeHeaderInfoT = tuple[int, int, int]
+
+
+class ShpReader(_HasCheckedReadableFile):
+    """Reads an shp file."""
+
+    FileProto = ReadSeekableBinStream
+    new_file_obj_mode = "rb"
+    ext = ".shp"
+
+    def __init__(
+        self,
+        shp: str | PathLike[Any] | ReadSeekableBinStream,
+    ):
+        super().__init__(file=shp)
+        # self.bbox: BBox
+        # self.zbox: ZBox
+        # self.mbox: MBox
+        self.shapeType: int
+        self._shpHeader()
+        self.headers_cache: list[ShapeHeaderInfoT] = []
+
+    @property
+    def shapeTypeName(self) -> str:
+        return SHAPETYPE_LOOKUP[self.shapeType]
+
+    def _shpHeader(self) -> None:
+        """Reads the header information from a .shp file."""
+
+        # File length (16-bit word * 2 = bytes)
+        self.file.seek(24)
+        self.shp_file_size_B = unpack(">i", self.file.read(4))[0] * 2
+        # Shape type
+        self.file.seek(32)
+        self.shapeType = unpack("<i", self.file.read(4))[0]
+        # The shapefile's bounding box (lower left, upper right)
+        # self.bbox: BBox = tuple(_Array("d", unpack("<4d", shp.read(32))))
+        self.bbox = BBox(*unpack("<4d", self.file.read(32)))
+        # xmin, ymin, xmax, ymax = unpack("<4d", shp.read(32))
+        # self.bbox = BBox(xmin=xmin, ymin=ymin, xmax=xmax, ymax=ymax)
+        # Elevation
+        # self.zbox: ZBox = tuple(_Array("d", unpack("<2d", shp.read(16))))
+        self.zbox = ZBox(*unpack("<2d", self.file.read(16)))
+        # zmin, zmax = unpack("<2d", shp.read(16))
+        # self.zbox = ZBox(zmin=zmin, zmax=zmax)
+        # Measure
+        # Measure values less than -1e38 are nodata values according to the spec
+        self.mbox = MBox(
+            *(
+                float(m_bound) if m_bound >= ISDATA_LOWER_BOUND else None
+                for m_bound in unpack("<2d", self.file.read(16))
+            )
+        )
+
+        if self.file_size_B != self.shp_file_size_B:
+            file_name = getattr(self.file, "name", ".shp")
+            msg = (
+                f"Declared file size in {file_name} header: {self.shp_file_size_B} "
+                f"not equal to actual file size: {self.file_size_B} "
+                "(both in bytes)"
+            )
+            warnings.warn(msg, category=PossiblyCorruptFileHeader)
+
+    @functools.cache  # Only read through the shape headers (e.g. on disk), at most once.
+    def _headers_cached_gen(self) -> Iterator[ShapeHeaderInfoT]:
+
+        header_pos = 100  # after .shp file header, before start of first shape's header
+
+        while header_pos < self.file_size_B:
+            self.file.seek(header_pos)
+            # Unpack the shape header only
+            recNum, recLength_16bw = unpack(">2i", self.file.read(8))
+
+            shp_length_B = 2 * recLength_16bw
+            shape_header_data = header_pos, shp_length_B, recNum
+            self.headers_cache.append(shape_header_data)
+            yield shape_header_data
+
+            # Calculate next shape header position
+            header_pos += 8 + shp_length_B
+
+    def shape_header(self, index: int) -> ShapeHeaderInfoT:
+        while index < 0 or index >= len(self.headers_cache):
+            try:
+                next(self._headers_cached_gen())
+            except StopIteration:
+                break
+        return self.headers_cache[index]
+
+    def headers_gen(self) -> Iterator[ShapeHeaderInfoT]:
+        yield from self.headers_cache
+        yield from self._headers_cached_gen()
+
+    def cache_all_headers(self) -> None:
+        self.shape_header(-1)
+
+    @functools.cached_property
+    def offsets(self) -> list[int]:
+        return [header[0] for header in self.headers_gen()]
+
+    def shape(
+        self,
+        index: int,
+        offset: int | None = None,
+        shape_len_B: int | None = None,
+        bbox: BBox | None = None,
+    ) -> Shape | None:
+        """Returns the Shape at a given index, or None if it is outside the
+        specified bbox.  If a corresponding .shx file is available, it
+        is faster to provide offset and shape_len_B from it, e.g. via the main
+        Shapefile Reader class.  Otherwise offsets (and record numbers
+        and shape lengths) will be read on the fly as needed, and
+        cached in memory.
+        """
+        if offset is None or shape_len_B is None:
+            offset, shape_len_B, _recNum = self.shape_header(index)
+        # Seek to 8B after the offset (past the shape's 8B header).
+        self.file.seek(offset + 8)
+        shape = self._shape(shape_len_B=shape_len_B, oid=index, bbox=bbox)
+        return shape
+
+    def _shape(
+        self,
+        shape_len_B: int,  # Excluding header
+        oid: int | None = None,
+        bbox: BBox | None = None,
+    ) -> Shape | None:
+        """Returns geometry for a single shape (or None if
+        it is outside the specified bbox).
+
+        Requires the size in B of the shaps, and the .shp
+        file to have been .seeked to the start of the shape
+        (immediately after the shape's header).
+        """
+
+        # Read entire record into memory to avoid having to call
+        # seek on the file afterwards
+        b_io: ReadSeekableBinStream = io.BytesIO(self.file.read(shape_len_B))
+        # To avoid a .seek for the next shape's header (where we are already)
+        b_io.seek(0)
+
+        try:
+            shapeType = unpack("<i", b_io.read(4))[0]
+        except StructError as e:
+            print(shape_len_B)
+            raise e
+
+        ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[shapeType]
+        shape = ShapeClass.from_byte_stream(
+            shapeType, b_io, shape_len_B, oid=oid, bbox=bbox
+        )
+
+        # Seek to the end of this record as defined by the record header because
+        # the shapefile spec doesn't require the actual content to meet the header
+        # definition.  Probably allowed for lazy feature deletion.
+        # self.file.seek(next_shape_pos)
+
+        return shape
+
+    def shapes(
+        self,
+        shape_lengths_B: list[int] | None = None,
+        bbox: list[float] | tuple[float, float, float, float] | BBox | None = None,
+    ) -> Shapes:
+        """Returns all shapes in file.
+        To only read shapes within a given spatial region, specify the 'bbox'
+        arg as a list or tuple of xmin,ymin,xmax,ymax.
+        """
+        return Shapes(
+            self.iterShapes(
+                shape_lengths_B=shape_lengths_B,
+                bbox=BBox(*bbox) if bbox else None,
+            )
+        )
+
+    def iterShapes(
+        self,
+        shape_lengths_B: list[int] | None = None,
+        bbox: BBox | None = None,
+        outside_bbox_as_None: bool = False,
+    ) -> Iterator[Shape | None]:
+        """Returns a generator of shapes in a shapefile (or None for shapes
+        outside a specified bbox). Useful for handling large shapefiles.
+        bbox should be a tuple or list containing xmin,ymin,xmax,ymax.
+        """
+
+        bbox = BBox(*bbox) if bbox is not None else None
+
+        # Found shapefiles which report incorrect
+        # shp file length in the header. Can't trust
+        # that so we seek to the end of the file
+        # and figure it out.
+        # self.file.seek(0, 2)
+        # file_size_B = self.file.tell()
+        if shape_lengths_B is not None:
+            pos = 108  # Skip first shape's header
+            # Iterate exactly the number of shapes as shape
+            # lengths were provided for, e.g. from shx header
+            for i, shape_len_B in enumerate(shape_lengths_B):
+                self.file.seek(pos)
+                shape = self._shape(shape_len_B=shape_len_B, oid=i, bbox=bbox)
+                if shape is not None or outside_bbox_as_None:
+                    yield shape
+                pos += shape_len_B + 8
+
+            # MAYBE: check if more left of file or exit early?
+            return
+
+        # No shx file, unknown nr of shapes
+        # Instead iterate until reach end of file
+        # Calculate the offset indices during iteration
+        for i, (pos, shape_len_B, _recNum) in enumerate(self.headers_gen()):
+            self.file.seek(pos + 8)  # Skip the shape's 8 byte header
+            shape = self._shape(shape_len_B=shape_len_B, oid=i, bbox=bbox)
+            # # pos = self.file.tell()
+            # pos += num_bytes
+            if shape is not None or outside_bbox_as_None:
+                yield shape
+
+        n = i + 1  # num shapes yielded, having iterated over entire shp file.
+        assert n == len(self.headers_cache), f"{n=}, {len(self.headers_cache)=}"
 
 
 class _NoShpSentinel:
@@ -2850,7 +3162,7 @@ class _NoShpSentinel:
 _NO_SHP_SENTINEL = _NoShpSentinel()
 
 
-class Reader(_FileChecker[ReadSeekableBinStream]):
+class Reader(_HasExitStack):
     """Reads the three files of a shapefile as a unit or
     separately.  If one of the three files (.shp, .shx,
     .dbf) is missing no exception is thrown until you try
@@ -2872,7 +3184,7 @@ class Reader(_FileChecker[ReadSeekableBinStream]):
     """
 
     FileProto = ReadSeekableBinStream
-    new_file_mode = "rb"
+    new_file_obj_mode = "rb"
     ext = ".shp"
     ExceptionClass = ShapefileException
 
@@ -2889,16 +3201,15 @@ class Reader(_FileChecker[ReadSeekableBinStream]):
         # Keep kwargs even though unused, to preserve PyShp 2.4 API
         **kwargs: Any,
     ):
+        super().__init__()
+        # Store encoding info to use if lazy loading DbfReader later.
         self.encoding = encoding
         self.encodingErrors = encodingErrors
         self._shp = None
         self._shx = None
         self._dbf = None
         self.shapeName = "Not specified"
-        self._offsets: list[int] = []
-        self.shpLength: int | None = None
-        self.numShapes: int | None = None
-        self.exit_stack = ExitStack()
+        self.numShapes: int = 0
         # See if a shapefile name was passed as the first argument
         if shapefile_path:
             path = fsdecode_if_pathlike(shapefile_path)
@@ -2906,12 +3217,12 @@ class Reader(_FileChecker[ReadSeekableBinStream]):
             if isinstance(path, str):
                 if ".zip" in path:
                     self._load_from_zip(path)
-                    # Raises if not self._shp or self._dbf
+                    # Raises ShapefileException if not self._shp or self._dbf
                     return
 
                 if path.lower().startswith(SUPPORTED_URL_SCHEMES):
                     self._load_from_url(path)
-                    # Raises if not self._shp or self._dbf
+                    # Raises ShapefileException if not self._shp or self._dbf
                     return
 
                 # Local file path to a shapefile
@@ -2930,17 +3241,40 @@ class Reader(_FileChecker[ReadSeekableBinStream]):
 
         # Load the files
         if self._shp:
-            self._shpHeader()
+            self._get_shp_reader()
         if self._dbf:
             self._get_dbf_reader()
         if self._shx:
-            self._shxHeader()
+            self._get_shx_reader()
+
+    @functools.cache
+    def _get_shp_reader(self) -> ShpReader:
+        if self._shp is None:
+            raise ShapefileException(
+                "ShpReader requires a .shp file or file-like object."
+            )
+        shp_reader = ShpReader(
+            shp=self._shp,
+        )
+        return shp_reader
+
+    @functools.cache
+    def _get_shx_reader(self) -> ShxReader:
+        if self._shx is None:
+            raise ShapefileException(
+                "ShxReader requires a .shx file or file-like object."
+            )
+        shx_reader = ShxReader(
+            shx=self._shx,
+        )
+        self.numShapes = shx_reader.numShapes
+        return shx_reader
 
     @functools.cache
     def _get_dbf_reader(self) -> DbfReader:
         if self._dbf is None:
             raise ShapefileException(
-                "Shapefile DbfReader requires a .dbf file or file-like object."
+                "DbfReader requires a .dbf file or file-like object."
             )
         return DbfReader(
             dbf=self._dbf,
@@ -2949,30 +3283,55 @@ class Reader(_FileChecker[ReadSeekableBinStream]):
         )
 
     @property
+    def shp_reader(self) -> ShpReader:
+        return self._get_shp_reader()
+
+    @property
+    def shx_reader(self) -> ShxReader:
+        return self._get_shx_reader()
+
+    @property
     def dbf_reader(self) -> DbfReader:
         return self._get_dbf_reader()
 
-    @functools.cached_property
+    # Simple references to the 3 constituent file objects for backwards compatibility.
+    @property
     def shp(self) -> ReadSeekableBinStream:
-        return self._ensure_file_obj(
-            f=self._shp,
-            # FileProto=ReadSeekableBinStream,
-            # exit_stack=self.exit_stack,
-            # new_file_mode="rb",
-        )
-
-    @functools.cached_property
-    def shx(self) -> ReadSeekableBinStream:
-        return self._ensure_file_obj(
-            f=self._shx,
-            # FileProto=ReadSeekableBinStream,
-            # exit_stack=self.exit_stack,
-            # new_file_mode="rb",
-        )
+        return self.shp_reader.file
 
     @property
-    def dbf(self) -> ReadableBinStream:
+    def shx(self) -> ReadSeekableBinStream:
+        return self.shx_reader.file
+
+    @property
+    def dbf(self) -> ReadSeekableBinStream:
         return self.dbf_reader.file
+
+    @property
+    def _offsets(self) -> list[int]:
+        if self._shx:
+            return self.shx_reader.offsets
+        return self.shp_reader.offsets
+
+    @property
+    def shapeTypeName(self) -> str:
+        return self.shp_reader.shapeTypeName
+
+    @property
+    def shapeType(self) -> int:
+        return self.shp_reader.shapeType
+
+    @property
+    def bbox(self) -> BBox:
+        return self.shp_reader.bbox
+
+    @property
+    def mbox(self) -> MBox:
+        return self.shp_reader.mbox
+
+    @property
+    def zbox(self) -> ZBox:
+        return self.shp_reader.zbox
 
     @property
     def numRecords(self) -> int | None:
@@ -3026,33 +3385,56 @@ class Reader(_FileChecker[ReadSeekableBinStream]):
                 file_.seek(0)
                 return file_
             except (NameError, io.UnsupportedOperation):
+                # Read the whole file into a seekable wrapper.
                 return io.BytesIO(file_.read())
 
         raise ShapefileException(
             f"Could not load shapefile constituent file from: {file_}"
         )
 
+    def _load_shp_shx_or_dbf_from_url(
+        self,
+        urlinfo: ParseResult,
+        ext: Literal["shp", "shx", "dbf"],
+    ) -> tempfile._TemporaryFileWrapper[bytes] | None:
+        sniffed_bytes, resp = _try_to_download_binary_file(
+            urlinfo=urlinfo,
+            ext=ext,
+            suppress_http_errors=True,
+        )
+        if resp is None:
+            return None
+        # Use tempfile as source for url data.
+        fileobj = _save_to_named_tmp_file(resp, initial_bytes=sniffed_bytes)
+        self.exit_stack.enter_context(fileobj)
+        return fileobj
+
     def _load_from_url(self, url: str) -> None:
         # Shapefile is from a url
         # Download each file to temporary path and treat as normal shapefile path
         urlinfo = urlparse(url)
-        shp_or_dbf_downloaded = False
-        for ext in ["shp", "shx", "dbf"]:
-            sniffed_bytes, resp = _try_to_download_binary_file(
-                urlinfo=urlinfo,
-                ext=ext,
-                suppress_http_errors=True,
-            )
-            if resp is None:
-                continue
-            if ext != "shx":
-                shp_or_dbf_downloaded = True
-            # Use tempfile as source for url data.
-            fileobj = _save_to_named_tmp_file(resp, initial_bytes=sniffed_bytes)
-            setattr(self, f"_{ext}", fileobj)
-            self.exit_stack.enter_context(fileobj)
-        if not shp_or_dbf_downloaded:
+        self._shp = self._load_shp_shx_or_dbf_from_url(urlinfo, "shp")
+        self._shx = self._load_shp_shx_or_dbf_from_url(urlinfo, "shx")
+        self._dbf = self._load_shp_shx_or_dbf_from_url(urlinfo, "dbf")
+        if self._shp is None and self._dbf is None:
             raise ShapefileException(f"Failed to download .shp or .dbf from: {url}")
+
+    def _load_shp_shx_or_dbf_from_zip(
+        self,
+        archive: zipfile.ZipFile,
+        shapefile: str,
+        ext: Literal["shp", "shx", "dbf"],
+    ) -> tempfile._TemporaryFileWrapper[bytes] | None:
+        for cased_ext in {ext.lower(), ext.upper(), ext}:
+            try:
+                member = archive.open(f"{shapefile}.{cased_ext}")
+                # Use read+write tempfile as source for member data.
+                fileobj = _save_to_named_tmp_file(member)
+                self.exit_stack.enter_context(fileobj)
+                return fileobj
+            except (OSError, AttributeError, KeyError):
+                pass
+        return None
 
     def _load_from_zip(self, path: str) -> None:
         # Shapefile is inside a zipfile
@@ -3111,17 +3493,11 @@ class Reader(_FileChecker[ReadSeekableBinStream]):
                         "Please specify the full path to the shapefile you would like to open."
                     )
             # Try to extract file-like objects from zipfile
-            shapefile = os.path.splitext(shapefile)[0]  # root shapefile name
-            for ext in ["shp", "shx", "dbf"]:
-                for cased_ext in {ext.lower(), ext.upper(), ext}:
-                    try:
-                        member = archive.open(f"{shapefile}.{cased_ext}")
-                        # Use read+write tempfile as source for member data.
-                        fileobj = _save_to_named_tmp_file(member)
-                        setattr(self, f"_{ext.lower()}", fileobj)
-                        self.exit_stack.enter_context(fileobj)
-                    except (OSError, AttributeError, KeyError):
-                        pass
+            name = os.path.splitext(shapefile)[0]  # root shapefile name
+            self._shp = self._load_shp_shx_or_dbf_from_zip(archive, name, "shp")
+            self._shx = self._load_shp_shx_or_dbf_from_zip(archive, name, "shx")
+            self._dbf = self._load_shp_shx_or_dbf_from_zip(archive, name, "dbf")
+
         # Close and delete the temporary zipfile
         try:
             zipfileobj.close()
@@ -3154,7 +3530,7 @@ class Reader(_FileChecker[ReadSeekableBinStream]):
         self._shp = _try_get_open_constituent_file(shapefile_name, "shp")
         if self._shp:
             self.exit_stack.enter_context(self._shp)
-            self._shpHeader()
+            self._get_shp_reader()
 
     def load_shx(self, shapefile_name: str) -> None:
         """
@@ -3163,7 +3539,7 @@ class Reader(_FileChecker[ReadSeekableBinStream]):
         self._shx = _try_get_open_constituent_file(shapefile_name, "shx")
         if self._shx:
             self.exit_stack.enter_context(self._shx)
-            self._shxHeader()
+            self._get_shx_reader()
 
     def load_dbf(self, shapefile_name: str) -> None:
         """
@@ -3183,40 +3559,15 @@ class Reader(_FileChecker[ReadSeekableBinStream]):
         if self._shp:
             # Otherwise use shape count
             if self._shx:
-                if self.numShapes is None:
-                    self._shxHeader()
-
-                # ._shxHeader sets self.numShapes or raises Exception
-                return cast(int, self.numShapes)
+                return self.shx_reader.numShapes
 
             # Index file not available, iterate all shapes to get total count
-            if self.numShapes is None:
-                # Determine length of shp file
-                shp = self.shp
-                checkpoint = shp.tell()
-                shp.seek(0, 2)
-                shpLength = shp.tell()
-                shp.seek(100)
-                # Do a fast shape iteration until end of file.
-                offsets = []
-                pos = shp.tell()
-                while pos < shpLength:
-                    offsets.append(pos)
-                    # Unpack the shape header only
-                    (__recNum, recLength) = unpack_2_int32_be(shp.read(8))
-                    # Jump to next shape position
-                    pos += 8 + (2 * recLength)
-                    shp.seek(pos)
-                # Set numShapes and offset indices
-                self.numShapes = len(offsets)
-                self._offsets = offsets
-                # Return to previous file position
-                shp.seek(checkpoint)
+            elif self.numShapes == 0:
+                # Determine length of shp file from
+                # shp_reader offsets (and set these too)
+                self.numShapes = len(self._offsets)
 
-            return self.numShapes
-
-        # No file loaded yet, treat as 'empty' shapefile
-        return 0
+        return self.numShapes
 
     def __iter__(self) -> Iterator[ShapeRecord]:
         """Iterates through the shapes/records in the shapefile."""
@@ -3224,161 +3575,26 @@ class Reader(_FileChecker[ReadSeekableBinStream]):
 
     @property
     def __geo_interface__(self) -> GeoJSONFeatureCollectionWithBBox:
-        shaperecords = self.shapeRecords()
-        fcollection = GeoJSONFeatureCollectionWithBBox(
+        return GeoJSONFeatureCollectionWithBBox(
             bbox=list(self.bbox),
-            **shaperecords.__geo_interface__,
+            **self.shapeRecords().__geo_interface__,
         )
-        return fcollection
-
-    @property
-    def shapeTypeName(self) -> str:
-        return SHAPETYPE_LOOKUP[self.shapeType]
-
-    def _shpHeader(self) -> None:
-        """Reads the header information from a .shp file."""
-        if not self.shp:
-            raise ShapefileException(
-                "Shapefile Reader requires a shapefile or file-like object (no shp file found)."
-            )
-
-        shp = self.shp
-        # File length (16-bit word * 2 = bytes)
-        shp.seek(24)
-        self.shpLength = unpack(">i", shp.read(4))[0] * 2
-        # Shape type
-        shp.seek(32)
-        self.shapeType = unpack("<i", shp.read(4))[0]
-        # The shapefile's bounding box (lower left, upper right)
-        # self.bbox: BBox = tuple(_Array("d", unpack("<4d", shp.read(32))))
-        self.bbox: BBox = unpack("<4d", shp.read(32))
-        # xmin, ymin, xmax, ymax = unpack("<4d", shp.read(32))
-        # self.bbox = BBox(xmin=xmin, ymin=ymin, xmax=xmax, ymax=ymax)
-        # Elevation
-        # self.zbox: ZBox = tuple(_Array("d", unpack("<2d", shp.read(16))))
-        self.zbox: ZBox = unpack("<2d", shp.read(16))
-        # zmin, zmax = unpack("<2d", shp.read(16))
-        # self.zbox = ZBox(zmin=zmin, zmax=zmax)
-        # Measure
-        # Measure values less than -10e38 are nodata values according to the spec
-        m_bounds = [
-            float(m_bound) if m_bound >= NODATA else None
-            for m_bound in unpack("<2d", shp.read(16))
-        ]
-        # self.mbox = MBox(mmin=m_bounds[0], mmax=m_bounds[1])
-        self.mbox: tuple[float | None, float | None] = (m_bounds[0], m_bounds[1])
-
-    def _shxHeader(self) -> None:
-        """Reads the header information from a .shx file."""
-        shx = self.shx
-        if not shx:
-            raise ShapefileException(
-                "Shapefile Reader requires a shapefile or file-like object (no shx file found)."
-            )
-        # File length (16-bit word * 2 = bytes) - header length
-        shx.seek(24)
-        shx_records_length_B = (unpack(">i", shx.read(4))[0] * 2) - 100
-        self.numShapes = shx_records_length_B // 8
-
-    def _shxOffsets(self) -> None:
-        """Reads the shape offset positions from a .shx file"""
-        shx = self.shx
-        if not shx:
-            raise ShapefileException(
-                "Shapefile Reader requires a shapefile or file-like object (no shx file found)."
-            )
-        if self.numShapes is None:
-            raise ShapefileException(
-                "numShapes must not be None. "
-                " Was there a problem with ._shxHeader() ?"
-                f"Got: {self.numShapes=}"
-            )
-        # Jump to the first record.
-        shx.seek(100)
-        # Each index record consists of two nrs, we only want the first one
-        shxRecords = _Array[int]("i", shx.read(2 * self.numShapes * 4))
-        if sys.byteorder != "big":
-            shxRecords.byteswap()
-        self._offsets = [2 * el for el in shxRecords[::2]]
-
-    def _shape_index(self, i: int | None = None) -> int | None:
-        """Returns the offset in a .shp file for a shape based on information
-        in the .shx index file."""
-        # Return None if no shx or no index requested
-        if not self._shx or i is None:
-            return None
-        # At this point, we know the shx file exists
-        if not self._offsets:
-            self._shxOffsets()
-        return self._offsets[i]
 
     def __del__(self) -> None:
         self.close()
-
-    def close(self) -> None:
-        self.exit_stack.close()
-        # Close any files that the reader opened (but not those given by user)
-        # for file_ in [self._shp, self._dbf, self._shx]:
-        #     if file_ is None:
-        #         continue
-
-        #     if hasattr(file_, "close"):
-        #         try:
-        #             file_.close()
-        #         except OSError:
-        #             pass
 
     def __str__(self) -> str:
         """
         Use some general info on the shapefile as __str__
         """
         info = ["shapefile Reader"]
-        if self.shp:
+        if self._shp:
             info.append(
-                f"    {len(self)} shapes (type '{SHAPETYPE_LOOKUP[self.shapeType]}')"
+                f"    {self.numShapes} shapes (type '{SHAPETYPE_LOOKUP[self.shapeType]}')"
             )
-        if self.dbf:
-            info.append(f"    {len(self)} records ({len(self.fields)} fields)")
+        if self._dbf:
+            info.append(f"    {self.numRecords} records ({len(self.fields)} fields)")
         return "\n".join(info)
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: TracebackType | None,
-    ) -> None:
-        self.close()
-
-    def _shape(self, oid: int | None = None, bbox: BBox | None = None) -> Shape | None:
-        """Returns the header info and geometry for a single shape."""
-
-        # shape = Shape(oid=oid)
-        (__recNum, recLength) = unpack_2_int32_be(self.shp.read(8))
-        # Determine the start of the next record
-
-        # Convert from num of 16 bit words, to 8 bit bytes
-        recLength_bytes = 2 * recLength
-
-        # next_shape = self.shp.tell() + recLength_bytes
-
-        # Read entire record into memory to avoid having to call
-        # seek on the file afterwards
-        b_io: ReadSeekableBinStream = io.BytesIO(self.shp.read(recLength_bytes))
-        b_io.seek(0)
-
-        shapeType = unpack("<i", b_io.read(4))[0]
-
-        ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[shapeType]
-        shape = ShapeClass.from_byte_stream(
-            shapeType, b_io, recLength_bytes, oid=oid, bbox=bbox
-        )
-
-        # Seek to the end of this record as defined by the record header because
-        # the shapefile spec doesn't require the actual content to meet the header
-        # definition.  Probably allowed for lazy feature deletion.
-        # f.seek(next_shape)
-
-        return shape
 
     def shape(self, i: int = 0, bbox: BBox | None = None) -> Shape | None:
         """Returns a shape object for a shape in the geometry
@@ -3390,42 +3606,22 @@ class Reader(_FileChecker[ReadSeekableBinStream]):
         if N == 0:
             raise ShapefileException("No shapes loaded.")
         i = ensure_within_bounds(i, N)
-        offset = self._shape_index(i)
-        if not offset:
-            # Shx index not available.
-            # Determine length of shp file
-            self.shp.seek(0, 2)
-            shp_length_B = self.shp.tell()
-            self.shp.seek(100)
-            # Do a fast shape iteration until the requested index or end of file.
-            _i = 0
-            offset = self.shp.tell()
-            while offset < shp_length_B:
-                if _i == i:
-                    # Reached the requested index, exit loop with the offset value
-                    break
-                # Unpack the shape header only
-                (__recNum, recLength) = unpack_2_int32_be(self.shp.read(8))
-                # Jump to next shape position
-                offset += 8 + (2 * recLength)
-                self.shp.seek(offset)
-                _i += 1
-            # If the index was not found, it likely means the .shp file is incomplete
-            if _i != i:
-                raise ShapefileException(
-                    f"Shape index {i} is out of bounds; the .shp file only contains {_i} shapes"
-                )
-
-        # Seek to the offset and read the shape
-        self.shp.seek(offset)
-        return self._shape(oid=i, bbox=bbox)
+        if self._shx:
+            offset, shape_len_B = (
+                self.shx_reader.offsets[i],
+                self.shx_reader.shape_lengths_B[i],
+            )
+        else:
+            offset, shape_len_B = None, None
+        return self.shp_reader.shape(i, offset, shape_len_B, bbox)
 
     def shapes(self, bbox: BBox | None = None) -> Shapes:
         """Returns all shapes in a shapefile.
         To only read shapes within a given spatial region, specify the 'bbox'
         arg as a list or tuple of xmin,ymin,xmax,ymax.
         """
-        return Shapes(self.iterShapes(bbox=bbox))
+        shapes = Shapes(self.iterShapes(bbox=bbox))
+        return shapes
 
     def iterShapes(self, bbox: BBox | None = None) -> Iterator[Shape | None]:
         """Returns a generator of shapes in a shapefile. Useful
@@ -3433,40 +3629,12 @@ class Reader(_FileChecker[ReadSeekableBinStream]):
         To only read shapes within a given spatial region, specify the 'bbox'
         arg as a list or tuple of xmin,ymin,xmax,ymax.
         """
-        # Found shapefiles which report incorrect
-        # shp file length in the header. Can't trust
-        # that so we seek to the end of the file
-        # and figure it out.
-        self.shp.seek(0, 2)
-        shp_length_B = self.shp.tell()
-        self.shp.seek(100)
-
-        if self.numShapes:
-            # Iterate exactly the number of shapes from shx header
-            for i in range(self.numShapes):
-                # MAYBE: check if more left of file or exit early?
-                shape = self._shape(oid=i, bbox=bbox)
-                if shape:
-                    yield shape
-        else:
-            # No shx file, unknown nr of shapes
-            # Instead iterate until reach end of file
-            # Collect the offset indices during iteration
-            i = 0
-            offsets = []
-            pos = self.shp.tell()
-            while pos < shp_length_B:
-                offsets.append(pos)
-                shape = self._shape(oid=i, bbox=bbox)
-                pos = self.shp.tell()
-                if shape:
-                    yield shape
-                i += 1
-            # Entire shp file consumed
-            # Update the number of shapes and list of offsets
-            assert i == len(offsets)
-            self.numShapes = i
-            self._offsets = offsets
+        shape_lengths_B = self.shx_reader.shape_lengths_B if self._shx else None
+        bbox = BBox(*bbox) if bbox is not None else None
+        yield from self.shp_reader.iterShapes(
+            shape_lengths_B=shape_lengths_B, bbox=bbox
+        )
+        self.numShapes = len(self.shp_reader.headers_cache)
 
     def shapeRecord(
         self,
@@ -3554,11 +3722,11 @@ def _try_to_flush_file_obj(f: WriteSeekableBinStream | str | None) -> None:
         pass
 
 
-class DbfWriter(_FileChecker[WriteSeekableBinStream]):
+class DbfWriter(_FileObjChecker[WriteSeekableBinStream]):
     """Writes .dbf files (dBASE database files), in particular those of Shapefiles."""
 
     FileProto = WriteSeekableBinStream
-    new_file_mode = "w+b"
+    new_file_obj_mode = "w+b"
     ext = ".dbf"
 
     def __init__(
@@ -3571,7 +3739,10 @@ class DbfWriter(_FileChecker[WriteSeekableBinStream]):
         # Keep kwargs even though unused, to preserve PyShp 2.4 API
         **kwargs: Any,
     ):
-        super().__init__(file=dbf, encoding=encoding, encodingErrors=encodingErrors)
+        super().__init__(file=dbf)
+
+        self.encoding = encoding
+        self.encodingErrors = encodingErrors
 
         # dbf = fsdecode_if_pathlike(dbf)
         # self._dbf: str | WriteSeekableBinStream
@@ -3606,7 +3777,7 @@ class DbfWriter(_FileChecker[WriteSeekableBinStream]):
             # f=self._dbf,
             # FileProto=WriteSeekableBinStream,
             # exit_stack=self.exit_stack,
-            # new_file_mode="w+b",
+            # new_file_obj_mode="w+b",
             # ExceptionClass=dbfFileException,
         )
 
@@ -3819,13 +3990,13 @@ class DbfWriter(_FileChecker[WriteSeekableBinStream]):
             f.write(encoded)
 
 
-class Writer(_FileChecker[WriteSeekableBinStream]):
+class Writer(_FileObjChecker[WriteSeekableBinStream]):
     """Provides write support for ESRI Shapefiles."""
 
     # W = TypeVar("W", bound=WriteSeekableBinStream)
 
     FileProto = WriteSeekableBinStream
-    new_file_mode = "w+b"
+    new_file_obj_mode = "w+b"
     ext = ".shp"
     ExceptionClass = ShapefileException
 
@@ -3848,9 +4019,6 @@ class Writer(_FileChecker[WriteSeekableBinStream]):
 
         # User settable - see ### Geometry and Record Balancing in README.md
         self.autoBalance = autoBalance
-
-        self.encoding = encoding
-        self.encodingErrors = encodingErrors
 
         # User settable - see #### Setting the Shape Type in README.md
         self.shapeType = shapeType
@@ -3898,7 +4066,7 @@ class Writer(_FileChecker[WriteSeekableBinStream]):
             f=self._shp,
             # FileProto=WriteSeekableBinStream,
             # exit_stack=self.exit_stack,
-            # new_file_mode="w+b",
+            # new_file_obj_mode="w+b",
         )
 
     @functools.cached_property
@@ -3907,7 +4075,7 @@ class Writer(_FileChecker[WriteSeekableBinStream]):
             f=self._shx,
             # FileProto=WriteSeekableBinStream,
             # exit_stack=self.exit_stack,
-            # new_file_mode="w+b",
+            # new_file_obj_mode="w+b",
         )
 
     @functools.cached_property
@@ -4028,18 +4196,18 @@ class Writer(_FileChecker[WriteSeekableBinStream]):
             shape_bbox = s.bbox
         else:
             x, y = s.points[0][:2]
-            shape_bbox = (x, y, x, y)
+            shape_bbox = BBox(xmin=x, ymin=y, xmax=x, ymax=y)
 
         if shape_bbox is None:
             return None
 
         if self._bbox:
             # compare with existing
-            self._bbox = (
-                min(shape_bbox[0], self._bbox[0]),
-                min(shape_bbox[1], self._bbox[1]),
-                max(shape_bbox[2], self._bbox[2]),
-                max(shape_bbox[3], self._bbox[3]),
+            self._bbox = BBox(
+                xmin=min(shape_bbox.xmin, self._bbox.xmin),
+                ymin=min(shape_bbox.ymin, self._bbox.ymin),
+                xmax=max(shape_bbox.xmax, self._bbox.xmax),
+                ymax=max(shape_bbox.ymax, self._bbox.ymax),
             )
         else:
             # first time bbox is being set
@@ -4049,7 +4217,10 @@ class Writer(_FileChecker[WriteSeekableBinStream]):
     def _update_file_zbox(self, s: _HasZ | PointZ) -> None:
         if self._zbox:
             # compare with existing
-            self._zbox = (min(s.zbox[0], self._zbox[0]), max(s.zbox[1], self._zbox[1]))
+            self._zbox = ZBox(
+                zmin=min(s.zbox.zmin, self._zbox.zmin),
+                zmax=max(s.zbox.zmax, self._zbox.zmax),
+            )
         else:
             # first time zbox is being set
             self._zbox = s.zbox
@@ -4058,7 +4229,7 @@ class Writer(_FileChecker[WriteSeekableBinStream]):
         mbox = s.mbox
         if self._mbox:
             # compare with existing
-            self._mbox = (min(mbox[0], self._mbox[0]), max(mbox[1], self._mbox[1]))
+            self._mbox = self._mbox.expand(mbox)
         else:
             # first time mbox is being set
             self._mbox = mbox
@@ -4128,7 +4299,7 @@ class Writer(_FileChecker[WriteSeekableBinStream]):
 
         # Try writing
         try:
-            f.write(pack("<4d", *zbox, *mbox))
+            f.write(pack("<4d", *zbox, *replace_None_with_NODATA(mbox)))
         except StructError:
             raise ShapefileException(
                 "Failed to write shapefile elevation and measure values. Floats required."
@@ -4156,13 +4327,12 @@ class Writer(_FileChecker[WriteSeekableBinStream]):
                 )
             s = Shape._from_geojson(shape_dict)
         # Write to file
-        offset, length = self._shp_record(s)
+        offset_B, length_16bw = self._shp_record(s)
         if self._shx:
-            self._shx_record(offset, length)
+            self._shx_record(offset_B, length_16bw)
 
     def _shp_record(self, s: Shape) -> tuple[int, int]:
-        f = self.shp
-        offset = f.tell()
+        offset = self.shp.tell()
         self.shpNum += 1
 
         # Shape Type
@@ -4210,28 +4380,30 @@ class Writer(_FileChecker[WriteSeekableBinStream]):
         )
 
         # Finalize record length as 16-bit words
-        length = n // 2
+        length_16bw = n // 2
 
         # 4 bytes in is the content length field
         b_io.seek(4)
-        b_io.write(pack(">i", length))
+        b_io.write(pack(">i", length_16bw))
 
         # Flush to file.
         b_io.seek(0)
-        f.write(b_io.read())
-        return offset, length
+        self.shp.write(b_io.read())
+        return offset, length_16bw
 
-    def _shx_record(self, offset: int, length: int) -> None:
+    def _shx_record(self, offset_B: int, length_16bw: int) -> None:
         """Writes the shx records."""
 
         f = self.shx
-        try:
-            f.write(pack(">i", offset // 2))
-        except StructError:
+        max_value_B = (1 << 32) - 2  # 4294967294 Bytes
+        if offset_B > max_value_B:
             raise ShapefileException(
-                "The .shp file has reached its file size limit > 4294967294 bytes (4.29 GB). To fix this, break up your file into multiple smaller ones."
+                f".shp file position offset too big. Max_value: {max_value_B=}.  Got: {offset_B}. \n"
+                "It's over 4GB, perhaps split the .shp or the Shapefile into smaller ones? "
             )
-        f.write(pack(">i", length))
+
+        offset_16bw = offset_B // 2
+        f.write(pack(">2i", offset_16bw, length_16bw))
 
     def record(
         self,

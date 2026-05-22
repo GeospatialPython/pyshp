@@ -1,5 +1,10 @@
 VERSION 3.0.9.dev
 
+2026-05-23
+	Bug fix (BREAKING CHANGE):
+	* Correct NODATA lower threshold to -1e38 (as per [spec](https://www.esri.com/content/dam/esrisites/sitecore-archive/Files/Pdfs/library/whitepapers/pdfs/shapefile.pdf)
+	page 2, Numeric Types). This is a tenth of PyShp's previous threshold -10e38, but still a huge negative number.
+
 2026-05-20
 	Security:
 	* Add python_version >= 3.10 to pre-commit dev & lint groups' 'dependency' (due to CVE in filelock 3.19).
