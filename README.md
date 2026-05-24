@@ -435,7 +435,7 @@ Finally, you can use all of the above methods to read shapefiles directly from t
 	>>> sf = shapefile.Reader("https://github.com/JamesParrott/PyShp_test_shapefile/raw/main/gis_osm_natural_a_free_1.zip")
 
 	>>> # from a shapefile collection of files in a github repository
-	>>> sf = shapefile.Reader("https://github.com/nvkelso/natural-earth-vector/blob/master/110m_cultural/ne_110m_admin_0_tiny_countries.shp?raw=true")
+	>>> sf = shapefile.Reader("https://pubs.usgs.gov/of/2000/of00-006/gisdata/coverage/airports.shp")
 
 This will automatically download the file(s) to a temporary location before reading, saving you a lot of time and repetitive boilerplate code when you just want quick access to some external data.
 
