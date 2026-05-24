@@ -10,8 +10,8 @@ inputs:
     default: '-m "not network"'
     required: false
   replace_remote_urls_with_localhost:
-    description: yes or no.  Test loading shapefiles from a url, without overloading an external server from 30 parallel workflows.
-    default: 'no'
+    description: true or false.  Test loading shapefiles from a url, without overloading an external server from 30 parallel workflows.
+    default: 'false'
     required: false
   pyshp_repo_directory:
     description: Path to where the PyShp repo was checked out to (to keep separate from Shapefiles & artefacts repo).
@@ -40,7 +40,7 @@ runs:
     #   uses: ./Pyshp/.github/actions/test
     #   with:
     #     extra_args: ""
-    #     replace_remote_urls_with_localhost: 'yes'
+    #     replace_remote_urls_with_localhost: 'true'
     #     pyshp_repo_directory: ./Pyshp
 
     # The Python to be tested with is required to already be setup,
@@ -51,14 +51,14 @@ runs:
 
 
     - name: Checkout shapefiles and zip file artefacts repo
-      if: ${{ inputs.replace_remote_urls_with_localhost == 'yes' }}
+      if: ${{ inputs.replace_remote_urls_with_localhost == 'true' }}
       uses: actions/checkout@v6
       with:
         repository: JamesParrott/PyShp_test_shapefile
         path: ./PyShp_test_shapefile
 
     - name: Serve shapefiles and zip file artefacts on localhost
-      if: ${{ inputs.replace_remote_urls_with_localhost == 'yes' }}
+      if: ${{ inputs.replace_remote_urls_with_localhost == 'true' }}
       shell: bash
       working-directory: ./PyShp_test_shapefile
       run: |
@@ -105,12 +105,12 @@ runs:
     # - name: Test http server
     #   # (needs a full Github Actions runner or a Python non-slim Docker image,
     #   # as the slim Debian images don't have curl or wget).
-    #   if: ${{ inputs.replace_remote_urls_with_localhost == 'yes' }}
+    #   if: ${{ inputs.replace_remote_urls_with_localhost == 'true' }}
     #   shell: bash
     #   run: curl http://localhost:8000/ne_110m_admin_0_tiny_countries.shp
 
     - name: Stop http server
-      if: ${{ inputs.replace_remote_urls_with_localhost == 'yes' }}
+      if: ${{ inputs.replace_remote_urls_with_localhost == 'true' }}
       shell: bash
       run: |
         echo Killing http server process ID: ${{ env.HTTP_SERVER_PID }}

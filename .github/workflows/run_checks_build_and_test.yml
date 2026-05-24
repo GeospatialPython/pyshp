@@ -87,10 +87,10 @@ jobs:
       with:
         pyshp_repo_directory: ./Pyshp
 
-    - name: Network tests
+    - name: "Network tests (on Localhost ${{ !(matrix.os == 'ubuntu-24.04' && matrix.python-version == '3.14') }})"
       uses: ./Pyshp/.github/actions/test
       with:
         extra_args: '-m network'
-        replace_remote_urls_with_localhost: 'yes'
+        replace_remote_urls_with_localhost: ${{ !(matrix.os == 'ubuntu-24.04' && matrix.python-version == '3.14') }}
         # Checkout to ./PyShp, as the test job also needs to check out the artefact repo
         pyshp_repo_directory: ./Pyshp

@@ -479,25 +479,25 @@ def test_shaperecord_geo_interface():
             assert json.dumps(shaperec.__geo_interface__)
 
 
+@pytest.mark.skipif(
+    not shapefile.REPLACE_REMOTE_URLS_WITH_LOCALHOST,
+    reason="Flakey test, fails due to Github rate limit",
+)
 @pytest.mark.network
-def test_reader_url():
+def test_reader_nvkelso_files_from_localhost_url():
     """
     Assert that Reader can open shapefiles from a url.
     """
 
-    # Allow testing loading of shapefiles from a url on localhost (to avoid
-    # overloading external servers, and associated spurious test failures).
+    # Only test these shapefiles from localhost,
+    # https://github.com/nvkelso/natural-earth-vector urls throws 426 errors ("too many downloads").
     # A suitable repo of test files, and a localhost server setup is
     # defined in ./.github/actions/test/actions.yml
-    if shapefile.REPLACE_REMOTE_URLS_WITH_LOCALHOST:
 
-        def Reader(url):
-            new_url = shapefile._replace_remote_url(url)
-            print(f"repr(new_url): {repr(new_url)}")
-            return shapefile.Reader(new_url)
-    else:
-        print("Using plain Reader")
-        Reader = shapefile.Reader
+    def Reader(url):
+        new_url = shapefile._replace_remote_url(url)
+        print(f"repr(new_url): {repr(new_url)}")
+        return shapefile.Reader(new_url)
 
     # test with extension
     url = "https://github.com/nvkelso/natural-earth-vector/blob/master/110m_cultural/ne_110m_admin_0_tiny_countries.shp?raw=true"
@@ -518,6 +518,27 @@ def test_reader_url():
     assert sf._shx is None or sf.shx.closed
     assert sf.dbf.closed
 
+
+@pytest.mark.network
+def test_reader_urls():
+    """
+    Assert that Reader can open shapefiles from a few different urls.
+    """
+
+    # Allow testing loading of shapefiles from a url on localhost (to avoid
+    # overloading external servers, and associated spurious test failures).
+    # A suitable repo of test files, and a localhost server setup is
+    # defined in ./.github/actions/test/actions.yml
+    if shapefile.REPLACE_REMOTE_URLS_WITH_LOCALHOST:
+
+        def Reader(url):
+            new_url = shapefile._replace_remote_url(url)
+            print(f"repr(new_url): {repr(new_url)}")
+            return shapefile.Reader(new_url)
+    else:
+        print("Using plain Reader")
+        Reader = shapefile.Reader
+
     # test no files found
     url = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/README.md"
     with pytest.raises(shapefile.ShapefileException):
@@ -525,12 +546,29 @@ def test_reader_url():
             pass
 
     # test reading zipfile from url
-    url = "https://github.com/JamesParrott/PyShp_test_shapefile/raw/main/gis_osm_natural_a_free_1.zip"
-    with Reader(url) as sf:
-        for __recShape in sf.iterShapeRecords():
+    urls = [
+        "https://github.com/JamesParrott/PyShp_test_shapefile/raw/main/gis_osm_natural_a_free_1.zip",
+        "http://www.naturalearthdata.com/http//www.naturalearthdata.com/download/10m/cultural/ne_10m_admin_0_boundary_lines_land.zip",
+    ]
+    for url in urls:
+        try:
+            with Reader(url) as sf:
+                for __recShape in sf.iterShapeRecords():
+                    pass
+                assert len(sf) > 0
+        except shapefile.HTTPError:
             pass
-        assert len(sf) > 0
-    assert sf.shp.closed is sf.shx.closed is sf.dbf.closed is True
+        else:
+            assert sf.shp.closed is sf.shx.closed is sf.dbf.closed is True
+            break
+    else:
+        raise shapefile.HTTPError(
+            "\n".join(urls),
+            "Could not download .zipped shapefiles from any of the test urls",
+            404,
+            {},
+            None,
+        )
 
 
 def test_reader_zip():

@@ -60,7 +60,7 @@ VERBOSE = True
 
 # Test config (for the Doctest runner and test_shapefile.py)
 REPLACE_REMOTE_URLS_WITH_LOCALHOST = (
-    os.getenv("REPLACE_REMOTE_URLS_WITH_LOCALHOST", "").lower() == "yes"
+    os.getenv("REPLACE_REMOTE_URLS_WITH_LOCALHOST", "").lower() == "true"
 )
 
 # Constants for shape types
