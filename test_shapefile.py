@@ -1311,14 +1311,16 @@ def test_reader_corrupt_files():
             w.record("value")
             w.line([[(1, 1), (1, 2), (2, 2)]])
         # add junk byte data to end of dbf and shp files
-        w.dbf.write(b"12345")
+        w.dbf_writer.file.write(b"12345")
         w.shp.write(b"12345")
 
     # read the corrupt shapefile and assert that it reads correctly
     with pytest.warns(shapefile.PossiblyCorruptFileHeader):
         with shapefile.Reader(basename) as sf:
             # assert correct shapefile length metadata
-            assert len(sf) == sf.numRecords == sf.numShapes == 10
+            assert len(sf) == 10
+            assert sf.numRecords == 10
+            assert sf.numShapes == 10
             # assert that records are read without error
             assert len(sf.records()) == 10
             # assert that didn't read the extra junk data
@@ -1526,7 +1528,7 @@ def test_shaperecord_record():
 def test_reader_zip_polyylinez_no_m_itershaperecords():
     """
     Make sure the M field is initialised to None (so the
-    fix from the bgu in 3.0.2 isn't regressed)!
+    fix from the bug in 3.0.2 isn't regressed)!
 
     Test Polygonz Shapes can be read, even if the m field is missing
     (all the points in this file are 2D only, so this could also be
@@ -1538,7 +1540,7 @@ def test_reader_zip_polyylinez_no_m_itershaperecords():
     Original source:  https://github.com/OpenNHM/AvaFrameData/blob/main/avaPopeletzbach/
     License CC-BY-4.0
     """
-    with shapefile.Reader("shapefiles/test/REL.zip") as sf:
+    with shapefile.Reader("shapefiles/test/REL.zip/REL/releaseArea20090407") as sf:
         for _shaperec in sf.iterShapeRecords():
             pass
 
