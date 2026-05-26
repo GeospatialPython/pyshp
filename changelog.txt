@@ -1,5 +1,11 @@
 VERSION 3.0.9.dev
 
+2026-05-26
+	Bug fix (BREAKING CHANGE):
+	* Reader now raises TypeError instead of failing silently (e.g. in anticipation of a subsequent call
+	to Reader.load), when passed an unsupported truthy Python object (not a str or a Path) as its first
+	arg (the positional-only, non-keyword arg).
+
 2026-05-23
 	Bug fix (BREAKING CHANGE):
 	* Correct NODATA lower threshold to -1e38 (as per [spec](https://www.esri.com/content/dam/esrisites/sitecore-archive/Files/Pdfs/library/whitepapers/pdfs/shapefile.pdf)

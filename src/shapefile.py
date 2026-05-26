@@ -2490,9 +2490,9 @@ class _FileObjChecker(_HasExitStack, Generic[FileProtoT]):
         if not f:
             raise self.ExceptionClass(f"No file-like object received. Got: {f}")
         if isinstance(f, str):
-            pth = os.path.split(f)[0]
-            if pth and not os.path.exists(pth):
-                os.makedirs(pth)
+            dir_ = os.path.dirname(f)
+            if dir_ and not os.path.exists(dir_):
+                os.makedirs(dir_)
             fp = open(f, self.new_file_obj_mode)
 
             # Only push files created here to the exit stack.
@@ -3169,10 +3169,11 @@ class Reader(_HasExitStack):
     to call a method that depends on that particular file.
     The .shx index file is used if available for efficiency
     but is not required to read the geometry from the .shp
-    file. The "shapefile" argument in the constructor is the
-    name of the file you want to open, and can be the path
-    to a shapefile on a local filesystem, inside a zipfile,
-    or a url.
+    file. If present, the "shapefile_path" argument in the
+    constructor must be a string, path or otherwise satisfy
+    os.PathLike.  It is the name of the file you want to open,
+    and can be the path to a shapefile on a local filesystem,
+    inside a zipfile, or a url.
 
     You can instantiate a Reader without specifying a shapefile
     and then specify one later with the load() method.
@@ -3214,7 +3215,13 @@ class Reader(_HasExitStack):
         if shapefile_path:
             path = fsdecode_if_pathlike(shapefile_path)
             self.path = path
-            if isinstance(path, str):
+            if not isinstance(path, str):
+                raise TypeError(
+                    f"Unsupported shapefile path argument type: {type(shapefile_path)}. "
+                    "The first arg of Reader must be a pathlib.Path or str"
+                    " or otherwise, satisfy os.PathLike. "
+                )
+            else:
                 if ".zip" in path:
                     self._load_from_zip(path)
                     # Raises ShapefileException if not self._shp or self._dbf
@@ -3448,11 +3455,12 @@ class Reader(_HasExitStack):
             zpath = path
             shapefile = None
         else:
-            zpath = path[: path.find(".zip") + 4]
-            shapefile = path[path.find(".zip") + 4 + 1 :]
+            N = path.find(".zip") + 4
+            zpath = path[:N]  # endswith(".zip")
+            shapefile = path[N + 1 :]  # skip "." or ":" ?  Support archive.zip:shapes
 
+        # Declare a zip file handle
         zipfileobj: tempfile._TemporaryFileWrapper[bytes] | io.BufferedReader
-        # Create a zip file handle
         urlinfo = urlparse(zpath)
 
         resp: ReadableBinStream | None
@@ -3480,7 +3488,7 @@ class Reader(_HasExitStack):
                 shapefiles = [
                     name
                     for name in archive.namelist()
-                    if (name.endswith(".SHP") or name.endswith(".shp"))
+                    if name.endswith((".SHP", ".shp"))
                 ]
                 # The zipfile must contain exactly one shapefile
                 if len(shapefiles) == 0:
@@ -3743,28 +3751,6 @@ class DbfWriter(_FileObjChecker[WriteSeekableBinStream]):
 
         self.encoding = encoding
         self.encodingErrors = encodingErrors
-
-        # dbf = fsdecode_if_pathlike(dbf)
-        # self._dbf: str | WriteSeekableBinStream
-        # # Encoding
-        # self.encoding = encoding
-        # self.encodingErrors = encodingErrors
-        # if isinstance(dbf, str):
-        #     self._dbf = os.path.splitext(dbf)[0] + ".dbf"
-        # elif dbf:
-        #     self._dbf = self.file
-        # else:
-        #     raise TypeError(
-        #         f"dbf must be set to a str, Path or file-like object.  Got: {dbf}"
-        #     )
-
-        # Support not closing opened file objects passed in e.g.(handled by some
-        # external context manager, or the caller manually calling .close).
-        #
-        # This will only ever hold at most one context manager.
-        # But an ExitStack is the right tool for the job
-        # when the number of context manager(s) depends on user input.
-        # self.exit_stack = ExitStack()
 
         self.fields: list[Field] = []
         self.max_num_fields = max_num_fields

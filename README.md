@@ -94,8 +94,11 @@ part of your geospatial project.
 # Version Changes
 
 ## 3.0.9.dev
-### Bug fix
- - 	Correct NODATA lower threshold to -1e38 (as per [spec](https://www.esri.com/content/dam/esrisites/sitecore-archive/Files/Pdfs/library/whitepapers/pdfs/shapefile.pdf) 2, Numeric Types). This is 10% of
+### Bug fixes
+ - BREAKING CHANGE. Reader now raises TypeError instead of failing silently (e.g. in anticipation
+ of a subsequent call to Reader.load), when passed an unsupported truthy Python object (not a str
+ or a Path) as its first arg (the positional-only, non-keyword arg).
+ - BREAKING CHANGE. Correct NODATA lower threshold to -1e38 (as per [spec](https://www.esri.com/content/dam/esrisites/sitecore-archive/Files/Pdfs/library/whitepapers/pdfs/shapefile.pdf) 2, Numeric Types). This is 10% of
  PyShp's previous threshold -10e38, so it is possible large negative values x (-1e39 < x < -1e38 will now be NODATA.
 
 
