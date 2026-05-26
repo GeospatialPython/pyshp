@@ -95,9 +95,14 @@ part of your geospatial project.
 
 ## 3.0.9.dev
 ### Bug fixes
- - BREAKING CHANGE. Reader now raises TypeError instead of failing silently (e.g. in anticipation
- of a subsequent call to Reader.load), when passed an unsupported truthy Python object (not a str
- or a Path) as its first arg (the positional-only, non-keyword arg).
+ - Remove ambiguity in API (BREAKING CHANGE). Reader and Writer now both raise TypeError
+    when passed a supported Shapefile target
+	as the positional-only, non-keyword arg, but also passed kwargs for shp, dbf or shx (instead
+	of silently dropping or overwriting those kwargs, with the user being none the wiser).
+ - Bug fix (BREAKING CHANGE).  Reader and Writer now raise TypeError instead of continuing silently
+   as if given no args (e.g. in anticipation of a subsequent call to Reader.load), when passed an unsupported
+	truthy Python object (not a str or a Path) as its first arg (the positional-only, non-keyword arg).
+
  - BREAKING CHANGE. Correct NODATA lower threshold to -1e38 (as per [spec](https://www.esri.com/content/dam/esrisites/sitecore-archive/Files/Pdfs/library/whitepapers/pdfs/shapefile.pdf) 2, Numeric Types). This is 10% of
  PyShp's previous threshold -10e38, so it is possible large negative values x (-1e39 < x < -1e38 will now be NODATA.
 

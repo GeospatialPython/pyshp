@@ -1,10 +1,15 @@
 VERSION 3.0.9.dev
 
 2026-05-26
+	Remove ambiguity in API (BREAKING CHANGE):
+	* Reader and Writer now both raise TypeError when passed a supported Shapefile target
+	as the positional-only, non-keyword arg, and also kwargs for shp, dbf or shx (instead
+	of silently dropping or overwriting those kwargs, with the user being none the wiser).
+2026-05-26
 	Bug fix (BREAKING CHANGE):
-	* Reader now raises TypeError instead of failing silently (e.g. in anticipation of a subsequent call
-	to Reader.load), when passed an unsupported truthy Python object (not a str or a Path) as its first
-	arg (the positional-only, non-keyword arg).
+	* Reader and Writer now raise TypeError instead of continuing silently, as if given no args
+	(e.g. in anticipation of a subsequent call to Reader.load), when passed an unsupported
+	truthy Python object (not a str or a Path) as its first arg (the positional-only, non-keyword arg).
 
 2026-05-23
 	Bug fix (BREAKING CHANGE):
