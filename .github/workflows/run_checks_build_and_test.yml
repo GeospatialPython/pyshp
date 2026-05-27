@@ -57,18 +57,18 @@ jobs:
       fail-fast: false
       matrix:
         python-version: [
-          "3.9",
-          "3.10",
-          "3.11",
-          "3.12",
-          "3.13",
           "3.14",
+          "3.13",
+          "3.12",
           "3.15-dev",
+          "3.11",
+          "3.10",
+          "3.9",
         ]
         os: [
-          "macos-latest",
           "ubuntu-24.04",
           "windows-latest",
+          "macos-latest",
         ]
 
 

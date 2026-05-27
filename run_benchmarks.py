@@ -23,8 +23,8 @@ REPO_ROOT = Path(__file__).parent
 
 
 blockgroups_file = REPO_ROOT / "shapefiles" / "blockgroups.shp"
-edit_file = REPO_ROOT / "shapefiles" / "test" / "edit.shp"
-merge_file = REPO_ROOT / "shapefiles" / "test" / "merge.shp"
+edit_file = REPO_ROOT / "shapefiles" / "edit.shp"
+merge_file = REPO_ROOT / "shapefiles" / "merge.shp"
 states_provinces_file = PYSHP_TEST_REPO / "ne_10m_admin_1_states_provinces.shp"
 tiny_countries_file = PYSHP_TEST_REPO / "ne_110m_admin_0_tiny_countries.shp"
 gis_osm_natural_file = PYSHP_TEST_REPO / "gis_osm_natural_a_free_1.zip"

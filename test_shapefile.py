@@ -495,7 +495,7 @@ def test_reader_nvkelso_files_from_localhost_url():
     # defined in ./.github/actions/test/actions.yml
 
     def Reader(url):
-        new_url = shapefile._replace_remote_url(url)
+        new_url = shapefile._replace_remote_url_with_localhost(url)
         print(f"repr(new_url): {repr(new_url)}")
         return shapefile.Reader(new_url)
 
@@ -532,7 +532,7 @@ def test_reader_urls():
     if shapefile.REPLACE_REMOTE_URLS_WITH_LOCALHOST:
 
         def Reader(url):
-            new_url = shapefile._replace_remote_url(url)
+            new_url = shapefile._replace_remote_url_with_localhost(url)
             print(f"repr(new_url): {repr(new_url)}")
             return shapefile.Reader(new_url)
     else:
@@ -1296,12 +1296,12 @@ def test_reader_len_no_dbf_shx():
         assert len(sf) == len(sf.shapes())
 
 
-def test_reader_corrupt_files():
+def test_reader_corrupt_files(tmp_path):
     """
     Assert that reader is able to handle corrupt files by
     strictly going off the header information.
     """
-    basename = "shapefiles/test/corrupt_too_long"
+    basename = str(tmp_path / "corrupt_too_long")
 
     # write a shapefile with junk byte data at end of files
     with shapefile.Writer(basename) as w:
@@ -1540,7 +1540,7 @@ def test_reader_zip_polyylinez_no_m_itershaperecords():
     Original source:  https://github.com/OpenNHM/AvaFrameData/blob/main/avaPopeletzbach/
     License CC-BY-4.0
     """
-    with shapefile.Reader("shapefiles/test/REL.zip/REL/releaseArea20090407") as sf:
+    with shapefile.Reader("shapefiles/REL.zip/REL/releaseArea20090407") as sf:
         for _shaperec in sf.iterShapeRecords():
             pass
 
