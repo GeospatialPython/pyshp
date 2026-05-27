@@ -8,8 +8,8 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 
 - **Author**: [Joel Lawhead](https://github.com/GeospatialPython)
 - **Maintainers**: [James Parrott](https://github.com/JamesParrott) & [Karim Bahgat](https://github.com/karimbahgat)
-- **Version**: 3.0.9.dev
-- **Date**: 20th May 2026
+- **Version**: 3.0.9
+- **Date**: 27th May 2026
 - **License**: [MIT](https://github.com/GeospatialPython/pyshp/blob/master/LICENSE.TXT)
 
 ## Contents
@@ -93,7 +93,15 @@ part of your geospatial project.
 
 # Version Changes
 
-## 3.0.9.dev
+## 3.0.9
+### Testing
+ - Try to make tests not rely on downloads from Github repo URLs, to avoid 404s & 426s due to rate limits.
+
+### Testability / separation of concerns:
+ - Separate shx and shp only methods into new ShpWriter, ShxWriter, ShpReader, and ShxReader classes
+(instances of each pair is owned by the regular Shapefile Writer and Reader classes respectively).
+
+
 ### Bug fixes
  - Remove ambiguity in API (BREAKING CHANGE). Reader and Writer now both raise TypeError
     when passed a supported Shapefile target
