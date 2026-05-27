@@ -940,6 +940,7 @@ length of text values to save space:
 
 	>>> r = shapefile.Reader('shapefiles/test/dtype')
 	>>> assert r.record(0) == ['Hello', 'World', 'World'*50]
+	>>> r.close()
 
 Date fields are created using the 'D' type, and can be created using either
 date objects, lists, or a YYYYMMDD formatted string.
@@ -964,6 +965,7 @@ Field length or decimal have no impact on this type:
 	>>> assert r.record(1) == [date(1998,1,30)]
 	>>> assert r.record(2) == [date(1998,1,30)]
 	>>> assert r.record(3) == [None]
+	>>> r.close()
 
 Numeric fields are created using the 'N' type (or the 'F' type, which is exactly the same).
 By default the fourth decimal argument is set to zero, essentially creating an integer field.
@@ -989,6 +991,7 @@ To store very large numbers you must increase the field length size to the total
 	>>> r = shapefile.Reader('shapefiles/test/dtype')
 	>>> assert r.record(0) == [1, 1.32, 1.3217328, -3.2302e-25, 1.3217328, 10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000]
 	>>> assert r.record(1) == [None, None, None, None, None, None]
+	>>> r.close()
 
 
 Finally, we can create boolean fields by setting the type to 'L'.
@@ -1025,6 +1028,7 @@ None is interpreted as missing.
 	Record #4: [None]
 	>>> r.record(5)
 	Record #5: [None]
+	>>> r.close()
 
 You can also add attributes using keyword arguments where the keys are field names.
 
@@ -1150,6 +1154,7 @@ This can be particularly useful for copying from one file to another:
 	...     w.record(*shaperec.record)
 	...     w.shape(shaperec.shape.__geo_interface__)
 
+	>>> r.close()
 	>>> w.close()
 
 
@@ -1256,7 +1261,7 @@ For reading shapefiles in any non-utf8 encoding, such as Latin-1, just
 supply the encoding option when creating the Reader class.
 
 
-	>>> r = shapefile.Reader("shapefiles/test/latin1.shp", encoding="latin1")
+	>>> r = shapefile.Reader("shapefiles/latin1.shp", encoding="latin1")
 	>>> r.record(0) == [2, u'Ñandú']
 	True
 
@@ -1269,11 +1274,13 @@ should give you the same unicode string you started with.
 	>>> w.fields = r.fields[1:]
 	>>> w.record(*r.record(0))
 	>>> w.null()
+	>>> r.close()
 	>>> w.close()
 
 	>>> r = shapefile.Reader("shapefiles/test/latin_as_utf8.shp", encoding="utf8")
 	>>> r.record(0) == [2, u'Ñandú']
 	True
+	>>> r.close()
 
 If you supply the wrong encoding and the string is unable to be decoded, PyShp will by default raise an
 exception. If however, on rare occasion, you are unable to find the correct encoding and want to ignore
@@ -1281,9 +1288,10 @@ or replace encoding errors, you can specify the "encodingErrors" to be used by t
 applies to both reading and writing.
 
 
-	>>> r = shapefile.Reader("shapefiles/test/latin1.shp", encoding="ascii", encodingErrors="replace")
+	>>> r = shapefile.Reader("shapefiles/latin1.shp", encoding="ascii", encodingErrors="replace")
 	>>> r.record(0) == [2, u'�and�']
 	True
+	>>> r.close()
 
 
 
@@ -1491,6 +1499,8 @@ Shapefiles containing M-values can be examined in several ways:
 	>>> r.shape(0).m # flat list of M-values
 	[0.0, None, 3.0, None, 0.0, None, None]
 
+	>>> r.close()
+
 
 ### Shapefiles with elevation (Z) values
 
@@ -1523,6 +1533,8 @@ To examine a Z-type shapefile you can do:
 
 	>>> r.shape(0).z # flat list of Z-values
 	[18.0, 20.0, 22.0, 0.0, 0.0, 0.0, 0.0, 15.0, 13.0, 14.0]
+
+	>>> r.close()
 
 ### 3D MultiPatch Shapefiles
 
@@ -1583,8 +1595,6 @@ installed) from the test file:
 python test_shapefile.py
 ```
 
-Linux/Mac and similar platforms may need to run `$ dos2unix README.md` in order
-to correct line endings in README.md, if Git has not automatically changed them.
 
 ## Network tests
 
@@ -1598,7 +1608,7 @@ pytest -m "not network"
 ```
 or the doctests via:
 ```shell
-python shapefile.py -m "not network"
+python test_shapefile.py -m "not network"
 ```
 or ii) by cloning a repo of the files they download, serving these on localhost in a separate process,
 and running the network tests with the environment variable REPLACE_REMOTE_URLS_WITH_LOCALHOST to `yes`:
@@ -1614,7 +1624,7 @@ REPLACE_REMOTE_URLS_WITH_LOCALHOST=yes && pytest
 ```
 or the doctests via:
 ```bash
-REPLACE_REMOTE_URLS_WITH_LOCALHOST=yes && python shapefile.py
+REPLACE_REMOTE_URLS_WITH_LOCALHOST=yes && python test_shapefile.py
 ```
 The network tests alone can also be run (without also running all the tests that don't
 make network requests) using: `pytest -m network` (or the doctests using: `python shapefile.py -m network`).
