@@ -394,6 +394,8 @@ NODATA = (
 ARR_TYPE = TypeVar("ARR_TYPE", int, float)
 
 
+# Needed for backwards compatibility, and to keep a
+# simpler list like repr, e.g. in docstrings
 class _Array(array.array, Generic[ARR_TYPE]):  # type: ignore[type-arg]
     """Converts python tuples to lists of the appropriate type.
     Used to unpack different shapefile header parts."""
@@ -2873,7 +2875,7 @@ class ShxReader(_HasCheckedReadableFile):
         super().__init__(file=shx)
         self.numShapes: int
         self._shxHeader()
-        self._shxRecords_16bw: _Array[int] | None = None
+        self._shxRecords_16bw: array.array[int] | None = None
 
     def _shxHeader(self) -> None:
         """Reads the header information from a .shx file."""
@@ -2888,7 +2890,7 @@ class ShxReader(_HasCheckedReadableFile):
         # Jump to the first record.
         self.file.seek(100)
         # Each index record consists of two nums.  We only want the first one
-        self._shxRecords_16bw = _Array[int]("i", self.file.read(2 * self.numShapes * 4))
+        self._shxRecords_16bw = array.array("i", self.file.read(2 * self.numShapes * 4))
         if sys.byteorder != "big":
             self._shxRecords_16bw.byteswap()
 
@@ -2897,14 +2899,14 @@ class ShxReader(_HasCheckedReadableFile):
     def offsets(self) -> list[int]:
         self._read_shxRecords()
         # Convert from offsets in 16b Words to Bytes (8b).
-        offsets_ = [2 * el for el in cast(_Array[int], self._shxRecords_16bw)[::2]]
+        offsets_ = [2 * el for el in cast(Sequence[int], self._shxRecords_16bw)[::2]]
         assert len(offsets_) == self.numShapes, f"{self.numShapes=}, {len(offsets_)=}"
         return offsets_
 
     @functools.cached_property
     def shape_lengths_B(self) -> list[int]:
         self._read_shxRecords()
-        return [2 * x for x in cast(_Array[int], self._shxRecords_16bw)[1::2]]
+        return [2 * x for x in cast(Sequence[int], self._shxRecords_16bw)[1::2]]
 
 
 ShapeHeaderInfoT = tuple[int, int, int]
@@ -2943,15 +2945,9 @@ class ShpReader(_HasCheckedReadableFile):
         self.file.seek(32)
         self.shapeType = unpack("<i", self.file.read(4))[0]
         # The shapefile's bounding box (lower left, upper right)
-        # self.bbox: BBox = tuple(_Array("d", unpack("<4d", shp.read(32))))
         self.bbox = BBox(*unpack("<4d", self.file.read(32)))
-        # xmin, ymin, xmax, ymax = unpack("<4d", shp.read(32))
-        # self.bbox = BBox(xmin=xmin, ymin=ymin, xmax=xmax, ymax=ymax)
         # Elevation
-        # self.zbox: ZBox = tuple(_Array("d", unpack("<2d", shp.read(16))))
         self.zbox = ZBox(*unpack("<2d", self.file.read(16)))
-        # zmin, zmax = unpack("<2d", shp.read(16))
-        # self.zbox = ZBox(zmin=zmin, zmax=zmax)
         # Measure
         # Measure values less than -1e38 are nodata values according to the spec
         self.mbox = MBox(
