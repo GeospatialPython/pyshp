@@ -2102,10 +2102,12 @@ class _Record(list[RecordValue]):
         :return: the value of the field
         """
         try:
-            return list.__getitem__(self, item)  # type: ignore[index]
+            # Using | on types in Python 3.9 also raises TypeError, so
+            # Union is needed, as we subsequently catch TypeError.
+            return list.__getitem__(self, cast(Union[SupportsIndex, slice], item))
         except TypeError:
             try:
-                index = self.__field_positions[item]  # type: ignore[index]
+                index = self.__field_positions[cast(str, item)]
             except KeyError:
                 index = None
         if index is not None:
@@ -2132,12 +2134,17 @@ class _Record(list[RecordValue]):
         :param key: Either the position of the value or the name of a field
         :param value: the new value of the field
         """
+        ValidKVTuple = Union[
+            tuple[SupportsIndex, RecordValue], tuple[slice, Iterable[RecordValue]]
+        ]
         try:
-            return list.__setitem__(self, key, value)  # type: ignore[misc,assignment]
+            list.__setitem__(self, *cast(ValidKVTuple, (key, value)))
+            return
         except TypeError:
-            index = self.__field_positions.get(key)  # type: ignore[arg-type]
+            index = self.__field_positions.get(cast(str, key))
             if index is not None:
-                return list.__setitem__(self, index, value)  # type: ignore[misc]
+                list.__setitem__(self, index, cast(RecordValue, value))
+                return
 
             raise IndexError(f"{key} is not a field name and not an int")
 
@@ -3733,7 +3740,7 @@ class Reader(_HasExitStack):
             ):
                 yield ShapeRecord(shape=shape, record=record)
         else:
-            # only iterate where shape.bbox overlaps with the given bbox
+            # Only yield ShapeRecords whose shape.bbox overlaps with bbox.
             # TODO: internal _record method should be faster but would have to
             # make sure to seek to correct file location...
 
