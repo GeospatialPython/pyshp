@@ -8,7 +8,7 @@ Compatible with Python versions >=3.9
 
 from __future__ import annotations
 
-__version__ = "3.0.9"
+__version__ = "3.0.9.dev"
 
 import abc
 import array
@@ -286,6 +286,7 @@ RecordValueNotDate = Union[bool, int, float, str]
 RecordValue = Union[RecordValueNotDate, date]
 
 
+@runtime_checkable
 class HasGeoInterface(Protocol):
     @property
     def __geo_interface__(self) -> GeoJSONHomogeneousGeometryObject: ...
@@ -383,7 +384,9 @@ class GeoJSONFeatureCollectionWithBBox(GeoJSONFeatureCollection):
 # Helpers
 
 MISSING = (None, "")  # Don't make a set, as user input may not be Hashable
-ISDATA_LOWER_BOUND = -1e38  # as per the ESRI shapefile spec, only used for m-values.
+ISDATA_LOWER_BOUND = (
+    -1e38
+)  # Inclusive.  As per the ESRI shapefile spec, only used for m-values.
 NODATA = (
     10 * ISDATA_LOWER_BOUND
 )  # value to encode m=None as.  Must be < ISDATA_LOWER_BOUND
@@ -698,35 +701,22 @@ class GeoJSON_Error(Exception):
 
 
 class _NoShapeTypeSentinel:
-    """For use as a default value for Shape.__init__ to
-    preserve old behaviour for anyone who explictly
+    """An instance is the default value for Shape.__init__,
+    to preserve old behaviour for anyone who explictly
     called Shape(shapeType=None).
     """
 
 
-_NO_SHAPE_TYPE_SENTINEL: Final = _NoShapeTypeSentinel()
-
-
-def _m_from_point(point: PointMT | PointZT, mpos: int) -> float | None:
-    if len(point) > mpos and point[mpos] is not None:
-        return cast(float, point[mpos])
+def _m_from_point(point: PointT, i_m: int) -> float | None:
+    if 2 <= i_m < len(point):
+        return point[i_m]
     return None
 
 
-def _ms_from_points(
-    points: list[PointMT] | list[PointZT], mpos: int
-) -> Iterator[float | None]:
-    return (_m_from_point(p, mpos) for p in points)
-
-
-def _z_from_point(point: PointZT) -> float:
+def _z_from_point(point: PointT) -> float:
     if len(point) >= 3 and point[2] is not None:
         return point[2]
     return 0.0
-
-
-def _zs_from_points(points: Iterable[PointZT]) -> Iterator[float]:
-    return (_z_from_point(p) for p in points)
 
 
 class CanHaveBboxNoLinesKwargs(TypedDict, total=False):
@@ -744,7 +734,7 @@ class CanHaveBboxNoLinesKwargs(TypedDict, total=False):
 class Shape:
     def __init__(
         self,
-        shapeType: int | _NoShapeTypeSentinel = _NO_SHAPE_TYPE_SENTINEL,
+        shapeType: int | _NoShapeTypeSentinel = _NoShapeTypeSentinel(),
         points: PointsT | None = None,
         parts: Sequence[int] | None = None,  # index of start point of each part
         lines: list[PointsT] | None = None,
@@ -775,11 +765,11 @@ class Shape:
         """
 
         # Preserve previous behaviour for anyone who set self.shapeType = None
-        if shapeType is not _NO_SHAPE_TYPE_SENTINEL:
-            self.shapeType = cast(int, shapeType)
-        else:
+        if isinstance(shapeType, _NoShapeTypeSentinel):
             class_name = self.__class__.__name__
             self.shapeType = SHAPETYPENUM_LOOKUP.get(class_name.upper(), NULL)
+        else:
+            self.shapeType = shapeType
 
         if partTypes is not None:
             self.partTypes = partTypes
@@ -828,13 +818,11 @@ class Shape:
         if m:
             self.m: Sequence[float | None] = m
         elif self.shapeType in _HasM_shapeTypes:
-            mpos = 3 if self.shapeType in _HasZ_shapeTypes | PointZ_shapeTypes else 2
-            points_m_z = cast(Union[list[PointMT], list[PointZT]], self.points)
-            self.m = list(_ms_from_points(points_m_z, mpos))
+            i_m = 3 if self.shapeType in _HasZ_shapeTypes | PointZ_shapeTypes else 2
+            self.m = [_m_from_point(p, i_m) for p in self.points]
         elif self.shapeType in PointM_shapeTypes:
-            mpos = 3 if self.shapeType == POINTZ else 2
-            point_m_z = cast(Union[PointMT, PointZT], self.points[0])
-            self.m = (_m_from_point(point_m_z, mpos),)
+            i_m = 3 if self.shapeType == POINTZ else 2
+            self.m = (_m_from_point(self.points[0], i_m),)
         else:
             ms_found = False
 
@@ -842,11 +830,9 @@ class Shape:
         if z:
             self.z: Sequence[float] = z
         elif self.shapeType in _HasZ_shapeTypes:
-            points_z = cast(list[PointZT], self.points)
-            self.z = list(_zs_from_points(points_z))
+            self.z = [_z_from_point(p) for p in self.points]
         elif self.shapeType == POINTZ:
-            point_z = cast(PointZT, self.points[0])
-            self.z = (_z_from_point(point_z),)
+            self.z = (_z_from_point(self.points[0]),)
         else:
             zs_found = False
 
@@ -1029,34 +1015,30 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
 
     @staticmethod
     def _from_geojson(geoj: GeoJSONHomogeneousGeometryObject) -> Shape:
-        # create empty shape
-        # set shapeType
-        geojType = geoj["type"] if geoj else "Null"
-        if geojType in GEOJSON_TO_SHAPETYPE:
-            shapeType = GEOJSON_TO_SHAPETYPE[geojType]
-        else:
-            raise GeoJSON_Error(f"Cannot create Shape from GeoJSON type '{geojType}'")
 
-        coordinates = geoj["coordinates"]
-
-        if coordinates == ():
-            raise GeoJSON_Error(f"Cannot create non-Null Shape from: {coordinates=}")
+        shapeType = GEOJSON_TO_SHAPETYPE.get(geoj["type"], None)
+        if shapeType is None:
+            raise GeoJSON_Error(
+                f"Cannot create Shape from GeoJSON type '{geoj['type']}'"
+            )
+        if shapeType == NULL or (geoj["type"] == "Point" and geoj["coordinates"] == ()):
+            return NullShape()
 
         points: PointsT
         parts: list[int]
 
         # set points and parts
-        if geojType == "Point":
-            points = [cast(PointT, coordinates)]
+        if geoj["type"] == "Point" and isinstance(geoj["coordinates"], list):
+            points = [geoj["coordinates"]]
             parts = [0]
-        elif geojType in ("MultiPoint", "LineString"):
-            points = cast(PointsT, coordinates)
+        elif geoj["type"] == "MultiPoint" or geoj["type"] == "LineString":
+            points = geoj["coordinates"]
             parts = [0]
-        elif geojType == "Polygon":
+        elif geoj["type"] == "Polygon":
             points = []
             parts = []
             index = 0
-            for i, ext_or_hole in enumerate(cast(list[PointsT], coordinates)):
+            for i, ext_or_hole in enumerate(geoj["coordinates"]):
                 # although the latest GeoJSON spec states that exterior rings should have
                 # counter-clockwise orientation, we explicitly check orientation since older
                 # GeoJSONs might not enforce this.
@@ -1069,19 +1051,19 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
                 points.extend(ext_or_hole)
                 parts.append(index)
                 index += len(ext_or_hole)
-        elif geojType == "MultiLineString":
+        elif geoj["type"] == "MultiLineString":
             points = []
             parts = []
             index = 0
-            for linestring in cast(list[PointsT], coordinates):
+            for linestring in geoj["coordinates"]:
                 points.extend(linestring)
                 parts.append(index)
                 index += len(linestring)
-        elif geojType == "MultiPolygon":
+        elif geoj["type"] == "MultiPolygon":
             points = []
             parts = []
             index = 0
-            for polygon in cast(list[list[PointsT]], coordinates):
+            for polygon in geoj["coordinates"]:
                 for i, ext_or_hole in enumerate(polygon):
                     # although the latest GeoJSON spec states that exterior rings should have
                     # counter-clockwise orientation, we explicitly check orientation since older
@@ -1187,6 +1169,8 @@ class _CanHaveBBox(Shape):
     @staticmethod
     def _read_npoints_from_byte_stream(b_io: ReadableBinStream) -> int:
         (nPoints,) = unpack("<i", b_io.read(4))
+        # cast(int, ...) needed until mypy interprets struct fmt strings
+        # https://github.com/python/mypy/issues/20869
         return cast(int, nPoints)
 
     @staticmethod
@@ -1422,11 +1406,11 @@ class Point(Shape):
 
         # Write a single Z value
         if s.shapeType in PointZ_shapeTypes:
-            n += PointZ._write_single_point_z_to_byte_stream(b_io, s, i)
+            n += PointZ._write_single_point_z_to_byte_stream(b_io, cast(PointZ, s), i)
 
         # Write a single M value
         if s.shapeType in PointM_shapeTypes:
-            n += PointM._write_single_point_m_to_byte_stream(b_io, s, i)
+            n += PointM._write_single_point_m_to_byte_stream(b_io, cast(PointM, s), i)
 
         return n
 
@@ -1558,7 +1542,7 @@ class _HasM(_CanHaveBBox):
 
     @staticmethod
     def _write_ms_to_byte_stream(
-        b_io: WriteableBinStream, s: Shape, i: int, mbox: MBox | None
+        b_io: WriteableBinStream, s: _HasM, i: int, mbox: MBox | None
     ) -> int:
         if not mbox or len(mbox) != 2:
             raise ShapefileException(f"Two numbers required for mbox. Got: {mbox}")
@@ -1571,12 +1555,10 @@ class _HasM(_CanHaveBBox):
             raise ShapefileException(
                 f"Failed to write measure extremes for record {i}. Expected floats"
             )
+
+        ms_to_encode = replace_None_with_NODATA(s.m)
         try:
-            ms = cast(_HasM, s).m
-
-            ms_to_encode = replace_None_with_NODATA(ms)
-
-            num_bytes_written += b_io.write(pack(f"<{len(ms)}d", *ms_to_encode))
+            num_bytes_written += b_io.write(pack(f"<{len(s.m)}d", *ms_to_encode))
         except StructError:
             raise ShapefileException(
                 f"Failed to write measure values for record {i}. Expected floats"
@@ -1608,7 +1590,7 @@ class _HasZ(_CanHaveBBox):
 
     @staticmethod
     def _write_zs_to_byte_stream(
-        b_io: WriteableBinStream, s: Shape, i: int, zbox: ZBox | None
+        b_io: WriteableBinStream, s: _HasZ, i: int, zbox: ZBox | None
     ) -> int:
         if not zbox or len(zbox) != 2:
             raise ShapefileException(f"Two numbers required for zbox. Got: {zbox}")
@@ -1622,8 +1604,7 @@ class _HasZ(_CanHaveBBox):
                 f"Failed to write elevation extremes for record {i}. Expected floats."
             )
         try:
-            zs = cast(_HasZ, s).z
-            num_bytes_written += b_io.write(pack(f"<{len(zs)}d", *zs))
+            num_bytes_written += b_io.write(pack(f"<{len(s.z)}d", *s.z))
         except StructError:
             raise ShapefileException(
                 f"Failed to write elevation values for record {i}. Expected floats."
@@ -1715,20 +1696,19 @@ class PointM(Point):
 
     @staticmethod
     def _write_single_point_m_to_byte_stream(
-        b_io: WriteableBinStream, s: Shape, i: int
+        b_io: WriteableBinStream, s: PointM, i: int
     ) -> int:
+
+        m = s.m[0] if s.m else None
+        # Set missing m values to NODATA.
+        m_to_encode = m if m is not None else NODATA
+
         try:
-            s = cast(_HasM, s)
-            m = s.m[0] if s.m else None
+            return b_io.write(pack("<1d", m_to_encode))
         except StructError:
             raise ShapefileException(
                 f"Failed to write measure value for record {i}. Expected floats."
             )
-
-        # Note: missing m values are autoset to NODATA.
-        m_to_encode = m if m is not None else NODATA
-
-        return b_io.write(pack("<1d", m_to_encode))
 
 
 PolylineM_shapeTypes = frozenset([POLYLINEM, POLYLINEZ])
@@ -1859,21 +1839,16 @@ class PointZ(PointM):
 
     @staticmethod
     def _write_single_point_z_to_byte_stream(
-        b_io: WriteableBinStream, s: Shape, i: int
+        b_io: WriteableBinStream, s: PointZ, i: int
     ) -> int:
         # Note: missing z values are autoset to 0, but not sure if this is ideal.
-        z: float = 0.0
-        # then write value
-
+        z: float = s.z[0] if s.z else 0.0
         try:
-            if s.z:
-                z = s.z[0]
+            return b_io.write(pack("<d", z))
         except StructError:
             raise ShapefileException(
                 f"Failed to write elevation value for record {i}. Expected floats."
             )
-
-        return b_io.write(pack("<d", z))
 
 
 PolylineZ_shapeTypes = frozenset([POLYLINEZ])
@@ -3126,14 +3101,11 @@ class ShpReader(_HasCheckedReadableFile):
 
 
 class _NoShpSentinel:
-    """For use as a default value for shp to preserve the
-    behaviour (from when all keyword args were gathered
+    """An instance is the default value for shp to preserve the
+    old behaviour (from when all keyword args were gathered
     in the **kwargs dict) in case someone explictly
     called Reader(shp=None) to load self.shx.
     """
-
-
-_NO_SHP_SENTINEL = _NoShpSentinel()
 
 
 class Reader(_HasExitStack):
@@ -3170,7 +3142,7 @@ class Reader(_HasExitStack):
         *,
         encoding: str = "utf-8",
         encodingErrors: str = "strict",
-        shp: _NoShpSentinel | BinaryFileT | None = _NO_SHP_SENTINEL,
+        shp: _NoShpSentinel | BinaryFileT | None = _NoShpSentinel(),
         shx: BinaryFileT | None = None,
         dbf: BinaryFileT | None = None,
         # Keep kwargs even though unused, to preserve PyShp 2.4 API
@@ -3195,7 +3167,7 @@ class Reader(_HasExitStack):
                     " (or satisfy os.PathLike). "
                 )
             discarded_kwargs = {}
-            if shp not in (None, _NO_SHP_SENTINEL):
+            if shp is not None and not isinstance(shp, _NoShpSentinel):
                 discarded_kwargs["shp"] = shp
             if shx is not None:
                 discarded_kwargs["shx"] = shx
@@ -3268,8 +3240,7 @@ class Reader(_HasExitStack):
             #
             return
 
-        if shp is not _NO_SHP_SENTINEL:
-            shp = cast(Union[BinaryFileT, None], shp)
+        if not isinstance(shp, _NoShpSentinel):
             self._shp = self._seek_0_on_file_obj_wrap_or_open_from_name(".shp", shp)
             self._shx = self._seek_0_on_file_obj_wrap_or_open_from_name(".shx", shx)
 
@@ -4171,10 +4142,8 @@ class ShpWriter(_ShpWriterInfo):
         self,
         s: Shape | HasGeoInterface | GeoJSONHomogeneousGeometryObject,
     ) -> tuple[int, int]:
-        # Check is shape or import from geojson
         if not isinstance(s, Shape):
-            if hasattr(s, "__geo_interface__"):
-                s = cast(HasGeoInterface, s)
+            if isinstance(s, HasGeoInterface):
                 shape_dict = s.__geo_interface__
             elif isinstance(s, dict):  # TypedDict is a dict at runtime
                 shape_dict = s
