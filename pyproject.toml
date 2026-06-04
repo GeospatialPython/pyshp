@@ -42,8 +42,9 @@ lint = [
     "ruff",
 ]
 test = [
-    "pytest",
+    "pytest", "hypothesis"
 ]
+
 
 [project.urls]
 Repository = "https://github.com/GeospatialPython/pyshp"
@@ -74,7 +75,9 @@ path = "src/shapefile.py"
 markers = [
     "network: marks tests requiring network access",
     "slow: marks other tests that cause bottlenecks",
+    "hypothesis: tests that require hypothesis",
 ]
+python_files = "test_*.py *_test.py *_tests.py"
 
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.

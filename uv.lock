@@ -14,6 +14,15 @@ exclude-newer-span = "P1W"
 pyshp-stubs = false
 
 [[package]]
+name = "attrs"
+version = "26.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/9a/8e/82a0fe20a541c03148528be8cac2408564a6c9a0cc7e9171802bc1d26985/attrs-26.1.0.tar.gz", hash = "sha256:d03ceb89cb322a8fd706d4fb91940737b6642aa36998fe130a9bc96c985eff32", size = 952055, upload-time = "2026-03-19T14:22:25.026Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/64/b4/17d4b0b2a2dc85a6df63d1157e028ed19f90d4cd97c36717afef2bc2f395/attrs-26.1.0-py3-none-any.whl", hash = "sha256:c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309", size = 67548, upload-time = "2026-03-19T14:22:23.645Z" },
+]
+
+[[package]]
 name = "cfgv"
 version = "3.5.0"
 source = { registry = "https://pypi.org/simple" }
@@ -59,6 +68,39 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/b5/fe/997687a931ab51049acce6fa1f23e8f01216374ea81374ddee763c493db5/filelock-3.29.0.tar.gz", hash = "sha256:69974355e960702e789734cb4871f884ea6fe50bd8404051a3530bc07809cf90", size = 57571, upload-time = "2026-04-19T15:39:10.068Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/81/47/dd9a212ef6e343a6857485ffe25bba537304f1913bdbed446a23f7f592e1/filelock-3.29.0-py3-none-any.whl", hash = "sha256:96f5f6344709aa1572bbf631c640e4ebeeb519e08da902c39a001882f30ac258", size = 39812, upload-time = "2026-04-19T15:39:08.752Z" },
+]
+
+[[package]]
+name = "hypothesis"
+version = "6.141.1"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version < '3.10'",
+]
+dependencies = [
+    { name = "attrs", marker = "python_full_version < '3.10'" },
+    { name = "exceptiongroup", marker = "python_full_version < '3.10'" },
+    { name = "sortedcontainers", marker = "python_full_version < '3.10'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/85/20/8aa62b3e69fea68bb30d35d50be5395c98979013acd8152d64dc927e4cdb/hypothesis-6.141.1.tar.gz", hash = "sha256:8ef356e1e18fbeaa8015aab3c805303b7fe4b868e5b506e87ad83c0bf951f46f", size = 467389, upload-time = "2025-10-15T19:12:25.262Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bc/9a/f901858f139694dd669776983781b08a7c1717911025da6720e526bd8ce3/hypothesis-6.141.1-py3-none-any.whl", hash = "sha256:a5b3c39c16d98b7b4c3c5c8d4262e511e3b2255e6814ced8023af49087ad60b3", size = 535000, upload-time = "2025-10-15T19:12:21.659Z" },
+]
+
+[[package]]
+name = "hypothesis"
+version = "6.154.1"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.10'",
+]
+dependencies = [
+    { name = "exceptiongroup", marker = "python_full_version == '3.10.*'" },
+    { name = "sortedcontainers", marker = "python_full_version >= '3.10'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b1/a3/10b04ba828ccde01b8a6806d8f18a16755825701fa7d1bcda294cccedeff/hypothesis-6.154.1.tar.gz", hash = "sha256:5956848819cada59aaecafd984d70e3577580e20f2fa6bfc202b0edb27dcecad", size = 476035, upload-time = "2026-05-28T07:27:14.599Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/03/0e/2793685fcb9e9021d5614845088276ccf06ccc0517e34348fe9500936757/hypothesis-6.154.1-py3-none-any.whl", hash = "sha256:61d7caf9837d18d1675f427bf6bb23c8d2e5f511e1bb795bd6f4ed495cb38893", size = 542426, upload-time = "2026-05-28T07:27:11.383Z" },
 ]
 
 [[package]]
@@ -333,6 +375,8 @@ stubs = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "hypothesis", version = "6.141.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "hypothesis", version = "6.154.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "mypy" },
     { name = "pre-commit", marker = "python_full_version >= '3.10'" },
     { name = "pytest", version = "8.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
@@ -345,6 +389,8 @@ lint = [
     { name = "ruff" },
 ]
 test = [
+    { name = "hypothesis", version = "6.141.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "hypothesis", version = "6.154.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "pytest", version = "8.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "pytest", version = "9.0.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
 ]
@@ -355,6 +401,7 @@ provides-extras = ["stubs"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "hypothesis" },
     { name = "mypy", specifier = "==1.19.1" },
     { name = "pre-commit", marker = "python_full_version >= '3.10'" },
     { name = "pytest" },
@@ -365,7 +412,10 @@ lint = [
     { name = "pre-commit", marker = "python_full_version >= '3.10'" },
     { name = "ruff" },
 ]
-test = [{ name = "pytest" }]
+test = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+]
 
 [[package]]
 name = "pyshp-stubs"
@@ -527,6 +577,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/6b/8c/b1e1666aef7fc6555094d73ae6cd981701781ae85b97ceefc0eebd0b4668/ruff-0.15.13-py3-none-win32.whl", hash = "sha256:4044f94208b3b05ba0fc4a4abd0558cf4d6459bd18325eead7fd8cc66f909b41", size = 10721455, upload-time = "2026-05-14T13:44:35.697Z" },
     { url = "https://files.pythonhosted.org/packages/ab/a6/870a3e8a50590bb92be184ad928c2922f088b00d9dc5c5ec7b924ee08c22/ruff-0.15.13-py3-none-win_amd64.whl", hash = "sha256:7064884d442b7d477b4e7473d12da7f08851d2b1982763c5d3f388a19468a1a4", size = 11900409, upload-time = "2026-05-14T13:44:30.389Z" },
     { url = "https://files.pythonhosted.org/packages/9b/36/9c015cd052fca743dae8cb2aeb16b551444787467db42ceab0fc968865af/ruff-0.15.13-py3-none-win_arm64.whl", hash = "sha256:2471da9bd1068c8c064b5fd9c0c4b6dddffd6369cb1cd68b29993b1709ff1b21", size = 11179336, upload-time = "2026-05-14T13:44:33.026Z" },
+]
+
+[[package]]
+name = "sortedcontainers"
+version = "2.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e8/c4/ba2f8066cceb6f23394729afe52f3bf7adec04bf9ed2c820b39e19299111/sortedcontainers-2.4.0.tar.gz", hash = "sha256:25caa5a06cc30b6b83d11423433f65d1f9d76c4c6a0c90e3379eaa43b9bfdb88", size = 30594, upload-time = "2021-05-16T22:03:42.897Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/32/46/9cb0e58b2deb7f82b84065f37f3bffeb12413f947f9388e4cac22c4621ce/sortedcontainers-2.4.0-py2.py3-none-any.whl", hash = "sha256:a163dcaede0f1c021485e957a39245190e74249897e2ae4b2aa38595db237ee0", size = 29575, upload-time = "2021-05-16T22:03:41.177Z" },
 ]
 
 [[package]]

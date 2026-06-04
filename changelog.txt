@@ -1,3 +1,13 @@
+VERSION 3.0.10
+
+2026-06-04
+	Bug fix
+	* Convert directly supplied m values strictly below ISDATA_LOWER_BOUND (-1e38) to None.
+	Testing
+	* Move tests into ./tests.
+	* Remove doctest runner from user land.
+	* Add round trip property tests for Point and PointM using hypothesis.
+
 VERSION 3.0.9
 
 2026-05-27
