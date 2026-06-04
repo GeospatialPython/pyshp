@@ -8,7 +8,7 @@ Compatible with Python versions >=3.9
 
 from __future__ import annotations
 
-__version__ = "3.0.9.dev"
+__version__ = "3.0.10"
 
 import abc
 import array
@@ -701,9 +701,16 @@ class _NoShapeTypeSentinel:
     """
 
 
+def _ensure_within_bounds(m: float | None) -> float | None:
+    if m is not None and m >= ISDATA_LOWER_BOUND:
+        return m
+    return None
+
+
 def _m_from_point(point: PointT, i_m: int) -> float | None:
     if 2 <= i_m < len(point):
-        return point[i_m]
+        m = point[i_m]
+        return _ensure_within_bounds(m)
     return None
 
 
@@ -810,7 +817,7 @@ class Shape:
 
         ms_found = True
         if m:
-            self.m: Sequence[float | None] = m
+            self.m: Sequence[float | None] = [_ensure_within_bounds(x) for x in m]
         elif self.shapeType in _HasM_shapeTypes:
             i_m = 3 if self.shapeType in _HasZ_shapeTypes | PointZ_shapeTypes else 2
             self.m = [_m_from_point(p, i_m) for p in self.points]
@@ -3020,7 +3027,11 @@ class ShpReader(_HasCheckedReadableFile):
 
         ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[shapeType]
         shape = ShapeClass.from_byte_stream(
-            shapeType, b_io, shape_len_B, oid=oid, bbox=bbox
+            shapeType=shapeType,
+            b_io=b_io,
+            next_shape_pos=shape_len_B,
+            oid=oid,
+            bbox=bbox,
         )
 
         # Seek to the end of this record as defined by the record header because

@@ -8,8 +8,8 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 
 - **Author**: [Joel Lawhead](https://github.com/GeospatialPython)
 - **Maintainers**: [James Parrott](https://github.com/JamesParrott) & [Karim Bahgat](https://github.com/karimbahgat)
-- **Version**: 3.0.9
-- **Date**: 27th May 2026
+- **Version**: 3.0.10
+- **Date**: 4th June 2026
 - **License**: [MIT](https://github.com/GeospatialPython/pyshp/blob/master/LICENSE.TXT)
 
 ## Contents
@@ -92,6 +92,14 @@ part of your geospatial project.
 
 
 # Version Changes
+
+## 3.0.10
+### Bug fix
+ - Convert directly supplied m values to None if they are strictly below ISDATA_LOWER_BOUND (-1e38).
+### Testing
+ - Move tests into ./tests.
+ - Remove doctest runner from user land.
+ - Add round trip property tests for Point and PointM using hypothesis.
 
 ## 3.0.9
 ### Testing
