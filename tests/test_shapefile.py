@@ -10,8 +10,14 @@ from pathlib import Path
 # third party imports
 import pytest
 
-# our imports
+# our imports (the code under test)
 import shapefile
+
+# helper functions
+from .run_doctests import (
+    REPLACE_REMOTE_URLS_WITH_LOCALHOST,
+    _replace_remote_url_with_localhost,
+)
 
 shapefiles_dir = Path(__file__).parent / "shapefiles"
 
@@ -452,7 +458,7 @@ def test_expected_shape_geo_interface(typ, points, parts, expected):
 
 
 def test_reader_geo_interface():
-    with shapefile.Reader("shapefiles/blockgroups") as r:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as r:
         geoj = r.__geo_interface__
         assert geoj["type"] == "FeatureCollection"
         assert "bbox" in geoj
@@ -460,27 +466,27 @@ def test_reader_geo_interface():
 
 
 def test_shapes_geo_interface():
-    with shapefile.Reader("shapefiles/blockgroups") as r:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as r:
         geoj = r.shapes().__geo_interface__
         assert geoj["type"] == "GeometryCollection"
         assert json.dumps(geoj)
 
 
 def test_shaperecords_geo_interface():
-    with shapefile.Reader("shapefiles/blockgroups") as r:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as r:
         geoj = r.shapeRecords().__geo_interface__
         assert geoj["type"] == "FeatureCollection"
         assert json.dumps(geoj)
 
 
 def test_shaperecord_geo_interface():
-    with shapefile.Reader("shapefiles/blockgroups") as r:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as r:
         for shaperec in r:
             assert json.dumps(shaperec.__geo_interface__)
 
 
 @pytest.mark.skipif(
-    not shapefile.REPLACE_REMOTE_URLS_WITH_LOCALHOST,
+    not REPLACE_REMOTE_URLS_WITH_LOCALHOST,
     reason="Flakey test, fails due to Github rate limit",
 )
 @pytest.mark.network
@@ -495,7 +501,7 @@ def test_reader_nvkelso_files_from_localhost_url():
     # defined in ./.github/actions/test/actions.yml
 
     def Reader(url):
-        new_url = shapefile._replace_remote_url_with_localhost(url)
+        new_url = _replace_remote_url_with_localhost(url)
         print(f"repr(new_url): {repr(new_url)}")
         return shapefile.Reader(new_url)
 
@@ -529,10 +535,10 @@ def test_reader_urls():
     # overloading external servers, and associated spurious test failures).
     # A suitable repo of test files, and a localhost server setup is
     # defined in ./.github/actions/test/actions.yml
-    if shapefile.REPLACE_REMOTE_URLS_WITH_LOCALHOST:
+    if REPLACE_REMOTE_URLS_WITH_LOCALHOST:
 
         def Reader(url):
-            new_url = shapefile._replace_remote_url_with_localhost(url)
+            new_url = _replace_remote_url_with_localhost(url)
             print(f"repr(new_url): {repr(new_url)}")
             return shapefile.Reader(new_url)
     else:
@@ -576,7 +582,7 @@ def test_reader_zip():
     Assert that Reader can open shapefiles inside a zipfile.
     """
     # test reading zipfile only
-    with shapefile.Reader("shapefiles/blockgroups.zip") as sf:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups.zip") as sf:
         for __recShape in sf.iterShapeRecords():
             pass
         assert len(sf) > 0
@@ -584,12 +590,14 @@ def test_reader_zip():
 
     # test require specific path when reading multi-shapefile zipfile
     with pytest.raises(shapefile.ShapefileException):
-        with shapefile.Reader("shapefiles/blockgroups_multishapefile.zip") as sf:
+        with shapefile.Reader(
+            f"{shapefiles_dir.as_posix()}/blockgroups_multishapefile.zip"
+        ) as sf:
             pass
 
     # test specifying the path when reading multi-shapefile zipfile (with extension)
     with shapefile.Reader(
-        "shapefiles/blockgroups_multishapefile.zip/blockgroups2.shp"
+        f"{shapefiles_dir.as_posix()}/blockgroups_multishapefile.zip/blockgroups2.shp"
     ) as sf:
         for __recShape in sf.iterShapeRecords():
             pass
@@ -598,7 +606,7 @@ def test_reader_zip():
 
     # test specifying the path when reading multi-shapefile zipfile (without extension)
     with shapefile.Reader(
-        "shapefiles/blockgroups_multishapefile.zip/blockgroups2"
+        f"{shapefiles_dir.as_posix()}/blockgroups_multishapefile.zip/blockgroups2"
     ) as sf:
         for __recShape in sf.iterShapeRecords():
             pass
@@ -607,7 +615,7 @@ def test_reader_zip():
 
     # test raising error when can't find shapefile inside zipfile
     with pytest.raises(shapefile.ShapefileException):
-        with shapefile.Reader("shapefiles/empty_zipfile.zip") as sf:
+        with shapefile.Reader(f"{shapefiles_dir.as_posix()}/empty_zipfile.zip") as sf:
             pass
 
 
@@ -619,7 +627,7 @@ def test_reader_close_path():
     """
     # note uses an actual shapefile from
     # the projects "shapefiles" directory
-    sf = shapefile.Reader("shapefiles/blockgroups.shp")
+    sf = shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups.shp")
     sf.close()
 
     assert sf.shp.closed is True
@@ -627,7 +635,7 @@ def test_reader_close_path():
     assert sf.shx.closed is True
 
     # check that can read again
-    sf = shapefile.Reader("shapefiles/blockgroups.shp")
+    sf = shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups.shp")
     sf.close()
 
 
@@ -639,9 +647,9 @@ def test_reader_close_filelike():
     """
     # note uses an actual shapefile from
     # the projects "shapefiles" directory
-    shp = open("shapefiles/blockgroups.shp", mode="rb")
-    shx = open("shapefiles/blockgroups.shx", mode="rb")
-    dbf = open("shapefiles/blockgroups.dbf", mode="rb")
+    shp = open(f"{shapefiles_dir.as_posix()}/blockgroups.shp", mode="rb")
+    shx = open(f"{shapefiles_dir.as_posix()}/blockgroups.shx", mode="rb")
+    dbf = open(f"{shapefiles_dir.as_posix()}/blockgroups.dbf", mode="rb")
     sf = shapefile.Reader(shp=shp, shx=shx, dbf=dbf)
     sf.close()
 
@@ -662,7 +670,7 @@ def test_reader_context_path():
     """
     # note uses an actual shapefile from
     # the projects "shapefiles" directory
-    with shapefile.Reader("shapefiles/blockgroups") as sf:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as sf:
         pass
 
     assert sf.shp.closed is True
@@ -670,7 +678,7 @@ def test_reader_context_path():
     assert sf.shx.closed is True
 
     # check that can read again
-    with shapefile.Reader("shapefiles/blockgroups") as sf:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as sf:
         pass
 
 
@@ -682,9 +690,9 @@ def test_reader_context_filelike():
     """
     # note uses an actual shapefile from
     # the projects "shapefiles" directory
-    shp = open("shapefiles/blockgroups.shp", mode="rb")
-    shx = open("shapefiles/blockgroups.shx", mode="rb")
-    dbf = open("shapefiles/blockgroups.dbf", mode="rb")
+    shp = open(f"{shapefiles_dir.as_posix()}/blockgroups.shp", mode="rb")
+    shx = open(f"{shapefiles_dir.as_posix()}/blockgroups.shx", mode="rb")
+    dbf = open(f"{shapefiles_dir.as_posix()}/blockgroups.dbf", mode="rb")
     with shapefile.Reader(shp=shp, shx=shx, dbf=dbf) as sf:
         pass
 
@@ -702,7 +710,7 @@ def test_reader_shapefile_type():
     Assert that the type of the shapefile
     is returned correctly.
     """
-    with shapefile.Reader("shapefiles/blockgroups") as sf:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as sf:
         assert sf.shapeType == 5  # 5 means Polygon
         assert sf.shapeType == shapefile.POLYGON
         assert sf.shapeTypeName == "POLYGON"
@@ -714,12 +722,12 @@ def test_reader_shapefile_length():
     matches up with the number of records
     in the file.
     """
-    with shapefile.Reader("shapefiles/blockgroups") as sf:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as sf:
         assert len(sf) == len(sf.shapes())
 
 
 def test_shape_metadata():
-    with shapefile.Reader("shapefiles/blockgroups") as sf:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as sf:
         shape = sf.shape(0)
         assert shape.shapeType == 5  # Polygon
         assert shape.shapeType == shapefile.POLYGON
@@ -733,7 +741,7 @@ def test_reader_fields():
     Assert that each field has a name,
     type, field length, and decimal length.
     """
-    with shapefile.Reader("shapefiles/blockgroups") as sf:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as sf:
         fields = sf.fields
         assert isinstance(fields, list)
 
@@ -749,7 +757,7 @@ def test_reader_shapefile_extension_ignored():
     Assert that the filename's extension is
     ignored when reading a shapefile.
     """
-    base = "shapefiles/blockgroups"
+    base = f"{shapefiles_dir.as_posix()}/blockgroups"
     ext = ".abc"
     filename = base + ext
     with shapefile.Reader(filename) as sf:
@@ -773,7 +781,7 @@ def test_reader_dbf_only():
     dbf argument to the shapefile reader
     reads just the dbf file.
     """
-    with shapefile.Reader(dbf="shapefiles/blockgroups.dbf") as sf:
+    with shapefile.Reader(dbf=f"{shapefiles_dir.as_posix()}/blockgroups.dbf") as sf:
         assert len(sf) == 663
         record = sf.record(3)
         assert record[1:3] == ["060750601001", 4715]
@@ -798,7 +806,8 @@ def test_reader_shp_shx_only():
     reads just the shp and shx file.
     """
     with shapefile.Reader(
-        shp="shapefiles/blockgroups.shp", shx="shapefiles/blockgroups.shx"
+        shp=f"{shapefiles_dir.as_posix()}/blockgroups.shp",
+        shx=f"{shapefiles_dir.as_posix()}/blockgroups.shx",
     ) as sf:
         assert len(sf) == 663
         shape = sf.shape(3)
@@ -826,7 +835,8 @@ def test_reader_shp_dbf_only():
     reads just the shp and dbf file.
     """
     with shapefile.Reader(
-        shp="shapefiles/blockgroups.shp", dbf="shapefiles/blockgroups.dbf"
+        shp=f"{shapefiles_dir.as_posix()}/blockgroups.shp",
+        dbf=f"{shapefiles_dir.as_posix()}/blockgroups.dbf",
     ) as sf:
         assert len(sf) == 663
         shape = sf.shape(3)
@@ -857,7 +867,7 @@ def test_reader_shp_only():
     shp argument to the shapefile reader
     reads just the shp file (shx optional).
     """
-    with shapefile.Reader(shp="shapefiles/blockgroups.shp") as sf:
+    with shapefile.Reader(shp=f"{shapefiles_dir.as_posix()}/blockgroups.shp") as sf:
         assert len(sf) == 663
         shape = sf.shape(3)
         assert len(shape.points) == 173
@@ -881,7 +891,9 @@ def test_reader_filelike_dbf_only():
     dbf argument to the shapefile reader
     reads just the dbf file.
     """
-    with shapefile.Reader(dbf=open("shapefiles/blockgroups.dbf", "rb")) as sf:
+    with shapefile.Reader(
+        dbf=open(f"{shapefiles_dir.as_posix()}/blockgroups.dbf", "rb")
+    ) as sf:
         assert len(sf) == 663
         record = sf.record(3)
         assert record[1:3] == ["060750601001", 4715]
@@ -894,8 +906,8 @@ def test_reader_filelike_shp_shx_only():
     reads just the shp and shx file.
     """
     with shapefile.Reader(
-        shp=open("shapefiles/blockgroups.shp", "rb"),
-        shx=open("shapefiles/blockgroups.shx", "rb"),
+        shp=open(f"{shapefiles_dir.as_posix()}/blockgroups.shp", "rb"),
+        shx=open(f"{shapefiles_dir.as_posix()}/blockgroups.shx", "rb"),
     ) as sf:
         assert len(sf) == 663
         shape = sf.shape(3)
@@ -909,8 +921,8 @@ def test_reader_filelike_shp_dbf_only():
     reads just the shp and dbf file.
     """
     with shapefile.Reader(
-        shp=open("shapefiles/blockgroups.shp", "rb"),
-        dbf=open("shapefiles/blockgroups.dbf", "rb"),
+        shp=open(f"{shapefiles_dir.as_posix()}/blockgroups.shp", "rb"),
+        dbf=open(f"{shapefiles_dir.as_posix()}/blockgroups.dbf", "rb"),
     ) as sf:
         assert len(sf) == 663
         shape = sf.shape(3)
@@ -925,7 +937,9 @@ def test_reader_filelike_shp_only():
     shp argument to the shapefile reader
     reads just the shp file (shx optional).
     """
-    with shapefile.Reader(shp=open("shapefiles/blockgroups.shp", "rb")) as sf:
+    with shapefile.Reader(
+        shp=open(f"{shapefiles_dir.as_posix()}/blockgroups.shp", "rb")
+    ) as sf:
         assert len(sf) == 663
         shape = sf.shape(3)
         assert len(shape.points) == 173
@@ -942,7 +956,7 @@ def test_reader_shapefile_delayed_load():
         with pytest.raises(shapefile.ShapefileException):
             sf.shape(0)
         # assert that works after loading file manually
-        sf.load("shapefiles/blockgroups")
+        sf.load(f"{shapefiles_dir.as_posix()}/blockgroups")
         assert len(sf) == 663
 
 
@@ -951,7 +965,7 @@ def test_records_match_shapes():
     Assert that the number of records matches
     the number of shapes in the shapefile.
     """
-    with shapefile.Reader("shapefiles/blockgroups") as sf:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as sf:
         records = sf.records()
         shapes = sf.shapes()
         assert len(records) == len(shapes)
@@ -965,7 +979,7 @@ def test_record_attributes(fields=None):
     # note
     # second element in fields matches first element
     # in record because records dont have DeletionFlag
-    with shapefile.Reader("shapefiles/blockgroups") as sf:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as sf:
         for i in range(len(sf)):
             # full record
             full_record = sf.record(i)
@@ -1028,7 +1042,7 @@ def test_record_subfields_duplicates():
     fields = ["AREA", "AREA", "AREA", "MALES", "MALES", "MOBILEHOME"]
     test_record_attributes(fields=fields)
     # check that only 3 values
-    with shapefile.Reader("shapefiles/blockgroups") as sf:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as sf:
         rec = sf.record(0, fields=fields)
         assert len(rec) == len(set(fields))
 
@@ -1041,7 +1055,7 @@ def test_record_subfields_empty():
     fields = []
     test_record_attributes(fields=fields)
     # check that only 0 values
-    with shapefile.Reader("shapefiles/blockgroups") as sf:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as sf:
         rec = sf.record(0, fields=fields)
         assert len(rec) == 0
 
@@ -1051,7 +1065,7 @@ def test_record_as_dict():
     Assert that a record object can be converted
     into a dictionary and data remains correct.
     """
-    with shapefile.Reader("shapefiles/blockgroups") as sf:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as sf:
         record = sf.record(0)
         as_dict = record.as_dict()
 
@@ -1065,7 +1079,7 @@ def test_record_oid():
     Assert that the record's oid attribute returns
     its index in the shapefile.
     """
-    with shapefile.Reader("shapefiles/blockgroups") as sf:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as sf:
         for i in range(len(sf)):
             record = sf.record(i)
             assert record.oid == i
@@ -1088,7 +1102,7 @@ def test_iterRecords_start_stop():
     by index with Reader.record
     """
 
-    with shapefile.Reader("shapefiles/blockgroups") as sf:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as sf:
         N = len(sf)
 
         # Arbitrary selection of record indices
@@ -1126,7 +1140,7 @@ def test_shape_oid():
     Assert that the shape's oid attribute returns
     its index in the shapefile.
     """
-    with shapefile.Reader("shapefiles/blockgroups") as sf:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as sf:
         for i in range(len(sf)):
             shape = sf.shape(i)
             assert shape.oid == i
@@ -1146,7 +1160,7 @@ def test_shape_oid_no_shx():
     Assert that the shape's oid attribute returns
     its index in the shapefile, when shx file is missing.
     """
-    basename = "shapefiles/blockgroups"
+    basename = f"{shapefiles_dir.as_posix()}/blockgroups"
     shp = open(basename + ".shp", "rb")
     dbf = open(basename + ".dbf", "rb")
     with shapefile.Reader(shp=shp, dbf=dbf) as sf:
@@ -1182,7 +1196,7 @@ def test_reader_offsets():
     Assert that reader will not read the shx offsets unless necessary,
     i.e. requesting a shape index.
     """
-    basename = "shapefiles/blockgroups"
+    basename = f"{shapefiles_dir.as_posix()}/blockgroups"
     with shapefile.Reader(basename) as sf:
         # shx offsets should not be read during loading
         assert sf.shx_reader._shxRecords_16bw is None
@@ -1196,7 +1210,7 @@ def test_reader_offsets_no_shx():
     Assert that reading a shapefile without a shx file will not build
     the offsets unless necessary, i.e. reading all the shapes.
     """
-    basename = "shapefiles/blockgroups"
+    basename = f"{shapefiles_dir.as_posix()}/blockgroups"
     shp = open(basename + ".shp", "rb")
     dbf = open(basename + ".dbf", "rb")
     with shapefile.Reader(shp=shp, dbf=dbf) as sf:
@@ -1218,7 +1232,7 @@ def test_reader_numshapes():
     Assert that reader reads the numShapes attribute from the
     shx file header during loading.
     """
-    basename = "shapefiles/blockgroups"
+    basename = f"{shapefiles_dir.as_posix()}/blockgroups"
     with shapefile.Reader(basename) as sf:
         # numShapes should be set during loading
         assert sf.numShapes is not None
@@ -1232,7 +1246,7 @@ def test_reader_numshapes_no_shx():
     an unknown value for the numShapes attribute (None), and that
     reading all the shapes will set the numShapes attribute.
     """
-    basename = "shapefiles/blockgroups"
+    basename = f"{shapefiles_dir.as_posix()}/blockgroups"
     shp = open(basename + ".shp", "rb")
     dbf = open(basename + ".dbf", "rb")
     with shapefile.Reader(shp=shp, dbf=dbf) as sf:
@@ -1248,7 +1262,7 @@ def test_reader_len():
     Assert that calling len() on reader is equal to length of
     all shapes and records.
     """
-    basename = "shapefiles/blockgroups"
+    basename = f"{shapefiles_dir.as_posix()}/blockgroups"
     with shapefile.Reader(basename) as sf:
         assert len(sf) == len(sf.records()) == len(sf.shapes())
 
@@ -1267,7 +1281,7 @@ def test_reader_len_dbf_only():
     Assert that calling len() on reader when reading a dbf file only,
     is equal to length of all records.
     """
-    basename = "shapefiles/blockgroups"
+    basename = f"{shapefiles_dir.as_posix()}/blockgroups"
     dbf = open(basename + ".dbf", "rb")
     with shapefile.Reader(dbf=dbf) as sf:
         assert len(sf) == len(sf.records())
@@ -1278,7 +1292,7 @@ def test_reader_len_no_dbf():
     Assert that calling len() on reader when dbf file is missing,
     is equal to length of all shapes.
     """
-    basename = "shapefiles/blockgroups"
+    basename = f"{shapefiles_dir.as_posix()}/blockgroups"
     shp = open(basename + ".shp", "rb")
     shx = open(basename + ".shx", "rb")
     with shapefile.Reader(shp=shp, shx=shx) as sf:
@@ -1290,7 +1304,7 @@ def test_reader_len_no_dbf_shx():
     Assert that calling len() on reader when dbf and shx file is missing,
     is equal to length of all shapes.
     """
-    basename = "shapefiles/blockgroups"
+    basename = f"{shapefiles_dir.as_posix()}/blockgroups"
     shp = open(basename + ".shp", "rb")
     with shapefile.Reader(shp=shp) as sf:
         assert len(sf) == len(sf.shapes())
@@ -1346,7 +1360,7 @@ def test_bboxfilter_shape():
     outside = list(inside)
     outside[0] *= 10
     outside[2] *= 10
-    with shapefile.Reader("shapefiles/blockgroups") as sf:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as sf:
         assert sf.shape(0, bbox=inside) is not None
         assert sf.shape(0, bbox=outside) is None
 
@@ -1357,7 +1371,7 @@ def test_bboxfilter_shapes():
     that fall outside, and returns those that fall inside.
     """
     bbox = [-122.4, 37.8, -122.35, 37.82]
-    with shapefile.Reader("shapefiles/blockgroups") as sf:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as sf:
         # apply bbox filter
         shapes = sf.shapes(bbox=bbox)
         # manually check bboxes
@@ -1379,7 +1393,7 @@ def test_bboxfilter_shapes_outside():
     no shapes when the bbox is outside the entire shapefile.
     """
     bbox = [-180, 89, -179, 90]
-    with shapefile.Reader("shapefiles/blockgroups") as sf:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as sf:
         shapes = sf.shapes(bbox=bbox)
         assert len(shapes) == 0
 
@@ -1390,7 +1404,7 @@ def test_bboxfilter_itershapes():
     that fall outside, and returns those that fall inside.
     """
     bbox = [-122.4, 37.8, -122.35, 37.82]
-    with shapefile.Reader("shapefiles/blockgroups") as sf:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as sf:
         # apply bbox filter
         shapes = list(sf.iterShapes(bbox=bbox))
         # manually check bboxes
@@ -1415,7 +1429,7 @@ def test_bboxfilter_shaperecord():
     outside = list(inside)
     outside[0] *= 10
     outside[2] *= 10
-    with shapefile.Reader("shapefiles/blockgroups") as sf:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as sf:
         # inside
         shaperec = sf.shapeRecord(0, bbox=inside)
         assert shaperec is not None
@@ -1430,7 +1444,7 @@ def test_bboxfilter_shaperecords():
     that fall outside, and returns those that fall inside.
     """
     bbox = [-122.4, 37.8, -122.35, 37.82]
-    with shapefile.Reader("shapefiles/blockgroups") as sf:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as sf:
         # apply bbox filter
         shaperecs = sf.shapeRecords(bbox=bbox)
         # manually check bboxes
@@ -1458,7 +1472,7 @@ def test_bboxfilter_itershaperecords():
     that fall outside, and returns those that fall inside.
     """
     bbox = [-122.4, 37.8, -122.35, 37.82]
-    with shapefile.Reader("shapefiles/blockgroups") as sf:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as sf:
         # apply bbox filter
         shaperecs = list(sf.iterShapeRecords(bbox=bbox))
         # manually check bboxes
@@ -1487,7 +1501,7 @@ def test_shaperecords_shaperecord():
     Assert that shapeRecord returns a single
     ShapeRecord at the given index.
     """
-    with shapefile.Reader("shapefiles/blockgroups") as sf:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as sf:
         shaperecs = sf.shapeRecords()
         shaperec = sf.shapeRecord(0)
         should_match = shaperecs[0]
@@ -1506,7 +1520,7 @@ def test_shaperecord_shape():
     Assert that a ShapeRecord object has a shape
     attribute that contains shape data.
     """
-    with shapefile.Reader("shapefiles/blockgroups") as sf:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as sf:
         shaperec = sf.shapeRecord(3)
         shape = shaperec.shape
         point = shape.points[0]
@@ -1518,7 +1532,7 @@ def test_shaperecord_record():
     Assert that a ShapeRecord object has a record
     attribute that contains record data.
     """
-    with shapefile.Reader("shapefiles/blockgroups") as sf:
+    with shapefile.Reader(f"{shapefiles_dir.as_posix()}/blockgroups") as sf:
         shaperec = sf.shapeRecord(3)
         record = shaperec.record
 
@@ -1540,7 +1554,9 @@ def test_reader_zip_polyylinez_no_m_itershaperecords():
     Original source:  https://github.com/OpenNHM/AvaFrameData/blob/main/avaPopeletzbach/
     License CC-BY-4.0
     """
-    with shapefile.Reader("shapefiles/REL.zip/REL/releaseArea20090407") as sf:
+    with shapefile.Reader(
+        f"{shapefiles_dir.as_posix()}/REL.zip/REL/releaseArea20090407"
+    ) as sf:
         for _shaperec in sf.iterShapeRecords():
             pass
 
@@ -2005,9 +2021,3 @@ def test_write_multipatch(tmpdir):
     w.record("house1")
 
     w.close()
-
-
-# This allows a PyShp wheel installed in the env to be tested
-# against the doctests.
-if __name__ == "__main__":
-    shapefile.main()

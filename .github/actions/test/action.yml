@@ -85,7 +85,7 @@ runs:
       working-directory: ${{ inputs.pyshp_repo_directory }}
       env:
         REPLACE_REMOTE_URLS_WITH_LOCALHOST: ${{ inputs.replace_remote_urls_with_localhost }}
-      run: python test_shapefile.py ${{ inputs.extra_args }}
+      run: python tests/run_doctests.py ${{ inputs.extra_args }}
 
     - name: Show Python and Pytest versions for logs.
       shell: bash

@@ -54,13 +54,14 @@ mypy_path = "src"
 explicit_package_bases = true
 exclude_gitignore = true
 exclude=[  # Mypy requires regexes, not globs:
-    'test_shapefile\.py',
-    'run_benchmarks\.py',
+    'tests/test_shapefile\.py',
+    'tests/run_benchmarks\.py',
+    'tests/run_doctests\.py',
 ]
 
 
 [tool.hatch.build.targets.sdist]
-only-include = ["src", "shapefiles", "test_shapefile.py"]
+only-include = ["src", "tests"]
 
 [tool.hatch.build.targets.wheel]
 only-include = ["src"]

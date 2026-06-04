@@ -411,36 +411,36 @@ files. You specify the base filename of the shapefile or the complete filename
 of any of the shapefile component files.
 
 
-	>>> sf = shapefile.Reader("shapefiles/blockgroups")
+	>>> sf = shapefile.Reader("tests/shapefiles/blockgroups")
 
 OR
 
 
-	>>> sf = shapefile.Reader("shapefiles/blockgroups.shp")
+	>>> sf = shapefile.Reader("tests/shapefiles/blockgroups.shp")
 
 OR
 
 
-	>>> sf = shapefile.Reader("shapefiles/blockgroups.dbf")
+	>>> sf = shapefile.Reader("tests/shapefiles/blockgroups.dbf")
 
 OR any of the other 5+ formats which are potentially part of a shapefile. The
 library does not care about file extensions. You can also specify that you only
 want to read some of the file extensions through the use of keyword arguments:
 
 
-	>>> sf = shapefile.Reader(dbf="shapefiles/blockgroups.dbf")
+	>>> sf = shapefile.Reader(dbf="tests/shapefiles/blockgroups.dbf")
 
 #### Reading Shapefiles from Zip Files
 
 If your shapefile is wrapped inside a zip file, the library is able to handle that too, meaning you don't have to worry about unzipping the contents:
 
 
-	>>> sf = shapefile.Reader("shapefiles/blockgroups.zip")
+	>>> sf = shapefile.Reader("tests/shapefiles/blockgroups.zip")
 
 If the zip file contains multiple shapefiles, just specify which shapefile to read by additionally specifying the relative path after the ".zip" part:
 
 
-	>>> sf = shapefile.Reader("shapefiles/blockgroups_multishapefile.zip/blockgroups2.shp")
+	>>> sf = shapefile.Reader("tests/shapefiles/blockgroups_multishapefile.zip/blockgroups2.shp")
 
 #### Reading Shapefiles from URLs
 
@@ -462,8 +462,8 @@ arguments to specify any of the three files. This feature is very powerful and
 allows you to custom load shapefiles from arbitrary storage formats, such as a protected url or zip file, a serialized object, or in some cases a database.
 
 
-	>>> myshp = open("shapefiles/blockgroups.shp", "rb")
-	>>> mydbf = open("shapefiles/blockgroups.dbf", "rb")
+	>>> myshp = open("tests/shapefiles/blockgroups.shp", "rb")
+	>>> mydbf = open("tests/shapefiles/blockgroups.dbf", "rb")
 	>>> r = shapefile.Reader(shp=myshp, dbf=mydbf)
 
 Notice in the examples above the shx file is never used. The shx file is a
@@ -477,7 +477,7 @@ it.
 The "Reader" class can be used as a context manager, to ensure open file
 objects are properly closed when done reading the data:
 
-    >>> with shapefile.Reader("shapefiles/blockgroups.shp") as shp:
+    >>> with shapefile.Reader("tests/shapefiles/blockgroups.shp") as shp:
     ...     print(shp)
     shapefile Reader
         663 shapes (type 'POLYGON')
@@ -490,7 +490,7 @@ A shapefile is a container for a specific type of geometry, and this can be chec
 shapeType attribute.
 
 
-	>>> sf = shapefile.Reader("shapefiles/blockgroups.dbf")
+	>>> sf = shapefile.Reader("tests/shapefiles/blockgroups.dbf")
 	>>> sf.shapeType
 	5
 
@@ -836,7 +836,7 @@ To create a shapefile you begin by initiating a new Writer instance, passing it
 the file path and name to save to:
 
 
-	>>> w = shapefile.Writer('shapefiles/test/testfile')
+	>>> w = shapefile.Writer('tests/shapefiles/test/testfile')
 	>>> w.field('field1', 'C')
 
 File extensions are optional when reading or writing shapefiles. If you specify
@@ -845,7 +845,7 @@ file name that is used for all three file types. Or you can specify a name for
 one or more file types:
 
 
-	>>> w = shapefile.Writer(dbf='shapefiles/test/onlydbf.dbf')
+	>>> w = shapefile.Writer(dbf='tests/shapefiles/test/onlydbf.dbf')
 	>>> w.field('field1', 'C')
 
 In that case, any file types not assigned will not
@@ -895,7 +895,7 @@ Alternatively, you can also use the "Writer" class as a context manager, to ensu
 objects are properly closed and final headers written once you exit the with-clause:
 
 
-	>>> with shapefile.Writer("shapefiles/test/contextwriter") as w:
+	>>> with shapefile.Writer("tests/shapefiles/test/contextwriter") as w:
 	... 	w.field('field1', 'C')
 	... 	pass
 
@@ -912,7 +912,7 @@ There are three ways to set the shape type:
 To manually set the shape type for a Writer object when creating the Writer:
 
 
-	>>> w = shapefile.Writer('shapefiles/test/shapetype', shapeType=3)
+	>>> w = shapefile.Writer('tests/shapefiles/test/shapetype', shapeType=3)
 	>>> w.field('field1', 'C')
 
 	>>> w.shapeType
@@ -938,7 +938,7 @@ Text fields are created using the 'C' type, and the third 'size' argument can be
 length of text values to save space:
 
 
-	>>> w = shapefile.Writer('shapefiles/test/dtype')
+	>>> w = shapefile.Writer('tests/shapefiles/test/dtype')
 	>>> w.field('TEXT', 'C')
 	>>> w.field('SHORT_TEXT', 'C', size=5)
 	>>> w.field('LONG_TEXT', 'C', size=250)
@@ -946,7 +946,7 @@ length of text values to save space:
 	>>> w.record('Hello', 'World', 'World'*50)
 	>>> w.close()
 
-	>>> r = shapefile.Reader('shapefiles/test/dtype')
+	>>> r = shapefile.Reader('tests/shapefiles/test/dtype')
 	>>> assert r.record(0) == ['Hello', 'World', 'World'*50]
 	>>> r.close()
 
@@ -956,7 +956,7 @@ Field length or decimal have no impact on this type:
 
 
 	>>> from datetime import date
-	>>> w = shapefile.Writer('shapefiles/test/dtype')
+	>>> w = shapefile.Writer('tests/shapefiles/test/dtype')
 	>>> w.field('DATE', 'D')
 	>>> w.null()
 	>>> w.null()
@@ -968,7 +968,7 @@ Field length or decimal have no impact on this type:
 	>>> w.record(None)
 	>>> w.close()
 
-	>>> r = shapefile.Reader('shapefiles/test/dtype')
+	>>> r = shapefile.Reader('tests/shapefiles/test/dtype')
 	>>> assert r.record(0) == [date(1898,1,30)]
 	>>> assert r.record(1) == [date(1998,1,30)]
 	>>> assert r.record(2) == [date(1998,1,30)]
@@ -982,7 +982,7 @@ To store very large numbers you must increase the field length size to the total
 (including comma and minus).
 
 
-	>>> w = shapefile.Writer('shapefiles/test/dtype')
+	>>> w = shapefile.Writer('tests/shapefiles/test/dtype')
 	>>> w.field('INT', 'N')
 	>>> w.field('LOWPREC', 'N', decimal=2)
 	>>> w.field('MEDPREC', 'N', decimal=10)
@@ -996,7 +996,7 @@ To store very large numbers you must increase the field length size to the total
 	>>> w.record(None, None, None, None, None, None)
 	>>> w.close()
 
-	>>> r = shapefile.Reader('shapefiles/test/dtype')
+	>>> r = shapefile.Reader('tests/shapefiles/test/dtype')
 	>>> assert r.record(0) == [1, 1.32, 1.3217328, -3.2302e-25, 1.3217328, 10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000]
 	>>> assert r.record(1) == [None, None, None, None, None, None]
 	>>> r.close()
@@ -1007,7 +1007,7 @@ This field can take True or False values, or 1 (True) or 0 (False).
 None is interpreted as missing.
 
 
-	>>> w = shapefile.Writer('shapefiles/test/dtype')
+	>>> w = shapefile.Writer('tests/shapefiles/test/dtype')
 	>>> w.field('BOOLEAN', 'L')
 	>>> w.null()
 	>>> w.null()
@@ -1023,7 +1023,7 @@ None is interpreted as missing.
 	>>> w.record("Nonsense")
 	>>> w.close()
 
-	>>> r = shapefile.Reader('shapefiles/test/dtype')
+	>>> r = shapefile.Reader('tests/shapefiles/test/dtype')
 	>>> r.record(0)
 	Record #0: [True]
 	>>> r.record(1)
@@ -1041,7 +1041,7 @@ None is interpreted as missing.
 You can also add attributes using keyword arguments where the keys are field names.
 
 
-	>>> w = shapefile.Writer('shapefiles/test/dtype')
+	>>> w = shapefile.Writer('tests/shapefiles/test/dtype')
 	>>> w.field('FIRST_FLD','C', 40)
 	>>> w.field('SECOND_FLD','C', 40)
 	>>> w.null()
@@ -1062,7 +1062,7 @@ A shapefile may contain some records for which geometry is not available, and ma
 Because Null shape types (shape type 0) have no geometry the "null" method is called without any arguments.
 
 
-	>>> w = shapefile.Writer('shapefiles/test/null')
+	>>> w = shapefile.Writer('tests/shapefiles/test/null')
 	>>> w.field('name', 'C')
 
 	>>> w.null()
@@ -1076,7 +1076,7 @@ Point shapes are added using the "point" method. A point is specified by an x an
 y value.
 
 
-	>>> w = shapefile.Writer('shapefiles/test/point')
+	>>> w = shapefile.Writer('tests/shapefiles/test/point')
 	>>> w.field('name', 'C')
 
 	>>> w.point(122, 37)
@@ -1090,7 +1090,7 @@ If your point data allows for the possibility of multiple points per feature, us
 These are specified as a list of xy point coordinates.
 
 
-	>>> w = shapefile.Writer('shapefiles/test/multipoint')
+	>>> w = shapefile.Writer('tests/shapefiles/test/multipoint')
 	>>> w.field('name', 'C')
 
 	>>> w.multipoint([[122,37], [124,32]])
@@ -1104,7 +1104,7 @@ For LineString shapefiles, each shape is given as a list of one or more linear f
 Each of the linear features must have at least two points.
 
 
-	>>> w = shapefile.Writer('shapefiles/test/line')
+	>>> w = shapefile.Writer('tests/shapefiles/test/line')
 	>>> w.field('name', 'C')
 
 	>>> w.line([
@@ -1128,7 +1128,7 @@ If any of the polygons have holes, then the hole polygon coordinates must be ord
 The direction of your polygons determines how shapefile readers will distinguish between polygon outlines and holes.
 
 
-	>>> w = shapefile.Writer('shapefiles/test/polygon')
+	>>> w = shapefile.Writer('tests/shapefiles/test/polygon')
 	>>> w.field('name', 'C')
 
 	>>> w.poly([
@@ -1147,9 +1147,9 @@ You can also pass it any GeoJSON dictionary or _\_geo_interface\_\_ compatible o
 This can be particularly useful for copying from one file to another:
 
 
-	>>> r = shapefile.Reader('shapefiles/test/polygon')
+	>>> r = shapefile.Reader('tests/shapefiles/test/polygon')
 
-	>>> w = shapefile.Writer('shapefiles/test/copy')
+	>>> w = shapefile.Writer('tests/shapefiles/test/copy')
 	>>> w.fields = r.fields[1:] # skip first deletion field
 
 	>>> # adding existing Shape objects
@@ -1174,7 +1174,7 @@ must take care to add records and shapes in the same order so that the record
 data lines up with the geometry data. For example:
 
 
-	>>> w = shapefile.Writer('shapefiles/test/balancing', shapeType=shapefile.POINT)
+	>>> w = shapefile.Writer('tests/shapefiles/test/balancing', shapeType=shapefile.POINT)
 	>>> w.field("field1", "C")
 	>>> w.field("field2", "C")
 
@@ -1269,7 +1269,7 @@ For reading shapefiles in any non-utf8 encoding, such as Latin-1, just
 supply the encoding option when creating the Reader class.
 
 
-	>>> r = shapefile.Reader("shapefiles/latin1.shp", encoding="latin1")
+	>>> r = shapefile.Reader("tests/shapefiles/latin1.shp", encoding="latin1")
 	>>> r.record(0) == [2, u'Ñandú']
 	True
 
@@ -1278,14 +1278,14 @@ as UTF-8. Assuming the new encoding supports the characters you are trying to wr
 should give you the same unicode string you started with.
 
 
-	>>> w = shapefile.Writer("shapefiles/test/latin_as_utf8.shp", encoding="utf8")
+	>>> w = shapefile.Writer("tests/shapefiles/test/latin_as_utf8.shp", encoding="utf8")
 	>>> w.fields = r.fields[1:]
 	>>> w.record(*r.record(0))
 	>>> w.null()
 	>>> r.close()
 	>>> w.close()
 
-	>>> r = shapefile.Reader("shapefiles/test/latin_as_utf8.shp", encoding="utf8")
+	>>> r = shapefile.Reader("tests/shapefiles/test/latin_as_utf8.shp", encoding="utf8")
 	>>> r.record(0) == [2, u'Ñandú']
 	True
 	>>> r.close()
@@ -1296,7 +1296,7 @@ or replace encoding errors, you can specify the "encodingErrors" to be used by t
 applies to both reading and writing.
 
 
-	>>> r = shapefile.Reader("shapefiles/latin1.shp", encoding="ascii", encodingErrors="replace")
+	>>> r = shapefile.Reader("tests/shapefiles/latin1.shp", encoding="ascii", encodingErrors="replace")
 	>>> r.record(0) == [2, u'�and�']
 	True
 	>>> r.close()
@@ -1422,17 +1422,17 @@ long as you iterate through the source files to avoid loading everything into
 memory. The following example copies the contents of a shapefile to a new file 10 times:
 
 	>>> # create writer
-	>>> w = shapefile.Writer('shapefiles/test/merge')
+	>>> w = shapefile.Writer('tests/shapefiles/test/merge')
 
 	>>> # copy over fields from the reader
-	>>> r = shapefile.Reader("shapefiles/blockgroups")
+	>>> r = shapefile.Reader("tests/shapefiles/blockgroups")
 	>>> for field in r.fields[1:]:
 	...     w.field(*field)
 
 	>>> # copy the shapefile to writer 10 times
 	>>> repeat = 10
 	>>> for i in range(repeat):
-	...     r = shapefile.Reader("shapefiles/blockgroups")
+	...     r = shapefile.Reader("tests/shapefiles/blockgroups")
 	...     for shapeRec in r.iterShapeRecords():
 	...         w.record(*shapeRec.record)
 	...         w.shape(shapeRec.shape)
@@ -1452,13 +1452,13 @@ If you need to edit a shapefile you would have to read the
 file one record at a time, modify or filter the contents, and write it back out. For instance, to create a copy of a shapefile that only keeps a subset of relevant fields:
 
 	>>> # create writer
-	>>> w = shapefile.Writer('shapefiles/test/edit')
+	>>> w = shapefile.Writer('tests/shapefiles/test/edit')
 
 	>>> # define which fields to keep
 	>>> keep_fields = ['BKG_KEY', 'MEDIANRENT']
 
 	>>> # copy over the relevant fields from the reader
-	>>> r = shapefile.Reader("shapefiles/blockgroups")
+	>>> r = shapefile.Reader("tests/shapefiles/blockgroups")
 	>>> for field in r.fields[1:]:
 	...     if field[0] in keep_fields:
 	...         w.field(*field)
@@ -1485,7 +1485,7 @@ third M value to each XY coordinate. Missing or unobserved M-values are specifie
 or by simply omitting the third M-coordinate.
 
 
-	>>> w = shapefile.Writer('shapefiles/test/linem')
+	>>> w = shapefile.Writer('tests/shapefiles/test/linem')
 	>>> w.field('name', 'C')
 
 	>>> w.linem([
@@ -1499,7 +1499,7 @@ or by simply omitting the third M-coordinate.
 
 Shapefiles containing M-values can be examined in several ways:
 
-	>>> r = shapefile.Reader('shapefiles/test/linem')
+	>>> r = shapefile.Reader('tests/shapefiles/test/linem')
 
 	>>> r.mbox # the lower and upper bound of M-values in the shapefile
 	MBox(mmin=0.0, mmax=3.0)
@@ -1519,7 +1519,7 @@ but if you omit the third Z-coordinate it will default to 0. Note that Z-type sh
 as a fourth M-coordinate. This too is optional.
 
 
-	>>> w = shapefile.Writer('shapefiles/test/linez')
+	>>> w = shapefile.Writer('tests/shapefiles/test/linez')
 	>>> w.field('name', 'C')
 
 	>>> w.linez([
@@ -1534,7 +1534,7 @@ as a fourth M-coordinate. This too is optional.
 
 To examine a Z-type shapefile you can do:
 
-	>>> r = shapefile.Reader('shapefiles/test/linez')
+	>>> r = shapefile.Reader('tests/shapefiles/test/linez')
 
 	>>> r.zbox # the lower and upper bound of Z-values in the shapefile
 	ZBox(zmin=0.0, zmax=22.0)
@@ -1556,7 +1556,7 @@ its roof:
 
 	>>> from shapefile import TRIANGLE_STRIP, TRIANGLE_FAN
 
-	>>> w = shapefile.Writer('shapefiles/test/multipatch')
+	>>> w = shapefile.Writer('tests/shapefiles/test/multipatch')
 	>>> w.field('name', 'C')
 
 	>>> w.multipatch([
@@ -1576,10 +1576,10 @@ ESRI White Paper](http://downloads.esri.com/support/whitepapers/ao_/J9749_MultiP
 
 # Testing
 
-The testing framework is pytest, and the tests are located in test_shapefile.py.
-This includes an extensive set of unit tests of the various pyshp features,
+The testing framework is pytest, and the tests are located in ./tests.
+This includes an extensive set of unit tests of the various pyshp features in ./tests/test_shapefile.py,
 and tests against various input data.
-In the same folder as README.md and shapefile.py, from the command line run:
+In the same folder as README.md and pyproject.toml, from the command line run:
 
 ```shell
 python -m pytest
@@ -1587,20 +1587,11 @@ python -m pytest
 
 Additionally, all the code and examples located in this file, README.md,
 is tested and verified with the builtin doctest framework.
-A special routine for invoking the doctest is run when calling directly on shapefile.py.
-In the same folder as README.md and shapefile.py, from the command line run:
+A special doctest runner will run the doctests, with test artefacts confined to a
+a temporary directory, and optionally switching the remote URLs for localhost:
 
 ```shell
-python shapefile.py
-```
-
-This tests the code inside shapefile.py itself.  To test an installed PyShp wheel against
-the doctests, the same special routine can be invoked (in an env with the wheel and pytest
-installed) from the test file:
-
-
-```shell
-python test_shapefile.py
+python tests/run_doctests.py
 ```
 
 
@@ -1616,7 +1607,7 @@ pytest -m "not network"
 ```
 or the doctests via:
 ```shell
-python test_shapefile.py -m "not network"
+python tests/run_doctests.py -m "not network"
 ```
 or ii) by cloning a repo of the files they download, serving these on localhost in a separate process,
 and running the network tests with the environment variable REPLACE_REMOTE_URLS_WITH_LOCALHOST to `yes`:
@@ -1632,10 +1623,10 @@ REPLACE_REMOTE_URLS_WITH_LOCALHOST=yes && pytest
 ```
 or the doctests via:
 ```bash
-REPLACE_REMOTE_URLS_WITH_LOCALHOST=yes && python test_shapefile.py
+REPLACE_REMOTE_URLS_WITH_LOCALHOST=yes && python tests/run_doctests.py
 ```
 The network tests alone can also be run (without also running all the tests that don't
-make network requests) using: `pytest -m network` (or the doctests using: `python shapefile.py -m network`).
+make network requests) using: `pytest -m network` (or the doctests using: `python tests/run_doctests.py -m network`).
 
 
 
