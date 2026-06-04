@@ -199,7 +199,7 @@ def main() -> None:
             temp_dir=Path(td).as_posix(),
             readme=namespace.readme,
             include_network=namespace.m.lower().strip() == "network",
-            include_non_network=namespace.m.lower().strip() == "not network",
+            include_non_network="not network" in namespace.m.lower(),
         )
     sys.exit(failure_count)
 

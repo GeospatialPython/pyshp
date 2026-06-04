@@ -8,8 +8,8 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 
 - **Author**: [Joel Lawhead](https://github.com/GeospatialPython)
 - **Maintainers**: [James Parrott](https://github.com/JamesParrott) & [Karim Bahgat](https://github.com/karimbahgat)
-- **Version**: 3.0.10
-- **Date**: 4th June 2026
+- **Version**: 3.0.11
+- **Date**: 5th June 2026
 - **License**: [MIT](https://github.com/GeospatialPython/pyshp/blob/master/LICENSE.TXT)
 
 ## Contents
@@ -92,6 +92,19 @@ part of your geospatial project.
 
 
 # Version Changes
+
+## 3.0.11
+### Edge case handling
+ - Raise ShapefileException i) when creating Non-null Shapes without (or with empty) points
+   and ii) when creating Null Shapes with non-empty points.
+ - Ensure Shape.z and Shape.partTypes are _Arrays.
+ - Make Shape stricter about its args, e.g. only points or lines, only one point for Points.
+
+### Bug fixes
+ - Multipoints with only a single point, now have their bbox calculated.
+
+### Testing
+ - Round trip property-based tests for Multipoints (passes).
 
 ## 3.0.10
 ### Bug fix
