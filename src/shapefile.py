@@ -8,7 +8,7 @@ Compatible with Python versions >=3.9
 
 from __future__ import annotations
 
-__version__ = "3.0.10"
+__version__ = "3.0.11"
 
 import abc
 import array
@@ -773,10 +773,55 @@ class Shape:
             self.shapeType = shapeType
 
         if partTypes is not None:
-            self.partTypes = partTypes
+            if self.shapeType != MULTIPATCH:
+                raise ShapefileException(
+                    f"Only a Multipatch shape supports partTypes, not: {self.__class__.__name__} "
+                    f" (shape type: {self.shapeTypeName}) "
+                    f"Got: {partTypes=}"
+                )
+            self.partTypes = _Array[int]("i", partTypes)
 
         default_points: PointsT = []
         default_parts: list[int] = []
+
+        if points and lines:
+            raise ShapefileException(
+                "Constructing meaningful Shapes unambiguously from both "
+                "points and lines is not supported.  Provide one only. "
+                f" Got: {points=} and {lines=}"
+            )
+        elif not points and not lines:
+            if self.shapeType != NULL:
+                raise ShapefileException(
+                    f"Shape: {self.__class__.__name__} or shape type: {self.shapeTypeName} "
+                    "requires non-empty points or non-empty lines."
+                    f" Got: {points=} and {lines=}"
+                )
+        elif self.shapeType == NULL:
+            raise ShapefileException(
+                f"NullShape or shape type: {self.shapeTypeName} "
+                "must have zero points and zero lines (or neither set, or both None). "
+                f" Got: {points=} and {lines=}"
+            )
+        elif self.shapeType in Point_shapeTypes:
+            if not points or len(points) >= 2:
+                raise ShapefileException(
+                    f"Single point Shape: {self.__class__.__name__}, shape type: {self.shapeTypeName} "
+                    "requires one or  points (and possibly a z co-ordinate and m value), not "
+                    f"lines. Got: {points=} and {lines=}"
+                )
+            if lines:
+                raise ShapefileException(
+                    f"Single point shape: {self.__class__.__name__}, shape type: {self.shapeTypeName} "
+                    f"does not support lines. Got: {lines=}"
+                )
+        elif self.shapeType in MultiPoint_shapeTypes and lines and len(lines) >= 2:
+            raise ShapefileException(
+                f"Multipoint shape: {self.__class__.__name__}, shape type: {self.shapeTypeName} "
+                f"is a single part shape, but was given multiple parts - got {lines=}. "
+                "Point clouds can be constructed from a list of list points supplied to lines "
+                "(instead of points) but only one single 'line' is supported. "
+            )
 
         if lines is not None:
             if self.shapeType in Polygon_shapeTypes:
@@ -800,20 +845,19 @@ class Shape:
             # _from_geojson.
             default_parts = [0]
 
+        # PyShp 2 API compatibility requires self.points = []
+        # on NullShapes (and self.parts = []).
         self.points: PointsT = points or default_points
-
         self.parts: Sequence[int] = parts or default_parts
 
-        # and a dict to silently record any errors encountered in GeoJSON
+        # and a dict to record any captured errors encountered in GeoJSON
         self._errors: dict[str, int] = {}
 
         # add oid
         self.__oid: int = -1 if oid is None else oid
 
-        if bbox is not None:
-            self.bbox: BBox = bbox
-        elif len(self.points) >= 2:
-            self.bbox = self._bbox_from_points()
+        if self.shapeType != NULL and self.shapeType not in Point_shapeTypes:
+            self.bbox: BBox = bbox or self._bbox_from_points()
 
         ms_found = True
         if m:
@@ -829,9 +873,9 @@ class Shape:
 
         zs_found = True
         if z:
-            self.z: Sequence[float] = z
+            self.z: Sequence[float] = _Array[float]("d", z)
         elif self.shapeType in _HasZ_shapeTypes:
-            self.z = [_z_from_point(p) for p in self.points]
+            self.z = _Array[float]("d", (_z_from_point(p) for p in self.points))
         elif self.shapeType == POINTZ:
             self.z = (_z_from_point(self.points[0]),)
         else:
@@ -846,6 +890,21 @@ class Shape:
             self.zbox: ZBox = zbox
         elif zs_found:
             self.zbox = self._zbox_from_zs()
+
+    @property
+    def oid(self) -> int:
+        """The index position of the shape in the original shapefile"""
+        return self.__oid
+
+    @property
+    def shapeTypeName(self) -> str:
+        return SHAPETYPE_LOOKUP[self.shapeType]
+
+    def __repr__(self) -> str:
+        class_name = self.__class__.__name__
+        if class_name == "Shape":
+            return f"Shape #{self.__oid}: {self.shapeTypeName}"
+        return f"{class_name} #{self.__oid}"
 
     @staticmethod
     def _ensure_polygon_rings_closed(
@@ -1080,21 +1139,6 @@ still included but were encoded as GeoJSON exterior rings instead of holes."
                     index += len(ext_or_hole)
         return Shape(shapeType=shapeType, points=points, parts=parts)
 
-    @property
-    def oid(self) -> int:
-        """The index position of the shape in the original shapefile"""
-        return self.__oid
-
-    @property
-    def shapeTypeName(self) -> str:
-        return SHAPETYPE_LOOKUP[self.shapeType]
-
-    def __repr__(self) -> str:
-        class_name = self.__class__.__name__
-        if class_name == "Shape":
-            return f"Shape #{self.__oid}: {self.shapeTypeName}"
-        return f"{class_name} #{self.__oid}"
-
 
 # Need unused arguments to keep the same call signature for
 # different implementations of from_byte_stream and write_to_byte_stream
@@ -1116,6 +1160,11 @@ class NullShape(Shape):
         oid: int | None = None,
         bbox: BBox | None = None,
     ) -> NullShape:
+        """In the ESRI spec, Null shapes are defined in .shp files
+        entirely by a single integer encoding shape type 0
+        (this happens in ShpWriter._shp_record, amongst the shape
+        record header code).
+        """
         # Shape.__init__ sets self.points = points or []
         return NullShape(oid=oid)
 
@@ -1125,6 +1174,7 @@ class NullShape(Shape):
         s: Shape,
         i: int,
     ) -> int:
+        """No op (see above)."""
         return 0
 
 
@@ -1602,13 +1652,13 @@ class _HasZ(_CanHaveBBox):
             num_bytes_written = b_io.write(pack("<2d", *zbox))
         except StructError:
             raise ShapefileException(
-                f"Failed to write elevation extremes for record {i}. Expected floats."
+                f"Failed to write elevation extremes (ZBox) for record {i}. Expected floats."
             )
         try:
             num_bytes_written += b_io.write(pack(f"<{len(s.z)}d", *s.z))
         except StructError:
             raise ShapefileException(
-                f"Failed to write elevation values for record {i}. Expected floats."
+                f"Failed to write elevation values (z) for record {i}. Expected floats."
             )
 
         return num_bytes_written

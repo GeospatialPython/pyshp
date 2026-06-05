@@ -51,7 +51,36 @@ jobs:
     - name: Build wheel from the project repo
       uses: ./.github/actions/build_wheel_and_sdist
 
-  test_on_all_platforms:
+  property-based_tests:
+    needs: build_wheel_and_sdist
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [
+          "3.14",
+        ]
+        os: [
+          "ubuntu-24.04",
+        ]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/setup-python@v6
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - uses: actions/checkout@v6
+      with:
+        path: ./Pyshp
+
+    - name: "Hypothesis tests"
+      if:
+      uses: ./Pyshp/.github/actions/test
+      with:
+        extra_args: '-m hypothesis'
+        run_doctests: 'no'
+        pyshp_repo_directory: ./Pyshp
+
+  Pytest_and_doctests:
     needs: build_wheel_and_sdist
     strategy:
       fail-fast: false
@@ -94,3 +123,4 @@ jobs:
         replace_remote_urls_with_localhost: ${{ !(matrix.os == 'ubuntu-24.04' && matrix.python-version == '3.14') }}
         # Checkout to ./PyShp, as the test job also needs to check out the artefact repo
         pyshp_repo_directory: ./Pyshp
+

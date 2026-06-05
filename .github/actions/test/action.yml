@@ -7,7 +7,7 @@ description:
 inputs:
   extra_args:
     description: Extra command line args for Pytest and python shapefile.py
-    default: '-m "not network"'
+    default: '-m "not network and not hypothesis"'
     required: false
   replace_remote_urls_with_localhost:
     description: true or false.  Test loading shapefiles from a url, without overloading an external server from 30 parallel workflows.
@@ -17,6 +17,11 @@ inputs:
     description: Path to where the PyShp repo was checked out to (to keep separate from Shapefiles & artefacts repo).
     required: false
     default: '.'
+  run_doctests:
+    description: Whether to run the doctests or not.
+    required: false
+    default: 'yes'
+
 
 
 
@@ -81,6 +86,7 @@ runs:
         python -m pip install $WHEEL_NAME --group ../Pyshp/pyproject.toml:test
 
     - name: Doctests
+      if: ${{ inputs.run_doctests == 'yes' }}
       shell: bash
       working-directory: ${{ inputs.pyshp_repo_directory }}
       env:
