@@ -1,3 +1,12 @@
+VERSION 3.0.12
+
+2026-06-05
+	Data consistency
+	* Add Shape.points_2D and Shape.points_3D properties - lists of guaranteed length tuples (2 and 3 respectively).
+
+	Testing
+	* Round trip property-based tests for Polylines and Polygons (both pass).
+
 VERSION 3.0.11
 
 2026-06-04

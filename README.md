@@ -8,7 +8,7 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 
 - **Author**: [Joel Lawhead](https://github.com/GeospatialPython)
 - **Maintainers**: [James Parrott](https://github.com/JamesParrott) & [Karim Bahgat](https://github.com/karimbahgat)
-- **Version**: 3.0.11
+- **Version**: 3.0.12
 - **Date**: 5th June 2026
 - **License**: [MIT](https://github.com/GeospatialPython/pyshp/blob/master/LICENSE.TXT)
 
@@ -92,6 +92,13 @@ part of your geospatial project.
 
 
 # Version Changes
+
+## 3.0.12
+### Data consistency
+ - Add Shape.points_2D and Shape.points_3D properties - lists of guaranteed length tuples (2 and 3 respectively).
+
+### Testing
+ - Round trip property-based tests for Polylines and Polygons (both pass).
 
 ## 3.0.11
 ### Edge case handling
@@ -597,13 +604,14 @@ index which is 7.
 
 
 	>>> # Read the bbox of the 8th shape to verify
+	>>> s.bbox
+	BBox(xmin=-122.449637, ymin=37.80149, xmax=-122.442109, ymax=37.807958)
 	>>> # Round coordinates to 3 decimal places
-	>>> ['%.3f' % coord for coord in s.bbox]
+	>>> [f'{coord:.3f}' for coord in s.bbox]
 	['-122.450', '37.801', '-122.442', '37.808']
 
 Each shape record (except Points) contains the following attributes. Records of
 shapeType Point do not have a bounding box 'bbox'.
-# TODO!!  Fix attributes
 
 	>>> for name in dir(shapes[3]):
 	...     if not name.startswith('_'):
@@ -613,6 +621,8 @@ shapeType Point do not have a bounding box 'bbox'.
 	'oid'
 	'parts'
 	'points'
+	'points_2D'
+	'points_3D'
 	'shapeType'
 	'shapeTypeName'
 	'write_to_byte_stream'
@@ -636,16 +646,17 @@ shapeType Point do not have a bounding box 'bbox'.
 		>>> shapes[3].shapeTypeName
 		'POLYGON'
 
-  * `bbox`: If the shape type contains multiple points this tuple describes the
+  * `bbox`: If the shape type contains multiple points this named tuple describes the
 	  lower left (x,y) coordinate and upper right corner coordinate creating a
 	  complete box around the points. If the shapeType is a
 	  Null (shapeType == 0) then an AttributeError is raised.
 
 
 		>>> # Get the bounding box of the 4th shape.
+		>>> shapes[3].bbox
+		BBox(xmin=-122.485792, ymin=37.786931, xmax=-122.446285, ymax=37.811019)
 		>>> # Round coordinates to 3 decimal places
-		>>> bbox = shapes[3].bbox
-		>>> ['%.3f' % coord for coord in bbox]
+		>>> [f'{coord:.3f}' for coord in shapes[3].bbox]
 		['-122.486', '37.787', '-122.446', '37.811']
 
   * `parts`: Parts simply group collections of points into shapes. If the shape
@@ -657,16 +668,16 @@ shapeType Point do not have a bounding box 'bbox'.
 		>>> shapes[3].parts
 		[0]
 
-  * `points`: The points attribute contains a list of tuples containing an
-	  (x,y) coordinate for each point in the shape.
+  * `points_2D`/`points_3D`: The points_2D and points_3D attributes contain lists
+  		of tuples containing (x,y) or (x,y,z) coordinates respectively for each
+		point in the shape.  If no z data is available, z is set to 0 is used.
 
-
-		>>> len(shapes[3].points)
+		>>> len(shapes[3].points_2D)
 		173
 		>>> # Get the 8th point of the fourth shape
 		>>> # Truncate coordinates to 3 decimal places
-		>>> shape = shapes[3].points[7]
-		>>> ['%.3f' % coord for coord in shape]
+		>>> coords = shapes[3].points_2D[7]
+		>>> [f'{coord:.3f}' for coord in coords]
 		['-122.471', '37.787']
 
 In most cases, however, if you need to do more than just type or bounds checking, you may want
@@ -1562,6 +1573,9 @@ To examine a Z-type shapefile you can do:
 
 	>>> r.shape(0).z # flat list of Z-values
 	[18.0, 20.0, 22.0, 0.0, 0.0, 0.0, 0.0, 15.0, 13.0, 14.0]
+
+	>>> r.shape(0).points_3D # list of 3D coordinates incorporating the Z-values
+	[(1.0, 5.0, 18.0), (5.0, 5.0, 20.0), (5.0, 1.0, 22.0), (3.0, 3.0, 0.0), (1.0, 1.0, 0.0), (3.0, 2.0, 0.0), (2.0, 6.0, 0.0), (3.0, 2.0, 15.0), (2.0, 6.0, 13.0), (1.0, 9.0, 14.0)]
 
 	>>> r.close()
 
