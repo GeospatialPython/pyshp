@@ -8,7 +8,7 @@ Compatible with Python versions >=3.9
 
 from __future__ import annotations
 
-__version__ = "3.0.11"
+__version__ = "3.0.12"
 
 import abc
 import array
@@ -133,7 +133,6 @@ class BBox(NamedTuple):
     ymin: float
     xmax: float
     ymax: float
-    # = tuple[float, float, float, float]
 
 
 def _min_not_None(m1: float | None, m2: float | None) -> float | None:
@@ -162,13 +161,10 @@ class MBox(NamedTuple):
             _max_not_None(self.mmax, other.mmax),
         )
 
-    # = tuple[float, float]
-
 
 class ZBox(NamedTuple):
     zmin: float
     zmax: float
-    # = tuple[float, float]
 
 
 class WriteableBinStream(Protocol):
@@ -720,6 +716,35 @@ def _z_from_point(point: PointT) -> float:
     return 0.0
 
 
+def _with_polygon_rings_closed(
+    parts: Iterable[PointsT],
+) -> list[PointsT]:
+    return [part if part[0] == part[-1] else part + [part[0]] for part in parts]
+
+
+def _points_and_part_indices(
+    parts: list[PointsT],
+) -> tuple[PointsT, list[int]]:
+    # Intended for Union[Polyline, Polygon, MultiPoint, MultiPatch]
+    """From a list of parts (each part a list of points) return
+    a flattened list of points, and a list of indexes into that
+    flattened list corresponding to the start of each part.
+
+    Internal method for both multipoints (formed entirely by a single part),
+    and shapes that have multiple collections of points (each one
+    a part): (poly)lines, polygons, and multipatchs.
+    """
+    part_indexes: list[int] = []
+    points: PointsT = []
+
+    for part in parts:
+        # set part index position
+        part_indexes.append(len(points))
+        points.extend(part)
+
+    return points, part_indexes
+
+
 class CanHaveBboxNoLinesKwargs(TypedDict, total=False):
     oid: int | None
     points: PointsT | None
@@ -825,21 +850,17 @@ class Shape:
 
         if lines is not None:
             if self.shapeType in Polygon_shapeTypes:
-                lines = list(lines)
-                self._ensure_polygon_rings_closed(lines)
+                lines = _with_polygon_rings_closed(lines)
 
-            default_points, default_parts = self._points_and_parts_indexes_from_lines(
-                lines
-            )
-        elif points and self.shapeType in _CanHaveBBox_shapeTypes:
+            default_points, default_parts = _points_and_part_indices(lines)
+
+        elif not parts and self.shapeType in _CanHaveBBox_shapeTypes:
             # TODO:  Raise issue.
             # This ensures Polylines, Polygons and Multipatches with no part information are a single
             # Polyline, Polygon or Multipatch respectively.
             #
-            # However this also allows MultiPoints shapes to have a single part index 0 as
-            # documented in README.md,also when set from points
-            # (even though this is just an artefact of initialising them as a length-1 nested
-            # list of points via _points_and_parts_indexes_from_lines).
+            # This is consistent with  MultiPoints shapes having single part index 0 as
+            # documented in README.md, also when set from points
             #
             # Alternatively single points could be given parts = [0] too, as they do if formed
             # _from_geojson.
@@ -848,7 +869,7 @@ class Shape:
         # PyShp 2 API compatibility requires self.points = []
         # on NullShapes (and self.parts = []).
         self.points: PointsT = points or default_points
-        self.parts: Sequence[int] = parts or default_parts
+        self.parts = _Array[int]("i", parts or default_parts)
 
         # and a dict to record any captured errors encountered in GeoJSON
         self._errors: dict[str, int] = {}
@@ -900,42 +921,22 @@ class Shape:
     def shapeTypeName(self) -> str:
         return SHAPETYPE_LOOKUP[self.shapeType]
 
+    @property
+    def points_2D(self) -> list[Point2D]:
+        return [(x, y) for (x, y, *_rest) in self.points]
+
+    @property
+    def points_3D(self) -> list[Point3D]:
+        zs = getattr(self, "z", None)
+        if zs is None:
+            return [(x, y, _z_from_point((x, y))) for (x, y, *_rest) in self.points]
+        return [(x, y, z) for (x, y, *_rest), z in zip(self.points, zs)]
+
     def __repr__(self) -> str:
         class_name = self.__class__.__name__
         if class_name == "Shape":
             return f"Shape #{self.__oid}: {self.shapeTypeName}"
         return f"{class_name} #{self.__oid}"
-
-    @staticmethod
-    def _ensure_polygon_rings_closed(
-        parts: list[PointsT],  # Mutated
-    ) -> None:
-        for part in parts:
-            if part[0] != part[-1]:
-                part.append(part[0])
-
-    @staticmethod
-    def _points_and_parts_indexes_from_lines(
-        parts: list[PointsT],
-    ) -> tuple[PointsT, list[int]]:
-        # Intended for Union[Polyline, Polygon, MultiPoint, MultiPatch]
-        """From a list of parts (each part a list of points) return
-        a flattened list of points, and a list of indexes into that
-        flattened list corresponding to the start of each part.
-
-        Internal method for both multipoints (formed entirely by a single part),
-        and shapes that have multiple collections of points (each one
-        a part): (poly)lines, polygons, and multipatchs.
-        """
-        part_indexes: list[int] = []
-        points: PointsT = []
-
-        for part in parts:
-            # set part index position
-            part_indexes.append(len(points))
-            points.extend(part)
-
-        return points, part_indexes
 
     def _bbox_from_points(self) -> BBox:
         xs: list[float] = []

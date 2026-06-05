@@ -72,7 +72,8 @@ def test_Point_2D_roundtrips(
         bbox=None,
     )
     assert isinstance(actual, shp.Point)
-    assert actual.points == expected.points
+    assert actual.points_2D == expected.points_2D
+
     assert actual.oid == expected.oid
 
 
@@ -94,7 +95,8 @@ def test_PointM_roundtrips(
         bbox=None,
     )
     assert isinstance(actual, shp.PointM)
-    assert actual.points == expected.points
+    assert actual.points_2D == expected.points_2D
+
     assert actual.m == expected.m
     assert actual.oid == expected.oid
 
@@ -117,7 +119,8 @@ def test_PointZ_roundtrips(
         bbox=None,
     )
     assert isinstance(actual, shp.PointM)
-    assert actual.points == expected.points
+    assert actual.points_3D == expected.points_3D
+
     assert actual.z == expected.z
     assert actual.m == expected.m
     assert actual.oid == expected.oid
@@ -144,7 +147,8 @@ def test_MultiPoint_roundtrips(
         bbox=None,
     )
     assert isinstance(actual, shp.MultiPoint)
-    assert actual.points == expected.points
+    assert actual.points_2D == expected.points_2D
+
     assert actual.oid == expected.oid
 
 
@@ -177,7 +181,8 @@ def test_MultiPointM_roundtrips(
         bbox=None,
     )
     assert isinstance(actual, shp.MultiPointM)
-    assert actual.points == expected.points
+    assert actual.points_2D == expected.points_2D
+
     assert actual.m == expected.m
     assert actual.oid == expected.oid
 
@@ -212,7 +217,165 @@ def test_MultiPointZ_roundtrips(
         bbox=None,
     )
     assert isinstance(actual, shp.MultiPointZ)
-    assert actual.points == expected.points
+    assert actual.points_3D == expected.points_3D
+
+    assert actual.m == expected.m, f"{type(actual.m)=}, {type(expected.m)=}"
+    assert actual.z == expected.z,  f"{type(actual.z)=}, {type(expected.z)=}"
+    assert actual.oid == expected.oid
+
+polyline = builds(shp.Polyline, lines=lists(lists(tuples(xs, ys), min_size=1), min_size=1), oid=oid)
+polylinem = builds(shp.PolylineM, lines=lists(lists(tuples(xs, ys, ms), min_size=1), min_size=1), oid=oid)
+polylinez = builds(shp.PolylineZ, lines=lists(lists(tuples(xs, ys, zs, ms), min_size=1), min_size=1), oid=oid)
+
+@pytest.mark.hypothesis
+@given(expected=polyline, i=integers(min_value=1))
+def test_Polyline_roundtrips(
+    expected: shp.Polyline,
+    i: int,
+) -> None:
+    stream = io.BytesIO()
+    n = shp.Polyline.write_to_byte_stream(b_io=stream, s=expected, i=i)
+    assert n == stream.tell()
+    stream.seek(0)
+    actual = shp.Polyline.from_byte_stream(
+        shapeType=shp.POLYLINE,
+        b_io=stream,
+        next_shape_pos=n,
+        oid=expected.oid,
+        bbox=None,
+    )
+    assert isinstance(actual, shp.Polyline)
+    assert actual.points_2D == expected.points_2D
+
+    assert actual.parts == expected.parts, f"{type(actual.parts)=}, {type(expected.parts)=}"
+    assert actual.oid == expected.oid
+
+@pytest.mark.hypothesis
+@settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
+@given(expected=polylinem, i=integers(min_value=1))
+def test_PolylineM_roundtrips(
+    expected: shp.PolylineM,
+    i: int,
+) -> None:
+    stream = io.BytesIO()
+    n = shp.PolylineM.write_to_byte_stream(b_io=stream, s=expected, i=i)
+    assert n == stream.tell()
+    stream.seek(0)
+    actual = shp.PolylineM.from_byte_stream(
+        shapeType=shp.POLYLINEM,
+        b_io=stream,
+        next_shape_pos=n,
+        oid=expected.oid,
+        bbox=None,
+    )
+    assert isinstance(actual, shp.PolylineM)
+    assert actual.points_2D == expected.points_2D
+
+    assert actual.parts == expected.parts, f"{type(actual.parts)=}, {type(expected.parts)=}"
+    assert actual.m == expected.m, f"{type(actual.m)=}, {type(expected.m)=}"
+    assert actual.oid == expected.oid
+
+@pytest.mark.hypothesis
+@settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
+@given(expected=polylinez, i=integers(min_value=1))
+def test_PolylineZ_roundtrips(
+    expected: shp.PolylineZ,
+    i: int,
+) -> None:
+    stream = io.BytesIO()
+    n = shp.PolylineZ.write_to_byte_stream(b_io=stream, s=expected, i=i)
+    assert n == stream.tell()
+    stream.seek(0)
+    actual = shp.PolylineZ.from_byte_stream(
+        shapeType=shp.POLYLINEZ,
+        b_io=stream,
+        next_shape_pos=n,
+        oid=expected.oid,
+        bbox=None,
+    )
+    assert isinstance(actual, shp.PolylineZ)
+    assert actual.points_3D == expected.points_3D
+
+    assert actual.parts == expected.parts, f"{type(actual.parts)=}, {type(expected.parts)=}"
+    assert actual.m == expected.m, f"{type(actual.m)=}, {type(expected.m)=}"
+    assert actual.z == expected.z,  f"{type(actual.z)=}, {type(expected.z)=}"
+    assert actual.oid == expected.oid
+
+# Relies on Shape._ensure_polygon_rings_closed to close the Polygons
+polygon = builds(shp.Polygon, lines=lists(lists(tuples(xs, ys), min_size=1), min_size=1), oid=oid)
+polygonm = builds(shp.PolygonM, lines=lists(lists(tuples(xs, ys, ms), min_size=1), min_size=1), oid=oid)
+polygonz = builds(shp.PolygonZ, lines=lists(lists(tuples(xs, ys, zs, ms), min_size=1), min_size=1), oid=oid)
+
+@pytest.mark.hypothesis
+@given(expected=polygon, i=integers(min_value=1))
+def test_Polygon_roundtrips(
+    expected: shp.Polygon,
+    i: int,
+) -> None:
+    stream = io.BytesIO()
+    n = shp.Polygon.write_to_byte_stream(b_io=stream, s=expected, i=i)
+    assert n == stream.tell()
+    stream.seek(0)
+    actual = shp.Polygon.from_byte_stream(
+        shapeType=shp.POLYGON,
+        b_io=stream,
+        next_shape_pos=n,
+        oid=expected.oid,
+        bbox=None,
+    )
+    assert isinstance(actual, shp.Polygon)
+    assert actual.points_2D == expected.points_2D
+
+    assert actual.parts == expected.parts, f"{type(actual.parts)=}, {type(expected.parts)=}"
+    assert actual.oid == expected.oid
+
+@pytest.mark.hypothesis
+@settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
+@given(expected=polygonm, i=integers(min_value=1))
+def test_PolygonM_roundtrips(
+    expected: shp.PolygonM,
+    i: int,
+) -> None:
+    stream = io.BytesIO()
+    n = shp.PolygonM.write_to_byte_stream(b_io=stream, s=expected, i=i)
+    assert n == stream.tell()
+    stream.seek(0)
+    actual = shp.PolygonM.from_byte_stream(
+        shapeType=shp.POLYGONM,
+        b_io=stream,
+        next_shape_pos=n,
+        oid=expected.oid,
+        bbox=None,
+    )
+    assert isinstance(actual, shp.PolygonM)
+    assert actual.points_2D == expected.points_2D
+
+    assert actual.parts == expected.parts, f"{type(actual.parts)=}, {type(expected.parts)=}"
+    assert actual.m == expected.m, f"{type(actual.m)=}, {type(expected.m)=}"
+    assert actual.oid == expected.oid
+
+@pytest.mark.hypothesis
+@settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
+@given(expected=polygonz, i=integers(min_value=1))
+def test_PolygonZ_roundtrips(
+    expected: shp.PolygonZ,
+    i: int,
+) -> None:
+    stream = io.BytesIO()
+    n = shp.PolygonZ.write_to_byte_stream(b_io=stream, s=expected, i=i)
+    assert n == stream.tell()
+    stream.seek(0)
+    actual = shp.PolygonZ.from_byte_stream(
+        shapeType=shp.POLYGONZ,
+        b_io=stream,
+        next_shape_pos=n,
+        oid=expected.oid,
+        bbox=None,
+    )
+    assert isinstance(actual, shp.PolygonZ)
+    assert actual.points_3D == expected.points_3D
+
+    assert actual.parts == expected.parts, f"{type(actual.parts)=}, {type(expected.parts)=}"
     assert actual.m == expected.m, f"{type(actual.m)=}, {type(expected.m)=}"
     assert actual.z == expected.z,  f"{type(actual.z)=}, {type(expected.z)=}"
     assert actual.oid == expected.oid
