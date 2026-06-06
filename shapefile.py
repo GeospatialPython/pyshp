@@ -1,12 +1,12 @@
 """
-shapefile.py
+PyShp (shapefile.py)
 Provides read and write support for ESRI Shapefiles.
 authors: jlawhead<at>geospatialpython.com
-maintainer: karim.bahgat.norway<at>gmail.com
+maintainers: james<at>jamesparrott.dev and karim.bahgat.norway<at>gmail.com
 Compatible with Python versions 2.7-3.x
 """
 
-__version__ = "2.4.1"
+__version__ = "2.4.2"
 
 import array
 import io

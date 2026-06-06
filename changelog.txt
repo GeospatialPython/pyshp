@@ -1,3 +1,6 @@
+VERSION 2.4.2
+2026-06-06  Documentation update.
+
 VERSION 2.4.1
 
 2025-07-30
