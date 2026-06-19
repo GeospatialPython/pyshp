@@ -3141,6 +3141,8 @@ class ShpReader(_HasCheckedReadableFile):
             # MAYBE: check if more left of file or exit early?
             return
 
+        n = 0  # counter for num of actual shapes found
+
         # No shx file, unknown nr of shapes
         # Instead iterate until reach end of file
         # Calculate the offset indices during iteration
@@ -3149,10 +3151,10 @@ class ShpReader(_HasCheckedReadableFile):
             shape = self._shape(shape_len_B=shape_len_B, oid=i, bbox=bbox)
             # # pos = self.file.tell()
             # pos += num_bytes
+            n += 1
             if shape is not None or outside_bbox_as_None:
                 yield shape
 
-        n = i + 1  # num shapes yielded, having iterated over entire shp file.
         assert n == len(self.headers_cache), f"{n=}, {len(self.headers_cache)=}"
 
 
