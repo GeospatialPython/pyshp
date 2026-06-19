@@ -6,7 +6,7 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis.strategies import (
     builds,
-    composite,
+    composite, # Preferably avoid.  Shrinking composite strategies is slow.
     floats,
     integers,
     just,
@@ -153,19 +153,17 @@ def test_MultiPoint_roundtrips(
     assert actual.oid == expected.oid
 
 
-@composite
-def multipointM(draw):
-    N = draw(PointsLengths)
-    return shp.MultiPointM(
-        points=draw(coords_2D_list(min_size=N, max_size=N)),
-        m=draw(lists(ms, min_size=N, max_size=N)),
-        oid=oid,
-    )
 
+def multipointM_from_xyms(point_ms: tuple[float, float, float | None], oid_: int) -> shp.MultiPointM:
+    x_vals, y_vals, m_vals = zip(*point_ms)
+    xy_vals = zip(x_vals, y_vals)
+    return shp.MultiPointM(points=list(xy_vals), m=list(m_vals), oid=oid_)
+
+multipointM = builds(multipointM_from_xyms, lists(tuples(xs, ys, ms), min_size=1), oid)
 
 @pytest.mark.hypothesis
 @settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
-@given(expected=multipointM(), i=integers(min_value=1))
+@given(expected=multipointM, i=integers(min_value=1))
 def test_MultiPointM_roundtrips(
     expected: shp.MultiPointM,
     i: int,
@@ -188,20 +186,17 @@ def test_MultiPointM_roundtrips(
     assert actual.oid == expected.oid
 
 
-@composite
-def multipointZ(draw):
-    N = draw(PointsLengths)
-    return shp.MultiPointZ(
-        points=draw(coords_2D_list(min_size=N, max_size=N)),
-        z=draw(lists(zs, min_size=N, max_size=N)),
-        m=draw(lists(ms, min_size=N, max_size=N)),
-        oid=oid,
-    )
+def multipointZ_from_xyzms(pointz_ms: tuple[float, float, float, float | None], oid_: int) -> shp.MultiPointZ:
+    x_vals, y_vals, z_vals, m_vals = zip(*pointz_ms)
+    xy_vals = zip(x_vals, y_vals)
+    return shp.MultiPointZ(points=list(xy_vals), z=list(z_vals), m=list(m_vals), oid=oid_)
+
+multipointz = builds(multipointZ_from_xyzms, lists(tuples(xs, ys, zs, ms), min_size=1), oid)
 
 
 @pytest.mark.hypothesis
 @settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
-@given(expected=multipointZ(), i=integers(min_value=1))
+@given(expected=multipointz, i=integers(min_value=1))
 def test_MultiPointZ_roundtrips(
     expected: shp.MultiPointZ,
     i: int,
@@ -382,19 +377,28 @@ def test_PolygonZ_roundtrips(
     assert actual.oid == expected.oid
 
 part_types = sampled_from(range(6)) # 0: Triangle Strip, ..., 5: Ring
-@composite
-def multipatches(draw):
-    N = draw(PointsLengths)
-    p_types = draw(lists(part_types, min_size=N, max_size=N))
-    patches = draw(lists(lists(tuples(xs, ys, zs, ms), min_size=1), min_size=N, max_size=N))
-    return shp.MultiPatch(lines = patches, partTypes = p_types, oid=oid)
 
+def multipatch_from_xyzms_and_types(
+    xyzms_and_types: list[tuple[list[tuple[float, float, float, float | None]], int]],
+    oid: int,
+    ) -> shp.MultiPatch:
+    xyzm_vals, p_types = zip(*xyzms_and_types)
+    return shp.MultiPatch(lines = xyzm_vals, partTypes = p_types, oid=oid)
 
+multipatches = builds(
+    multipatch_from_xyzms_and_types,
+    lists(tuples(lists(tuples(xs, ys, zs, ms), min_size=1), part_types), min_size=1), oid)
+# @composite
+# def multipatches(draw):
+#     N = draw(PointsLengths)
+#     p_types = draw(lists(part_types, min_size=N, max_size=N))
+#     patches = draw(lists(lists(tuples(xs, ys, zs, ms), min_size=1), min_size=N, max_size=N))
+#     return shp.MultiPatch(lines = patches, partTypes = p_types, oid=oid)
 
 
 @pytest.mark.hypothesis
 @settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
-@given(expected=multipatches(), i=integers(min_value=1))
+@given(expected=multipatches, i=integers(min_value=1))
 def test_MultiPatch_roundtrips(
     expected: shp.MultiPatch,
     i: int,
