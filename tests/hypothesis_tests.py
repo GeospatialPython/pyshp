@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import itertools
 
 import pytest
 from hypothesis import HealthCheck, given, settings
@@ -27,14 +28,14 @@ zs = one_of(just(0.0), float_nums)
 PointsLengths = integers(min_value=1, max_value=8000)  # length of points
 oid = one_of(none(), integers(min_value=0))
 point_2D = builds(shp.Point, x=xs, y=ys, oid=oid)
-pointM = builds(
+pointm = builds(
     shp.PointM,
     x=xs,
     y=ys,
     m=ms,
     oid=oid,
 )
-pointZ = builds(
+pointz = builds(
     shp.PointZ,
     x=xs,
     y=ys,
@@ -79,7 +80,7 @@ def test_Point_2D_roundtrips(
 
 
 @pytest.mark.hypothesis
-@given(expected=pointM, i=integers(min_value=1))
+@given(expected=pointm, i=integers(min_value=1))
 def test_PointM_roundtrips(
     expected: shp.Point,
     i: int,
@@ -103,7 +104,7 @@ def test_PointM_roundtrips(
 
 
 @pytest.mark.hypothesis
-@given(expected=pointZ, i=integers(min_value=1))
+@given(expected=pointz, i=integers(min_value=1))
 def test_PointZ_roundtrips(
     expected: shp.Point,
     i: int,
@@ -159,11 +160,11 @@ def multipointM_from_xyms(point_ms: tuple[float, float, float | None], oid_: int
     xy_vals = zip(x_vals, y_vals)
     return shp.MultiPointM(points=list(xy_vals), m=list(m_vals), oid=oid_)
 
-multipointM = builds(multipointM_from_xyms, lists(tuples(xs, ys, ms), min_size=1), oid)
+multipointm = builds(multipointM_from_xyms, lists(tuples(xs, ys, ms), min_size=1), oid)
 
 @pytest.mark.hypothesis
-@settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
-@given(expected=multipointM, i=integers(min_value=1))
+# @settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
+@given(expected=multipointm, i=integers(min_value=1))
 def test_MultiPointM_roundtrips(
     expected: shp.MultiPointM,
     i: int,
@@ -195,7 +196,7 @@ multipointz = builds(multipointZ_from_xyzms, lists(tuples(xs, ys, zs, ms), min_s
 
 
 @pytest.mark.hypothesis
-@settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
+# @settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
 @given(expected=multipointz, i=integers(min_value=1))
 def test_MultiPointZ_roundtrips(
     expected: shp.MultiPointZ,
@@ -247,7 +248,7 @@ def test_Polyline_roundtrips(
     assert actual.oid == expected.oid
 
 @pytest.mark.hypothesis
-@settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
+# @settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
 @given(expected=polylinem, i=integers(min_value=1))
 def test_PolylineM_roundtrips(
     expected: shp.PolylineM,
@@ -272,7 +273,7 @@ def test_PolylineM_roundtrips(
     assert actual.oid == expected.oid
 
 @pytest.mark.hypothesis
-@settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
+# @settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
 @given(expected=polylinez, i=integers(min_value=1))
 def test_PolylineZ_roundtrips(
     expected: shp.PolylineZ,
@@ -326,7 +327,7 @@ def test_Polygon_roundtrips(
     assert actual.oid == expected.oid
 
 @pytest.mark.hypothesis
-@settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
+# @settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
 @given(expected=polygonm, i=integers(min_value=1))
 def test_PolygonM_roundtrips(
     expected: shp.PolygonM,
@@ -351,7 +352,7 @@ def test_PolygonM_roundtrips(
     assert actual.oid == expected.oid
 
 @pytest.mark.hypothesis
-@settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
+# @settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
 @given(expected=polygonz, i=integers(min_value=1))
 def test_PolygonZ_roundtrips(
     expected: shp.PolygonZ,
@@ -385,20 +386,14 @@ def multipatch_from_xyzms_and_types(
     xyzm_vals, p_types = zip(*xyzms_and_types)
     return shp.MultiPatch(lines = xyzm_vals, partTypes = p_types, oid=oid)
 
-multipatches = builds(
+multipatch = builds(
     multipatch_from_xyzms_and_types,
     lists(tuples(lists(tuples(xs, ys, zs, ms), min_size=1), part_types), min_size=1), oid)
-# @composite
-# def multipatches(draw):
-#     N = draw(PointsLengths)
-#     p_types = draw(lists(part_types, min_size=N, max_size=N))
-#     patches = draw(lists(lists(tuples(xs, ys, zs, ms), min_size=1), min_size=N, max_size=N))
-#     return shp.MultiPatch(lines = patches, partTypes = p_types, oid=oid)
 
 
 @pytest.mark.hypothesis
-@settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
-@given(expected=multipatches, i=integers(min_value=1))
+# @settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
+@given(expected=multipatch, i=integers(min_value=1))
 def test_MultiPatch_roundtrips(
     expected: shp.MultiPatch,
     i: int,
@@ -422,3 +417,69 @@ def test_MultiPatch_roundtrips(
     assert actual.z == expected.z,  f"{type(actual.z)=}, {type(expected.z)=}"
     assert actual.oid == expected.oid
     assert actual.partTypes == expected.partTypes, f"{type(actual.partTypes)=}, {type(expected.partTypes)=}"
+
+
+shape_codes_names_and_strategies = [
+# (0, "Null Shape"),
+(1, "Point", point_2D),
+(3, "PolyLine", polyline),
+(5, "Polygon", polygon),
+(8, "MultiPoint", multipoint),
+(11, "PointZ", pointz),
+(13, "PolyLineZ", polylinez),
+(15, "PolygonZ", polygonz),
+(18, "MultiPointZ", multipointz),
+(21, "PointM", pointm),
+(23, "PolyLineM", polylinem),
+(25, "PolygonM", polygonm),
+(28, "MultiPointM", multipointm),
+(31, "MultiPatch", multipatch),
+]
+
+def code_and_shape_strat_from_triple(t):
+    x, _name, shapes  = t
+    return tuples(just(x), lists(shapes, min_size = 0))  # Empty shp files are in the esri spec.
+
+codes_and_shapes_strats = [
+    code_and_shape_strat_from_triple(t)
+    for t in shape_codes_names_and_strategies
+]
+
+codes_and_shapes = one_of(codes_and_shapes_strats)
+
+@pytest.mark.hypothesis
+# @settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
+@given(codes_and_shapes=codes_and_shapes)
+def test_shp_reader_writer_roundtrip(codes_and_shapes)-> None:
+    code_ex, expected_shapes = codes_and_shapes
+    stream = io.BytesIO()
+    with shp.ShpWriter(shp=stream, shapeType=code_ex) as w:
+        for shape in expected_shapes:
+            w.shape(shape)
+    stream.seek(0)
+    with shp.ShpReader(shp=stream) as r:
+        assert r.shapeType == code_ex
+
+        for actual, expected in itertools.zip_longest(r.shapes(), expected_shapes):
+
+            assert isinstance(actual, shp.SHAPE_CLASS_FROM_SHAPETYPE[code_ex])
+            assert actual.points_3D == expected.points_3D
+            # Don't assert actual.oid == expected.oid it's defined by
+            # actual.oid indicates the order actual was written in, expected.oid
+            # is not currently encoded (as we'd have to resort the entire Shapefile after each shape)
+            assert actual.parts == expected.parts, f"{type(actual.parts)=}, {type(expected.parts)=}"
+
+            if (m := getattr(actual, "m", None)):
+                assert m == expected.m, f"{type(m)=}, {type(expected.m)=}"
+            else:
+                assert not hasattr(expected, "m")
+
+            if (z := getattr(actual, "z", None)):
+                assert z == expected.z, f"{type(z)=}, {type(expected.z)=}"
+            else:
+                assert not hasattr(expected, "z")
+
+            if (partTypes := getattr(actual, "partTypes", None)):
+                assert actual.partTypes == expected.partTypes, f"{type(actual.partTypes)=}, {type(expected.partTypes)=}"
+            else:
+                assert not hasattr(expected, "partTypes")
