@@ -14,6 +14,7 @@ from hypothesis.strategies import (
     none,
     one_of,
     tuples,
+    sampled_from,
 )
 
 import shapefile as shp
@@ -379,3 +380,41 @@ def test_PolygonZ_roundtrips(
     assert actual.m == expected.m, f"{type(actual.m)=}, {type(expected.m)=}"
     assert actual.z == expected.z,  f"{type(actual.z)=}, {type(expected.z)=}"
     assert actual.oid == expected.oid
+
+part_types = sampled_from(range(6)) # 0: Triangle Strip, ..., 5: Ring
+@composite
+def multipatches(draw):
+    N = draw(PointsLengths)
+    p_types = draw(lists(part_types, min_size=N, max_size=N))
+    patches = draw(lists(lists(tuples(xs, ys, zs, ms), min_size=1), min_size=N, max_size=N))
+    return shp.MultiPatch(lines = patches, partTypes = p_types, oid=oid)
+
+
+
+
+@pytest.mark.hypothesis
+@settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
+@given(expected=multipatches(), i=integers(min_value=1))
+def test_MultiPatch_roundtrips(
+    expected: shp.MultiPatch,
+    i: int,
+) -> None:
+    stream = io.BytesIO()
+    n = shp.MultiPatch.write_to_byte_stream(b_io=stream, s=expected, i=i)
+    assert n == stream.tell()
+    stream.seek(0)
+    actual = shp.MultiPatch.from_byte_stream(
+        shapeType=shp.MULTIPATCH,
+        b_io=stream,
+        next_shape_pos=n,
+        oid=expected.oid,
+        bbox=None,
+    )
+    assert isinstance(actual, shp.MultiPatch)
+    assert actual.points_3D == expected.points_3D
+
+    assert actual.parts == expected.parts, f"{type(actual.parts)=}, {type(expected.parts)=}"
+    assert actual.m == expected.m, f"{type(actual.m)=}, {type(expected.m)=}"
+    assert actual.z == expected.z,  f"{type(actual.z)=}, {type(expected.z)=}"
+    assert actual.oid == expected.oid
+    assert actual.partTypes == expected.partTypes, f"{type(actual.partTypes)=}, {type(expected.partTypes)=}"
