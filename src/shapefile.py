@@ -4134,7 +4134,11 @@ class ShpWriter(_ShpWriterInfo):
     def _write_file_length(self) -> None:
         # self.file required to be at correct position, e.g.
         # if called by self._header
-        self.file.write(pack(">i", self._shp_file_length_B()))
+        
+        # Calculate size as 16-bit words
+        size_B = self._shp_file_length_B()
+        size_16b_words = size_B // 2
+        self.file.write(pack(">i", size_16b_words))
 
     def _shp_file_length_B(self) -> int:
         """Calculates the file length of the shp file."""
@@ -4143,9 +4147,7 @@ class ShpWriter(_ShpWriterInfo):
 
         # Calculate size of all shapes
         self.file.seek(0, 2)
-        size_16b_words = self.file.tell()
-        # Calculate size as 16-bit words
-        size_B = size_16b_words // 2
+        size_B = self.file.tell()
         # Return to start
         self.file.seek(start_B)
         return size_B
@@ -4199,7 +4201,7 @@ class ShpWriter(_ShpWriterInfo):
         self,
         s: Shape | HasGeoInterface | GeoJSONHomogeneousGeometryObject,
     ) -> tuple[int, int]:
-        """Returns shape's offset and length in B"""
+        """Appends s to the file.  Returns shape's offset and length in B"""
         if not isinstance(s, Shape):
             if isinstance(s, HasGeoInterface):
                 shape_dict = s.__geo_interface__
@@ -4216,7 +4218,7 @@ class ShpWriter(_ShpWriterInfo):
         return self._shp_record(s)
 
     def _shp_record(self, s: Shape) -> tuple[int, int]:
-        """Returns shape's offset and length in B"""
+        """Appends s to the file.  Returns shape's offset and length in B"""
         offset = self.file.tell()
         self.shpNum += 1
 
