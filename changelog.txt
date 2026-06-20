@@ -1,3 +1,8 @@
+VERSION 3.0.14.dev
+
+2026-06-20
+	* API Tweak (small breaking change).  Make ShpWriter.shape return shape length in bytes (like offset) not in 16 bit words.
+
 VERSION 3.0.13
 
 2026-06-19
@@ -21,7 +26,7 @@ VERSION 3.0.11
 
 2026-06-04
 	Edge case handling
-	* Raise ShapefileException i) when creating Non-null Shapes without (or with empty) points
+	* Raise ShapefileException: i) when creating Non-null Shapes without (or with empty) points
 	  and ii) when creating Null Shapes with non-empty points.
 	* Ensure Shape.z and Shape.partTypes are _Arrays.
 	* Make Shape stricter about its args, e.g. only points or lines, only one point for Points.
