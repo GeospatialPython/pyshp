@@ -93,6 +93,12 @@ part of your geospatial project.
 
 # Version Changes
 
+## 3.0.14.dev
+### ShpWriter.shape API Tweak (small breaking change).
+ - Make ShpWriter.shape return shape length in bytes (the
+   same as for offset) not in 16 bit words.
+
+
 ## 3.0.13
 ### Bug fix
  - Fix bug when reading empty shp files.

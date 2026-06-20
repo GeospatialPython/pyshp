@@ -8,7 +8,7 @@ Compatible with Python versions >=3.9
 
 from __future__ import annotations
 
-__version__ = "3.0.13"
+__version__ = "3.0.14.dev"
 
 import abc
 import array
@@ -1607,7 +1607,6 @@ class _HasM(_CanHaveBBox):
             raise ShapefileException(
                 f"Failed to write measure extremes for record {i}. Expected floats"
             )
-
         ms_to_encode = replace_None_with_NODATA(s.m)
         try:
             num_bytes_written += b_io.write(pack(f"<{len(s.m)}d", *ms_to_encode))
@@ -4135,7 +4134,11 @@ class ShpWriter(_ShpWriterInfo):
     def _write_file_length(self) -> None:
         # self.file required to be at correct position, e.g.
         # if called by self._header
-        self.file.write(pack(">i", self._shp_file_length_B()))
+
+        # Calculate size as 16-bit words
+        size_B = self._shp_file_length_B()
+        size_16b_words = size_B // 2
+        self.file.write(pack(">i", size_16b_words))
 
     def _shp_file_length_B(self) -> int:
         """Calculates the file length of the shp file."""
@@ -4144,9 +4147,7 @@ class ShpWriter(_ShpWriterInfo):
 
         # Calculate size of all shapes
         self.file.seek(0, 2)
-        size_16b_words = self.file.tell()
-        # Calculate size as 16-bit words
-        size_B = size_16b_words // 2
+        size_B = self.file.tell()
         # Return to start
         self.file.seek(start_B)
         return size_B
@@ -4200,6 +4201,7 @@ class ShpWriter(_ShpWriterInfo):
         self,
         s: Shape | HasGeoInterface | GeoJSONHomogeneousGeometryObject,
     ) -> tuple[int, int]:
+        """Appends s to the file.  Returns shape's offset and length in B"""
         if not isinstance(s, Shape):
             if isinstance(s, HasGeoInterface):
                 shape_dict = s.__geo_interface__
@@ -4216,6 +4218,7 @@ class ShpWriter(_ShpWriterInfo):
         return self._shp_record(s)
 
     def _shp_record(self, s: Shape) -> tuple[int, int]:
+        """Appends s to the file.  Returns shape's offset and length in B"""
         offset = self.file.tell()
         self.shpNum += 1
 
@@ -4274,7 +4277,7 @@ class ShpWriter(_ShpWriterInfo):
         # Flush to file.
         b_io.seek(0)
         self.file.write(b_io.read())
-        return offset, length_16bw
+        return offset, n
 
 
 class ShxWriter(_ShpShxHeaderWriter):
@@ -4288,7 +4291,7 @@ class ShxWriter(_ShpShxHeaderWriter):
         super().__init__(file=shx)
         self.shp_writer = shp_writer
 
-    def _shx_record(self, offset_B: int, length_16bw: int) -> None:
+    def _shx_record(self, offset_B: int, length_B: int) -> None:
         """Writes the shx records."""
 
         f = self.file
@@ -4299,7 +4302,7 @@ class ShxWriter(_ShpShxHeaderWriter):
                 "It's over 4GB, perhaps split the .shp or the Shapefile into smaller ones? "
             )
 
-        offset_16bw = offset_B // 2
+        offset_16bw, length_16bw = offset_B // 2, length_B // 2
         f.write(pack(">2i", offset_16bw, length_16bw))
 
     def _header(self) -> None:
@@ -4454,9 +4457,9 @@ class Writer(_HasExitStack):
         # Balance if already not balanced
         if self.autoBalance and self.dbf_writer.recNum < self.shp_writer.shpNum:
             self.balance()
-        offset_B, length_16bw = self.shp_writer.shape(s)
+        offset_B, length_B = self.shp_writer.shape(s)
         if self._shx:
-            self.shx_writer._shx_record(offset_B, length_16bw)
+            self.shx_writer._shx_record(offset_B, length_B)
 
     def record(
         self,
