@@ -4134,7 +4134,7 @@ class ShpWriter(_ShpWriterInfo):
     def _write_file_length(self) -> None:
         # self.file required to be at correct position, e.g.
         # if called by self._header
-        
+
         # Calculate size as 16-bit words
         size_B = self._shp_file_length_B()
         size_16b_words = size_B // 2

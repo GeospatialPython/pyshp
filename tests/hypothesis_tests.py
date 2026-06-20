@@ -163,7 +163,6 @@ def multipointM_from_xyms(point_ms: tuple[float, float, float | None], oid_: int
 multipointm = builds(multipointM_from_xyms, lists(tuples(xs, ys, ms), min_size=1), oid)
 
 @pytest.mark.hypothesis
-# @settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
 @given(expected=multipointm, i=integers(min_value=1))
 def test_MultiPointM_roundtrips(
     expected: shp.MultiPointM,
@@ -196,7 +195,6 @@ multipointz = builds(multipointZ_from_xyzms, lists(tuples(xs, ys, zs, ms), min_s
 
 
 @pytest.mark.hypothesis
-# @settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
 @given(expected=multipointz, i=integers(min_value=1))
 def test_MultiPointZ_roundtrips(
     expected: shp.MultiPointZ,
@@ -248,7 +246,6 @@ def test_Polyline_roundtrips(
     assert actual.oid == expected.oid
 
 @pytest.mark.hypothesis
-# @settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
 @given(expected=polylinem, i=integers(min_value=1))
 def test_PolylineM_roundtrips(
     expected: shp.PolylineM,
@@ -273,7 +270,6 @@ def test_PolylineM_roundtrips(
     assert actual.oid == expected.oid
 
 @pytest.mark.hypothesis
-# @settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
 @given(expected=polylinez, i=integers(min_value=1))
 def test_PolylineZ_roundtrips(
     expected: shp.PolylineZ,
@@ -327,7 +323,6 @@ def test_Polygon_roundtrips(
     assert actual.oid == expected.oid
 
 @pytest.mark.hypothesis
-# @settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
 @given(expected=polygonm, i=integers(min_value=1))
 def test_PolygonM_roundtrips(
     expected: shp.PolygonM,
@@ -352,7 +347,6 @@ def test_PolygonM_roundtrips(
     assert actual.oid == expected.oid
 
 @pytest.mark.hypothesis
-# @settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
 @given(expected=polygonz, i=integers(min_value=1))
 def test_PolygonZ_roundtrips(
     expected: shp.PolygonZ,
@@ -392,7 +386,6 @@ multipatch = builds(
 
 
 @pytest.mark.hypothesis
-# @settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
 @given(expected=multipatch, i=integers(min_value=1))
 def test_MultiPatch_roundtrips(
     expected: shp.MultiPatch,
@@ -418,6 +411,12 @@ def test_MultiPatch_roundtrips(
     assert actual.oid == expected.oid
     assert actual.partTypes == expected.partTypes, f"{type(actual.partTypes)=}, {type(expected.partTypes)=}"
 
+MAX_FILE_SIZE_16bw = (1 << 31) - 1 # This bound comes from encoding the
+                                   # actual file size (in 16 bit words)
+                                   # as a 4 byte signed integer.
+MAX_NUM_SHAPES = (MAX_FILE_SIZE_16bw - 50) // 6 # Minus 100B header, 12 bytes
+                                                # per record (the minimum for
+                                                # a Null shape).
 
 shape_codes_names_and_strategies = [
 # (0, "Null Shape"),
@@ -438,7 +437,7 @@ shape_codes_names_and_strategies = [
 
 def code_and_shape_strat_from_triple(t):
     x, _name, shapes  = t
-    return tuples(just(x), lists(shapes, min_size = 0))  # Empty shp files are in the esri spec.
+    return tuples(just(x), lists(shapes, min_size = 0, max_size=MAX_NUM_SHAPES))  # Empty shp files are in the esri spec.
 
 codes_and_shapes_strats = [
     code_and_shape_strat_from_triple(t)
@@ -448,7 +447,6 @@ codes_and_shapes_strats = [
 codes_and_shapes = one_of(codes_and_shapes_strats)
 
 @pytest.mark.hypothesis
-# @settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
 @given(codes_and_shapes=codes_and_shapes)
 def test_shp_reader_writer_roundtrip(codes_and_shapes)-> None:
     code_ex, expected_shapes = codes_and_shapes
@@ -483,3 +481,62 @@ def test_shp_reader_writer_roundtrip(codes_and_shapes)-> None:
                 assert actual.partTypes == expected.partTypes, f"{type(actual.partTypes)=}, {type(expected.partTypes)=}"
             else:
                 assert not hasattr(expected, "partTypes")
+
+
+
+# SHX_UB = MAX_FILE_SIZE_16bw - 50
+
+
+# ##  Surprisingly slow.  Doesn't  add enough value to merit waiting for
+# @composite
+# def positive_ints_with_bounded_sum(
+#     draw,
+#     min_x: int = 6,
+#     upper_bound: int = SHX_UB,
+#     max_len: int = MAX_NUM_SHAPES,
+#     ):
+#     assert min_x >= 1
+#     assert upper_bound >= max_len
+#     length = draw(integers(min_value=0, max_value=max_len))
+#     if length == 0:
+#         return []
+
+#     max_x = upper_bound - (length - 1)
+#     result = []
+
+#     for i in range(length):
+#         if max_x < min_x :
+#             break
+#         x = draw(integers(min_value=min_x, max_value=max_x))
+#         result.append(x)
+#         max_x -= x
+
+#     return result
+
+
+@pytest.mark.hypothesis
+@given(codes_and_shapes=codes_and_shapes)
+def test_shx_reader_writer_roundtrip(codes_and_shapes)-> None:
+    code_ex, expected_shapes = codes_and_shapes
+
+    sizes_B = []
+    offsets_B = []
+    offset_B = 100 # "Thus, the offset for the first record in the
+                   #  main file is 50 (16bw), given the 100-byte header. "
+    shp_stream = io.BytesIO()
+    shx_stream = io.BytesIO()
+    with shp.ShpWriter(shp=shp_stream, shapeType=code_ex) as shp_w:
+        with shp.ShxWriter(shx=shx_stream, shp_writer = shp_w) as shx_w:
+            for shape in expected_shapes:
+                offset_B, size_B = shp_w.shape(shape)
+                sizes_B.append(size_B)
+                offsets_B.append(offset_B)
+                shx_w._shx_record(offset_B, size_B)
+
+    shx_stream.seek(0)
+
+    with shp.ShxReader(shx=shx_stream) as r:
+        assert r.numShapes == len(expected_shapes)
+        assert r.offsets == offsets_B
+        assert r.shape_lengths_B == sizes_B
+
