@@ -97,6 +97,8 @@ part of your geospatial project.
 ### ShpWriter.shape API Tweak (small breaking change).
  - Make ShpWriter.shape return shape length in bytes (the
    same as for offset) not in 16 bit words.
+### Testing
+ - Include NullShapes in shp round trip test.
 
 
 ## 3.0.13
