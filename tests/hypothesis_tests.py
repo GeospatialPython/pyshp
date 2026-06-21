@@ -525,8 +525,10 @@ def test_shx_reader_writer_roundtrip(codes_and_shapes)-> None:
 
 DBF_FIELD_TYPES = {
     "C": {"max_decimal" : 0},
-    "N": {"max_decimal" : 253},
-    "F": {"max_decimal" : 253},
+    "N": {"max_decimal" : 253, "max_length": 23},  # max length=23 to avoid error due to precision limit, e.g.:
+    "F": {"max_decimal" : 253, "max_length": 23},  # hypothesis.errors.InvalidArgument: max_value=100000000000000000000000 
+                                                   # cannot be exactly represented as a float of 
+                                                   # width 64 - use max_value=1e+23 instead.
     "L": {"max_length": 1},
     "D": {"min_length": 1, "max_length": 8, "max_decimal" : 0},
 }
@@ -571,8 +573,10 @@ def record_value_for_field(name: str, field_type: str, length: int, decimal: int
             return integers(min_value=min_int, max_value=max_int)
 
         return floats(
-            min_value=min_int - 1,  # + eps
-            max_value=max_int + 1,  # - eps
+            min_value=min_int - 1,
+            max_value=max_int + 1,
+            exclude_min=True,
+            exclude_max=True,
         )
     if field_type == "L":
         return sampled_from([True, False, None])
@@ -611,7 +615,9 @@ def test_dbf_reader_writer_roundtrip(fields_and_records)-> None:
             dbf_w.record(record)
     stream.seek(0)
     with shp.DbfReader(dbf=stream) as r:
-        for f_r, f_w in itertools.zip_longest(r.fields, fields):
+        actual_fields = iter(r.fields)
+        next(actual_fields) # skip deletion flag
+        for f_r, f_w in itertools.zip_longest(actual_fields, fields):
             assert f_r._asdict() == f_w
         for expected, actual in itertools.zip_longest(records, r.records()):
             assert actual == list(expected)
