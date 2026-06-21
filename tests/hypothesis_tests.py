@@ -27,6 +27,7 @@ ms = one_of(none(), float_nums)
 zs = one_of(just(0.0), float_nums)
 PointsLengths = integers(min_value=1, max_value=8000)  # length of points
 oid = one_of(none(), integers(min_value=0))
+null_shapes = builds(shp.NullShape, oid=oid)
 point_2D = builds(shp.Point, x=xs, y=ys, oid=oid)
 pointm = builds(
     shp.PointM,
@@ -419,7 +420,7 @@ MAX_NUM_SHAPES = (MAX_FILE_SIZE_16bw - 50) // 6 # Minus 100B header, 12 bytes
                                                 # a Null shape).
 
 shape_codes_names_and_strategies = [
-# (0, "Null Shape"),
+(0, "Null Shape", null_shapes),
 (1, "Point", point_2D),
 (3, "PolyLine", polyline),
 (5, "Polygon", polygon),
@@ -437,8 +438,14 @@ shape_codes_names_and_strategies = [
 
 def code_and_shape_strat_from_triple(t):
     x, _name, shapes  = t
-    return tuples(just(x), lists(shapes, min_size = 0, max_size=MAX_NUM_SHAPES))  # Empty shp files are in the esri spec.
-
+    return tuples(
+        just(x),
+        lists(
+            one_of(shapes, null_shapes),
+            min_size = 0, # Empty shp files are in the ESRI spec.
+            max_size=MAX_NUM_SHAPES,
+        ),
+    )
 codes_and_shapes_strats = [
     code_and_shape_strat_from_triple(t)
     for t in shape_codes_names_and_strategies
@@ -460,7 +467,7 @@ def test_shp_reader_writer_roundtrip(codes_and_shapes)-> None:
 
         for actual, expected in itertools.zip_longest(r.shapes(), expected_shapes):
 
-            assert isinstance(actual, shp.SHAPE_CLASS_FROM_SHAPETYPE[code_ex])
+            assert isinstance(actual, (shp.SHAPE_CLASS_FROM_SHAPETYPE[code_ex], shp.NullShape))
             assert actual.points_3D == expected.points_3D
             # Don't assert actual.oid == expected.oid it's defined by
             # actual.oid indicates the order actual was written in, expected.oid
@@ -483,35 +490,6 @@ def test_shp_reader_writer_roundtrip(codes_and_shapes)-> None:
                 assert not hasattr(expected, "partTypes")
 
 
-
-# SHX_UB = MAX_FILE_SIZE_16bw - 50
-
-
-# ##  Surprisingly slow.  Doesn't  add enough value to merit waiting for
-# @composite
-# def positive_ints_with_bounded_sum(
-#     draw,
-#     min_x: int = 6,
-#     upper_bound: int = SHX_UB,
-#     max_len: int = MAX_NUM_SHAPES,
-#     ):
-#     assert min_x >= 1
-#     assert upper_bound >= max_len
-#     length = draw(integers(min_value=0, max_value=max_len))
-#     if length == 0:
-#         return []
-
-#     max_x = upper_bound - (length - 1)
-#     result = []
-
-#     for i in range(length):
-#         if max_x < min_x :
-#             break
-#         x = draw(integers(min_value=min_x, max_value=max_x))
-#         result.append(x)
-#         max_x -= x
-
-#     return result
 
 
 @pytest.mark.hypothesis
