@@ -16,6 +16,9 @@ from hypothesis.strategies import (
     one_of,
     tuples,
     sampled_from,
+    text,
+    characters,
+    dates,
 )
 
 import shapefile as shp
@@ -518,3 +521,97 @@ def test_shx_reader_writer_roundtrip(codes_and_shapes)-> None:
         assert r.offsets == offsets_B
         assert r.shape_lengths_B == sizes_B
 
+
+
+DBF_FIELD_TYPES = {
+    "C": {"max_decimal" : 0},
+    "N": {"max_decimal" : 253},
+    "F": {"max_decimal" : 253},
+    "L": {"max_length": 1},
+    "D": {"min_length": 1, "max_length": 8, "max_decimal" : 0},
+}
+
+@composite
+def dbf_field(draw):
+    field_type, bounds_dict = draw(sampled_from(list(DBF_FIELD_TYPES.items())))
+
+    name = draw(
+        text(
+            alphabet=characters(whitelist_categories=("Lu", "Nd"), whitelist_characters="_"),
+            min_size=1,
+            max_size=10,
+        )
+    )
+
+    max_length = bounds_dict.get("max_length", 254)
+    min_length = bounds_dict.get("min_length", 1)
+    max_decimal = bounds_dict.get("max_decimal", 0)
+    length = draw(integers(min_value=min_length, max_value=max_length))
+    decimal = draw(integers(min_value=0, max_value=min(length - 1, max_decimal)))
+
+
+    return {"name": name, "field_type": field_type, "length": length, "decimal": decimal}
+
+
+def record_value_for_field(name: str, field_type: str, length: int, decimal: int = 0):
+
+    if field_type == "C":
+        return text(
+            alphabet=characters(blacklist_categories=("Cs",), blacklist_characters="\x00"),
+            min_size=0,
+            max_size=length,
+        )
+    if field_type in {"N", "F"}:
+
+        int_digits = length if decimal == 0 else length - decimal - 1
+        min_int = -(10 ** (int_digits - 1) - 1)
+        max_int = 10 ** int_digits - 1
+
+        if decimal == 0:
+            return integers(min_value=min_int, max_value=max_int)
+
+        return floats(
+            min_value=min_int - 1,  # + eps
+            max_value=max_int + 1,  # - eps
+        )
+    if field_type == "L":
+        return sampled_from([True, False, None])
+    if field_type == "D":
+        return dates().map(lambda d: d.strftime("%Y%m%d"))
+
+    raise ValueError(f"Unsupported: {field_type=}")
+
+
+@composite
+def dbf_fields_and_records(
+    draw,
+    max_fields=10, # In DbfWriter.__init__, max_num_fields: int = 2046,
+    max_records=20,
+    ):
+
+    fields = draw(lists(dbf_field(), min_size=1, max_size=max_fields))
+
+    record_strategy = tuples(*(record_value_for_field(**field) for field in fields))
+
+    records = draw(lists(record_strategy, min_size=0, max_size=max_records))
+
+    return fields, records
+
+
+
+@pytest.mark.hypothesis
+@given(fields_and_records=dbf_fields_and_records())
+def test_dbf_reader_writer_roundtrip(fields_and_records)-> None:
+    fields, records = fields_and_records
+    stream = io.BytesIO()
+    with shp.DbfWriter(dbf=stream) as dbf_w:
+        for field in fields:
+            dbf_w.field(field)
+        for record in records:
+            dbf_w.record(record)
+    stream.seek(0)
+    with shp.DbfReader(dbf=stream) as r:
+        for f_r, f_w in itertools.zip_longest(r.fields, fields):
+            assert f_r._asdict() == f_w
+        for expected, actual in itertools.zip_longest(records, r.records()):
+            assert actual == list(expected)
