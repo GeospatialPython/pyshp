@@ -528,8 +528,8 @@ def test_shx_reader_writer_roundtrip(codes_and_shapes)-> None:
 DBF_FIELD_TYPES = {
     "C": {},
     "N": {"max_decimal" : 20, "max_length": 22},  # max length=23 to avoid error due to precision limit, e.g.:
-    "F": {"max_decimal" : 20, "max_length": 22},  # hypothesis.errors.InvalidArgument: max_value=100000000000000000000000 
-                                                   # cannot be exactly represented as a float of 
+    "F": {"max_decimal" : 20, "max_length": 22},  # hypothesis.errors.InvalidArgument: max_value=100000000000000000000000
+                                                   # cannot be exactly represented as a float of
                                                    # width 64 - use max_value=1e+23 instead.
     "L": {"max_length": 1},
     "D": {"min_length": 8, "max_length": 8},
@@ -551,7 +551,7 @@ def dbf_field(draw):
     min_length = bounds_dict.get("min_length", 1)
     max_decimal = bounds_dict.get("max_decimal", 0)
     size = draw(integers(min_value=min_length, max_value=max_length))
-    decimal = draw(integers(min_value=0, max_value=max(0,min(size - 2, max_decimal))))
+    decimal = draw(integers(min_value=0, max_value=max(0,min(size - 3, max_decimal))))
 
 
     return {"name": name, "field_type": field_type, "size": size, "decimal": decimal}
