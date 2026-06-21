@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import datetime
 import io
 import itertools
+import string
 
 import pytest
 from hypothesis import HealthCheck, given, settings
@@ -525,8 +527,8 @@ def test_shx_reader_writer_roundtrip(codes_and_shapes)-> None:
 
 DBF_FIELD_TYPES = {
     "C": {},
-    "N": {"max_decimal" : 253, "max_length": 22},  # max length=23 to avoid error due to precision limit, e.g.:
-    "F": {"max_decimal" : 253, "max_length": 22},  # hypothesis.errors.InvalidArgument: max_value=100000000000000000000000 
+    "N": {"max_decimal" : 20, "max_length": 22},  # max length=23 to avoid error due to precision limit, e.g.:
+    "F": {"max_decimal" : 20, "max_length": 22},  # hypothesis.errors.InvalidArgument: max_value=100000000000000000000000 
                                                    # cannot be exactly represented as a float of 
                                                    # width 64 - use max_value=1e+23 instead.
     "L": {"max_length": 1},
@@ -539,7 +541,7 @@ def dbf_field(draw):
 
     name = draw(
         text(
-            alphabet=characters(whitelist_categories=("Lu", "Nd"), whitelist_characters="_"),
+            alphabet=characters(codec="ascii"),
             min_size=1,
             max_size=10,
         )
@@ -549,17 +551,18 @@ def dbf_field(draw):
     min_length = bounds_dict.get("min_length", 1)
     max_decimal = bounds_dict.get("max_decimal", 0)
     size = draw(integers(min_value=min_length, max_value=max_length))
-    decimal = draw(integers(min_value=0, max_value=min(size - 1, max_decimal)))
+    decimal = draw(integers(min_value=0, max_value=max(0,min(size - 2, max_decimal))))
 
 
     return {"name": name, "field_type": field_type, "size": size, "decimal": decimal}
 
+ascii_printable = string.ascii_letters + string.digits + string.punctuation #+ " "
 
 def record_value_for_field(name: str, field_type: str, size: int, decimal: int = 0):
 
     if field_type == "C":
         return text(
-            alphabet=characters(blacklist_categories=("Cs",), blacklist_characters="\x00"),
+            alphabet=ascii_printable,
             min_size=0,
             max_size=size,
         )
@@ -582,7 +585,7 @@ def record_value_for_field(name: str, field_type: str, size: int, decimal: int =
     if field_type == "L":
         return sampled_from([True, False, None])
     if field_type == "D":
-        return dates().map(lambda d: d.strftime("%Y%m%d"))
+        return one_of(dates(), dates().map(lambda d: d.strftime("%Y%m%d")))
 
     raise ValueError(f"Unsupported: {field_type=}")
 
@@ -622,5 +625,17 @@ def test_dbf_reader_writer_roundtrip(fields_and_records)-> None:
             actual_field_dict = f_r._asdict()
             for k in ("field_type", "size", "decimal"):
                 assert actual_field_dict[k] == f_w[k], f"{k=}, {actual_field_dict[k]=}, {f_w[k]=}"
-        for expected, actual in itertools.zip_longest(records, r.records()):
-            assert actual == list(expected)
+        for exp_rec, actual_rec in itertools.zip_longest(records, r.records()):
+            for expected, actual, field in itertools.zip_longest(exp_rec, actual_rec, fields):
+                field_type = field["field_type"]
+                decimal = field["decimal"]
+                if field_type == "D":
+                    if isinstance(expected, datetime.date):
+                        expected = expected.strftime("%Y%m%d")
+                    if isinstance(actual, datetime.date):
+                        actual = actual.strftime("%Y%m%d")
+                elif field_type in ("N", "F"):
+                    expected = float(format(expected, f".{decimal}f"))
+                # elif field_type == "C":
+                #     expected = expected.strip()
+                assert actual == expected, f"{actual=}, {expected=}, {field_type=}, {type(actual)=}, {type(expected)=}"

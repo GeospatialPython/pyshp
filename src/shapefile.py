@@ -3943,9 +3943,9 @@ class DbfWriter(_HasCheckedWriteableFile):
         else:
             # Blank fields for empty record
             record = ["" for _ in range(fieldCount)]
-        self.__dbfRecord(record)
+        self._record(record)
 
-    def __dbfRecord(self, record: list[RecordValue]) -> None:
+    def _record(self, record: list[RecordValue]) -> None:
         """Writes the dbf records."""
         f = self.file
         if self.recNum == 0:
