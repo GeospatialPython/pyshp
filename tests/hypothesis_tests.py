@@ -536,12 +536,15 @@ DBF_FIELD_TYPES = {
 }
 
 @composite
-def dbf_field(draw):
+def dbf_fields(draw):
     field_type, bounds_dict = draw(sampled_from(list(DBF_FIELD_TYPES.items())))
 
     name = draw(
         text(
-            alphabet=characters(codec="ascii"),
+            alphabet=characters(
+                codec="ascii",
+                exclude_characters=["\x00"],
+            ),
             min_size=1,
             max_size=10,
         )
@@ -555,6 +558,23 @@ def dbf_field(draw):
 
 
     return {"name": name, "field_type": field_type, "size": size, "decimal": decimal}
+
+
+@pytest.mark.hypothesis
+@given(field_kwargs=dbf_fields())
+def test_dbf_Field_roundtrips(
+    field_kwargs: dict,
+) -> None:
+    expected = shp.Field.from_unchecked(**field_kwargs)
+    stream = io.BytesIO()
+    encoded = expected.encode_field_descriptor(replace_ascii_spaces_with_underscores=False)
+    stream.write(encoded)
+    stream.seek(0)
+    actual = shp.Field.from_byte_stream(stream, strip_leading_whitespace=False)
+    assert isinstance(actual, shp.Field)
+    assert actual.name == expected.name
+    assert actual[1:] == expected[1:]
+
 
 ascii_printable = string.ascii_letters + string.digits + string.punctuation + " "
 
@@ -596,7 +616,7 @@ def _dbf_fields_and_record_strategy(
     max_records=20,
     ):
 
-    fields = draw(lists(dbf_field(), min_size=1, max_size=max_fields))
+    fields = draw(lists(dbf_fields(), min_size=1, max_size=max_fields))
 
     record_strategy = tuples(*(record_value_for_field(**field) for field in fields))
 
