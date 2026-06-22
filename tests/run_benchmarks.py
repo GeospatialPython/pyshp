@@ -10,7 +10,7 @@ from collections.abc import Callable, Iterable
 from os import PathLike
 from pathlib import Path
 from tempfile import TemporaryFile as TempF
-from typing import cast
+from typing import cast, Iterable
 
 import shapefile
 
@@ -55,14 +55,14 @@ shapeRecords: dict[str | PathLike, list[shapefile.shapeRecord]] = (
 
 def open_shapefile_with_PyShp(target: str | PathLike):
     with shapefile.Reader(target) as r:
-        fields[target] = r.fields
+        fields[target] = r.data_fields
         for shapeRecord in r.iterShapeRecords():
             shapeRecords[target].append(shapeRecord)
 
 
 def write_shapefile_with_PyShp(target: str | PathLike):
     with TempF("wb") as shp, TempF("wb") as dbf, TempF("wb") as shx:
-        with shapefile.Writer(shp=shp, dbf=dbf, shx=shx) as w:  # type: ignore [arg-type]
+        with shapefile.Writer(shp=shp, dbf=dbf, shx=shx, strict=False) as w:  # type: ignore [arg-type]
             for field_info_tuple in fields[target]:
                 w.field(*field_info_tuple)
             for shapeRecord in shapeRecords[target]:
@@ -87,32 +87,32 @@ for file_path in SHAPEFILES.values():
 
 COLS_WIDTHS = (22, 10)
 
-reader_benchmarks = [
-    functools.partial(
+reader_benchmarks = {
+    test_name : functools.partial(
         benchmark,
         name=f"Read {test_name}",
         func=functools.partial(open_shapefile_with_PyShp, target=target),
         col_widths=COLS_WIDTHS,
     )
     for test_name, target in SHAPEFILES.items()
-]
+}
 
 # Require fields and shapeRecords to first have been populated
 # from data from previouly running the reader_benchmarks
-writer_benchmarks = [
-    functools.partial(
+writer_benchmarks = {
+    test_name : functools.partial(
         benchmark,
         name=f"Write {test_name}",
         func=functools.partial(write_shapefile_with_PyShp, target=target),
         col_widths=COLS_WIDTHS,
     )
     for test_name, target in SHAPEFILES.items()
-]
+}
 
 
 def run(
     run_count: int,
-    benchmarks: list[Callable[[], None]],
+    benchmarks: Iterable[Callable[[], None]],
     col_widths: tuple[int, int] = COLS_WIDTHS,
 ) -> None:
     col_head = ("parser", "exec time", "performance (more is better)")
@@ -125,9 +125,11 @@ def run(
             run_count=run_count,
         )
 
+def main():
+    print("Reader tests:")
+    run(1, reader_benchmarks.values())  # type: ignore [arg-type]
+    print("\n\nWriter tests:")
+    run(1, writer_benchmarks.values())  # type: ignore [arg-type]
 
 if __name__ == "__main__":
-    print("Reader tests:")
-    run(1, reader_benchmarks)  # type: ignore [arg-type]
-    print("\n\nWriter tests:")
-    run(1, writer_benchmarks)  # type: ignore [arg-type]
+    main()

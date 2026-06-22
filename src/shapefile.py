@@ -8,7 +8,7 @@ Compatible with Python versions >=3.9
 
 from __future__ import annotations
 
-__version__ = "3.0.14.dev"
+__version__ = "3.1.0"
 
 import abc
 import array
@@ -24,7 +24,7 @@ import warnings
 import zipfile
 from collections.abc import Container, Iterable, Iterator, Reversible, Sequence
 from contextlib import AbstractContextManager, ExitStack
-from datetime import date
+from datetime import date, datetime
 from os import PathLike
 from pathlib import Path
 from struct import Struct, calcsize, error, pack, unpack
@@ -235,38 +235,110 @@ class PossibleDataLoss(Warning):
     pass
 
 
-def _largest_valid_truncated_encoding(
+class DbfStringDataLoss(ValueError):
+    pass
+
+
+class Decoder(Protocol):
+    __name__: str
+
+    def __call__(
+        self,
+        b: bytes,
+        encoding: str = "utf8",
+        encodingErrors: str = "strict",
+        strict: bool = False,
+    ) -> str: ...
+
+
+def _encode_dbf_string(
     s: str,
-    max_bytes: int,
-    strict: bool,
+    size: int,
+    decode: Decoder,
+    pad_byte: bytes | None = None,
     encoding: str = "utf8",
     encodingErrors: str = "strict",
+    strict: bool = True,
 ) -> tuple[bytes, str]:
+    """Attempts to encoded s with the codec specified,
+    progressively truncating its code points until
+    the resulting bytes are less than size
+    (e.g. the dbf field length or field name size == 10).
+    If less, these bytes are then padded to length size.
+
+    Replaces:    s.encode(self.encoding, self.encodingErrors)[:size]
+                .ljust(size))
+    in the legacy string encoding implementation:
+    """
     N = len(s)
+    trimmed: str
+    encoded: bytes
     for i in reversed(range(0, N + 1)):
         trimmed = s[:i]
         encoded = trimmed.encode(encoding, encodingErrors)
-        if len(encoded) <= max_bytes:
+
+        if len(encoded) <= size:
             if i <= N - 1:
                 msg = (
                     f"Dropped {N - i} code points (e.g. characters)! "
                     f"{s} was truncated to {trimmed} (discarding: {s[i:]}), "
-                    f"in order to encode it under {max_bytes} bytes for the field or field name. "
+                    f"in order to encode it under {size} bytes for the field or field name. "
                     f"Used: {encoding=} and {encodingErrors=}. "
                 )
                 if strict:
-                    raise ValueError(f"Data loss. {strict=}.\n{msg}")
-                else:
-                    warnings.warn(
-                        msg,
-                        category=PossibleDataLoss,
-                    )
-            return encoded, trimmed
-    raise ValueError(
-        f"Maximum truncation not sufficient to encode below {max_bytes=}. "
-        f"Could not encode first code point (e.g. character): {s[0]} "
-        f"to a short enough byte string, using {encoding=}, {encodingErrors=}"
+                    raise DbfStringDataLoss(f"Data loss. {strict=}.\n{msg}")
+                warnings.warn(
+                    msg,
+                    category=PossibleDataLoss,
+                )
+            break
+    else:  # for loop did not break, len(encoded) <= size,
+        #    e.g. encoding "" preppends a BOM bigger than size.
+        raise ValueError(
+            f"Maximum truncation not sufficient to encode below {size=}. "
+            f"Could not encode first code point (e.g. character): {s[0]} "
+            f"to a short enough byte string, using {encoding=}, {encodingErrors=}"
+        )
+
+    if len(encoded) < size and pad_byte is not None:
+        padded = encoded.ljust(size, pad_byte)
+    else:
+        padded = encoded
+
+    decoded = decode(
+        b=padded,
+        encoding=encoding,
+        encodingErrors=encodingErrors,
     )
+    if decoded != trimmed:
+        msg = f"Padded value: {padded!r} does not decode to {trimmed!r} using PyShp's decoder: {decode.__name__}"
+        if len(trimmed) < len(s):
+            msg = f"{msg} (trimmed, original string: {s}). "
+        if strict:
+            raise DbfStringDataLoss(msg)
+        warnings.warn(
+            msg,
+            category=PossibleDataLoss,
+        )
+
+    return padded, trimmed
+
+
+def _decode_C_or_M_field(
+    b: bytes,
+    encoding: str = "utf8",
+    encodingErrors: str = "strict",
+    strict: bool = True,
+) -> str:
+    retval = b.decode(encoding, encodingErrors).rstrip("\x00").rstrip(" ")
+    if retval.rstrip("\x00") != retval and strict:
+        msg = (
+            f"More Trailing Null chars in: {b!r}"
+            " after removing trailing null chars and ascii spaces"
+            f", resulting in {retval!r}"
+        )
+        warnings.warn(msg, category=PossibleDataLoss)
+    return retval
 
 
 class Field(NamedTuple):
@@ -281,28 +353,60 @@ class Field(NamedTuple):
         # En/decoding the name as "<10sx" embeds the null terminator.
         return Struct("<10sxc4xBB14x")
 
+    @staticmethod
+    def decode_name(
+        b: bytes,
+        encoding: str = "utf8",
+        encodingErrors: str = "strict",
+        strict: bool = True,
+    ) -> str:
+        N = len(b)
+        decoded: str
+        num_trailing_null_bytes = N - len(b.rstrip(b"\x00"))
+
+        # Test if we need to restore any of those null bytes to
+        # correctly decode the remaining bytes to a string.
+        for num_to_trim in reversed(range(num_trailing_null_bytes + 1)):
+            i = N - num_to_trim
+            trimmed = b[:i]
+            try:
+                decoded = trimmed.decode(encoding, encodingErrors)
+            except UnicodeDecodeError:
+                continue
+            if strict and num_to_trim < num_trailing_null_bytes:
+                warnings.warn(
+                    f"Used {num_trailing_null_bytes - num_to_trim} null bytes "
+                    f"from padding to decode {b!r} "
+                    f"to: {decoded!r} ({encoding=}, {encodingErrors=}) ",
+                    category=PossibleDataLoss,
+                )
+            if not strict:
+                decoded = decoded.lstrip()
+            return decoded
+
+        raise dbfFileException(
+            f"Could not decode field name: {b!r} using {encoding=} and {encodingErrors=}"
+            " no matter how many trailing null-bytes (if any) were used. "
+        )
+
     @classmethod
     def from_byte_stream(
         cls,
         b_io: ReadableBinStream,
-        strict: bool = False,
         encoding: str = "utf8",
         encodingErrors: str = "strict",
-        strip_leading_whitespace: bool = True,
+        strict: bool = False,
     ) -> Field:
         encoded_field_tuple: tuple[bytes, bytes, int, int]
         encoded_field_tuple = cls.get_struct().unpack(b_io.read(32))
         encoded_name, encoded_type_char, size, decimal = encoded_field_tuple
 
-        encoded_name, __, ___ = encoded_name.partition(b"\x00")
-        name = encoded_name.decode(encoding, encodingErrors)
-        if strip_leading_whitespace:
-            name = name.lstrip()
+        name = cls.decode_name(encoded_name, encoding, encodingErrors)
 
         field_type = FIELD_TYPE_ALIASES[encoded_type_char]
 
         return cls.from_unchecked(
-            name, field_type, size, decimal, strict, encoding, encodingErrors
+            name, field_type, size, decimal, encoding, encodingErrors, strict
         )
 
     @classmethod
@@ -312,15 +416,15 @@ class Field(NamedTuple):
         field_type: str | bytes | FieldTypeT = "C",
         size: int = 50,
         decimal: int = 0,
-        strict: bool = False,
         encoding: str = "utf8",
         encodingErrors: str = "strict",
+        strict: bool = False,
     ) -> Field:
 
         if "\x00" in name:
             msg = (
-                "Field names should contain null characters "
-                "as null bytes are used to pad them in the header. "
+                "Field names should not contain null characters "
+                "as null bytes are used for padding in the header. "
                 f"Got: {name=} "
             )
             if strict:
@@ -330,8 +434,8 @@ class Field(NamedTuple):
         try:
             type_ = FIELD_TYPE_ALIASES[field_type]
         except KeyError:
-            raise ShapefileException(
-                f"field_type must be in {{FieldType.__members__}}. Got: {field_type=}. "
+            raise dbfFileException(
+                f"field_type must be in {FieldType.__members__}. Got: {field_type=}. "
             )
 
         if type_ is FieldType.D:
@@ -341,29 +445,71 @@ class Field(NamedTuple):
             size = 1
             decimal = 0
 
+        # Only use the portion of the name that we are able to encode to
+        # 10 bytes or less.
+        _encoded_name, trimmed_name = cls.trim_name_until_encodable(
+            name=str(name),
+            encoding=encoding,
+            encodingErrors=encodingErrors,
+            strict=strict,
+        )
+
         # A doctest in README.md previously passed in a string ('40') for size,
         # so explictly convert name to str, and size and decimal to ints.
         inst = cls(
-            name=str(name), field_type=type_, size=int(size), decimal=int(decimal)
+            name=trimmed_name, field_type=type_, size=int(size), decimal=int(decimal)
         )
 
+        # Raise Exception or trigger warning early, before user adds more fields
+        # (fields are only written when first record added, and on close)
         inst.encode_field_descriptor(
-            strict=True, encoding=encoding, encodingErrors=encodingErrors
+            encoding=encoding,
+            encodingErrors=encodingErrors,
+            strict=strict,
         )
         return inst
+
+    @classmethod
+    def trim_name_until_encodable(
+        cls,
+        name: str,
+        encoding: str = "utf8",
+        encodingErrors: str = "strict",
+        strict: bool = False,
+    ) -> tuple[bytes, str]:
+        return _encode_dbf_string(
+            s=name,
+            size=10,
+            decode=cls.decode_name,
+            pad_byte=b"\x00",
+            encoding=encoding,
+            encodingErrors=encodingErrors,
+            strict=strict,
+        )
 
     @functools.cache
     def encode_field_descriptor(
         self,
-        strict: bool = False,
         encoding: str = "utf8",
         encodingErrors: str = "strict",
-        replace_ascii_spaces_with_underscores: bool = True,
+        strict: bool = False,
     ) -> bytes:
-        encoded_name = self.name.encode(encoding, encodingErrors)
-        if replace_ascii_spaces_with_underscores:
+        # encoded_name = self.name.encode(encoding, encodingErrors)
+        # encoded_name = encoded_name[:10].ljust(10, b"\x00")
+        encoded_name, _trimmed_name = self.trim_name_until_encodable(
+            name=self.name,
+            encoding=encoding,
+            encodingErrors=encodingErrors,
+            strict=strict,
+        )
+        if not strict and b" " in encoded_name:
+            warnings.warn(
+                "Replacing ascii spaces (0x20) with underscores "
+                f"in encoded bytes: {encoded_name!r}",
+                category=PossibleDataLoss,
+            )
             encoded_name = encoded_name.replace(b" ", b"_")
-        encoded_name = encoded_name[:10].ljust(10, b"\x00")
+
         encoded_field_type = self.field_type.encode("ascii")
         return self.get_struct().pack(
             encoded_name,
@@ -2708,9 +2854,9 @@ class DbfReader(_HasCheckedReadableFile):
             self.fields.append(
                 Field.from_byte_stream(
                     b_io=self.file,
-                    strict=self.strict,
                     encoding=self.encoding,
                     encodingErrors=self.encodingErrors,
+                    strict=self.strict,
                 )
             )
 
@@ -2733,6 +2879,11 @@ class DbfReader(_HasCheckedReadableFile):
         __fieldTuples, recLookup, recStruct = self._record_fields(fieldnames)
         self._fullRecStruct = recStruct
         self._fullRecLookup = recLookup
+
+    @property
+    def data_fields(self) -> list[Field]:
+        """All fields except the DeletionFlag."""
+        return self.fields[1:]
 
     def _record_fmt(self, fields: Container[str] | None = None) -> tuple[str, int]:
         """Calculates the format and size of a .dbf record. Optional 'fields' arg
@@ -2781,11 +2932,10 @@ class DbfReader(_HasCheckedReadableFile):
             # fetch relevant field info tuples
             fieldTuples = []
             for fieldinfo in self.fields[1:]:
-                name = fieldinfo[0]
-                if name in unique_fields:
+                if fieldinfo.name in unique_fields:
                     fieldTuples.append(fieldinfo)
             # store the field positions
-            recLookup = {f[0]: i for i, f in enumerate(fieldTuples)}
+            recLookup = {f.name: i for i, f in enumerate(fieldTuples)}
         else:
             # use all the dbf fields
             fieldTuples = self.fields[1:]  # sans deletion flag
@@ -2831,8 +2981,8 @@ class DbfReader(_HasCheckedReadableFile):
         for (__name, typ, __size, decimal), value in zip(fieldTuples, recordContents):
             if typ is FieldType.N or typ is FieldType.F:
                 # numeric or float: number stored as a string, right justified, and padded with blanks to the width of the field.
-                value = value.split(b"\0")[0]
-                value = value.replace(b"*", b"")  # QGIS NULL is all '*' chars
+                value, __, __ = value.partition(b"\x00")
+                value = value.strip(b"*")  # QGIS NULL is all '*' chars
                 if value == b"":
                     value = None
                 elif decimal:
@@ -2866,13 +3016,13 @@ class DbfReader(_HasCheckedReadableFile):
                     # but can check for all hex null-chars, all spaces, or all 0s (QGIS null)
                     value = None
                 else:
+                    date_str = value.decode("ascii")
                     try:
                         # return as python date object
-                        y, m, d = int(value[:4]), int(value[4:6]), int(value[6:8])
-                        value = date(y, m, d)
+                        value = datetime.strptime(date_str, "%Y%m%d").date()
                     except (TypeError, ValueError):
-                        # if invalid date, just return as unicode string so user can decimalde
-                        value = str(value.strip())
+                        # if invalid date, just return as unicode string so user can handle it.
+                        value = date_str
             elif typ is FieldType.L:
                 # logical: 1 byte - initialized to 0x20 (space) otherwise T or F.
                 if value == b" ":
@@ -2885,10 +3035,11 @@ class DbfReader(_HasCheckedReadableFile):
                     else:
                         value = None  # unknown value is set to missing
             else:
-                value = value.decode(self.encoding, self.encodingErrors)
-                value = value.strip().rstrip(
-                    "\x00"
-                )  # remove null-padding at end of strings
+                value = _decode_C_or_M_field(
+                    value,
+                    encoding=self.encoding,
+                    encodingErrors=self.encodingErrors,
+                )
             record.append(value)
 
         return _Record(recLookup, record, oid)
@@ -3508,6 +3659,11 @@ class Reader(_HasExitStack):
     def fields(self) -> list[Field]:
         return self.dbf_reader.fields
 
+    @property
+    def data_fields(self) -> list[Field]:
+        """All fields except the DeletionFlag."""
+        return self.dbf_reader.data_fields
+
     def record(self, i: int = 0, fields: list[str] | None = None) -> _Record | None:
         return self.dbf_reader.record(i, fields)
 
@@ -3959,7 +4115,7 @@ class DbfWriter(_HasCheckedWriteableFile):
             raise dbfFileException(
                 f".dbf Shapefile Writer reached maximum number of fields: {self.max_num_fields}."
             )
-        field_ = Field.from_unchecked(
+        field = Field.from_unchecked(
             name=name,
             field_type=field_type,
             size=size,
@@ -3968,7 +4124,7 @@ class DbfWriter(_HasCheckedWriteableFile):
             encodingErrors=self.encodingErrors,
             strict=self.strict,
         )
-        self.fields.append(field_)
+        self.fields.append(field)
 
     def _header(self) -> None:
         """Writes the dbf header and field descriptors."""
@@ -3978,17 +4134,17 @@ class DbfWriter(_HasCheckedWriteableFile):
         year, month, day = time.localtime()[:3]
         year -= 1900
         # Get all fields, ignoring DeletionFlag if specified
-        fields = [field for field in self.fields if field[0] != "DeletionFlag"]
+        fields = [field for field in self.fields if field.name != "DeletionFlag"]
         # Ensure has at least one field
         if not fields:
-            raise ShapefileException(
+            raise dbfFileException(
                 "Shapefile dbf file must contain at least one field."
             )
         numRecs = self.recNum
         numFields = len(fields)
         headerLength = numFields * 32 + 33
         if headerLength >= 65535:
-            raise ShapefileException(
+            raise dbfFileException(
                 "Shapefile dbf header length exceeds maximum length."
             )
         recordLength = sum(field.size for field in fields) + 1
@@ -4008,7 +4164,7 @@ class DbfWriter(_HasCheckedWriteableFile):
         for field in fields:
             f.write(
                 field.encode_field_descriptor(
-                    self.strict, self.encoding, self.encodingErrors
+                    self.encoding, self.encodingErrors, self.strict
                 )
             )
 
@@ -4053,19 +4209,19 @@ class DbfWriter(_HasCheckedWriteableFile):
 
     def _record(self, record: list[RecordValue]) -> None:
         """Writes the dbf records."""
-        f = self.file
+        record_stream = io.BytesIO()  # Temporary buffer to make record writing atomic.
         if self.recNum == 0:
             # first records, so all fields should be set
             # allowing us to write the dbf header
             # cannot change the fields after this point
             self._header()
         # first byte of the record is deletion flag, always disabled
-        f.write(b" ")
+        record_stream.write(b" ")
         # begin
-        self.recNum += 1
         fields = (
             field for field in self.fields if field[0] != "DeletionFlag"
         )  # ignore deletionflag field in case it was specified
+
         for (fieldName, fieldType, size, deci), value in zip(fields, record):
             # write
             # fieldName, fieldType, size and deci were already checked
@@ -4096,17 +4252,19 @@ class DbfWriter(_HasCheckedWriteableFile):
                     )  # caps the size if exceeds the field size
             elif fieldType == "D":
                 # date: 8 bytes - date stored as a string in the format YYYYMMDD.
+                if isinstance(value, list) and len(value) == 3:
+                    value = date(*value)
                 if isinstance(value, date):
-                    str_val = f"{value.year:04d}{value.month:02d}{value.day:02d}"
-                elif isinstance(value, list) and len(value) == 3:
-                    str_val = f"{value[0]:04d}{value[1]:02d}{value[2]:02d}"
+                    str_val = value.strftime("%Y%m%d")
                 elif value in MISSING:
                     str_val = "0" * 8  # QGIS NULL for date type
                 elif isinstance(value, str) and len(value) == 8:
                     pass  # value is already a date string
                 else:
                     raise ShapefileException(
-                        "Date values must be either a datetime.date object, a list, a YYYYMMDD string, or a missing value."
+                        f"Could not read as date: {value}. "
+                        "Date values must be either a datetime.date object, "
+                        "a list, a YYYYMMDD string, or a missing value."
                     )
             elif fieldType == "L":
                 # logical: 1 byte - initialized to 0x20 (space) otherwise T or F.
@@ -4120,20 +4278,22 @@ class DbfWriter(_HasCheckedWriteableFile):
                     str_val = " "  # unknown is set to space
 
             if str_val is None:
-                # Types C and M, and anything else, value is forced to string,
-                # encoded by the codec specified to the Writer (utf-8 by default),
-                # then the resulting bytes are padded and truncated to the length
-                # of the field
-                encoded = (
-                    str(value)
-                    .encode(self.encoding, self.encodingErrors)[:size]
-                    .ljust(size)
+                # Types C and M, and anything else, value is forced to string.
+                encoded, _trimmed = _encode_dbf_string(
+                    s=str(value),
+                    size=size,
+                    decode=_decode_C_or_M_field,
+                    pad_byte=b" ",
+                    encoding=self.encoding,
+                    encodingErrors=self.encodingErrors,
+                    strict=self.strict,
                 )
             else:
                 # str_val was given a not-None string value
                 # under the checks for fieldTypes "N", "F", "D", or "L" above
                 # Numeric, logical, and date numeric types are ascii already, but
-                # for Shapefile or dbf spec reasons
+                # for Shapefile or dbf spec reasons ( "All field data is ASCII"
+                # https://en.wikipedia.org/wiki/.dbf#Database_records )
                 # "should be default ascii encoding"
                 encoded = str_val.encode("ascii", self.encodingErrors)
 
@@ -4142,7 +4302,10 @@ class DbfWriter(_HasCheckedWriteableFile):
                     f"Shapefile Writer unable to pack incorrect sized {value=}"
                     f" (encoded as {len(encoded)}B) into field '{fieldName}' ({size}B)."
                 )
-            f.write(encoded)
+            record_stream.write(encoded)
+
+        self.file.write(record_stream.getvalue())
+        self.recNum += 1
 
 
 class _ShpShxHeaderWriter(_HasCheckedWriteableFile):
@@ -4438,6 +4601,7 @@ class Writer(_HasExitStack):
         *,
         encoding: str = "utf-8",
         encodingErrors: str = "strict",
+        strict: bool = False,
         shp: WriteSeekableBinStream | None = None,
         shx: WriteSeekableBinStream | None = None,
         dbf: WriteSeekableBinStream | None = None,
@@ -4469,7 +4633,7 @@ class Writer(_HasExitStack):
                 raise TypeError(
                     "Unused kwargs were silently ignored by previous versions of PyShp. "
                     "Either specify target (first positional only arg), "
-                    "or shp and/or dbf, possible plus shx"
+                    "or shp and/or dbf, possibly plus shx"
                 )
             self._shp = target.with_suffix(".shp")
             self._shx = target.with_suffix(".shx")
@@ -4494,6 +4658,7 @@ class Writer(_HasExitStack):
                 dbf=self._dbf,
                 encoding=encoding,
                 encodingErrors=encodingErrors,
+                strict=strict,
             )
             self.exit_stack.enter_context(self._dbf_writer)
 

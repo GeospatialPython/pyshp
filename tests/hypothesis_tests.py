@@ -6,7 +6,7 @@ import itertools
 import string
 
 import pytest
-from hypothesis import HealthCheck, given, settings
+from hypothesis import HealthCheck, given, settings, reproduce_failure
 from hypothesis.strategies import (
     builds,
     composite, # Preferably avoid.  Shrinking composite strategies is slow.
@@ -543,7 +543,7 @@ def dbf_fields(draw):
         text(
             alphabet=characters(
                 codec="ascii",
-                exclude_characters=["\x00"],
+                exclude_categories=["Z", "C"] # Z - Whitespace, C - Control chars++
             ),
             min_size=1,
             max_size=10,
@@ -567,10 +567,10 @@ def test_dbf_Field_roundtrips(
 ) -> None:
     expected = shp.Field.from_unchecked(**field_kwargs)
     stream = io.BytesIO()
-    encoded = expected.encode_field_descriptor(replace_ascii_spaces_with_underscores=False)
+    encoded = expected.encode_field_descriptor(strict=True)
     stream.write(encoded)
     stream.seek(0)
-    actual = shp.Field.from_byte_stream(stream, strip_leading_whitespace=False)
+    actual = shp.Field.from_byte_stream(stream, strict=True)
     assert isinstance(actual, shp.Field)
     assert actual.name == expected.name
     assert actual[1:] == expected[1:]
@@ -637,17 +637,24 @@ def dbf_fields_and_records(
     return fields, records
 
 
-
 @pytest.mark.hypothesis
 @given(fields_and_records=dbf_fields_and_records())
 def test_dbf_reader_writer_roundtrip(fields_and_records)-> None:
     fields, records = fields_and_records
     stream = io.BytesIO()
-    with shp.DbfWriter(dbf=stream) as dbf_w:
+    written_records = []
+    with shp.DbfWriter(dbf=stream, strict=True) as dbf_w:
         for field in fields:
             dbf_w.field(**field)
         for record in records:
-            dbf_w.record(*record)
+            try:
+                dbf_w.record(*record)
+            except shp.DbfStringDataLoss:
+                pass
+            else:
+                written_records.append(record)
+
+
     stream.seek(0)
     with shp.DbfReader(dbf=stream) as r:
         actual_fields = iter(r.fields)
@@ -656,7 +663,7 @@ def test_dbf_reader_writer_roundtrip(fields_and_records)-> None:
             actual_field_dict = f_r._asdict()
             for k in ("field_type", "size", "decimal"):
                 assert actual_field_dict[k] == f_w[k], f"{k=}, {actual_field_dict[k]=}, {f_w[k]=}"
-        for exp_rec, actual_rec in itertools.zip_longest(records, r.records()):
+        for exp_rec, actual_rec in itertools.zip_longest(written_records, r.records()):
             for expected, actual, field in itertools.zip_longest(exp_rec, actual_rec, fields):
                 field_type = field["field_type"]
                 decimal = field["decimal"]
@@ -667,6 +674,4 @@ def test_dbf_reader_writer_roundtrip(fields_and_records)-> None:
                         actual = actual.strftime("%Y%m%d")
                 elif field_type in ("N", "F") and decimal >= 1:
                     expected = float(format(expected, f".{decimal}f"))
-                elif field_type == "C":
-                    expected = expected.strip()
                 assert actual == expected, f"{actual=}, {expected=}, {field_type=}, {type(actual)=}, {type(expected)=}"
