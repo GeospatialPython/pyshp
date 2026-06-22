@@ -1347,7 +1347,11 @@ applies to both reading and writing.
 	True
 	>>> r.close()
 
-
+Valid values for encodingErrors are those supported by both `bytes.decode` and `str.encode` in the Python
+version being used, e.g. 'strict', 'ignore' or 'replace'
+in [CPython 3.9 - 3.14](https://docs.python.org/3/library/stdtypes.html#bytes.decode)
+('xmlcharrefreplace' and 'backslashreplace' are only supported by
+[`str.encode`](https://docs.python.org/3/library/stdtypes.html#str.encode)).
 
 ## Reading Large Shapefiles
 

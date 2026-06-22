@@ -231,6 +231,44 @@ for c in FieldType.__members__:
     FIELD_TYPE_ALIASES[c.encode("ascii").upper()] = c
 
 
+class PossibleDataLoss(Warning):
+    pass
+
+
+def _largest_valid_truncated_encoding(
+    s: str,
+    max_bytes: int,
+    strict: bool,
+    encoding: str = "utf8",
+    encodingErrors: str = "strict",
+) -> tuple[bytes, str]:
+    N = len(s)
+    for i in reversed(range(0, N + 1)):
+        trimmed = s[:i]
+        encoded = trimmed.encode(encoding, encodingErrors)
+        if len(encoded) <= max_bytes:
+            if i <= N - 1:
+                msg = (
+                    f"Dropped {N - i} code points (e.g. characters)! "
+                    f"{s} was truncated to {trimmed} (discarding: {s[i:]}), "
+                    f"in order to encode it under {max_bytes} bytes for the field or field name. "
+                    f"Used: {encoding=} and {encodingErrors=}. "
+                )
+                if strict:
+                    raise ValueError(f"Data loss. {strict=}.\n{msg}")
+                else:
+                    warnings.warn(
+                        msg,
+                        category=PossibleDataLoss,
+                    )
+            return encoded, trimmed
+    raise ValueError(
+        f"Maximum truncation not sufficient to encode below {max_bytes=}. "
+        f"Could not encode first code point (e.g. character): {s[0]} "
+        f"to a short enough byte string, using {encoding=}, {encodingErrors=}"
+    )
+
+
 # Use functional syntax to have an attribute named type, a Python keyword
 class Field(NamedTuple):
     name: str
@@ -245,6 +283,9 @@ class Field(NamedTuple):
         field_type: str | bytes | FieldTypeT = "C",
         size: int = 50,
         decimal: int = 0,
+        strict: bool = False,
+        encoding: str = "utf8",
+        encodingErrors: str = "strict",
     ) -> Field:
         try:
             type_ = FIELD_TYPE_ALIASES[field_type]
@@ -262,8 +303,30 @@ class Field(NamedTuple):
 
         # A doctest in README.md previously passed in a string ('40') for size,
         # so explictly convert name to str, and size and decimal to ints.
-        return cls(
+        inst = cls(
             name=str(name), field_type=type_, size=int(size), decimal=int(decimal)
+        )
+
+        inst.encode_field_descriptor(strict, encoding, encodingErrors)
+        return inst
+
+    @functools.cache
+    def encode_field_descriptor(
+        self,
+        strict: bool,
+        encoding: str,
+        encodingErrors: str,
+    ) -> bytes:
+        encoded_name = self.name.encode(encoding, encodingErrors)
+        encoded_name = encoded_name.replace(b" ", b"_")
+        encoded_name = encoded_name[:10].ljust(10, b"\x00")
+        encoded_field_type = self.field_type.encode("ascii")
+        return pack(
+            "<10sxc4xBB14x",  # Packing the name as "<10sx" adds the null terminator.
+            encoded_name,
+            encoded_field_type,
+            self.size,
+            self.decimal,
         )
 
     def __repr__(self) -> str:
@@ -2598,15 +2661,16 @@ class DbfReader(_HasCheckedReadableFile):
         numFields = (self.__dbfHdrLength - 33) // 32
         for __field in range(numFields):
             encoded_field_tuple: tuple[bytes, bytes, int, int] = unpack(
-                "<11sc4xBB14x", self.file.read(32)
+                # Historically the name is a 10 char, null-terminated byte string.
+                # For clarity we now unpack it as <10sx,
+                # (instead of <11s, and then having to remove the null
+                # terminator that never needed to be unpacked in the first place).
+                "<10sxc4xBB14x",
+                self.file.read(32),
             )
             encoded_name, encoded_type_char, size, decimal = encoded_field_tuple
 
-            if b"\x00" in encoded_name:
-                idx = encoded_name.index(b"\x00")
-            else:
-                idx = len(encoded_name) - 1
-            encoded_name = encoded_name[:idx]
+            encoded_name, __, ___ = encoded_name.partition(b"\x00")
             name = encoded_name.decode(self.encoding, self.encodingErrors)
             name = name.lstrip()
 
@@ -2624,11 +2688,11 @@ class DbfReader(_HasCheckedReadableFile):
 
         # store all field positions for easy lookups
         # note: fieldLookup gives the index position of a field inside Reader.fields
-        self.__fieldLookup = {f[0]: i for i, f in enumerate(self.fields)}
+        self.__fieldLookup = {f.name: i for i, f in enumerate(self.fields)}
 
         # by default, read all fields except the deletion flag, hence "[1:]"
         # note: recLookup gives the index position of a field inside a _Record list
-        fieldnames = [f[0] for f in self.fields[1:]]
+        fieldnames = [f.name for f in self.fields[1:]]
         __fieldTuples, recLookup, recStruct = self._record_fields(fieldnames)
         self.__fullRecStruct = recStruct
         self.__fullRecLookup = recLookup
@@ -3831,6 +3895,7 @@ class DbfWriter(_HasCheckedWriteableFile):
         encoding: str = "utf-8",
         encodingErrors: str = "strict",
         max_num_fields: int = 2046,
+        strict: bool = False,
         # Keep kwargs even though unused, to preserve PyShp 2.4 API
         **kwargs: Any,
     ):
@@ -3838,9 +3903,10 @@ class DbfWriter(_HasCheckedWriteableFile):
 
         self.encoding = encoding
         self.encodingErrors = encodingErrors
+        self.max_num_fields = max_num_fields
+        self.strict = strict
 
         self.fields: list[Field] = []
-        self.max_num_fields = max_num_fields
         self.recNum = 0
 
     def field(
@@ -3856,7 +3922,15 @@ class DbfWriter(_HasCheckedWriteableFile):
             raise dbfFileException(
                 f".dbf Shapefile Writer reached maximum number of fields: {self.max_num_fields}."
             )
-        field_ = Field.from_unchecked(name, field_type, size, decimal)
+        field_ = Field.from_unchecked(
+            name=name,
+            field_type=field_type,
+            size=size,
+            decimal=decimal,
+            encoding=self.encoding,
+            encodingErrors=self.encodingErrors,
+            strict=self.strict,
+        )
         self.fields.append(field_)
 
     def _header(self) -> None:
@@ -3892,21 +3966,16 @@ class DbfWriter(_HasCheckedWriteableFile):
             recordLength,
         )
         f.write(header)
+
         # Field descriptors
         for field in fields:
-            encoded_name = field.name.encode(self.encoding, self.encodingErrors)
-            encoded_name = encoded_name.replace(b" ", b"_")
-            encoded_name = encoded_name[:10].ljust(11).replace(b" ", b"\x00")
-            encodedFieldType = field.field_type.encode("ascii")
-            fld = pack(
-                "<11sc4xBB14x",
-                encoded_name,
-                encodedFieldType,
-                field.size,
-                field.decimal,
+            f.write(
+                field.encode_field_descriptor(
+                    self.strict, self.encoding, self.encodingErrors
+                )
             )
-            f.write(fld)
-        # Terminator
+
+        # Terminator (0x0d from dbf spec https://en.wikipedia.org/wiki/.dbf#File_header)
         f.write(b"\r")
 
     def record(
