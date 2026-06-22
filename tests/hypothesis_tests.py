@@ -556,7 +556,7 @@ def dbf_field(draw):
 
     return {"name": name, "field_type": field_type, "size": size, "decimal": decimal}
 
-ascii_printable = string.ascii_letters + string.digits + string.punctuation #+ " "
+ascii_printable = string.ascii_letters + string.digits + string.punctuation + " "
 
 def record_value_for_field(name: str, field_type: str, size: int, decimal: int = 0):
 
@@ -590,8 +590,7 @@ def record_value_for_field(name: str, field_type: str, size: int, decimal: int =
     raise ValueError(f"Unsupported: {field_type=}")
 
 
-@composite
-def dbf_fields_and_records(
+def _dbf_fields_and_record_strategy(
     draw,
     max_fields=10, # In DbfWriter.__init__, max_num_fields: int = 2046,
     max_records=20,
@@ -600,6 +599,18 @@ def dbf_fields_and_records(
     fields = draw(lists(dbf_field(), min_size=1, max_size=max_fields))
 
     record_strategy = tuples(*(record_value_for_field(**field) for field in fields))
+
+    return fields, record_strategy
+
+
+@composite
+def dbf_fields_and_records(
+    draw,
+    max_fields=10, # In DbfWriter.__init__, max_num_fields: int = 2046,
+    max_records=20,
+    ):
+
+    fields, record_strategy = _dbf_fields_and_record_strategy(draw, max_fields, max_records)
 
     records = draw(lists(record_strategy, min_size=0, max_size=max_records))
 
@@ -634,8 +645,8 @@ def test_dbf_reader_writer_roundtrip(fields_and_records)-> None:
                         expected = expected.strftime("%Y%m%d")
                     if isinstance(actual, datetime.date):
                         actual = actual.strftime("%Y%m%d")
-                elif field_type in ("N", "F"):
+                elif field_type in ("N", "F") and decimal >= 1:
                     expected = float(format(expected, f".{decimal}f"))
-                # elif field_type == "C":
-                #     expected = expected.strip()
+                elif field_type == "C":
+                    expected = expected.strip()
                 assert actual == expected, f"{actual=}, {expected=}, {field_type=}, {type(actual)=}, {type(expected)=}"
