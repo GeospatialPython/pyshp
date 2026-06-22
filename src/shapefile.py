@@ -269,12 +269,41 @@ def _largest_valid_truncated_encoding(
     )
 
 
-# Use functional syntax to have an attribute named type, a Python keyword
 class Field(NamedTuple):
     name: str
     field_type: FieldTypeT
     size: int
     decimal: int
+
+    @classmethod
+    @functools.cache
+    def get_struct(cls) -> Struct:
+        # En/decoding the name as "<10sx" embeds the null terminator.
+        return Struct("<10sxc4xBB14x")
+
+    @classmethod
+    def from_byte_stream(
+        cls,
+        b_io: ReadableBinStream,
+        strict: bool = False,
+        encoding: str = "utf8",
+        encodingErrors: str = "strict",
+        strip_leading_whitespace: bool = True,
+    ) -> Field:
+        encoded_field_tuple: tuple[bytes, bytes, int, int]
+        encoded_field_tuple = cls.get_struct().unpack(b_io.read(32))
+        encoded_name, encoded_type_char, size, decimal = encoded_field_tuple
+
+        encoded_name, __, ___ = encoded_name.partition(b"\x00")
+        name = encoded_name.decode(encoding, encodingErrors)
+        if strip_leading_whitespace:
+            name = name.lstrip()
+
+        field_type = FIELD_TYPE_ALIASES[encoded_type_char]
+
+        return cls.from_unchecked(
+            name, field_type, size, decimal, strict, encoding, encodingErrors
+        )
 
     @classmethod
     def from_unchecked(
@@ -287,6 +316,17 @@ class Field(NamedTuple):
         encoding: str = "utf8",
         encodingErrors: str = "strict",
     ) -> Field:
+
+        if "\x00" in name:
+            msg = (
+                "Field names should contain null characters "
+                "as null bytes are used to pad them in the header. "
+                f"Got: {name=} "
+            )
+            if strict:
+                raise dbfFileException(msg)
+            warnings.warn(msg, category=PossibleDataLoss)
+
         try:
             type_ = FIELD_TYPE_ALIASES[field_type]
         except KeyError:
@@ -307,22 +347,25 @@ class Field(NamedTuple):
             name=str(name), field_type=type_, size=int(size), decimal=int(decimal)
         )
 
-        inst.encode_field_descriptor(strict, encoding, encodingErrors)
+        inst.encode_field_descriptor(
+            strict=True, encoding=encoding, encodingErrors=encodingErrors
+        )
         return inst
 
     @functools.cache
     def encode_field_descriptor(
         self,
-        strict: bool,
-        encoding: str,
-        encodingErrors: str,
+        strict: bool = False,
+        encoding: str = "utf8",
+        encodingErrors: str = "strict",
+        replace_ascii_spaces_with_underscores: bool = True,
     ) -> bytes:
         encoded_name = self.name.encode(encoding, encodingErrors)
-        encoded_name = encoded_name.replace(b" ", b"_")
+        if replace_ascii_spaces_with_underscores:
+            encoded_name = encoded_name.replace(b" ", b"_")
         encoded_name = encoded_name[:10].ljust(10, b"\x00")
         encoded_field_type = self.field_type.encode("ascii")
-        return pack(
-            "<10sxc4xBB14x",  # Packing the name as "<10sx" adds the null terminator.
+        return self.get_struct().pack(
             encoded_name,
             encoded_field_type,
             self.size,
@@ -938,7 +981,7 @@ class Shape:
         self._errors: dict[str, int] = {}
 
         # add oid
-        self.__oid: int = -1 if oid is None else oid
+        self._oid: int = -1 if oid is None else oid
 
         if self.shapeType != NULL and self.shapeType not in Point_shapeTypes:
             self.bbox: BBox = bbox or self._bbox_from_points()
@@ -978,7 +1021,7 @@ class Shape:
     @property
     def oid(self) -> int:
         """The index position of the shape in the original shapefile"""
-        return self.__oid
+        return self._oid
 
     @property
     def shapeTypeName(self) -> str:
@@ -998,8 +1041,8 @@ class Shape:
     def __repr__(self) -> str:
         class_name = self.__class__.__name__
         if class_name == "Shape":
-            return f"Shape #{self.__oid}: {self.shapeTypeName}"
-        return f"{class_name} #{self.__oid}"
+            return f"Shape #{self._oid}: {self.shapeTypeName}"
+        return f"{class_name} #{self._oid}"
 
     def _bbox_from_points(self) -> BBox:
         xs: list[float] = []
@@ -2129,11 +2172,11 @@ class _Record(list[RecordValue]):
         :param values: A sequence of values
         :param oid: The object id, an int (optional)
         """
-        self.__field_positions = field_positions
+        self._field_positions = field_positions
         if oid is not None:
-            self.__oid = oid
+            self._oid = oid
         else:
-            self.__oid = -1
+            self._oid = -1
         list.__init__(self, values)
 
     def __getattr__(self, item: str) -> RecordValue:
@@ -2150,7 +2193,7 @@ class _Record(list[RecordValue]):
         try:
             if item == "__setstate__":  # Prevent infinite loop from copy.deepcopy()
                 raise AttributeError("_Record does not implement __setstate__")
-            index = self.__field_positions[item]
+            index = self._field_positions[item]
             return list.__getitem__(self, index)
         except KeyError:
             raise AttributeError(f"{item} is not a field name")
@@ -2170,7 +2213,7 @@ class _Record(list[RecordValue]):
         if key.startswith("_"):  # Prevent infinite loop when setting mangled attribute
             return list.__setattr__(self, key, value)
         try:
-            index = self.__field_positions[key]
+            index = self._field_positions[key]
             return list.__setitem__(self, index, value)
         except KeyError:
             raise AttributeError(f"{key} is not a field name")
@@ -2198,7 +2241,7 @@ class _Record(list[RecordValue]):
             return list.__getitem__(self, cast(Union[SupportsIndex, slice], item))
         except TypeError:
             try:
-                index = self.__field_positions[cast(str, item)]
+                index = self._field_positions[cast(str, item)]
             except KeyError:
                 index = None
         if index is not None:
@@ -2232,7 +2275,7 @@ class _Record(list[RecordValue]):
             list.__setitem__(self, *cast(ValidKVTuple, (key, value)))
             return
         except TypeError:
-            index = self.__field_positions.get(cast(str, key))
+            index = self._field_positions.get(cast(str, key))
             if index is not None:
                 list.__setitem__(self, index, cast(RecordValue, value))
                 return
@@ -2242,14 +2285,14 @@ class _Record(list[RecordValue]):
     @property
     def oid(self) -> int:
         """The index position of the record in the original shapefile"""
-        return self.__oid
+        return self._oid
 
     def as_dict(self, date_strings: bool = False) -> dict[str, RecordValue]:
         """
         Returns this Record as a dictionary using the field names as keys
         :return: dict
         """
-        dct = {f: self[i] for f, i in self.__field_positions.items()}
+        dct = {f: self[i] for f, i in self._field_positions.items()}
         if date_strings:
             for k, v in dct.items():
                 if isinstance(v, date):
@@ -2257,7 +2300,7 @@ class _Record(list[RecordValue]):
         return dct
 
     def __repr__(self) -> str:
-        return f"Record #{self.__oid}: {list(self)}"
+        return f"Record #{self._oid}: {list(self)}"
 
     def __dir__(self) -> list[str]:
         """
@@ -2270,13 +2313,13 @@ class _Record(list[RecordValue]):
             dir(type(self))
         )  # default list methods and attributes of this class
         fnames = list(
-            self.__field_positions.keys()
+            self._field_positions.keys()
         )  # plus field names (random order if Python version < 3.6)
         return default + fnames
 
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, _Record):
-            if self.__field_positions != other.__field_positions:
+            if self._field_positions != other._field_positions:
                 return False
         return list.__eq__(self, other)
 
@@ -2631,14 +2674,16 @@ class DbfReader(_HasCheckedReadableFile):
         *,
         encoding: str = "utf-8",
         encodingErrors: str = "strict",
+        strict: bool = False,
     ):
         super().__init__(file=dbf)
 
         self.encoding = encoding
         self.encodingErrors = encodingErrors
+        self.strict = strict
 
         self.fields: list[Field] = []
-        self.__fieldLookup: dict[str, int] = {}
+        self._fieldLookup: dict[str, int] = {}
 
         self._dbfHeader()
 
@@ -2653,34 +2698,26 @@ class DbfReader(_HasCheckedReadableFile):
 
         # read relevant header parts
         self.file.seek(0)
-        self.numRecords, self.__dbfHdrLength, self._record_length = cast(
+        self.numRecords, self._dbfHdrLength, self._record_length = cast(
             tuple[int, int, int], unpack("<xxxxLHH20x", self.file.read(32))
         )
 
         # read fields
-        numFields = (self.__dbfHdrLength - 33) // 32
-        for __field in range(numFields):
-            encoded_field_tuple: tuple[bytes, bytes, int, int] = unpack(
-                # Historically the name is a 10 char, null-terminated byte string.
-                # For clarity we now unpack it as <10sx,
-                # (instead of <11s, and then having to remove the null
-                # terminator that never needed to be unpacked in the first place).
-                "<10sxc4xBB14x",
-                self.file.read(32),
+        numFields = (self._dbfHdrLength - 33) // 32
+        for __ in range(numFields):
+            self.fields.append(
+                Field.from_byte_stream(
+                    b_io=self.file,
+                    strict=self.strict,
+                    encoding=self.encoding,
+                    encodingErrors=self.encodingErrors,
+                )
             )
-            encoded_name, encoded_type_char, size, decimal = encoded_field_tuple
 
-            encoded_name, __, ___ = encoded_name.partition(b"\x00")
-            name = encoded_name.decode(self.encoding, self.encodingErrors)
-            name = name.lstrip()
-
-            field_type = FIELD_TYPE_ALIASES[encoded_type_char]
-
-            self.fields.append(Field(name, field_type, size, decimal))
         terminator = self.file.read(1)
         if terminator != b"\r":
-            raise ShapefileException(
-                "Shapefile dbf header lacks expected terminator. (likely corrupt?)"
+            raise dbfFileException(
+                "Dbf header lacks expected terminator. (likely corrupt?)"
             )
 
         # insert deletion field at start
@@ -2688,14 +2725,14 @@ class DbfReader(_HasCheckedReadableFile):
 
         # store all field positions for easy lookups
         # note: fieldLookup gives the index position of a field inside Reader.fields
-        self.__fieldLookup = {f.name: i for i, f in enumerate(self.fields)}
+        self._fieldLookup = {f.name: i for i, f in enumerate(self.fields)}
 
         # by default, read all fields except the deletion flag, hence "[1:]"
         # note: recLookup gives the index position of a field inside a _Record list
         fieldnames = [f.name for f in self.fields[1:]]
         __fieldTuples, recLookup, recStruct = self._record_fields(fieldnames)
-        self.__fullRecStruct = recStruct
-        self.__fullRecLookup = recLookup
+        self._fullRecStruct = recStruct
+        self._fullRecLookup = recLookup
 
     def _record_fmt(self, fields: Container[str] | None = None) -> tuple[str, int]:
         """Calculates the format and size of a .dbf record. Optional 'fields' arg
@@ -2739,7 +2776,7 @@ class DbfReader(_HasCheckedReadableFile):
             recStruct = Struct(fmt)
             # make sure the given fieldnames exist
             for name in unique_fields:
-                if name not in self.__fieldLookup or name == "DeletionFlag":
+                if name not in self._fieldLookup or name == "DeletionFlag":
                     raise ValueError(f'"{name}" is not a valid field name')
             # fetch relevant field info tuples
             fieldTuples = []
@@ -2752,8 +2789,8 @@ class DbfReader(_HasCheckedReadableFile):
         else:
             # use all the dbf fields
             fieldTuples = self.fields[1:]  # sans deletion flag
-            recStruct = self.__fullRecStruct
-            recLookup = self.__fullRecLookup
+            recStruct = self._fullRecStruct
+            recLookup = self._fullRecLookup
         return fieldTuples, recLookup, recStruct
 
     def _record(
@@ -2867,7 +2904,7 @@ class DbfReader(_HasCheckedReadableFile):
         i = ensure_within_bounds(i, self.numRecords)
         recSize = self._record_length
         self.file.seek(0)
-        self.file.seek(self.__dbfHdrLength + (i * recSize))
+        self.file.seek(self._dbfHdrLength + (i * recSize))
         fieldTuples, recLookup, recStruct = self._record_fields(fields)
         return self._record(
             oid=i, fieldTuples=fieldTuples, recLookup=recLookup, recStruct=recStruct
@@ -2939,7 +2976,7 @@ class DbfReader(_HasCheckedReadableFile):
         elif stop < 0:
             stop = range(self.numRecords)[stop]
         recSize = self._record_length
-        self.file.seek(self.__dbfHdrLength + (start * recSize))
+        self.file.seek(self._dbfHdrLength + (start * recSize))
         fieldTuples, recLookup, recStruct = self._record_fields(fields)
         for i in range(start, stop):
             r = self._record(
