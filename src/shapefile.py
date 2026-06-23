@@ -8,7 +8,7 @@ Compatible with Python versions >=3.9
 
 from __future__ import annotations
 
-__version__ = "3.1.0"
+__version__ = "3.1.1"
 
 import abc
 import array
@@ -251,6 +251,38 @@ class Decoder(Protocol):
     ) -> str: ...
 
 
+def _warn_if_string_ends_with_decoded_pad_bytes(
+    s: str,
+    pad_byte: bytes,
+    encoding: str = "utf-8",
+    encodingErrors: str = "strict",
+) -> None:
+    """Warns if e.g. the encoding is utf-16-le, and the
+    decoded text ends in "†", which encodes to a pair of
+    ascii spaces (b"  ", the pad byte for C and M fields).
+    """
+    # Max code unit size under UTF-8, UTF-16, and UTF-32 is 4 bytes.
+    for n in range(1, 5):
+        # TODO: test for encodings ending in a null terminator preceded
+        #       by pad bytes, that are exactly the field's size (length).
+        pad_bytes = pad_byte * n
+        try:
+            decoded_pad_bytes: str = pad_bytes.decode(encoding, encodingErrors)
+        except UnicodeDecodeError:
+            continue
+        if s.endswith(decoded_pad_bytes):
+            msg = (
+                f"Under the given encoding: {encoding}, "
+                f" the text (field name or 'C' or 'M' field): {s!r} "
+                f" ends with {decoded_pad_bytes!r}, which coincidentally"
+                f"encodes to the pad bytes: {pad_bytes!r}. "
+                "The real end of the actual data may be earlier. "
+            )
+
+            warnings.warn(msg, category=PossibleDataLoss)
+            break
+
+
 def _encode_dbf_string(
     s: str,
     size: int,
@@ -273,6 +305,8 @@ def _encode_dbf_string(
     N = len(s)
     trimmed: str
     encoded: bytes
+
+    # i - num of characters to keep.  Starts by trying to keep all N.
     for i in reversed(range(0, N + 1)):
         trimmed = s[:i]
         encoded = trimmed.encode(encoding, encodingErrors)
@@ -300,16 +334,27 @@ def _encode_dbf_string(
             f"to a short enough byte string, using {encoding=}, {encodingErrors=}"
         )
 
+    if pad_byte is not None:
+        _warn_if_string_ends_with_decoded_pad_bytes(
+            s=trimmed,
+            pad_byte=pad_byte,
+            encoding=encoding,
+            encodingErrors=encodingErrors,
+        )
+
     if len(encoded) < size and pad_byte is not None:
         padded = encoded.ljust(size, pad_byte)
     else:
         padded = encoded
 
-    decoded = decode(
-        b=padded,
-        encoding=encoding,
-        encodingErrors=encodingErrors,
-    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        decoded = decode(
+            b=padded,
+            encoding=encoding,
+            encodingErrors=encodingErrors,
+        )
+
     if decoded != trimmed:
         msg = f"Padded value: {padded!r} does not decode to {trimmed!r} using PyShp's decoder: {decode.__name__}"
         if len(trimmed) < len(s):
@@ -324,20 +369,67 @@ def _encode_dbf_string(
     return padded, trimmed
 
 
+def _try_to_decode_dbf_name_or_text_field(
+    b: bytes,
+    pad_bytes: bytes,  # Pad bytes will be trimmed (from the R of b) in their order in the byte-string
+    encoding: str = "utf8",
+    encodingErrors: str = "strict",
+) -> str:
+    N = len(b)
+    decoded: str
+    trimmed = b
+    num_trailing_pad_bytes = N - len(b.rstrip(pad_bytes))
+
+    # Test if we need to restore any pad_bytes to
+    # correctly decode the remaining bytes to a string.
+    # num_to_trim starts from num_trailing_pad_bytes
+    # - initially trimming all trailing pad bytes
+    for num_to_trim in reversed(range(num_trailing_pad_bytes + 1)):
+        i = N - num_to_trim
+        trimmed = b[:i]
+        try:
+            decoded = trimmed.decode(encoding, encodingErrors)
+        except UnicodeDecodeError:
+            continue
+        if num_to_trim < num_trailing_pad_bytes:
+            warnings.warn(
+                f"Used {num_trailing_pad_bytes - num_to_trim} pad bytes ({pad_bytes!r}) "
+                f"from padding to decode raw field: {b!r} "
+                f"to: {decoded!r} ({encoding=}, {encodingErrors=}) ",
+                category=PossibleDataLoss,
+            )
+        return decoded
+
+    raise dbfFileException(
+        f"Could not decode field name or text/memo field: {b!r} using {encoding=} and {encodingErrors=}"
+        " no matter how many trailing pad bytes (if any) ({pad_bytes!r}) were used. "
+    )
+
+
 def _decode_C_or_M_field(
     b: bytes,
     encoding: str = "utf8",
     encodingErrors: str = "strict",
     strict: bool = True,
 ) -> str:
-    retval = b.decode(encoding, encodingErrors).rstrip("\x00").rstrip(" ")
-    if retval.rstrip("\x00") != retval and strict:
+    retval = _try_to_decode_dbf_name_or_text_field(
+        b=b,
+        pad_bytes=b" \x00",
+        encoding=encoding,
+        encodingErrors=encodingErrors,
+    )
+
+    if not strict:
+        return retval
+
+    if retval.rstrip("\x00") != retval:
         msg = (
-            f"More Trailing Null chars in: {b!r}"
-            " after removing trailing null chars and ascii spaces"
-            f", resulting in {retval!r}"
+            f"More trailing null chars in: {retval!r}"
+            " after removing one trailing null char and ascii spaces"
+            f" from {b!r}, and decoding (codec: {encoding}, errors: {encodingErrors}). "
         )
         warnings.warn(msg, category=PossibleDataLoss)
+
     return retval
 
 
@@ -360,34 +452,15 @@ class Field(NamedTuple):
         encodingErrors: str = "strict",
         strict: bool = True,
     ) -> str:
-        N = len(b)
-        decoded: str
-        num_trailing_null_bytes = N - len(b.rstrip(b"\x00"))
-
-        # Test if we need to restore any of those null bytes to
-        # correctly decode the remaining bytes to a string.
-        for num_to_trim in reversed(range(num_trailing_null_bytes + 1)):
-            i = N - num_to_trim
-            trimmed = b[:i]
-            try:
-                decoded = trimmed.decode(encoding, encodingErrors)
-            except UnicodeDecodeError:
-                continue
-            if strict and num_to_trim < num_trailing_null_bytes:
-                warnings.warn(
-                    f"Used {num_trailing_null_bytes - num_to_trim} null bytes "
-                    f"from padding to decode {b!r} "
-                    f"to: {decoded!r} ({encoding=}, {encodingErrors=}) ",
-                    category=PossibleDataLoss,
-                )
-            if not strict:
-                decoded = decoded.lstrip()
-            return decoded
-
-        raise dbfFileException(
-            f"Could not decode field name: {b!r} using {encoding=} and {encodingErrors=}"
-            " no matter how many trailing null-bytes (if any) were used. "
+        decoded = _try_to_decode_dbf_name_or_text_field(
+            b=b,
+            pad_bytes=b"\x00",
+            encoding=encoding,
+            encodingErrors=encodingErrors,
         )
+        if not strict:
+            decoded = decoded.lstrip()
+        return decoded
 
     @classmethod
     def from_byte_stream(
@@ -444,6 +517,14 @@ class Field(NamedTuple):
         elif type_ is FieldType.L:
             size = 1
             decimal = 0
+
+        if not strict and " " in name:
+            warnings.warn(
+                f"Replacing ascii spaces (0x20, ' 's) with underscores ('_'s) in {name!r}. "
+                "Use a Writer(file, strict=True) to preserve the field name as it is. ",
+                category=PossibleDataLoss,
+            )
+            name = name.replace(" ", "_")
 
         # Only use the portion of the name that we are able to encode to
         # 10 bytes or less.
@@ -502,13 +583,6 @@ class Field(NamedTuple):
             encodingErrors=encodingErrors,
             strict=strict,
         )
-        if not strict and b" " in encoded_name:
-            warnings.warn(
-                "Replacing ascii spaces (0x20) with underscores "
-                f"in encoded bytes: {encoded_name!r}",
-                category=PossibleDataLoss,
-            )
-            encoded_name = encoded_name.replace(b" ", b"_")
 
         encoded_field_type = self.field_type.encode("ascii")
         return self.get_struct().pack(

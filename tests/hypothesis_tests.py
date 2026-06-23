@@ -461,12 +461,14 @@ codes_and_shapes = one_of(codes_and_shapes_strats)
 @pytest.mark.hypothesis
 @given(codes_and_shapes=codes_and_shapes)
 def test_shp_reader_writer_roundtrip(codes_and_shapes)-> None:
+
     code_ex, expected_shapes = codes_and_shapes
     stream = io.BytesIO()
+
     with shp.ShpWriter(shp=stream, shapeType=code_ex) as w:
         for shape in expected_shapes:
             w.shape(shape)
-    stream.seek(0)
+
     with shp.ShpReader(shp=stream) as r:
         assert r.shapeType == code_ex
 
@@ -495,8 +497,6 @@ def test_shp_reader_writer_roundtrip(codes_and_shapes)-> None:
                 assert not hasattr(expected, "partTypes")
 
 
-
-
 @pytest.mark.hypothesis
 @given(codes_and_shapes=codes_and_shapes)
 def test_shx_reader_writer_roundtrip(codes_and_shapes)-> None:
@@ -515,8 +515,6 @@ def test_shx_reader_writer_roundtrip(codes_and_shapes)-> None:
                 sizes_B.append(size_B)
                 offsets_B.append(offset_B)
                 shx_w._shx_record(offset_B, size_B)
-
-    shx_stream.seek(0)
 
     with shp.ShxReader(shx=shx_stream) as r:
         assert r.numShapes == len(expected_shapes)
@@ -655,7 +653,6 @@ def test_dbf_reader_writer_roundtrip(fields_and_records)-> None:
                 written_records.append(record)
 
 
-    stream.seek(0)
     with shp.DbfReader(dbf=stream) as r:
         actual_fields = iter(r.fields)
         next(actual_fields) # skip deletion flag

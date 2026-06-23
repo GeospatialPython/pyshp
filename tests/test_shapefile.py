@@ -2,6 +2,7 @@
 This module tests the functionality of shapefile.py.
 """
 
+import contextlib
 import datetime
 import io
 import json
@@ -2044,33 +2045,111 @@ DATES = [datetime.date(*triple) for triple in [
 @pytest.mark.parametrize("expected_date", DATES)
 def test_round_trip_dbf_date_record(expected_date):
     stream = io.BytesIO()
-    with shapefile.DbfWriter(dbf=stream) as dbf_w:
-        dbf_w.field("Date","D")
-        dbf_w.record(expected_date)
-    stream.seek(0)
-    with shapefile.DbfReader(dbf=stream) as dbf_r:
-        assert dbf_r.record(0)[0] == expected_date
+    dbf_w = shapefile.DbfWriter(dbf=stream)
+    dbf_w.field("Date","D")
+    dbf_w.record(expected_date)
+    dbf_w.close()
+
+    dbf_r = shapefile.DbfReader(dbf=stream)
+    dbf_r.record(0)[0] == expected_date
+    dbf_r.close()
 
 
-LONG_FIELD_NAME_TESTS = [
-    ("ÀÀÀÀ०", 8, "utf-8", "strict"),
+LONG_FIELD_NAMES = [
+    ("ÀÀÀÀ०", 8, "utf-8", "strict"),  # Encoded bytes are corrupted if truncated to 10 bytes
 ]
 
-@pytest.mark.parametrize("name,encoded_len,codec,errors", LONG_FIELD_NAME_TESTS)
-def test_encode_dbf_field_too_long_names(name,encoded_len,codec,errors):
+@pytest.mark.parametrize("name,encoded_len,codec,errors", LONG_FIELD_NAMES)
+def test_encode_dbf_field_name_truncation(name,encoded_len,codec,errors):
     stream = io.BytesIO()
-    with shapefile.DbfWriter(
+    w = shapefile.DbfWriter(
         stream,
         encoding=codec,
         encodingErrors=errors,
         strict = False,
-        ) as w:
-        with pytest.warns(shapefile.PossibleDataLoss):
-            w.field(name=name)
-        field = w.fields[0]
-        assert name.startswith(field.name)
-        assert len(w.fields[0].name.encode(codec, errors)) == encoded_len
+        )
+    with pytest.warns(shapefile.PossibleDataLoss):
+        w.field(name=name)
+    field = w.fields[0]
+    assert name.startswith(field.name)
+    assert len(w.fields[0].name.encode(codec, errors)) == encoded_len
+    w.close()
 
-    stream.seek(0)
-    with shapefile.DbfReader(stream) as r:
-        assert r.fields[1].name == field.name
+    r = shapefile.DbfReader(stream, encoding=codec, encodingErrors=errors, strict=False)
+    assert r.fields[1].name == field.name
+    r.close()
+
+
+TEST_ENCODING_WARNINGS_FIELD_NAMES = [
+    ("A", 2, "utf-16-le", "strict"),  # Encoded bytes end in null byte (second byte in low end UTF16 code unit)
+    ("ABC", 6, "utf-16-le", "strict"),  # Encoded bytes end in null byte (second byte in low end UTF16 code unit)
+    ("ABCDE", 10, "utf-16-le", "strict"),  # Encoded bytes end in null byte (second byte in low end UTF16 code unit)
+]
+
+@pytest.mark.parametrize("name,encoded_len,codec,errors", TEST_ENCODING_WARNINGS_FIELD_NAMES)
+def test_encode_dbf_field_name_padding(name,encoded_len,codec,errors):
+    stream = io.BytesIO()
+    w = shapefile.DbfWriter(
+        stream,
+        encoding=codec,
+        encodingErrors=errors,
+        strict = True,
+        )
+    w.field(name=name)
+    field = w.fields[0]
+    assert name.startswith(field.name)
+    assert len(w.fields[0].name.encode(codec, errors)) == encoded_len
+    w.close()
+
+    with pytest.warns(shapefile.PossibleDataLoss):
+        r = shapefile.DbfReader(stream, encoding=codec, encodingErrors=errors, strict=False)
+    assert r.fields[1].name == field.name
+    r.close()
+
+NON_ASCII_FIELD_NAMES = [
+    ("囊萤映雪", 8, 'utf-16-be', "strict"), # Issue 421.  Encoded bytes contain an ascii space (0x20) so by applying
+                                           # encoded.replace(b" ",b"_") the text is corrupted from
+                                           # "囊萤映雪" ("Studying by the light of fireflies and snow")
+                                           # to: "囊萤晟雪" ("Gathering Fireflies and Flourishing Snow")
+                                           # (English translation from Google Translate).
+]
+
+@pytest.mark.parametrize("name,encoded_len,codec,errors", NON_ASCII_FIELD_NAMES)
+def test_encode_dbf_field_name_corruption(name,encoded_len,codec,errors):
+    stream = io.BytesIO()
+    w = shapefile.DbfWriter(
+        stream,
+        encoding=codec,
+        encodingErrors=errors,
+        strict = True,
+        )
+    w.field(name=name)
+    field = w.fields[0]
+    assert name.startswith(field.name)
+    assert len(w.fields[0].name.encode(codec, errors)) == encoded_len
+    w.close()
+
+    r = shapefile.DbfReader(stream, encoding=codec, encodingErrors=errors, strict=False)
+    assert r.fields[1].name == field.name
+    r.close()
+
+TEST_STR_VALUES = LONG_FIELD_NAMES + TEST_ENCODING_WARNINGS_FIELD_NAMES + NON_ASCII_FIELD_NAMES
+
+@pytest.mark.parametrize("value,encoded_len,codec,errors", TEST_STR_VALUES)
+def test_encode_dbf_field_values(value,encoded_len,codec,errors):
+    stream = io.BytesIO()
+    w = shapefile.DbfWriter(
+        stream,
+        encoding=codec,
+        encodingErrors=errors,
+        strict = False,
+        )
+    w.field("name", "C")
+    w.record(value)
+    w.close()
+    WARNS = codec.lower() == "utf-16-le" and value.isascii()
+    context = pytest.warns(shapefile.PossibleDataLoss) if WARNS else contextlib.nullcontext()
+    with context:
+        r = shapefile.DbfReader(stream, encoding=codec, encodingErrors=errors, strict=False)
+        assert r.record(0)[0] == value
+    r.close()
