@@ -3,6 +3,7 @@ This module tests the functionality of shapefile.py.
 """
 
 import datetime
+import io
 import json
 import os.path
 from pathlib import Path
@@ -1561,25 +1562,39 @@ def test_reader_zip_polyylinez_no_m_itershaperecords():
             pass
 
 
-def test_write_field_name_limit(tmpdir):
-    """
-    Abc...
-    """
+def test_write_field_name_below_limit(tmpdir):
     filename = tmpdir.join("test.shp").strpath
-    with shapefile.Writer(filename) as writer:
+    with shapefile.Writer(filename, strict=True) as writer:
         writer.field("a" * 5, "C")  # many under length limit
         writer.field("a" * 9, "C")  # 1 under length limit
-        writer.field("a" * 10, "C")  # at length limit
-        writer.field("a" * 11, "C")  # 1 over length limit
-        writer.field("a" * 20, "C")  # many over limit
 
     with shapefile.Reader(filename) as reader:
         fields = reader.fields[1:]
         assert len(fields[0][0]) == 5
         assert len(fields[1][0]) == 9
+
+def test_write_field_names_above_limit_non_strict(tmpdir):
+    filename = tmpdir.join("test.shp").strpath
+    with shapefile.Writer(filename, strict=False) as w:
+        w.field("a" * 10, "C") # at length limit
+        for l in [11, 20]: # 1 over, and twice the limit
+            with pytest.warns(shapefile.PossibleDataLoss):
+                w.field("a" * l, "C")
+
+    with shapefile.Reader(filename) as reader:
+        fields = reader.fields[1:]
+        assert len(fields[0][0]) == 10
+        assert len(fields[1][0]) == 10
         assert len(fields[2][0]) == 10
-        assert len(fields[3][0]) == 10
-        assert len(fields[4][0]) == 10
+
+def test_write_field_names_above_limit_strict(tmpdir):
+    filename = tmpdir.join("test.shp").strpath
+    with shapefile.Writer(filename, strict=True) as writer:
+        writer.field("a" * 10, "C") # at length limit
+        for l in [11, 20]: # at 1 over length limitand twice the limit
+            with pytest.raises(ValueError):
+                writer.field("a" * l, "C")
+
 
 
 def test_write_shp_only(tmpdir):
@@ -2021,3 +2036,41 @@ def test_write_multipatch(tmpdir):
     w.record("house1")
 
     w.close()
+
+DATES = [datetime.date(*triple) for triple in [
+    (2000,1,1),
+]]
+
+@pytest.mark.parametrize("expected_date", DATES)
+def test_round_trip_dbf_date_record(expected_date):
+    stream = io.BytesIO()
+    with shapefile.DbfWriter(dbf=stream) as dbf_w:
+        dbf_w.field("Date","D")
+        dbf_w.record(expected_date)
+    stream.seek(0)
+    with shapefile.DbfReader(dbf=stream) as dbf_r:
+        assert dbf_r.record(0)[0] == expected_date
+
+
+LONG_FIELD_NAME_TESTS = [
+    ("ÀÀÀÀ०", 8, "utf-8", "strict"),
+]
+
+@pytest.mark.parametrize("name,encoded_len,codec,errors", LONG_FIELD_NAME_TESTS)
+def test_encode_dbf_field_too_long_names(name,encoded_len,codec,errors):
+    stream = io.BytesIO()
+    with shapefile.DbfWriter(
+        stream,
+        encoding=codec,
+        encodingErrors=errors,
+        strict = False,
+        ) as w:
+        with pytest.warns(shapefile.PossibleDataLoss):
+            w.field(name=name)
+        field = w.fields[0]
+        assert name.startswith(field.name)
+        assert len(w.fields[0].name.encode(codec, errors)) == encoded_len
+
+    stream.seek(0)
+    with shapefile.DbfReader(stream) as r:
+        assert r.fields[1].name == field.name

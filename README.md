@@ -93,12 +93,32 @@ part of your geospatial project.
 
 # Version Changes
 
-## 3.0.14.dev
+## 3.1.0
+### Unicode support made more robust and encoding bugs fixed
+ - Truncation of field names and text fields now respects unicode code point boundaries (fixes issues -
+   416 and 148).
+ - Warnings raised if truncation, or replacing b" " with b"_" would corrupt encoded field names, -
+   both if they would either be undecodable, or would silently decode to incorrect data (warns users
+   if issue 421 applies).
+ - Correctly truncated field names are now stored in field instances, as would actually be seen in the file.
+ - New strict mode.  Writer(strict=True) raises errors or refuse to create fields and text records with data that -
+   would be truncated or cannot be correctly decoded back again by PyShp, exactly as given by the user.
+ - In strict mode, ascii spaces in encoded names are no longer replaced by ascii underscores at all
+   (work around to avoid corrupting unicode field names - provides opt-in fix for issue 421).
+ - BREAKING. When reading .dbf files, Trailing ascii spaces in text fields before a null terminator char (in the  -
+   decoded string) is now removed (i.e. instead of .strip().rstrip('\x00') we now do: .rstrip("\x00").rstrip(" ")).
+ - BREAKING. Enclosing Whitespace other than trailing ascii spaces (0x20) after null chars in text fields is now -
+   preserved, when reading .dbf files (fixes issue 418 - James feels this was a bug.  Let him know if you think otherwise).
+ - BREAKING Trailing null chars other than null terminators & null padding bytes, followed by whitespace other than
+   ascii spaces, are now preserved.
+ - Writing dbf records is now atomic.
+
 ### ShpWriter.shape API Tweak (small breaking change).
  - Make ShpWriter.shape return shape length in bytes (the
    same as for offset) not in 16 bit words.
 ### Testing
  - Include NullShapes in shp round trip test.
+ - En/decoding of Dbf files and Fields round trips correctly.
 
 
 ## 3.0.13
