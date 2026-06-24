@@ -1,3 +1,8 @@
+VERSION 3.1.1
+	Unicode support made even more robust and yet another encoding bug fixed!
+	* When reading, only use minimum number of pad bytes to decode text successfully (fixes issue 423).
+	* When writing, warn (or raise in strict mode) if the text's encoding ends in pad bytes.
+
 VERSION 3.1.0
 
 2026-06-23
