@@ -8,7 +8,7 @@ Compatible with Python versions >=3.9
 
 from __future__ import annotations
 
-__version__ = "3.1.1"
+__version__ = "3.1.2"
 
 import abc
 import array
@@ -251,11 +251,12 @@ class Decoder(Protocol):
     ) -> str: ...
 
 
-def _warn_if_string_ends_with_decoded_pad_bytes(
+def _check_if_string_ends_with_decoded_pad_bytes(
     s: str,
     pad_byte: bytes,
     encoding: str = "utf-8",
     encodingErrors: str = "strict",
+    strict: bool = True,
 ) -> None:
     """Warns if e.g. the encoding is utf-16-le, and the
     decoded text ends in "†", which encodes to a pair of
@@ -278,7 +279,8 @@ def _warn_if_string_ends_with_decoded_pad_bytes(
                 f"encodes to the pad bytes: {pad_bytes!r}. "
                 "The real end of the actual data may be earlier. "
             )
-
+            if strict:
+                raise DbfStringDataLoss(msg)
             warnings.warn(msg, category=PossibleDataLoss)
             break
 
@@ -335,11 +337,12 @@ def _encode_dbf_string(
         )
 
     if pad_byte is not None:
-        _warn_if_string_ends_with_decoded_pad_bytes(
+        _check_if_string_ends_with_decoded_pad_bytes(
             s=trimmed,
             pad_byte=pad_byte,
             encoding=encoding,
             encodingErrors=encodingErrors,
+            strict=strict,
         )
 
     if len(encoded) < size and pad_byte is not None:
