@@ -1,4 +1,13 @@
+VERSION 3.1.2
+
+2026-06-24
+	* Raise error in strict mode when creating field with a name, or writing strings, that ends with whole code points
+ that whose encoding is pad bytes.
+	* Document handling of unicode.
+
 VERSION 3.1.1
+
+2026-06-24
 	Unicode support made even more robust and yet another encoding bug fixed!
 	* When reading, only use minimum number of pad bytes to decode text successfully (fixes issue 423).
 	* When writing, warn (or raise in strict mode) if the text's encoding ends in pad bytes.

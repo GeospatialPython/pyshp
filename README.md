@@ -8,7 +8,7 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 
 - **Author**: [Joel Lawhead](https://github.com/GeospatialPython)
 - **Maintainers**: [James Parrott](https://github.com/JamesParrott) & [Karim Bahgat](https://github.com/karimbahgat)
-- **Version**: 3.1.1
+- **Version**: 3.1.2
 - **Date**: 24th June 2026
 - **License**: [MIT](https://github.com/GeospatialPython/pyshp/blob/master/LICENSE.TXT)
 
@@ -92,6 +92,10 @@ part of your geospatial project.
 
 
 # Version Changes
+
+## 3.1.2
+ - Raise error in strict mode when creating field with a name, or writing strings, that ends with whole code points
+ that whose encoding is pad bytes.
 
 ## 3.1.1
 ### Unicode support made even more robust and yet another encoding bug fixed!
@@ -1334,8 +1338,14 @@ All logging happens under the namespace `shapefile`. So another way to suppress 
 
 PyShp supports reading and writing shapefiles in any language or character encoding, and provides several options for decoding and encoding text.
 Most shapefiles are written in UTF-8 encoding, PyShp's default encoding, so in most cases you don't have to specify the encoding.
+#### Encoding errors
 If you encounter an encoding error when reading a shapefile, this means the shapefile was likely written in a non-utf8 encoding.
 For instance, when working with English language shapefiles, a common reason for encoding errors is that the shapefile was written in Latin-1 encoding.
+#### Recommendation
+*We recommend avoiding writing Shapefiles with unicode encoded as UTF-16 and UTF-32, especially UTF-16-LE (if at all possible).*
+When using other encodings, especially UTF-32 or UTF-16, a whole host of other known (and unknown) unicode related issues can be encountered.  See ## Specialist Unicode Handling below for more details.
+
+#### Non-utf8 encodings
 For reading shapefiles in any non-utf8 encoding, such as Latin-1, just
 supply the encoding option when creating the Reader class.
 
@@ -1362,7 +1372,10 @@ should give you the same unicode string you started with.
 	>>> r.close()
 
 If you supply the wrong encoding and the string is unable to be decoded, PyShp will by default raise an
-exception. If however, on rare occasion, you are unable to find the correct encoding and want to ignore
+exception.
+
+#### Custom handling of encoding errors.
+If however, on rare occasion, you are unable to find the correct encoding and want to ignore
 or replace encoding errors, you can specify the "encodingErrors" to be used by the decode method. This
 applies to both reading and writing.
 
@@ -1377,6 +1390,95 @@ version being used, e.g. 'strict', 'ignore' or 'replace'
 in [CPython 3.9 - 3.14](https://docs.python.org/3/library/stdtypes.html#bytes.decode)
 ('xmlcharrefreplace' and 'backslashreplace' are only supported by
 [`str.encode`](https://docs.python.org/3/library/stdtypes.html#str.encode)).
+
+## Specialist Unicode handling.
+### Summary
+If at all possible use UTF-8.  Or at the very least avoid UTF-16 and UTF-32
+### Background
+Unicode is one of humanity's greatest achievements.  GIS applications support it within Shapefiles.
+But most unicode encodings (e.g. UTF-8, UTF-16) assume
+data will be stored in pure binary form, as bytes (8-bit octets).  The Shapefile spec however, defers to
+a long lost dbf spec (the URL link to a former company's website is now dead) which like most other dbf
+specifications, will require text to be stored as Ascii.
+The fields are some known width, and Extended Ascii character sets (with 256 entries, not only the first
+128 common to them all) are essentially one-to-one mappings to bytes - so this would not be a
+problem in isolation.
+### Padding bytes
+Dbf field names are post padded with null bytes, and dbf text fields ("C" and "M") are post
+padded with Ascii spaces (the byte 0x20).  Example shapefiles exist where text fields also end in numerous
+null bytes, essentially also as padding.
+#### Problem 1.
+Encodings of some unicode strings may contain these exact padding bytes as part of their data (in particular
+the first null byte is not necessarily a null terminator).
+
+	>>> "囊萤映雪".encode("utf-16-be")
+	b'V\xca\x84$f \x96\xea'
+
+#### Problem 2.
+Some unicode strings encode to byte sequences under some non-UTF-8 codecs, that contain and even
+trail a null byte as part of their data.
+
+	>>> "ABC".encode("utf-16-le")
+	b'A\x00B\x00C\x00'
+
+#### Problem 3.
+Some unicode strings encode to byte sequences under some non-UTF-8 codecs, that
+are entirely dbf padding bytes, e.g.:
+
+	>>> '††††'.encode("utf-16-le")
+	b'        '
+
+#### Problem 4.
+If encodings of even only moderately long unicode strings (especially the 10 byte field names) are truncated at byte
+boundaries (i.e. not truncated correctly at one of the string's code-point boundaries), their data is corrupted, and
+the encoding of the final code point whose bytes were chopped is corrupted.
+
+	>>> try:
+	...     "ÀÀÀÀ०".encode()[:10].decode()
+	... except UnicodeDecodeError:
+	...     print("Failed to decode")
+	...
+	Failed to decode
+
+#### Problem 5.
+Historically, PyShp has attempted to prettify dbf string data.  E.g. stripping whitespace.
+In particular, ascii spaces (`b" "`) in a dbf name were transformed to underscores (`b"_"`) - but
+crucially, only after encoding to bytes, whether the codec was ascii or not.  This can result in silent
+changes to the user's data, and since version 3.1 PyShp no longer does this.
+
+	>>> s = "囊萤映雪"
+	>>> s2 = s.encode("utf-16-be").replace(b" ",b"_").decode("utf-16-be")
+	>>> print(s2)
+	囊萤晟雪
+	>>> s == s2
+	False
+
+### PyShp's approach
+The simplest most robust solution to support arbitrary codec encoding as ascii bytes, is probably to encode those
+bytes as Base64 (with an alphabet excluding dbf pad bytes), and then encode that Base64 string a third time as bytes.
+PyShp tries to be a little easier to use than this.  The intention is to adhere to [Postel's Law](https://en.wikipedia.org/wiki/Robustness_principle) so hopefully PyShp is still fairly lenient when decoding and reading Shapefiles, but either informative or
+stricter, when the user attempts to encoding or write invalid files.
+#### Warnings
+When possible data corruption is detected when reading or writing a Shapefile (or dbf file), by default
+PyShp will raise a warning.  Supported situations are listed below under Decoding and Encoding.
+#### Strict mode
+If a Writer (or dbf version) is created with `strict=True` then an exception is raised instead of any of the above warnings
+(hopefully before corrupt data can be written at all).
+#### Decoding
+ - PyShp first removes all padding bytes.  If decoding fails, those padding bytes are restored one by one to the data
+ until decoding succeeds.  A warning is raised if any padding bytes were required, but an exception is not raised for this
+ in strict mode (those pad bytes might just have been part of a valid encoding).
+ - PyShp warns if there is a null character in a decoded string (but silently accepts null bytes in encoded strings).  This
+   warning does not become an exception in strict mode (there might simply be null characters in the data).
+#### Encoding
+ - PyShp warns when trying to write data to a text field or field name that PyShp itself would not be able to decode correctly.
+ - PyShp now truncates text fields the dbf field `size` or 10 byte limit for names, by if necessary, successively
+truncating the actual string, one code point at a time, until the number of encoded bytes is less than or equal
+to the maximum.  If truncation was necessary, a warning is raised.
+ - When trying to write text data, that ends with code points that would encode
+ to pad bytes (these would be lost on decoding, otherwise all fields stored as utf-16 under the limit will end
+ in ††††††††††††...).
+ - PyShp warns if a field name is written containing a null character (before encoding).  For users who wish to steer well clear of potential bugs.
 
 ## Reading Large Shapefiles
 
