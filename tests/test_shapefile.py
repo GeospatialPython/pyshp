@@ -2054,6 +2054,18 @@ def test_round_trip_dbf_date_record(expected_date):
     dbf_r.record(0)[0] == expected_date
     dbf_r.close()
 
+FIELD_VALUE_ERRORS = [
+    (" ", 1, "utf-8", "strict"),
+]
+
+@pytest.mark.parametrize("value,encoded_len,codec,errors", FIELD_VALUE_ERRORS)
+def test_encode_dbf_field_padding_bytes_errors(value,encoded_len,codec,errors):
+    s = io.BytesIO()
+    w = shapefile.DbfWriter(dbf=s, encoding=codec, encodingErrors=errors, strict=True)
+    w.field("name","C", size=len(value))
+    with pytest.raises(shapefile.DbfStringDataLoss):
+        w.record(value)
+    w.close()
 
 LONG_FIELD_NAMES = [
     ("ÀÀÀÀ०", 8, "utf-8", "strict"),  # Encoded bytes are corrupted if truncated to 10 bytes
