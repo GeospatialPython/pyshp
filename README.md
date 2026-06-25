@@ -8,8 +8,8 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 
 - **Author**: [Joel Lawhead](https://github.com/GeospatialPython)
 - **Maintainers**: [James Parrott](https://github.com/JamesParrott) & [Karim Bahgat](https://github.com/karimbahgat)
-- **Version**: 3.1.2
-- **Date**: 24th June 2026
+- **Version**: 3.1.3
+- **Date**: 25th June 2026
 - **License**: [MIT](https://github.com/GeospatialPython/pyshp/blob/master/LICENSE.TXT)
 
 ## Contents
@@ -92,6 +92,9 @@ part of your geospatial project.
 
 
 # Version Changes
+
+## 3.1.3
+ - Restore faster text writing paths for single-byte Ascii encodings, and Utf-8.
 
 ## 3.1.2
  - Raise error in strict mode when creating field with a name, or writing strings, that ends with whole code points
@@ -761,7 +764,7 @@ You can call the "fields" attribute of the shapefile as a Python list. Each
 field is a Python namedtuple (Field) with the following information:
 
   * name: the name describing the data at this column index (a string).
-  * field_type: a FieldType enum member determining the type of data at this column index. Names can be:
+  * field_type: a FieldType determining the type of data at this column index. Names can be:
        * "C": Characters, text.
 	   * "N": Numbers, with or without decimals.
 	   * "F": Floats (same as "N").
@@ -773,9 +776,9 @@ field is a Python namedtuple (Field) with the following information:
 	   fields.
   * deci: Decimal length. The number of decimal places found in "Number" fields.
 
-A new field can be created directly from the type enum member etc., or as follows:
+A new field can be created as follows:
 
-	>>> shapefile.Field.from_unchecked("Population", "N", 10,0)
+	>>> shapefile.Field("Population", "N", 10,0)
 	Field(name="Population", field_type=FieldType.N, size=10, decimal=0)
 
 Using this method the conversion from string to enum is done automatically.
@@ -1454,10 +1457,16 @@ changes to the user's data, and since version 3.1 PyShp no longer does this.
 	False
 
 ### PyShp's approach
-The simplest most robust solution to support arbitrary codec encoding as ascii bytes, is probably to encode those
-bytes as Base64 (with an alphabet excluding dbf pad bytes), and then encode that Base64 string a third time as bytes.
-PyShp tries to be a little easier to use than this.  The intention is to adhere to [Postel's Law](https://en.wikipedia.org/wiki/Robustness_principle) so hopefully PyShp is still fairly lenient when decoding and reading Shapefiles, but either informative or
-stricter, when the user attempts to encoding or write invalid files.
+The simplest, most robust solution to store arbitrary codec encodings as ascii bytes, is probably to encode those
+encodings as Base64 (with an alphabet excluding dbf pad bytes), and then encode that Base64 string a third time as Ascii bytes.
+PyShp tries to be a little easier to use than this.  The intention is to adhere to [Postel's Law](https://en.wikipedia.org/wiki/Robustness_principle) so hopefully PyShp is still fairly lenient when decoding and reading Shapefiles.  But either informative or
+stricter, when the user attempts to encode or write potentially invalid text data.
+#### UTF-8 and Single byte codecs
+UTF-8 is backwards compatible with ascii, and so far (as we know), is only known to be affected by Problem 4.
+PyShp a provides a faster 'happy' path for Writers and DbfWriters using "utf8" (the default), and when text
+field values are known to have been encoded, each code point to a single byte.  Otherwise, a more robust
+strategy is used, to handle the trickier codecs, to hopefully correctly encode data as far as possible,
+otherwise to raise a warning or error.
 #### Warnings
 When possible data corruption is detected when reading or writing a Shapefile (or dbf file), by default
 PyShp will raise a warning.  Supported situations are listed below under Decoding and Encoding.

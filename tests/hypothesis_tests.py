@@ -563,12 +563,14 @@ def dbf_fields(draw):
 def test_dbf_Field_roundtrips(
     field_kwargs: dict,
 ) -> None:
-    expected = shp.Field.from_unchecked(**field_kwargs)
+    BOM, decoded_pad_bytes = shp._BOM_and_dbf_decoded_pad_bytes()
+
+    expected = shp.Field.from_unchecked(decoded_pad_bytes=decoded_pad_bytes,**field_kwargs)
     stream = io.BytesIO()
     encoded = expected.encode_field_descriptor(strict=True)
     stream.write(encoded)
     stream.seek(0)
-    actual = shp.Field.from_byte_stream(stream, strict=True)
+    actual = shp.Field.from_byte_stream(stream)
     assert isinstance(actual, shp.Field)
     assert actual.name == expected.name
     assert actual[1:] == expected[1:]
