@@ -582,9 +582,10 @@ def encodings_and_dbf_fields(draw):
 
 def _get_fields_context(fields, codec, strict=False):
     for field in fields:
-        if len(field["name"].encode(codec)) > 10:
-            return pytest.warns(shp.PossibleDataLoss)
-        if not strict and " " in field["name"]:
+        if (len(field["name"].encode(codec)) > 10 or
+            "\x00" in field["name"] or
+            (not strict and " " in field["name"])
+            ):
             return pytest.warns(shp.PossibleDataLoss)
     return contextlib.nullcontext()
 
@@ -685,7 +686,8 @@ def _assert_reader_matches_expected_fields(r, expected_fields, written_records, 
         expected_name = f_w["name"]
         if not writer_strict:
             expected_name = expected_name.replace(" ", "_")
-        assert expected_name.startswith(f_r.name), f"{f_w["name"]=}, {actual_name=}"
+        expected_name = expected_name.rstrip("\x00")
+        assert expected_name.startswith(f_r.name), f"{f_w['name']=}, {actual_name=}"
         actual_field_dict = f_r._asdict()
         for k in ("field_type", "size", "decimal"):
             assert actual_field_dict[k] == f_w[k], f"{k=}, {actual_field_dict[k]=}, {f_w[k]=}"

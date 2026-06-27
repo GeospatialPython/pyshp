@@ -537,7 +537,7 @@ class Field(NamedTuple):
 
         if "\x00" in name:
             msg = (
-                "Field names should not contain null characters "
+                "Field names ought not contain null characters, "
                 "as null bytes are used for padding in the header. "
                 f"Got: {name=} "
             )
