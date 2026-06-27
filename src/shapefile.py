@@ -8,7 +8,7 @@ Compatible with Python versions >=3.9
 
 from __future__ import annotations
 
-__version__ = "3.1.3"
+__version__ = "3.1.4.dev"
 
 import abc
 import array
@@ -283,6 +283,7 @@ def _truncate_utf8_str(
     )
 
 
+@functools.cache
 def _BOM_and_dbf_decoded_pad_bytes(
     encoding: str = "utf8",
 ) -> tuple[bytes, Mapping[str, bytes]]:
@@ -310,7 +311,6 @@ def _encode_dbf_string(
     size: int,
     decode: Decoder | None,
     pad_byte: bytes,
-    decoded_pad_bytes: Mapping[str, bytes],
     encoding: str = "utf8",
     encodingErrors: str = "strict",
     strict: bool = True,
@@ -357,6 +357,8 @@ def _encode_dbf_string(
             f"Could not encode first code point (e.g. character): {s[0]} "
             f"to a short enough byte string, using {encoding=}, {encodingErrors=} ({BOM=!r})"
         )
+
+    _BOM, decoded_pad_bytes = _BOM_and_dbf_decoded_pad_bytes(encoding)
 
     for suffix, pad_bytes in decoded_pad_bytes.items():
         if s.endswith(suffix):
@@ -523,7 +525,6 @@ class Field(NamedTuple):
         cls,
         name: str,
         *,
-        decoded_pad_bytes: Mapping[str, bytes],
         field_type: str | bytes | FieldTypeT = "C",
         size: int = 50,
         decimal: int = 0,
@@ -531,6 +532,8 @@ class Field(NamedTuple):
         encodingErrors: str = "strict",
         strict: bool = False,
     ) -> Field:
+
+        name = str(name)
 
         if "\x00" in name:
             msg = (
@@ -567,11 +570,10 @@ class Field(NamedTuple):
         # Only use the portion of the name that we are able to encode to
         # 10 bytes or less.
         _encoded_name, trimmed_name = cls.trim_name_until_encodable(
-            name=str(name),
+            name=name,
             encoding=encoding,
             encodingErrors=encodingErrors,
             strict=strict,
-            decoded_pad_bytes=decoded_pad_bytes,
         )
 
         # A doctest in README.md previously passed in a string ('40') for size,
@@ -586,7 +588,6 @@ class Field(NamedTuple):
             encoding=encoding,
             encodingErrors=encodingErrors,
             strict=strict,
-            decoded_pad_bytes=decoded_pad_bytes,
         )
         return inst
 
@@ -597,14 +598,12 @@ class Field(NamedTuple):
         encoding: str = "utf8",
         encodingErrors: str = "strict",
         strict: bool = False,
-        decoded_pad_bytes: Mapping[str, bytes] = {},
     ) -> tuple[bytes, str]:
         return _encode_dbf_string(
             s=name,
             size=10,
             decode=cls.decode_name,
             pad_byte=b"\x00",
-            decoded_pad_bytes=decoded_pad_bytes,
             encoding=encoding,
             encodingErrors=encodingErrors,
             strict=strict,
@@ -615,7 +614,6 @@ class Field(NamedTuple):
         encoding: str = "utf8",
         encodingErrors: str = "strict",
         strict: bool = False,
-        decoded_pad_bytes: Mapping[str, bytes] = {},
     ) -> bytes:
         # encoded_name = self.name.encode(encoding, encodingErrors)
         # encoded_name = encoded_name[:10].ljust(10, b"\x00")
@@ -624,7 +622,6 @@ class Field(NamedTuple):
             encoding=encoding,
             encodingErrors=encodingErrors,
             strict=strict,
-            decoded_pad_bytes=decoded_pad_bytes,
         )
 
         encoded_field_type = self.field_type.encode("ascii")
@@ -4242,7 +4239,6 @@ class DbfWriter(_HasCheckedWriteableFile):
             encoding=self.encoding,
             encodingErrors=self.encodingErrors,
             strict=self.strict,
-            decoded_pad_bytes=self._decoded_pad_bytes,
         )
         self.fields.append(field)
 
@@ -4287,7 +4283,6 @@ class DbfWriter(_HasCheckedWriteableFile):
                     encoding=self.encoding,
                     encodingErrors=self.encodingErrors,
                     strict=self.strict,
-                    decoded_pad_bytes=self._decoded_pad_bytes,
                 )
             )
 
@@ -4454,7 +4449,7 @@ class DbfWriter(_HasCheckedWriteableFile):
                         )
                         if self.strict:
                             raise DbfStringDataLoss(msg)
-                        warnings.warn(msg)
+                        warnings.warn(msg, category=PossibleDataLoss)
 
                     encoded = encoded.ljust(size)
                 else:
@@ -4463,7 +4458,6 @@ class DbfWriter(_HasCheckedWriteableFile):
                         size=size,
                         decode=_decode_C_or_M_field if self.strict else None,
                         pad_byte=b" ",
-                        decoded_pad_bytes=self._decoded_pad_bytes,
                         encoding=self.encoding,
                         encodingErrors=self.encodingErrors,
                         strict=self.strict,
@@ -4885,6 +4879,14 @@ class Writer(_HasExitStack):
     @fields.setter
     def fields(self, value: list[Field]) -> None:
         self.dbf_writer.fields = value
+
+    @property
+    def strict(self) -> bool:
+        return self.dbf_writer.strict
+
+    @strict.setter
+    def strict(self, value: bool) -> None:
+        self.dbf_writer.strict = value
 
     @property
     def recNum(self) -> int:
