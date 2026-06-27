@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import datetime
 import io
 import itertools
@@ -538,14 +539,23 @@ DBF_FIELD_TYPES = {
     "D": {"min_length": 8, "max_length": 8},
 }
 
+
+ENCODINGS = [
+    "ascii",
+    "utf-8",
+]
+
+encodings = sampled_from(ENCODINGS)
+
+
 @composite
-def dbf_fields(draw):
+def _dbf_fields_strategy(draw, encoding: str) -> dict[str, str | int]:
     field_type, bounds_dict = draw(sampled_from(list(DBF_FIELD_TYPES.items())))
 
     name = draw(
         text(
             alphabet=characters(
-                codec="ascii",
+                codec=encoding,
                 exclude_categories=["Z", "C"] # Z - Whitespace, C - Control chars++
             ),
             min_size=1,
@@ -559,23 +569,43 @@ def dbf_fields(draw):
     size = draw(integers(min_value=min_length, max_value=max_length))
     decimal = draw(integers(min_value=0, max_value=max(0,min(size - 3, max_decimal))))
 
-
     return {"name": name, "field_type": field_type, "size": size, "decimal": decimal}
 
 
-@pytest.mark.hypothesis
-@given(field_kwargs=dbf_fields())
-def test_dbf_Field_roundtrips(
-    field_kwargs: dict,
-) -> None:
-    BOM, decoded_pad_bytes = shp._BOM_and_dbf_decoded_pad_bytes()
+@composite
+def encodings_and_dbf_fields(draw):
+    encoding = draw(encodings)
+    fields_strategy = _dbf_fields_strategy(encoding)
+    field = draw(fields_strategy)
+    return encoding, field
 
-    expected = shp.Field.from_unchecked(decoded_pad_bytes=decoded_pad_bytes,**field_kwargs)
+
+@pytest.mark.hypothesis
+@settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
+@given(encoding_and_dbf_field=encodings_and_dbf_fields())
+def test_dbf_Field_roundtrips(
+    encoding_and_dbf_field: dict,
+) -> None:
+    encoding, field_kwargs = encoding_and_dbf_field
+    BOM, decoded_pad_bytes = shp._BOM_and_dbf_decoded_pad_bytes(encoding)
+
+    L = len(field_kwargs["name"].encode(encoding))
+    context = contextlib.nullcontext() if L <= 10 else pytest.warns(shp.PossibleDataLoss)
+
+    with context:
+        expected = shp.Field.from_unchecked(
+            decoded_pad_bytes=decoded_pad_bytes,
+            encoding=encoding,
+            **field_kwargs,
+        )
     stream = io.BytesIO()
     encoded = expected.encode_field_descriptor(strict=True)
     stream.write(encoded)
     stream.seek(0)
-    actual = shp.Field.from_byte_stream(stream)
+    actual = shp.Field.from_byte_stream(
+        stream,
+        encoding=encoding,
+    )
     assert isinstance(actual, shp.Field)
     assert actual.name == expected.name
     assert actual[1:] == expected[1:]
@@ -583,7 +613,7 @@ def test_dbf_Field_roundtrips(
 
 ascii_printable = string.ascii_letters + string.digits + string.punctuation + " "
 
-def record_value_for_field(name: str, field_type: str, size: int, decimal: int = 0):
+def record_value_for_field(name: str, field_type: str, size: int, decimal: int, encoding: str):
 
     if field_type == "C":
         return text(
@@ -615,34 +645,38 @@ def record_value_for_field(name: str, field_type: str, size: int, decimal: int =
     raise ValueError(f"Unsupported: {field_type=}")
 
 
-def _dbf_fields_and_record_strategy(
+def _dbf_encoding_fields_and_record_strategy(
     draw,
-    max_fields=10, # In DbfWriter.__init__, max_num_fields: int = 2046,
+    max_fields: int=10, # In DbfWriter.__init__, max_num_fields: int = 2046,
     ):
 
-    fields = draw(lists(dbf_fields(), min_size=1, max_size=max_fields))
+    encoding = draw(encodings)
 
-    record_strategy = tuples(*(record_value_for_field(**field) for field in fields))
+    fields = draw(lists(_dbf_fields_strategy(encoding), min_size=1, max_size=max_fields))
 
-    return fields, record_strategy
+    record_strategy = tuples(*(record_value_for_field(encoding=encoding, **field) for field in fields))
+
+    return encoding, fields, record_strategy
 
 
 @composite
-def dbf_fields_and_records(
+def dbf_encoding_fields_and_records(
     draw,
     max_fields=10, # In DbfWriter.__init__, max_num_fields: int = 2046,
     max_records=20,
     ):
 
-    fields, record_strategy = _dbf_fields_and_record_strategy(draw, max_fields)
+    encoding, fields, record_strategy = _dbf_encoding_fields_and_record_strategy(draw, max_fields)
 
     records = draw(lists(record_strategy, min_size=0, max_size=max_records))
 
-    return fields, records
+    return encoding, fields, records
+
 
 def _assert_reader_matches_expected_records(r, fields, written_records):
     for f_r, f_w in itertools.zip_longest(r.data_fields, fields):
         actual_field_dict = f_r._asdict()
+        assert f_w["name"].startswith(actual_field_dict["name"])
         for k in ("field_type", "size", "decimal"):
             assert actual_field_dict[k] == f_w[k], f"{k=}, {actual_field_dict[k]=}, {f_w[k]=}"
     for exp_rec, actual_rec in itertools.zip_longest(written_records, r.records()):
@@ -658,16 +692,28 @@ def _assert_reader_matches_expected_records(r, fields, written_records):
                 expected = float(format(expected, f".{decimal}f"))
             assert actual == expected, f"{actual=}, {expected=}, {field_type=}, {type(actual)=}, {type(expected)=}"
 
+def _get_fields_context(fields, codec):
+    for field in fields:
+        if len(field["name"].encode(codec)) > 10:
+            return pytest.warns(shp.PossibleDataLoss)
+    return contextlib.nullcontext()
 
 @pytest.mark.hypothesis
-@given(fields_and_records=dbf_fields_and_records())
-def test_dbf_reader_writer_roundtrip(fields_and_records)-> None:
-    fields, records = fields_and_records
+@given(codec_fields_and_records=dbf_encoding_fields_and_records())
+def test_dbf_reader_writer_roundtrip(codec_fields_and_records)-> None:
+    codec, fields, records = codec_fields_and_records
     stream = io.BytesIO()
+    fields_context = _get_fields_context(fields, codec)
     written_records = []
-    with shp.DbfWriter(dbf=stream, strict=True) as dbf_w:
-        for field in fields:
-            dbf_w.field(**field)
+    with shp.DbfWriter(dbf=stream, encoding=codec, strict=False) as dbf_w:
+
+        # Only use strict = False to write fields, so that we still
+        # test the corresponding record values for any fields
+        # whose name was truncated.
+        with fields_context:
+            for field in fields:
+                dbf_w.field(**field)
+        dbf_w.strict = True
         for record in records:
             try:
                 dbf_w.record(*record)
@@ -676,50 +722,41 @@ def test_dbf_reader_writer_roundtrip(fields_and_records)-> None:
             else:
                 written_records.append(record)
 
-
-    with shp.DbfReader(dbf=stream) as r:
+    with shp.DbfReader(dbf=stream, encoding=codec) as r:
         _assert_reader_matches_expected_records(r, fields, written_records)
-# def code_and_shape_strategy_from_triple(t):
-#     x, _name, shapes  = t
-#     return tuples(
-#         just(x),
-#         lists(
-#             one_of(shapes, null_shapes),
-#             min_size = 0, # Empty shp files are in the ESRI spec.
-#             max_size=MAX_NUM_SHAPES,
-#         ),
-#     )
-# codes_and_shapes_strategies = [
-#     code_and_shape_strategy_from_triple(t)
-#     for t in shape_codes_names_and_strategies
-# ]
 
-# codes_and_shapes = one_of(codes_and_shapes_strategies)
 
 @composite
-def codes_fields_shapes_and_records(draw):
+def codes_codecs_fields_shapes_and_records(draw):
     code, shapes = draw(codes_and_shapes)
-    fields, records_strategy = _dbf_fields_and_record_strategy(draw, max_fields=10)
+    encoding, fields, records_strategy = _dbf_encoding_fields_and_record_strategy(draw, max_fields=10)
     N = len(shapes)
     records = [draw(records_strategy) for _ in range(N)]
 
-    return code, fields, zip(shapes, records)
+    return code, encoding, fields, list(zip(shapes, records))
+
 
 @pytest.mark.hypothesis
 @settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
-@given(codes_fields_shapes_and_records=codes_fields_shapes_and_records())
-def test_shapefile_reader_writer_roundtrip(codes_fields_shapes_and_records)-> None:
+@given(codes_codecs_fields_shapes_and_records=codes_codecs_fields_shapes_and_records())
+def test_shapefile_reader_writer_roundtrip(codes_codecs_fields_shapes_and_records)-> None:
 
-    code_ex, fields_ex, shapes_and_records = codes_fields_shapes_and_records
+    code_ex, encoding, fields_ex, shapes_and_records = codes_codecs_fields_shapes_and_records
     streams = {"shp" : io.BytesIO(), "shx" : io.BytesIO(), "dbf" : io.BytesIO(),}
 
     expected_shapes = []
     expected_records = []
+    fields_context = _get_fields_context(fields=fields_ex, codec=encoding)
 
-    with shp.Writer(shapeType = code_ex, strict=True, **streams) as w:
-        for field in fields_ex:
-            w.field(**field)
+    with shp.Writer(shapeType = code_ex, encoding=encoding, strict=False, **streams) as w:
+        with fields_context:
+            for field in fields_ex:
+                w.field(**field)
 
+        # Only use strict = False to write fields, so that we still
+        # test the corresponding record values for any fields
+        # whose name was truncated.
+        w.strict=True
         for shape, record in shapes_and_records:
             try:
                 w.record(*record)
@@ -729,6 +766,6 @@ def test_shapefile_reader_writer_roundtrip(codes_fields_shapes_and_records)-> No
             expected_shapes.append(shape)
             expected_records.append(record)
 
-    with shp.Reader(**streams) as r:
+    with shp.Reader(encoding=encoding, **streams) as r:
         _assert_reader_matches_expected_records(r, fields_ex, expected_records)
         _assert_reader_matches_expected_shapes(r, code_ex, expected_shapes)

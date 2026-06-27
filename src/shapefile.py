@@ -8,7 +8,7 @@ Compatible with Python versions >=3.9
 
 from __future__ import annotations
 
-__version__ = "3.1.3"
+__version__ = "3.1.4.dev"
 
 import abc
 import array
@@ -4454,7 +4454,7 @@ class DbfWriter(_HasCheckedWriteableFile):
                         )
                         if self.strict:
                             raise DbfStringDataLoss(msg)
-                        warnings.warn(msg)
+                        warnings.warn(msg, category=PossibleDataLoss)
 
                     encoded = encoded.ljust(size)
                 else:
@@ -4885,6 +4885,14 @@ class Writer(_HasExitStack):
     @fields.setter
     def fields(self, value: list[Field]) -> None:
         self.dbf_writer.fields = value
+
+    @property
+    def strict(self) -> bool:
+        return self.dbf_writer.strict
+
+    @strict.setter
+    def strict(self, value: bool) -> None:
+        self.dbf_writer.strict = value
 
     @property
     def recNum(self) -> int:
