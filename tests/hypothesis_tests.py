@@ -557,7 +557,7 @@ def _dbf_fields_strategy(draw, encoding: str) -> dict[str, str | int]:
             alphabet=characters(
                 codec=encoding,
                 exclude_categories=["C"], # Z - Whitespace, C - Control chars++
-                exclude_characters=[" "],
+                # exclude_characters=[" "],
             ),
             min_size=1,
             max_size=10,
@@ -584,7 +584,7 @@ def _get_fields_context(fields, codec, strict=False):
     for field in fields:
         if len(field["name"].encode(codec)) > 10:
             return pytest.warns(shp.PossibleDataLoss)
-        if not strict and " " in field:
+        if not strict and " " in field["name"]:
             return pytest.warns(shp.PossibleDataLoss)
     return contextlib.nullcontext()
 
@@ -596,7 +596,6 @@ def test_dbf_Field_roundtrips(
 ) -> None:
     encoding, field_kwargs = encoding_and_dbf_field
 
-    L = len(field_kwargs["name"].encode(encoding))
     context = _get_fields_context([field_kwargs], encoding, strict=False)
 
     with context:
@@ -681,13 +680,13 @@ def dbf_encoding_fields_and_records(
     return encoding, fields, records
 
 
-def _assert_reader_matches_expected_fields(r, fields, written_records, writer_strict):
-    for f_r, f_w in itertools.zip_longest(r.data_fields, fields):
-        actual_field_dict = f_r._asdict()
-        actual_name = actual_field_dict["name"]
+def _assert_reader_matches_expected_fields(r, expected_fields, written_records, writer_strict):
+    for f_r, f_w in itertools.zip_longest(r.data_fields, expected_fields):
+        expected_name = f_w["name"]
         if not writer_strict:
-            actual_name = actual_name.replace(" ", "_")
-        assert f_w["name"].startswith(actual_name)
+            expected_name = expected_name.replace(" ", "_")
+        assert expected_name.startswith(f_r.name), f"{f_w["name"]=}, {actual_name=}"
+        actual_field_dict = f_r._asdict()
         for k in ("field_type", "size", "decimal"):
             assert actual_field_dict[k] == f_w[k], f"{k=}, {actual_field_dict[k]=}, {f_w[k]=}"
 
