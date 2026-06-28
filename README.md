@@ -525,7 +525,7 @@ Finally, you can use all of the above methods to read shapefiles directly from t
 
 
 	>>> # from a zipped shapefile on website
-	>>> sf = shapefile.Reader("https://geodata.ucdavis.edu/gadm/gadm4.1/shp/gadm41_ATA_shp.zip")
+	>>> sf = shapefile.Reader("https://github.com/JamesParrott/PyShp_test_shapefile/raw/refs/heads/main/gadm41_ATA_shp.zip")
 
 	>>> # from a shapefile collection of files in a github repository
 	>>> sf = shapefile.Reader("https://pubs.usgs.gov/of/2000/of00-006/gisdata/coverage/airports.shp")
