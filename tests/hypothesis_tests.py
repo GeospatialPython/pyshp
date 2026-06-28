@@ -556,8 +556,9 @@ def _dbf_fields_strategy(draw, encoding: str) -> dict[str, str | int]:
         text(
             alphabet=characters(
                 codec=encoding,
-                exclude_categories=["C"], # Z - Whitespace, C - Control chars++
-                exclude_characters=[" "],
+                # https://en.wikipedia.org/wiki/Unicode_character_property#General_Category
+                exclude_categories=["Cs", "Co", "Cn"], # Cs - surrogates
+                # exclude_characters=[" "],
             ),
             min_size=1,
             max_size=10,
@@ -582,38 +583,42 @@ def encodings_and_dbf_fields(draw):
 
 def _get_fields_context(fields, codec, strict=False):
     for field in fields:
-        if len(field["name"].encode(codec)) > 10:
-            return pytest.warns(shp.PossibleDataLoss)
-        if not strict and " " in field:
-            return pytest.warns(shp.PossibleDataLoss)
-    return contextlib.nullcontext()
+        if (len(field["name"].encode(codec)) > 10 or
+            "\x00" in field["name"] or
+            (" " in field["name"] and not strict)
+            ):
+            if strict:
+                return pytest.raises(shp.DbfStringDataLoss), True
+            return pytest.warns(shp.PossibleDataLoss), False
+    return contextlib.nullcontext(), False
 
 @pytest.mark.hypothesis
 @settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large])
 @given(encoding_and_dbf_field=encodings_and_dbf_fields())
-def test_dbf_Field_roundtrips(
-    encoding_and_dbf_field: dict,
-) -> None:
+def test_dbf_Field_roundtrips(encoding_and_dbf_field: dict) -> None:
+
     encoding, field_kwargs = encoding_and_dbf_field
 
-    L = len(field_kwargs["name"].encode(encoding))
-    context = _get_fields_context([field_kwargs], encoding, strict=False)
+    w_context, error_expected = _get_fields_context([field_kwargs], encoding, strict=True)
 
-    with context:
+    with w_context:
         expected = shp.Field.from_unchecked(
             encoding=encoding,
-            strict=False,
+            strict=True,
             **field_kwargs,
         )
+        encoded = expected.encode_field_descriptor(strict=True)
+    if error_expected:
+        return
     stream = io.BytesIO()
-
-    encoded = expected.encode_field_descriptor(strict=True)
     stream.write(encoded)
     stream.seek(0)
+
     actual = shp.Field.from_byte_stream(
         stream,
         encoding=encoding,
     )
+
     assert isinstance(actual, shp.Field)
     assert actual.name == expected.name
     assert actual[1:] == expected[1:]
@@ -681,18 +686,24 @@ def dbf_encoding_fields_and_records(
     return encoding, fields, records
 
 
-def _assert_reader_matches_expected_fields(r, fields, written_records, writer_strict):
-    for f_r, f_w in itertools.zip_longest(r.data_fields, fields):
-        actual_field_dict = f_r._asdict()
-        actual_name = actual_field_dict["name"]
+def _assert_reader_matches_expected_fields(r, expected_fields, writer_strict):
+    assert len(expected_fields) == len(r.data_fields), f"{expected_fields=}, {r.data_fields=}"
+
+    for f_r, f_w in zip(r.data_fields, expected_fields):
+        expected_name = f_w["name"]
         if not writer_strict:
-            actual_name = actual_name.replace(" ", "_")
-        assert f_w["name"].startswith(actual_name)
+            expected_name = expected_name.replace(" ", "_")
+        expected_name = expected_name.rstrip("\x00")
+        assert expected_name.startswith(f_r.name), f"{expected_name=}, {f_r.name=}"
+        actual_field_dict = f_r._asdict()
         for k in ("field_type", "size", "decimal"):
             assert actual_field_dict[k] == f_w[k], f"{k=}, {actual_field_dict[k]=}, {f_w[k]=}"
 
 def _assert_reader_matches_expected_records(r, fields, written_records):
-    for exp_rec, actual_rec in itertools.zip_longest(written_records, r.records()):
+    actual_records = r.records()
+    expected_records = [rec for rec in written_records if rec is not None]
+    assert len(expected_records) == len(actual_records), f"{expected_records=}, {actual_records=}"
+    for exp_rec, actual_rec in zip(expected_records, actual_records):
         for expected, actual, field in itertools.zip_longest(exp_rec, actual_rec, fields):
             field_type = field["field_type"]
             decimal = field["decimal"]
@@ -706,33 +717,62 @@ def _assert_reader_matches_expected_records(r, fields, written_records):
             assert actual == expected, f"{actual=}, {expected=}, {field_type=}, {type(actual)=}, {type(expected)=}"
 
 
+def _write_fields_and_records_to_strict(w, fields, records):
+
+    field_indices, written_records = set(), []
+
+
+    for i, field in enumerate(fields):
+        try:
+            w.field(**field)
+        except shp.DbfStringDataLoss:
+            pass
+        else:
+            field_indices.add(i)
+
+    if not field_indices:
+        return None, None
+
+
+    for record in records:
+        rec_list = [
+            val
+            for i, val in enumerate(record)
+            if i in field_indices
+        ]
+        try:
+            w.record(*rec_list)
+        except shp.DbfStringDataLoss:
+            written_records.append(None)
+        else:
+            written_records.append(rec_list)
+
+
+    written_fields = [field for i, field in enumerate(fields) if i in field_indices]
+
+    return written_fields, written_records
+
 @pytest.mark.hypothesis
 @given(codec_fields_and_records=dbf_encoding_fields_and_records())
 def test_dbf_reader_writer_roundtrip(codec_fields_and_records)-> None:
     codec, fields, records = codec_fields_and_records
     stream = io.BytesIO()
-    fields_context = _get_fields_context(fields, codec, strict=False)
-    written_records = []
-    with shp.DbfWriter(dbf=stream, encoding=codec, strict=False) as dbf_w:
 
-        # Only use strict = False to write fields, so that we still
-        # test the corresponding record values for any fields
-        # whose name was truncated.
-        with fields_context:
-            for field in fields:
-                dbf_w.field(**field)
-        dbf_w.strict = True
-        for record in records:
-            try:
-                dbf_w.record(*record)
-            except shp.DbfStringDataLoss:
-                pass
-            else:
-                written_records.append(record)
+    # pytest.raises and pytest.warns can obscure other
+    # exceptions inside them
+    w = shp.DbfWriter(dbf=stream, encoding=codec, strict=True)
+
+    written_fields, written_records = _write_fields_and_records_to_strict(w, fields, records)
+
+    if not written_fields or written_records is None:
+        return
+
+    w.close()
+
 
     with shp.DbfReader(dbf=stream, encoding=codec) as r:
-        _assert_reader_matches_expected_fields(r, fields, written_records, False)
-        _assert_reader_matches_expected_records(r, fields, written_records)
+        _assert_reader_matches_expected_fields(r, written_fields, True)
+        _assert_reader_matches_expected_records(r, written_fields, written_records)
 
 
 @composite
@@ -742,7 +782,7 @@ def codes_codecs_fields_shapes_and_records(draw):
     N = len(shapes)
     records = [draw(records_strategy) for _ in range(N)]
 
-    return code, encoding, fields, list(zip(shapes, records))
+    return code, encoding, fields, shapes, records
 
 
 @pytest.mark.hypothesis
@@ -750,32 +790,30 @@ def codes_codecs_fields_shapes_and_records(draw):
 @given(codes_codecs_fields_shapes_and_records=codes_codecs_fields_shapes_and_records())
 def test_shapefile_reader_writer_roundtrip(codes_codecs_fields_shapes_and_records)-> None:
 
-    code_ex, encoding, fields_ex, shapes_and_records = codes_codecs_fields_shapes_and_records
+    code_ex, encoding, fields, shapes, records = codes_codecs_fields_shapes_and_records
     streams = {"shp" : io.BytesIO(), "shx" : io.BytesIO(), "dbf" : io.BytesIO(),}
+    w = shp.Writer(shapeType = code_ex, encoding=encoding, strict=True, **streams)
 
     expected_shapes = []
-    expected_records = []
-    fields_context = _get_fields_context(fields=fields_ex, codec=encoding, strict=False)
 
-    with shp.Writer(shapeType = code_ex, encoding=encoding, strict=False, **streams) as w:
-        with fields_context:
-            for field in fields_ex:
-                w.field(**field)
+    written_fields, written_records = _write_fields_and_records_to_strict(w, fields, records)
 
-        # Only use strict = False to write fields, so that we still
-        # test the corresponding record values for any fields
-        # whose name was truncated.
-        w.strict=True
-        for shape, record in shapes_and_records:
-            try:
-                w.record(*record)
-            except shp.DbfStringDataLoss:
-                continue
-            w.shape(shape)
-            expected_shapes.append(shape)
-            expected_records.append(record)
+    if not written_fields:
+        try:
+            w.close()
+        except shp.dbfFileException:
+            pass
+        return
+
+    for shape, written_record in zip(shapes, written_records):
+        if written_record is None:
+            continue
+        w.shape(shape)
+        expected_shapes.append(shape)
+
+    w.close()
 
     with shp.Reader(encoding=encoding, **streams) as r:
-        _assert_reader_matches_expected_fields(r, fields_ex, expected_records, False)
-        _assert_reader_matches_expected_records(r, fields_ex, expected_records)
+        _assert_reader_matches_expected_fields(r, written_fields, True)
+        _assert_reader_matches_expected_records(r, written_fields, written_records)
         _assert_reader_matches_expected_shapes(r, code_ex, expected_shapes)
