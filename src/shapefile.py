@@ -8,7 +8,7 @@ Compatible with Python versions >=3.9
 
 from __future__ import annotations
 
-__version__ = "3.1.4.dev"
+__version__ = "3.1.4"
 
 import abc
 import array
@@ -4436,7 +4436,7 @@ class DbfWriter(_HasCheckedWriteableFile):
                 elif value in MISSING:
                     str_val = "0" * 8  # QGIS NULL for date type
                 elif isinstance(value, str) and len(value) == 8:
-                    pass  # value is already a date string
+                    str_val = value
                 else:
                     raise ShapefileException(
                         f"Could not read as date: {value}. "

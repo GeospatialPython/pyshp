@@ -1,8 +1,10 @@
 
-VERSION 3.1.4.dev
-
+VERSION 3.1.4
+2026-06-29
+	* Fix bug causing dates supplied as length 8 strings to be encoded by the custom codec, not ascii
 2026-06-27
-	* Test other codecs (ascii and unicode so far).
+	* Test other codecs (ascii and UTF-8, UTF-16 & UTF-32 so far).
+	* Test all other codecs in CI
 
 VERSION 3.1.3
 
