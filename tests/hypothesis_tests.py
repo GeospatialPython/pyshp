@@ -4,6 +4,7 @@ import contextlib
 import datetime
 import io
 import itertools
+import os
 import string
 import warnings
 
@@ -26,6 +27,8 @@ from hypothesis.strategies import (
 )
 
 import shapefile as shp
+
+IN_CI = bool(os.getenv("CI") or os.getenv("GITHUB_ACTIONS"))
 
 @contextlib.contextmanager
 def ignore_warnings(category=None):
@@ -551,42 +554,29 @@ DBF_FIELD_TYPES = {
 }
 
 
-ENCODINGS = [
+ENCODINGS  = [
     "ascii",
     "latin1",
     "utf-8",
     "utf-16-be",
     "utf-16-le",
-    "utf-16",
-    "utf-32-be",
     "utf-32-le",
-    "cp1252",
-    "cp1254",
-    "cp932",
-    "euc_kr",
-    "euc_jp",
-    "mac_iceland",
-    "cp932",
-    "shift_jis",
-    "iso8859_5",
-    "koi8_r",
-    "gbk",
-    "gb18030",
-    "big5",
+    "cp1140",
 ]
-encodings = sampled_from(ENCODINGS)
 
-# from encodings.aliases import aliases
-# encs = set()
-# for enc in aliases.values():
-#     if enc in encs:
-#         continue
-#     try:
-#         "".encode(enc)
-#     except UnicodeEncodeError, LookupError:
-#         continue
-#     encs.add(enc)
-# assert encs == ['utf_16_le', 'iso8859_7', 'cp437', 'iso2022_jp_3', 'shift_jis', 'cp775', 'cp1140',
+def _encodings() -> set[str]:
+    from encodings.aliases import aliases
+    encs = set()
+    for enc in aliases.values():
+        if enc in encs:
+            continue
+        try:
+            "".encode(enc)
+        except (UnicodeEncodeError, LookupError):
+            continue
+        encs.add(enc)
+    return encs
+# assert _encodings() == {'utf_16_le', 'iso8859_7', 'cp437', 'iso2022_jp_3', 'shift_jis', 'cp775', 'cp1140',
 # 'cp861', 'iso8859_11', 'iso8859_9', 'euc_jp', 'utf_16', 'cp950', 'mac_cyrillic', 'mac_turkish', 'iso2022_jp_1', 'iso8859_10',
 # 'iso2022_jp_2004', 'cp866', 'mac_greek', 'hz', 'cp1257', 'cp037', 'cp863', 'iso8859_4', 'utf_16_be', 'gb18030', 'cp1250',
 # 'cp850', 'iso8859_5', 'shift_jisx0213', 'iso8859_8', 'cp273', 'euc_jisx0213', 'cp932', 'cp862', 'tis_620', 'cp1125', 'koi8_r',
@@ -594,9 +584,9 @@ encodings = sampled_from(ENCODINGS)
 # 'ascii', 'cp1254', 'cp424', 'cp855', 'hp_roman8', 'mac_latin2', 'euc_jis_2004', 'euc_kr', 'cp1256', 'shift_jis_2004',
 # 'utf_32_le', 'gbk', 'cp869', 'iso8859_13', 'iso8859_3', 'big5', 'cp1258', 'cp1253', 'latin_1', 'cp864', 'utf_8',
 # 'iso2022_kr', 'cp1251', 'cp1255', 'mac_iceland', 'kz1048', 'iso8859_14', 'utf_32_be', 'ptcp154', 'iso8859_6', 'mac_roman',
-# 'utf_32', 'iso2022_jp_2', 'iso8859_16', 'mbcs', 'cp500', 'iso8859_2', 'cp949', 'cp852', 'utf_7', 'big5hkscs', 'johab']
+# 'utf_32', 'iso2022_jp_2', 'iso8859_16', 'mbcs', 'cp500', 'iso8859_2', 'cp949', 'cp852', 'utf_7', 'big5hkscs', 'johab'}
 
-# encodings = sampled_from(list(encs))
+encodings = sampled_from(list(_encodings())) # if IN_CI else ENCODINGS)
 
 
 @composite

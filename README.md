@@ -8,8 +8,8 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 
 - **Author**: [Joel Lawhead](https://github.com/GeospatialPython)
 - **Maintainers**: [James Parrott](https://github.com/JamesParrott) & [Karim Bahgat](https://github.com/karimbahgat)
-- **Version**: 3.1.4.dev
-- **Date**: 27th June 2026
+- **Version**: 3.1.4
+- **Date**: 29th June 2026
 - **License**: [MIT](https://github.com/GeospatialPython/pyshp/blob/master/LICENSE.TXT)
 
 ## Contents
@@ -93,9 +93,14 @@ part of your geospatial project.
 
 # Version Changes
 
-## 3.1.4.dev
+## 3.1.4
+### Bug fix
+ - Fix bug causing dates supplied as length 8 strings of digits to be encoded by the custom encoding, not ascii.
+
 ### Testing
- - Test other codecs (ascii and unicode so far).
+ - Test other codecs (ascii and UTF-8, UTF-16 & UTF-32 so far).
+ - Test all available codecs in CI (92 of them).
+
 ## 3.1.3
  - Restore faster text writing paths for single-byte Ascii encodings, and Utf-8.
 
