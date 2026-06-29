@@ -74,6 +74,7 @@ markers = [
     "network: marks tests requiring network access",
     "slow: marks other tests that cause bottlenecks",
     "hypothesis: tests that require hypothesis",
+    "hypothesis_dbf: hypothesis tests that test dbf functionality",
 ]
 python_files = "test_*.py *_test.py *_tests.py"
 

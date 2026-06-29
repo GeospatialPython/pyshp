@@ -632,6 +632,7 @@ class Field(NamedTuple):
 
         # Raise Exception or trigger warning early, before user adds more fields
         # (fields are only written when first record added, and on close)
+        # Tests field_type, size and decimal. Name already tested and cached above.
         inst.encode_field_descriptor(
             encoding=encoding,
             encodingErrors=encodingErrors,
