@@ -77,13 +77,42 @@ def coords_2D_list(
         max_size=max_size,
     )
 
+EXCLUDE_CHARS = [
+    ("iso2022", "\x1b")
+]
+"""  Pending solution to (not sure if bug in hypothesis generation or core library):
+Python 3.13.14 (main, Jul 18 2026, 17:02:37) [Clang 22.1.3 ] on linux
+Type "help", "copyright", "credits" or "license" for more information.
+>>> enc="iso2022_jp_1"
+>>> s="\x1b"
+>>> b=s.encode(enc)
+>>> b
+b'\x1b'
+>>> b.decode(enc)
+Traceback (most recent call last):
+  File "<python-input-4>", line 1, in <module>
+    b.decode(enc)
+    ~~~~~~~~^^^^^
+UnicodeDecodeError: 'iso2022_jp_1' codec can't decode byte 0x1b in position 0: incomplete multibyte sequence
+decoding with 'iso2022_jp_1' codec failed
+
+"""
+
+
 def strings_of_supported_code_points(encoding: str, min_size: int=1, max_size: int=10):
+    
+    for prefix, exclude_chars in EXCLUDE_CHARS:
+        if encoding.startswith(prefix):
+            break
+    else:
+        exclude_chars = ""
+
     return text(
         alphabet=characters(
             codec=encoding,
             # https://en.wikipedia.org/wiki/Unicode_character_property#General_Category
             exclude_categories=["Cs", "Co", "Cn"], # Cs - surrogates
-            # exclude_characters=[" "],
+            exclude_characters=exclude_chars,
         ),
         min_size=min_size,
         max_size=max_size,
