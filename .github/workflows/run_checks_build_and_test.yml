@@ -58,10 +58,20 @@ jobs:
       matrix:
         python-version: [
           "3.14",
+          "3.13",
+          "3.12",
+          "3.15-dev",
+          "3.11",
+          "3.10",
+          "3.9",
         ]
         os: [
           "ubuntu-24.04",
         ]
+        include:
+          - python-version: "3.14"
+          - os: "ubuntu-latest"
+          
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/setup-python@v6
@@ -73,7 +83,6 @@ jobs:
         path: ./Pyshp
 
     - name: "Hypothesis tests"
-      if:
       uses: ./Pyshp/.github/actions/test
       with:
         extra_args: '-m hypothesis'

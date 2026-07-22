@@ -688,6 +688,9 @@ def test_dbf_Field_roundtrips(encoding_and_dbf_field: dict) -> None:
 
 ascii_printable = string.ascii_letters + string.digits + string.punctuation + " "
 
+def date_to_str(d: datetime.date) -> str:
+    return d.strftime("%Y%m%d").zfill(8)
+
 def record_value_for_field(name: str, field_type: str, size: int, decimal: int, encoding: str):
 
     if field_type == "C":
@@ -715,7 +718,7 @@ def record_value_for_field(name: str, field_type: str, size: int, decimal: int, 
     if field_type == "L":
         return sampled_from([True, False, None])
     if field_type == "D":
-        return one_of(dates(), dates().map(lambda d: d.strftime("%Y%m%d")))
+        return one_of(dates(), dates().map(date_to_str))
 
     raise ValueError(f"Unsupported: {field_type=}")
 
@@ -771,9 +774,9 @@ def _assert_reader_matches_expected_records(r, fields, written_records):
             decimal = field["decimal"]
             if field_type == "D":
                 if isinstance(expected, datetime.date):
-                    expected = expected.strftime("%Y%m%d")
+                    expected = date_to_str(expected)
                 if isinstance(actual, datetime.date):
-                    actual = actual.strftime("%Y%m%d")
+                    actual = date_to_str(actual)
             elif field_type in ("N", "F") and decimal >= 1:
                 expected = float(format(expected, f".{decimal}f"))
             assert actual == expected, f"{actual=}, {expected=}, {field_type=}, {type(actual)=}, {type(expected)=}"

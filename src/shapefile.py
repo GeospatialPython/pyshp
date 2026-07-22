@@ -8,7 +8,7 @@ Compatible with Python versions >=3.9
 
 from __future__ import annotations
 
-__version__ = "3.1.4"
+__version__ = "3.1.5"
 
 import abc
 import array
@@ -4430,8 +4430,10 @@ class DbfWriter(_HasCheckedWriteableFile):
                 # date: 8 bytes - date stored as a string in the format YYYYMMDD.
                 if isinstance(value, list) and len(value) == 3:
                     value = date(*value)
-                if isinstance(value, date):
-                    str_val = value.strftime("%Y%m%d")
+                if isinstance(value, date): 
+                    # In Pythons using certain glibc versions.
+                    # date.strftime does not preppend zeros. 
+                    str_val = value.strftime("%Y%m%d").zfill(8)
                     # b"".join(ord(c).to_bytes() for c in s)
                 elif value in MISSING:
                     str_val = "0" * 8  # QGIS NULL for date type
