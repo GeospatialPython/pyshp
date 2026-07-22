@@ -8,8 +8,8 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 
 - **Author**: [Joel Lawhead](https://github.com/GeospatialPython)
 - **Maintainers**: [James Parrott](https://github.com/JamesParrott) & [Karim Bahgat](https://github.com/karimbahgat)
-- **Version**: 3.1.4
-- **Date**: 29th June 2026
+- **Version**: 3.1.5
+- **Date**: 22nd July 2026
 - **License**: [MIT](https://github.com/GeospatialPython/pyshp/blob/master/LICENSE.TXT)
 
 ## Contents
@@ -92,6 +92,10 @@ part of your geospatial project.
 
 
 # Version Changes
+
+## 3.1.5
+### Bug fix
+ - Fixed another bug causing dates before the year 1000 to be encoded as less than 8 chars under "%Y%m%d (found by [Thomas Beierlein](https://github.com/GeospatialPython/pyshp/issues/435))
 
 ## 3.1.4
 ### Bug fix

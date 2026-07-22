@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import datetime
+import functools
 import io
 import itertools
 import os
@@ -66,6 +67,7 @@ pointz = builds(
 )
 
 
+
 def coords_2D_list(
     min_size: int = 1,
     max_size: int | None = None,
@@ -75,6 +77,7 @@ def coords_2D_list(
         min_size=min_size,
         max_size=max_size,
     )
+
 
 
 @pytest.mark.hypothesis
@@ -563,20 +566,90 @@ ENCODINGS  = [
     "utf-32-le",
     "cp1140",
 ]
+POSSIBLY_NONINJECTIVE_CODECS = frozenset({
+    'big5', 'big5hkscs', 'cp932', 'cp949', 'cp950',
+    'euc_jp', 'euc_jis_2004', 'euc_kr', 'gb2312', 'gbk', 'gb18030',
+    'hz', 'iso2022_jp', 'iso2022_kr', 'shift_jis', 'shift_jis_2004'
+})
 
-def _encodings() -> set[str]:
+@functools.cache
+def _exclude_chars() -> dict[str,list[str]]:
+
+    exclude_chars = {} #"iso2022" : ["\x1b"]}
+    """
+    Not sure if bug in hypothesis generation, in core library, or just the way it is:
+
+    Python taking a short cut with Control characters in ISO_2022 stateful codecs
+    Python 3.13.14 (main, Jul 18 2026, 17:02:37) [Clang 22.1.3 ] on linux
+    Type "help", "copyright", "credits" or "license" for more information.
+    >>> enc="iso2022_jp_1"
+    >>> s="\x1b"
+    >>> b=s.encode(enc)
+    >>> b
+    b'\x1b'
+    >>> b.decode(enc)
+    Traceback (most recent call last):
+    File "<python-input-4>", line 1, in <module>
+        b.decode(enc)
+        ~~~~~~~~^^^^^
+    UnicodeDecodeError: 'iso2022_jp_1' codec can't decode byte 0x1b in position 0: incomplete multibyte sequence
+    decoding with 'iso2022_jp_1' codec failed
+
+    Non injective encodings (dealt with below)
+    >>> enc="cp950"
+    >>> "•".encode(enc)
+    b'\xa1E'
+    >>> b=_
+    >>> b.decode(enc)
+    '‧'
+    >>> s = _
+    >>> s.encode(enc)
+    b'\xa1E'
+
+    """
+
+
     from encodings.aliases import aliases
-    encs = set()
     for enc in aliases.values():
-        if enc in encs:
+        if enc in exclude_chars:
             continue
+        # I'm not sure why any encoding would fail on an empty string,
+        # but I'd rather not have the tests get bogged by any that do exist.
         try:
             "".encode(enc)
         except (UnicodeEncodeError, LookupError):
             continue
-        encs.add(enc)
-    return encs
-# assert _encodings() == {'utf_16_le', 'iso8859_7', 'cp437', 'iso2022_jp_3', 'shift_jis', 'cp775', 'cp1140',
+
+        exclude_chars[enc] = []
+
+        if enc not in POSSIBLY_NONINJECTIVE_CODECS:
+            continue
+
+        # find collisions of non-injective codecs
+        # Iterate over BMP
+        for code_point in range(0x10000):
+            char = chr(code_point)
+            try:
+                b = char.encode(enc)
+            except (UnicodeEncodeError, LookupError):
+                exclude_chars[enc].append(char)
+                continue
+
+            decoded = None
+            try:
+                decoded = b.decode(enc)
+            except (UnicodeDecodeError, LookupError):
+                exclude_chars[enc].append(char)
+                continue
+
+            if decoded != char:
+                exclude_chars[enc].append(char)
+
+
+
+
+    return exclude_chars
+# assert set(_encodings()) == {'utf_16_le', 'iso8859_7', 'cp437', 'iso2022_jp_3', 'shift_jis', 'cp775', 'cp1140',
 # 'cp861', 'iso8859_11', 'iso8859_9', 'euc_jp', 'utf_16', 'cp950', 'mac_cyrillic', 'mac_turkish', 'iso2022_jp_1', 'iso8859_10',
 # 'iso2022_jp_2004', 'cp866', 'mac_greek', 'hz', 'cp1257', 'cp037', 'cp863', 'iso8859_4', 'utf_16_be', 'gb18030', 'cp1250',
 # 'cp850', 'iso8859_5', 'shift_jisx0213', 'iso8859_8', 'cp273', 'euc_jisx0213', 'cp932', 'cp862', 'tis_620', 'cp1125', 'koi8_r',
@@ -586,25 +659,29 @@ def _encodings() -> set[str]:
 # 'iso2022_kr', 'cp1251', 'cp1255', 'mac_iceland', 'kz1048', 'iso8859_14', 'utf_32_be', 'ptcp154', 'iso8859_6', 'mac_roman',
 # 'utf_32', 'iso2022_jp_2', 'iso8859_16', 'mbcs', 'cp500', 'iso8859_2', 'cp949', 'cp852', 'utf_7', 'big5hkscs', 'johab'}
 
-encodings = sampled_from(list(_encodings())) # if IN_CI else ENCODINGS)
+
+def strings_of_supported_code_points(encoding: str, min_size: int=1, max_size: int=10):
+
+    return text(
+        alphabet=characters(
+            codec=encoding,
+            # https://en.wikipedia.org/wiki/Unicode_character_property#General_Category
+            exclude_categories=["Cs", "Co", "Cn"], # Cs - surrogates
+            exclude_characters=_exclude_chars().get(encoding, []),
+        ),
+        min_size=min_size,
+        max_size=max_size,
+    )
+
+
+encodings = sampled_from(list(_exclude_chars())) # if IN_CI else ENCODINGS)
 
 
 @composite
 def _dbf_fields_strategy(draw, encoding: str) -> dict[str, str | int]:
     field_type, bounds_dict = draw(sampled_from(list(DBF_FIELD_TYPES.items())))
 
-    name = draw(
-        text(
-            alphabet=characters(
-                codec=encoding,
-                # https://en.wikipedia.org/wiki/Unicode_character_property#General_Category
-                exclude_categories=["Cs", "Co", "Cn"], # Cs - surrogates
-                # exclude_characters=[" "],
-            ),
-            min_size=1,
-            max_size=10,
-        )
-    )
+    name = draw(strings_of_supported_code_points(encoding))
 
     max_length = bounds_dict.get("max_length", 254)
     min_length = bounds_dict.get("min_length", 1)
@@ -688,14 +765,13 @@ def test_dbf_Field_roundtrips(encoding_and_dbf_field: dict) -> None:
 
 ascii_printable = string.ascii_letters + string.digits + string.punctuation + " "
 
-def record_value_for_field(name: str, field_type: str, size: int, decimal: int, encoding: str):
+def date_to_str(d: datetime.date) -> str:
+    return d.strftime("%Y%m%d").zfill(8)
+
+def record_value_strat_for_field(name: str, field_type: str, size: int, decimal: int, encoding: str):
 
     if field_type == "C":
-        return text(
-            alphabet=ascii_printable,
-            min_size=0,
-            max_size=size,
-        )
+        return strings_of_supported_code_points(encoding, 0, size)
     if field_type in {"N", "F"}:
 
         int_digits = size if decimal == 0 else size - decimal - 1
@@ -715,7 +791,7 @@ def record_value_for_field(name: str, field_type: str, size: int, decimal: int, 
     if field_type == "L":
         return sampled_from([True, False, None])
     if field_type == "D":
-        return one_of(dates(), dates().map(lambda d: d.strftime("%Y%m%d")))
+        return one_of(dates(), dates().map(date_to_str))
 
     raise ValueError(f"Unsupported: {field_type=}")
 
@@ -729,7 +805,7 @@ def _dbf_encoding_fields_and_record_strategy(
 
     fields = draw(lists(_dbf_fields_strategy(encoding), min_size=1, max_size=max_fields))
 
-    record_strategy = tuples(*(record_value_for_field(encoding=encoding, **field) for field in fields))
+    record_strategy = tuples(*(record_value_strat_for_field(encoding=encoding, **field) for field in fields))
 
     return encoding, fields, record_strategy
 
@@ -771,9 +847,9 @@ def _assert_reader_matches_expected_records(r, fields, written_records):
             decimal = field["decimal"]
             if field_type == "D":
                 if isinstance(expected, datetime.date):
-                    expected = expected.strftime("%Y%m%d")
+                    expected = date_to_str(expected)
                 if isinstance(actual, datetime.date):
-                    actual = actual.strftime("%Y%m%d")
+                    actual = date_to_str(actual)
             elif field_type in ("N", "F") and decimal >= 1:
                 expected = float(format(expected, f".{decimal}f"))
             assert actual == expected, f"{actual=}, {expected=}, {field_type=}, {type(actual)=}, {type(expected)=}"
