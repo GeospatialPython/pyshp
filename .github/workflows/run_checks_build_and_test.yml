@@ -70,7 +70,11 @@ jobs:
         ]
         include:
           - python-version: "3.14"
-          - os: "ubuntu-latest"
+            os: "ubuntu-latest"
+          - python-version: "3.14"
+            os: "windows-latest"
+          - python-version: "3.14"
+            os: "macos-latest"
 
     runs-on: ${{ matrix.os }}
     steps:
