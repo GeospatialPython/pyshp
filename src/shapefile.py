@@ -4430,9 +4430,9 @@ class DbfWriter(_HasCheckedWriteableFile):
                 # date: 8 bytes - date stored as a string in the format YYYYMMDD.
                 if isinstance(value, list) and len(value) == 3:
                     value = date(*value)
-                if isinstance(value, date): 
+                if isinstance(value, date):
                     # In Pythons using certain glibc versions.
-                    # date.strftime does not preppend zeros. 
+                    # date.strftime does not preppend zeros.
                     str_val = value.strftime("%Y%m%d").zfill(8)
                     # b"".join(ord(c).to_bytes() for c in s)
                 elif value in MISSING:

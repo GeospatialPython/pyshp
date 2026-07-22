@@ -66,6 +66,7 @@ pointz = builds(
 )
 
 
+
 def coords_2D_list(
     min_size: int = 1,
     max_size: int | None = None,
@@ -76,6 +77,17 @@ def coords_2D_list(
         max_size=max_size,
     )
 
+def strings_of_supported_code_points(encoding: str, min_size: int=1, max_size: int=10):
+    return text(
+        alphabet=characters(
+            codec=encoding,
+            # https://en.wikipedia.org/wiki/Unicode_character_property#General_Category
+            exclude_categories=["Cs", "Co", "Cn"], # Cs - surrogates
+            # exclude_characters=[" "],
+        ),
+        min_size=min_size,
+        max_size=max_size,
+    )
 
 @pytest.mark.hypothesis
 @given(expected=point_2D, i=integers(min_value=1))
@@ -570,6 +582,8 @@ def _encodings() -> set[str]:
     for enc in aliases.values():
         if enc in encs:
             continue
+        # I'm not sure why any encoding would fail on an empty string,
+        # but I'd rather not have the tests get bogged by any that do exist.
         try:
             "".encode(enc)
         except (UnicodeEncodeError, LookupError):
@@ -593,18 +607,7 @@ encodings = sampled_from(list(_encodings())) # if IN_CI else ENCODINGS)
 def _dbf_fields_strategy(draw, encoding: str) -> dict[str, str | int]:
     field_type, bounds_dict = draw(sampled_from(list(DBF_FIELD_TYPES.items())))
 
-    name = draw(
-        text(
-            alphabet=characters(
-                codec=encoding,
-                # https://en.wikipedia.org/wiki/Unicode_character_property#General_Category
-                exclude_categories=["Cs", "Co", "Cn"], # Cs - surrogates
-                # exclude_characters=[" "],
-            ),
-            min_size=1,
-            max_size=10,
-        )
-    )
+    name = draw(strings_of_supported_code_points(encoding))
 
     max_length = bounds_dict.get("max_length", 254)
     min_length = bounds_dict.get("min_length", 1)
@@ -691,14 +694,10 @@ ascii_printable = string.ascii_letters + string.digits + string.punctuation + " 
 def date_to_str(d: datetime.date) -> str:
     return d.strftime("%Y%m%d").zfill(8)
 
-def record_value_for_field(name: str, field_type: str, size: int, decimal: int, encoding: str):
+def record_value_strat_for_field(name: str, field_type: str, size: int, decimal: int, encoding: str):
 
     if field_type == "C":
-        return text(
-            alphabet=ascii_printable,
-            min_size=0,
-            max_size=size,
-        )
+        return strings_of_supported_code_points(encoding, 0, size)
     if field_type in {"N", "F"}:
 
         int_digits = size if decimal == 0 else size - decimal - 1
@@ -732,7 +731,7 @@ def _dbf_encoding_fields_and_record_strategy(
 
     fields = draw(lists(_dbf_fields_strategy(encoding), min_size=1, max_size=max_fields))
 
-    record_strategy = tuples(*(record_value_for_field(encoding=encoding, **field) for field in fields))
+    record_strategy = tuples(*(record_value_strat_for_field(encoding=encoding, **field) for field in fields))
 
     return encoding, fields, record_strategy
 

@@ -71,7 +71,7 @@ jobs:
         include:
           - python-version: "3.14"
           - os: "ubuntu-latest"
-          
+
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/setup-python@v6
