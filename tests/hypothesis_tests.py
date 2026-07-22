@@ -613,8 +613,9 @@ def _exclude_chars() -> dict[str,list[str]]:
     for enc in aliases.values():
         if enc in exclude_chars:
             continue
-        # I'm not sure why any encoding would fail on an empty string,
-        # but I'd rather not have the tests get bogged by any that do exist.
+
+        # Weed out: base64_codec, bz2_codec, hex_codec,
+        # quopri_codec, rot_13, uu_codec & zlib_codec
         try:
             "".encode(enc)
         except (UnicodeEncodeError, LookupError):
