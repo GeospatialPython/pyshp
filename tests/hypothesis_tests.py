@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import datetime
+import functools
 import io
 import itertools
 import os
@@ -77,46 +78,7 @@ def coords_2D_list(
         max_size=max_size,
     )
 
-EXCLUDE_CHARS = [
-    ("iso2022", "\x1b")
-]
-"""  Pending solution to (not sure if bug in hypothesis generation or core library):
-Python 3.13.14 (main, Jul 18 2026, 17:02:37) [Clang 22.1.3 ] on linux
-Type "help", "copyright", "credits" or "license" for more information.
->>> enc="iso2022_jp_1"
->>> s="\x1b"
->>> b=s.encode(enc)
->>> b
-b'\x1b'
->>> b.decode(enc)
-Traceback (most recent call last):
-  File "<python-input-4>", line 1, in <module>
-    b.decode(enc)
-    ~~~~~~~~^^^^^
-UnicodeDecodeError: 'iso2022_jp_1' codec can't decode byte 0x1b in position 0: incomplete multibyte sequence
-decoding with 'iso2022_jp_1' codec failed
 
-"""
-
-
-def strings_of_supported_code_points(encoding: str, min_size: int=1, max_size: int=10):
-    
-    for prefix, exclude_chars in EXCLUDE_CHARS:
-        if encoding.startswith(prefix):
-            break
-    else:
-        exclude_chars = ""
-
-    return text(
-        alphabet=characters(
-            codec=encoding,
-            # https://en.wikipedia.org/wiki/Unicode_character_property#General_Category
-            exclude_categories=["Cs", "Co", "Cn"], # Cs - surrogates
-            exclude_characters=exclude_chars,
-        ),
-        min_size=min_size,
-        max_size=max_size,
-    )
 
 @pytest.mark.hypothesis
 @given(expected=point_2D, i=integers(min_value=1))
@@ -604,12 +566,53 @@ ENCODINGS  = [
     "utf-32-le",
     "cp1140",
 ]
+POSSIBLY_NONINJECTIVE_CODECS = frozenset({
+    'big5', 'big5hkscs', 'cp932', 'cp936', 'cp949', 'cp950',
+    'euc_jp', 'euc_jis_2004', 'euc_kr', 'gb2312', 'gbk', 'gb18030',
+    'hz', 'iso2022_jp', 'iso2022_kr', 'shift_jis', 'shift_jis_2004'
+})
 
-def _encodings() -> set[str]:
+@functools.cache
+def _exclude_chars() -> dict[str,list[str]]:
+
+    exclude_chars = {}
+    exclude_chars["iso2022"].append("\x1b")
+    """
+    Not sure if bug in hypothesis generation, in core library, or just the way it is:
+
+    Python taking a short cut with Control characters in ISO_2022 stateful codecs
+    Python 3.13.14 (main, Jul 18 2026, 17:02:37) [Clang 22.1.3 ] on linux
+    Type "help", "copyright", "credits" or "license" for more information.
+    >>> enc="iso2022_jp_1"
+    >>> s="\x1b"
+    >>> b=s.encode(enc)
+    >>> b
+    b'\x1b'
+    >>> b.decode(enc)
+    Traceback (most recent call last):
+    File "<python-input-4>", line 1, in <module>
+        b.decode(enc)
+        ~~~~~~~~^^^^^
+    UnicodeDecodeError: 'iso2022_jp_1' codec can't decode byte 0x1b in position 0: incomplete multibyte sequence
+    decoding with 'iso2022_jp_1' codec failed
+
+    Non injective encodings (dealt with below)
+    >>> enc="cp950"
+    >>> "•".encode(enc)
+    b'\xa1E'
+    >>> b=_
+    >>> b.decode(enc)
+    '‧'
+    >>> s = _
+    >>> s.encode(enc)
+    b'\xa1E'
+
+    """
+
+
     from encodings.aliases import aliases
-    encs = set()
     for enc in aliases.values():
-        if enc in encs:
+        if enc in exclude_chars:
             continue
         # I'm not sure why any encoding would fail on an empty string,
         # but I'd rather not have the tests get bogged by any that do exist.
@@ -617,9 +620,37 @@ def _encodings() -> set[str]:
             "".encode(enc)
         except (UnicodeEncodeError, LookupError):
             continue
-        encs.add(enc)
-    return encs
-# assert _encodings() == {'utf_16_le', 'iso8859_7', 'cp437', 'iso2022_jp_3', 'shift_jis', 'cp775', 'cp1140',
+
+        exclude_chars[enc] = []
+
+        if enc not in POSSIBLY_NONINJECTIVE_CODECS:
+            continue
+
+        # find collisions of non-injective codecs
+        # Iterate over BMP
+        for code_point in range(0x10000):
+            char = chr(code_point)
+            try:
+                b = char.encode(enc)
+            except (UnicodeEncodeError, LookupError):
+                exclude_chars[enc].append(char)
+                continue
+
+            decoded = None
+            try:
+                decoded = b.decode(enc)
+            except (UnicodeDecodeError, LookupError):
+                exclude_chars[enc].append(char)
+                continue
+
+            if decoded != char:
+                exclude_chars[enc].append(char)
+
+
+
+
+    return exclude_chars
+# assert set(_encodings()) == {'utf_16_le', 'iso8859_7', 'cp437', 'iso2022_jp_3', 'shift_jis', 'cp775', 'cp1140',
 # 'cp861', 'iso8859_11', 'iso8859_9', 'euc_jp', 'utf_16', 'cp950', 'mac_cyrillic', 'mac_turkish', 'iso2022_jp_1', 'iso8859_10',
 # 'iso2022_jp_2004', 'cp866', 'mac_greek', 'hz', 'cp1257', 'cp037', 'cp863', 'iso8859_4', 'utf_16_be', 'gb18030', 'cp1250',
 # 'cp850', 'iso8859_5', 'shift_jisx0213', 'iso8859_8', 'cp273', 'euc_jisx0213', 'cp932', 'cp862', 'tis_620', 'cp1125', 'koi8_r',
@@ -629,7 +660,28 @@ def _encodings() -> set[str]:
 # 'iso2022_kr', 'cp1251', 'cp1255', 'mac_iceland', 'kz1048', 'iso8859_14', 'utf_32_be', 'ptcp154', 'iso8859_6', 'mac_roman',
 # 'utf_32', 'iso2022_jp_2', 'iso8859_16', 'mbcs', 'cp500', 'iso8859_2', 'cp949', 'cp852', 'utf_7', 'big5hkscs', 'johab'}
 
-encodings = sampled_from(list(_encodings())) # if IN_CI else ENCODINGS)
+
+def strings_of_supported_code_points(encoding: str, min_size: int=1, max_size: int=10):
+
+    for prefix, exclude_chars in _exclude_chars().items():
+        if encoding.startswith(prefix):
+            break
+    else:
+        exclude_chars = []
+
+    return text(
+        alphabet=characters(
+            codec=encoding,
+            # https://en.wikipedia.org/wiki/Unicode_character_property#General_Category
+            exclude_categories=["Cs", "Co", "Cn"], # Cs - surrogates
+            exclude_characters=exclude_chars,
+        ),
+        min_size=min_size,
+        max_size=max_size,
+    )
+
+
+encodings = sampled_from(list(_exclude_chars())) # if IN_CI else ENCODINGS)
 
 
 @composite
