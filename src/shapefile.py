@@ -205,7 +205,11 @@ FieldTypeT = Literal["C", "D", "F", "L", "M", "N"]
 
 # https://en.wikipedia.org/wiki/.dbf#Database_records
 class FieldType:
-    """A bare bones 'enum', as the enum library noticeably slows performance."""
+    """A bare bones 'enum', as the enum library used to noticeably slow performance.
+    A StrENum could be used instead, once the minimum supported Python
+    version >= 3.11.  But the Public API supports passing strings into
+    Field (a NamedTuple which used to just be a plain tuple[str,str,int,int]).
+    """
 
     C: Final = "C"  # "Character"  # (str)
     D: Final = "D"  # "Date"
@@ -1106,6 +1110,7 @@ class GeoJSON_Error(Exception):
     pass
 
 
+# Could be an Enum, but an isinstance check is still needed.
 class _NoShapeTypeSentinel:
     """An instance is the default value for Shape.__init__,
     to preserve old behaviour for anyone who explictly
@@ -3572,6 +3577,7 @@ class ShpReader(_HasCheckedReadableFile):
         assert n == len(self.headers_cache), f"{n=}, {len(self.headers_cache)=}"
 
 
+# Could be an enum, but an isinstance check is still needed.
 class _NoShpSentinel:
     """An instance is the default value for shp to preserve the
     old behaviour (from when all keyword args were gathered
