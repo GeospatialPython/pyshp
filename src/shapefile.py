@@ -8,7 +8,7 @@ Compatible with Python versions >=3.9
 
 from __future__ import annotations
 
-__version__ = "3.1.6.dev"
+__version__ = "3.1.6"
 
 import abc
 import array
@@ -2819,25 +2819,6 @@ def _try_to_download_binary_file(
     return initial_bytes, cast(ReadableBinStream, resp)
 
 
-def _try_get_open_constituent_file(
-    file: Path,
-    ext: Literal[".shp", ".shx", ".dbf"],
-) -> IO[bytes] | None:
-    """
-    Attempts to open a .shp, .dbf or .shx file,
-    with both lower case and upper case file extensions,
-    and return it.  If it was not possible to open the file, None is returned.
-    """
-    exts = {ext, ext.upper(), ext.lower()}
-
-    for candidate_ext in exts:
-        try:
-            return file.with_suffix(candidate_ext).open("rb")
-        except OSError:
-            pass
-    return None
-
-
 def ensure_within_bounds(i: int, num_records: int) -> int:
     """Provides list-like handling of a record index with a clearer
     error message if the index is out of bounds."""
@@ -3359,7 +3340,7 @@ ShapeHeaderInfoT = tuple[int, int, int]
 
 
 class ShpReader(_HasCheckedReadableFile):
-    """Reads an shp file."""
+    """Reads a .shp file."""
 
     FileProto = ReadSeekableBinStream
     new_file_obj_mode = "rb"
@@ -3618,21 +3599,23 @@ class Reader(_HasExitStack):
         shapefile_path: str | PathLike[Any] = "",
         /,
         *,
-        encoding: str = "utf-8",
+        encoding: str | None = None,
         encodingErrors: str = "strict",
         shp: _NoShpSentinel | BinaryFileT | None = _NoShpSentinel(),
         shx: BinaryFileT | None = None,
         dbf: BinaryFileT | None = None,
+        cpg: BinaryFileT | None = None,
         # Keep kwargs even though unused, to preserve PyShp 2.4 API
         **kwargs: Any,
     ):
         super().__init__()
         # Store encoding info to use if lazy loading DbfReader later.
-        self.encoding = encoding
+        self._user_specified_encoding = encoding
         self.encodingErrors = encodingErrors
         self._shp = None
         self._shx = None
         self._dbf = None
+        self._cpg = None
         self.shapeName = "Not specified"
         self.numShapes: int = 0
         self.path: str | os.PathLike[Any] | None = None
@@ -3651,13 +3634,15 @@ class Reader(_HasExitStack):
                 discarded_kwargs["shx"] = shx
             if dbf is not None:
                 discarded_kwargs["dbf"] = dbf
+            if cpg is not None:
+                discarded_kwargs["cpg"] = cpg
             if discarded_kwargs:
                 raise TypeError(
                     "Please be specific about the shapefile you want to load. "
                     f"Got: {shapefile_path}, plus the following unusable "
                     " kwargs: {discarded_kwargs} which previous versions of PyShp ignored. \n"
                     "Only either: i) exactly one positional arg \n"
-                    "         or: ii) one or both of shp and dbf, optionally plus shx kwargs\n"
+                    "         or: ii) one or both of shp and dbf, optionally plus shx and cpg kwargs\n"
                     "is currently supported.  All other kwargs may be set (or not). "
                 )
             self.path = shapefile_path
@@ -3684,6 +3669,7 @@ class Reader(_HasExitStack):
                         zipfileobj = self._download_binary_file_from_url(
                             url_info,
                             ".zip",
+                            add_to_exit_stack=False,
                             suppress_http_errors=False,
                         )
                         if zipfileobj is None:
@@ -3722,12 +3708,14 @@ class Reader(_HasExitStack):
             self._shp = self._seek_0_on_file_obj_wrap_or_open_from_name(".shp", shp)
             self._shx = self._seek_0_on_file_obj_wrap_or_open_from_name(".shx", shx)
 
+        self._cpg = self._seek_0_on_file_obj_wrap_or_open_from_name(".cpg", cpg)
         self._dbf = self._seek_0_on_file_obj_wrap_or_open_from_name(".dbf", dbf)
 
         # Load the files
         if self._shp:
             self._get_shp_reader()
         if self._dbf:
+            # Sets self.encoding
             self._get_dbf_reader()
         if self._shx:
             self._get_shx_reader()
@@ -3761,11 +3749,36 @@ class Reader(_HasExitStack):
             raise ShapefileException(
                 "DbfReader requires a .dbf file or file-like object."
             )
+        self._set_encoding()
         return DbfReader(
             dbf=self._dbf,
             encoding=self.encoding,
             encodingErrors=self.encodingErrors,
         )
+
+    @functools.cache
+    def _set_encoding(self) -> None:
+        if self._cpg is None:
+            encoding_from_cpg = ""
+        else:
+            encoding_from_cpg = (
+                self._cpg.read().decode().lower().replace("-", "_").strip()
+            )
+            if not encoding_from_cpg:
+                warnings.warn("Empty .cpg file (no encoding found). ")
+
+        if self._user_specified_encoding is None:
+            encoding = encoding_from_cpg
+        else:
+            encoding = self._user_specified_encoding.lower().replace("-", "_").strip()
+
+            if encoding_from_cpg and encoding != encoding_from_cpg:
+                warnings.warn(
+                    f"Specified encoding: {encoding} "
+                    "different to encoding read from "
+                    f".cpg file: {encoding_from_cpg}",
+                )
+        self.encoding = encoding or "utf-8"
 
     @property
     def shp_reader(self) -> ShpReader:
@@ -3854,20 +3867,41 @@ class Reader(_HasExitStack):
     ) -> Iterator[_Record | None]:
         return self.dbf_reader.iterRecords(fields, start, stop, deleted_as_None)
 
+    def _try_get_open_constituent_file(
+        self,
+        file: Path,
+        ext: Literal[".shp", ".shx", ".dbf", ".cpg"],
+    ) -> IO[bytes] | None:
+        """
+        Attempts to open a .shp, .dbf or .shx file,
+        with both lower case and upper case file extensions,
+        and return it.  If it was not possible to open the file, None is returned.
+        """
+        exts = {ext, ext.upper(), ext.lower()}
+
+        for candidate_ext in exts:
+            try:
+                file_obj = file.with_suffix(candidate_ext).open("rb")
+            except OSError:
+                continue
+            self.exit_stack.enter_context(file_obj)
+            return file_obj
+        return None
+
     def _seek_0_on_file_obj_wrap_or_open_from_name(
         self,
-        ext: Literal[".shp", ".shx", ".dbf"],
+        ext: Literal[".shp", ".shx", ".dbf", ".cpg"],
         file: BinaryFileT | None,
     ) -> None | IO[bytes]:
         if file is None:
             return None
 
         if isinstance(file, (str, PathLike)):
-            file_obj = _try_get_open_constituent_file(Path(file), ext)
-            if file_obj is not None:
-                self.exit_stack.enter_context(file_obj)
-            return file_obj
+            # Added to exit stack if opened.
+            return self._try_get_open_constituent_file(Path(file), ext)
 
+        # Other user-opened file objects not added to exit stack.
+        # The user must close them.
         if hasattr(file, "read"):
             # Copy if required
             try:
@@ -3884,7 +3918,8 @@ class Reader(_HasExitStack):
     def _download_binary_file_from_url(
         self,
         urlinfo: SplitResult,
-        ext: Literal[".shp", ".shx", ".dbf", ".zip"],
+        ext: Literal[".shp", ".shx", ".dbf", ".cpg", ".zip"],
+        add_to_exit_stack: bool = True,
         suppress_http_errors: bool = True,
     ) -> tempfile._TemporaryFileWrapper[bytes] | None:
         sniffed_bytes, resp = _try_to_download_binary_file(
@@ -3896,6 +3931,8 @@ class Reader(_HasExitStack):
             return None
         # Use tempfile as source for url data.
         fileobj = _save_to_named_tmp_file(resp, initial_bytes=sniffed_bytes)
+        if add_to_exit_stack:
+            self.exit_stack.enter_context(fileobj)
         return fileobj
 
     def _load_from_url(self, urlinfo: SplitResult) -> None:
@@ -3903,19 +3940,10 @@ class Reader(_HasExitStack):
         # Download each file to temporary path and treat as normal shapefile path
         self._shp = self._download_binary_file_from_url(urlinfo, ".shp")
         self._shx = self._download_binary_file_from_url(urlinfo, ".shx")
+        self._cpg = self._download_binary_file_from_url(urlinfo, ".cpg")
         self._dbf = self._download_binary_file_from_url(urlinfo, ".dbf")
 
-        shp_or_dbf_loaded = False
-        if self._shx is not None:
-            self.exit_stack.enter_context(self._shx)
-        if self._shp is not None:
-            self.exit_stack.enter_context(self._shp)
-            shp_or_dbf_loaded = True
-        if self._dbf is not None:
-            self.exit_stack.enter_context(self._dbf)
-            shp_or_dbf_loaded = True
-
-        if not shp_or_dbf_loaded:
+        if self._shp is None and self._dbf is None:
             raise ShapefileException(
                 f"Failed to download .shp or .dbf from: {urlunsplit(urlinfo)}"
             )
@@ -3924,7 +3952,7 @@ class Reader(_HasExitStack):
         self,
         archive: zipfile.ZipFile,
         file: Path,
-        ext: Literal[".shp", ".shx", ".dbf"],
+        ext: Literal[".shp", ".shx", ".dbf", ".cpg"],
     ) -> tempfile._TemporaryFileWrapper[bytes] | None:
         for cased_ext in {ext.lower(), ext.upper(), ext}:
             try:
@@ -3978,7 +4006,7 @@ class Reader(_HasExitStack):
                 constituent_files = (
                     Path(name)
                     for name in archive.namelist()
-                    if name.lower().endswith((".shp", ".dbf", ".shx"))
+                    if name.lower().endswith((".shp", ".dbf", ".shx", ".cpg"))
                 )
 
                 def without_ext(path: Path) -> Path:
@@ -4001,6 +4029,7 @@ class Reader(_HasExitStack):
             # Try to extract file-like objects from zipfile
             self._shp = self._load_file_from_zip_to_tmp_file(archive, shapefile, ".shp")
             self._shx = self._load_file_from_zip_to_tmp_file(archive, shapefile, ".shx")
+            self._cpg = self._load_file_from_zip_to_tmp_file(archive, shapefile, ".cpg")
             self._dbf = self._load_file_from_zip_to_tmp_file(archive, shapefile, ".dbf")
 
     def load(self, file: str | os.PathLike[Any]) -> None:
@@ -4024,27 +4053,25 @@ class Reader(_HasExitStack):
         """
         Attempts to load file with .shp extension as both lower and upper case
         """
-        self._shp = _try_get_open_constituent_file(file, ".shp")
-        if self._shp:
-            self.exit_stack.enter_context(self._shp)
+        self._shp = self._try_get_open_constituent_file(file, ".shp")
+        if self._shp is not None:
             self._get_shp_reader()
 
     def load_shx(self, file: Path) -> None:
         """
         Attempts to load file with .shx extension as both lower and upper case
         """
-        self._shx = _try_get_open_constituent_file(file, ".shx")
-        if self._shx:
-            self.exit_stack.enter_context(self._shx)
+        self._shx = self._try_get_open_constituent_file(file, ".shx")
+        if self._shx is not None:
             self._get_shx_reader()
 
     def load_dbf(self, file: Path) -> None:
         """
         Attempts to load file with .dbf extension as both lower and upper case
         """
-        self._dbf = _try_get_open_constituent_file(file, ".dbf")
-        if self._dbf:
-            self.exit_stack.enter_context(self._dbf)
+        self._dbf = self._try_get_open_constituent_file(file, ".dbf")
+        if self._dbf is not None:
+            self._cpg = self._try_get_open_constituent_file(file, ".cpg")
             self._get_dbf_reader()
 
     def __len__(self) -> int:

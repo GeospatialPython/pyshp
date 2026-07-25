@@ -1,3 +1,7 @@
+VERSION 3.1.6
+2026-07-25
+	* Encodings can now be read from .cpg files (and optionally written to them).
+
 VERSION 3.1.5
 2026-07-22
 	* Fixed another bug causing dates before the year 1000 to be encoded as less than 8 chars under "%Y%m%d (found by [Thomas Beierlein](https://github.com/GeospatialPython/pyshp/issues/435))

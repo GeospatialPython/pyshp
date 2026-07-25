@@ -8,8 +8,8 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 
 - **Author**: [Joel Lawhead](https://github.com/GeospatialPython)
 - **Maintainers**: [James Parrott](https://github.com/JamesParrott) & [Karim Bahgat](https://github.com/karimbahgat)
-- **Version**: 3.1.6.dev
-- **Date**: 22nd July 2026
+- **Version**: 3.1.6
+- **Date**: 25th July 2026
 - **License**: [MIT](https://github.com/GeospatialPython/pyshp/blob/master/LICENSE.TXT)
 
 ## Contents
@@ -92,6 +92,10 @@ part of your geospatial project.
 
 
 # Version Changes
+
+## 3.1.6
+### Feature
+ - Encodings can now be read from .cpg files (and optionally written to them).
 
 ## 3.1.5
 ### Bug fix
