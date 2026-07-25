@@ -8,6 +8,7 @@ import io
 import json
 import os.path
 from pathlib import Path
+import shutil
 
 # third party imports
 import pytest
@@ -2165,3 +2166,49 @@ def test_encode_dbf_field_values(value,encoded_len,codec,errors):
         r = shapefile.DbfReader(stream, encoding=codec, encodingErrors=errors, strict=False)
         assert r.record(0)[0] == value
     r.close()
+
+@pytest.fixture
+def tmp_latin1_shapefile_shp(tmp_path):
+    name = "latin1"
+    test_shapefile_dir = tmp_path / name
+    test_shapefile_dir.mkdir()
+    for file in shapefiles_dir.glob("latin1.*"):
+        shutil.copy(file, test_shapefile_dir)
+    test_shapefile = test_shapefile_dir / f"{name}.shp"
+    return test_shapefile
+
+ENCODINGS_AND_CONTEXTS = [
+    ("latin1", contextlib.nullcontext()),
+    ("utf8", pytest.raises(shapefile.dbfFileException)),
+]
+@pytest.mark.parametrize("encoding, context", ENCODINGS_AND_CONTEXTS)
+def test_read_latin1_shapefile(encoding, context, tmp_latin1_shapefile_shp):
+    """ Extend the smoke test in README.md doctests """
+
+    assert tmp_latin1_shapefile_shp.is_file()
+
+    r = shapefile.Reader(tmp_latin1_shapefile_shp, encoding=encoding)
+    with context:
+        rec = r.record(0)
+    r.close()
+    if encoding == "latin1":
+        assert rec == [2, u'Ñandú']
+
+@pytest.mark.xfail(reason="Support for reading encodings from .cpg files not implemented yet")
+@pytest.mark.parametrize("encoding, context", ENCODINGS_AND_CONTEXTS[:1])
+def test_read_latin1_shapefile_cpg_file(encoding, context, tmp_latin1_shapefile_shp):
+    """ Extend the smoke test in README.md doctests """
+
+    assert tmp_latin1_shapefile_shp.is_file()
+
+    cpg_file = tmp_latin1_shapefile_shp.with_suffix(".cpg")
+    cpg_file.write_text(encoding.upper().replace("_","-"))
+
+    r = shapefile.Reader(tmp_latin1_shapefile_shp)
+    with context:
+        rec = r.record(0)
+    r.close()
+    if encoding == "latin1":
+        assert rec == [2, u'Ñandú']
+
+
