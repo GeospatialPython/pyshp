@@ -2194,8 +2194,7 @@ def test_read_latin1_shapefile(encoding, context, tmp_latin1_shapefile_shp):
     if encoding == "latin1":
         assert rec == [2, u'Ñandú']
 
-@pytest.mark.xfail(reason="Support for reading encodings from .cpg files not implemented yet")
-@pytest.mark.parametrize("encoding, context", ENCODINGS_AND_CONTEXTS[:1])
+@pytest.mark.parametrize("encoding, context", ENCODINGS_AND_CONTEXTS)
 def test_read_latin1_shapefile_cpg_file(encoding, context, tmp_latin1_shapefile_shp):
     """ Extend the smoke test in README.md doctests """
 
