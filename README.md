@@ -93,6 +93,12 @@ part of your geospatial project.
 
 # Version Changes
 
+## 3.1.7
+### Bug fix
+ - Warn (or raise the new `DbfNumericDataLoss` in strict mode) when a number is too wide for its
+ "N" or "F" field and has to be truncated, instead of silently writing a different number.
+ `DbfStringDataLoss` and `DbfNumericDataLoss` now share a `DbfDataLoss` base class.
+
 ## 3.1.6
 ### Feature
  - Encodings can now be read from .cpg files (and optionally written to them).
@@ -1073,7 +1079,9 @@ Numeric fields are created using the 'N' type (or the 'F' type, which is exactly
 By default the fourth decimal argument is set to zero, essentially creating an integer field.
 To store floats you must set the decimal argument to the precision of your choice.
 To store very large numbers you must increase the field length size to the total number of digits
-(including comma and minus).
+(including comma and minus).  A number that is wider than its field has to be truncated to keep the
+record layout intact, which writes a different number, so PyShp warns about this (and raises
+`DbfNumericDataLoss` in strict mode).
 
 
 	>>> w = shapefile.Writer('tests/shapefiles/test/dtype')

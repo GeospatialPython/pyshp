@@ -239,7 +239,15 @@ class PossibleDataLoss(Warning):
     pass
 
 
-class DbfStringDataLoss(ValueError):
+class DbfDataLoss(ValueError):
+    pass
+
+
+class DbfStringDataLoss(DbfDataLoss):
+    pass
+
+
+class DbfNumericDataLoss(DbfDataLoss):
     pass
 
 
@@ -455,6 +463,35 @@ def _encode_dbf_string(
         )
 
     return padded, trimmed
+
+
+def _pack_dbf_number(
+    formatted: str,
+    size: int,
+    value: RecordValue,
+    field_name: str,
+    strict: bool = True,
+) -> str:
+    """Right justifies an already formatted number in a field of width size.
+
+    A truncated number is a different number, not a lossy version of the data
+    like a truncated string is, so warn about it (or raise in strict mode),
+    as the "C" and "M" field paths do.
+    """
+    if len(formatted) > size:
+        msg = (
+            f"Formatted: {formatted} of data: {value!r} needs {len(formatted)} bytes, "
+            f"and was truncated to: {formatted[:size]} "
+            f"to fit within the {size=} bytes of field: {field_name!r}, "
+            "changing the number that is written. "
+            "To avoid data loss, make a new Writer or dbfWriter and call .field "
+            "with a bigger size (and if applicable, a smaller decimal). "
+        )
+        if strict:
+            raise DbfNumericDataLoss(msg)
+        warnings.warn(msg, category=PossibleDataLoss)
+
+    return formatted[:size].rjust(size)
 
 
 def _try_to_decode_dbf_name_or_text_field(
@@ -4451,14 +4488,14 @@ class DbfWriter(_HasCheckedWriteableFile):
                     except ValueError:
                         # forcing directly to int failed, so was probably a float.
                         num_val = int(float(cast(float, value)))
-                    str_val = format(num_val, "d")[:size].rjust(
-                        size
-                    )  # caps the size if exceeds the field size
+                    str_val = _pack_dbf_number(
+                        format(num_val, "d"), size, value, fieldName, self.strict
+                    )
                 else:
                     f_val = float(cast(float, value))
-                    str_val = format(f_val, f".{deci}f")[:size].rjust(
-                        size
-                    )  # caps the size if exceeds the field size
+                    str_val = _pack_dbf_number(
+                        format(f_val, f".{deci}f"), size, value, fieldName, self.strict
+                    )
             elif fieldType == "D":
                 # date: 8 bytes - date stored as a string in the format YYYYMMDD.
                 if isinstance(value, list) and len(value) == 3:

@@ -9,6 +9,7 @@ import json
 import os.path
 from pathlib import Path
 import shutil
+import warnings
 
 # third party imports
 import pytest
@@ -2067,6 +2068,100 @@ def test_encode_dbf_field_padding_bytes_errors(value,encoded_len,codec,errors):
     with pytest.raises(shapefile.DbfStringDataLoss):
         w.record(value)
     w.close()
+
+
+def _write_one_field_record(field_type, size, decimal, value, strict):
+    """Returns the raw bytes of the single field, and the value read back."""
+    stream = io.BytesIO()
+    w = shapefile.DbfWriter(dbf=stream, strict=strict)
+    w.field("V", field_type, size=size, decimal=decimal)
+    w.record(value)
+    w.close()
+
+    raw = stream.getvalue()
+    # 32 byte header + 32 bytes per field + terminator + the record's deletion flag.
+    start = 32 + 32 + 1 + 1
+    with shapefile.DbfReader(dbf=io.BytesIO(raw)) as r:
+        # DeletionFlag is r.fields[0].
+        written_size = r.fields[1][2]
+        return raw[start:start + written_size], r.record(0)[0]
+
+# Numbers that do not fit their field, with the corrupted bytes and the
+# different number that PyShp writes in their place.
+NUMERIC_FIELD_OVERFLOWS = [
+    ("N", 5, 0, 123456789, b"12345", 12345),
+    ("N", 5, 0, -123456, b"-1234", -1234),
+    ("N", 2, 0, -999, b"-9", -9),
+    ("N", 1, 0, -5, b"-", None),  # nothing but the sign is left
+    ("N", 3, 0, 10 ** 30, b"100", 100),
+    ("N", 6, 2, 12345.67, b"12345.", 12345.0),  # ends in a bare decimal point
+    ("N", 5, 2, 12345.67, b"12345", 12345.0),
+    ("N", 3, 1, -1.25, b"-1.", -1.0),
+    ("N", 9, 1, 9999999.96875, b"10000000.", 10000000.0),  # rounding carries a digit
+    ("F", 5, 0, 123456789, b"12345", 12345),
+    ("F", 6, 2, 12345.67, b"12345.", 12345.0),
+    ("F", 4, 2, -1.25, b"-1.2", -1.2),
+]
+
+# The same fields and values, sized so that nothing has to be truncated.
+NUMERIC_FIELDS_THAT_FIT = [
+    ("N", 5, 0, 12345),
+    ("N", 5, 0, -1234),
+    ("N", 1, 0, 7),
+    ("N", 8, 2, 12345.67),
+    ("N", 10, 3, 1.5),
+    ("F", 9, 1, 9999999.9),
+    ("F", 6, 2, -1.25),
+]
+
+@pytest.mark.parametrize("field_type,size,decimal,value,expected_bytes,read_back", NUMERIC_FIELD_OVERFLOWS)
+def test_numeric_field_overflow_warns_and_corrupts_the_value(
+        field_type, size, decimal, value, expected_bytes, read_back
+        ):
+    with pytest.warns(shapefile.PossibleDataLoss):
+        written, actual = _write_one_field_record(field_type, size, decimal, value, strict=False)
+
+    assert written == expected_bytes
+    assert actual == read_back
+    assert actual != value
+
+@pytest.mark.parametrize("field_type,size,decimal,value,expected_bytes,read_back", NUMERIC_FIELD_OVERFLOWS)
+def test_numeric_field_overflow_raises_in_strict_mode(
+        field_type, size, decimal, value, expected_bytes, read_back
+        ):
+    with pytest.raises(shapefile.DbfNumericDataLoss):
+        _write_one_field_record(field_type, size, decimal, value, strict=True)
+
+@pytest.mark.parametrize("strict", [False, True])
+@pytest.mark.parametrize("field_type,size,decimal,value", NUMERIC_FIELDS_THAT_FIT)
+def test_numeric_field_that_fits_round_trips_without_warning(field_type, size, decimal, value, strict):
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", shapefile.PossibleDataLoss)
+        written, actual = _write_one_field_record(field_type, size, decimal, value, strict)
+
+    assert len(written) == size
+    assert actual == value
+
+@pytest.mark.parametrize("strict", [False, True])
+@pytest.mark.parametrize("field_type,size,value,expected_bytes", [
+    ("D", 4, datetime.date(2026, 8, 6), b"20260806"),
+    ("D", 20, datetime.date(2026, 8, 6), b"20260806"),
+    ("L", 4, True, b"T"),
+    ("L", 20, False, b"F"),
+])
+def test_date_and_logical_fields_cannot_overflow(field_type, size, value, expected_bytes, strict):
+    # Field.from_unchecked forces "D" to 8 bytes and "L" to 1, so unlike the
+    # "N" and "F" fields, a mis-sized field cannot truncate the value.
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", shapefile.PossibleDataLoss)
+        written, _actual = _write_one_field_record(field_type, size, 0, value, strict)
+
+    assert written == expected_bytes
+
+def test_dbf_data_loss_exceptions_share_a_base_class():
+    assert issubclass(shapefile.DbfStringDataLoss, shapefile.DbfDataLoss)
+    assert issubclass(shapefile.DbfNumericDataLoss, shapefile.DbfDataLoss)
+    assert issubclass(shapefile.DbfDataLoss, ValueError)
 
 LONG_FIELD_NAMES = [
     ("ÀÀÀÀ०", 8, "utf-8", "strict"),  # Encoded bytes are corrupted if truncated to 10 bytes

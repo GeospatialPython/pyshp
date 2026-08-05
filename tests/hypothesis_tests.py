@@ -881,7 +881,9 @@ def _write_fields_and_records_to_strict(w, fields, records):
         ]
         try:
             w.record(*rec_list)
-        except shp.DbfStringDataLoss:
+        except shp.DbfDataLoss:
+            # Numbers too wide for their field are rejected in strict mode too,
+            # e.g. round(9999999.96875, 1) needs 10 chars in an N field of size 9.
             written_records.append(None)
         else:
             written_records.append(rec_list)

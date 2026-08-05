@@ -1,3 +1,7 @@
+VERSION 3.1.7
+2026-08-06
+	* Warn (or raise the new DbfNumericDataLoss in strict mode) when a number is too wide for its "N" or "F" field and has to be truncated, instead of silently writing a different number.
+
 VERSION 3.1.6
 2026-07-25
 	* Encodings can now be read from .cpg files (and optionally written to them).
