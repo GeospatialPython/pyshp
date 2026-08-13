@@ -622,6 +622,44 @@ def test_reader_zip():
             pass
 
 
+def _minimal_point_shp(shape_type=1):
+    import struct
+
+    record = (
+        struct.pack('>2i', 1, 10)
+        + struct.pack('<i', shape_type)
+        + struct.pack('<2d', 1.0, 2.0)
+    )
+    header = (
+        struct.pack('>i', 9994)
+        + bytes(20)
+        + struct.pack('>i', (100 + len(record)) // 2)
+        + struct.pack('<i', 1000)
+        + struct.pack('<i', 1)
+        + struct.pack('<8d', 1, 2, 1, 2, 0, 0, 0, 0)
+    )
+    header = header + bytes(100 - len(header))
+    return header + record
+
+
+def test_reader_truncated_shp_raises_shapefile_exception():
+    # A .shp that ends partway through its header or a record must raise a
+    # ShapefileException, not a bare struct.error from an unchecked read.
+    valid = _minimal_point_shp()
+    assert len(shapefile.Reader(shp=io.BytesIO(valid)).shapes()) == 1
+    # Cuts inside the 100-byte header, inside a record header, and inside a
+    # record body all previously raised a bare struct.error.
+    for length in (0, 4, 50, 99, 101, 108, 120, len(valid) - 1):
+        with pytest.raises(shapefile.ShapefileException):
+            shapefile.Reader(shp=io.BytesIO(valid[:length])).shapes()
+
+
+def test_reader_unknown_shape_type_raises_shapefile_exception():
+    data = _minimal_point_shp(shape_type=999999)
+    with pytest.raises(shapefile.ShapefileException):
+        shapefile.Reader(shp=io.BytesIO(data)).shapes()
+
+
 def test_reader_close_path():
     """
     Assert that manually calling Reader.close()

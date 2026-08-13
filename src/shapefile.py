@@ -3365,6 +3365,15 @@ class ShpReader(_HasCheckedReadableFile):
     def _shpHeader(self) -> None:
         """Reads the header information from a .shp file."""
 
+        # The .shp header is a fixed 100 bytes; a shorter file cannot hold one,
+        # so bail out with a ShapefileException instead of letting the unpack
+        # calls below raise a bare struct.error on the short read.
+        if self.file_size_B < 100:
+            raise ShapefileException(
+                f"Unable to read .shp header: file is {self.file_size_B} bytes, "
+                "but the shapefile header is 100 bytes."
+            )
+
         # File length (16-bit word * 2 = bytes)
         self.file.seek(24)
         self.shp_file_size_B = unpack(">i", self.file.read(4))[0] * 2
@@ -3401,9 +3410,21 @@ class ShpReader(_HasCheckedReadableFile):
         while header_pos < self.file_size_B:
             self.file.seek(header_pos)
             # Unpack the shape header only
-            recNum, recLength_16bw = unpack(">2i", self.file.read(8))
+            record_header = self.file.read(8)
+            if len(record_header) < 8:
+                raise ShapefileException(
+                    "Truncated .shp file: expected an 8-byte record header at "
+                    f"offset {header_pos}, got {len(record_header)} bytes."
+                )
+            recNum, recLength_16bw = unpack(">2i", record_header)
 
             shp_length_B = 2 * recLength_16bw
+            if header_pos + 8 + shp_length_B > self.file_size_B:
+                raise ShapefileException(
+                    f"Truncated .shp file: record {recNum} at offset {header_pos} "
+                    f"declares {shp_length_B} bytes of shape data but the file "
+                    "ends before that."
+                )
             shape_header_data = header_pos, shp_length_B, recNum
             self.headers_cache.append(shape_header_data)
             yield shape_header_data
@@ -3476,7 +3497,12 @@ class ShpReader(_HasCheckedReadableFile):
         except StructError as e:
             raise e
 
-        ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[shapeType]
+        try:
+            ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[shapeType]
+        except KeyError:
+            raise ShapefileException(
+                f"Unknown shape type {shapeType} in record {oid}."
+            )
         shape = ShapeClass.from_byte_stream(
             shapeType=shapeType,
             b_io=b_io,
