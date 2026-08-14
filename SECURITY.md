@@ -3,7 +3,7 @@ If you have found a security issue in PyShp - then thankyou!  Accordingly, we tr
 handle it as best we can.  It is in nobody's interest to attribute blame.
 
 ## Bug bounty
-There is no bug bounty.  But one maintainer has bought people a drink before, for far less. 
+There is no bug bounty.  But one maintainer has bought people a drink before, for far less.
 
 ## Overview / attack surface
  - PyShp is a pure-Python library that typically gets called from other Python code.  Attackers with the ability to run Python code on a target in the first place, can already peform any function Python allows them to.  As long as PyShp was not the means by which the Attacker gained the ability to run arbitrary Python code, PyShp cannot prevent this.
