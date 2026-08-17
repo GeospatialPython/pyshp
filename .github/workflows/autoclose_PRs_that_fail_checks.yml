@@ -17,4 +17,3 @@ jobs:
         with:
           require-associated-issue: "true"
           post-comment: "false"
-      
