@@ -1,0 +1,20 @@
+name: "Close PRs that didn't run workflows, or mention no issue"
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+    branches:
+      - main
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - uses: NotTodayThankyou/NotTodayThankyou@v1
+        with:
+          require-associated-issue: "true"
+          post-comment: "false"
+      
