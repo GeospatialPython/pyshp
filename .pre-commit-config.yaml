@@ -22,4 +22,5 @@ repos:
   hooks:
     - id: check-yaml
     - id: trailing-whitespace
+      args: [--markdown-linebreak-ext=md]
 

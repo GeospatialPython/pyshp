@@ -15,5 +15,4 @@ jobs:
     steps:
       - uses: NotTodayThankyou/NotTodayThankyou@v1
         with:
-          require-associated-issue: "true"
           post-comment: "false"
