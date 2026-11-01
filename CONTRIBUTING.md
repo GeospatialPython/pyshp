@@ -68,22 +68,12 @@ run our tests on your fork, on your code, using Github's infrastructure.  Github
 on runner minutes for public projects and forks, so this is free for contributors.
 
 
-
-There is currently a [workflow](https://github.com/GeospatialPython/pyshp/blob/master/.github/workflows/autoclose_PRs_that_fail_checks.yml)
-to close PRs automatically, using an [Action](https://github.com/NotTodayThankyou/NotTodayThankyou) James created.  
-
-Currently the above requirements for PRs, are a bit too strict and unforgiving.  The settings corresponding to them will
-be tweaked, to the minimum necessary to catch the spammers, so please bear with us until then.  
-
-All feedback is welcome.  
-This is still under development, we absolutely welcome new human contributors and don't wish to put anyone off - the intention is only to deter, and automate managing, machine generated spam PRs, not to put people off.
-
 Otherwise:
  - Before reading a single line of code, we would like to know what the goal of the PR is.  E.g. what it's
  trying to fix or what feature it adds.  Or otherwise what the intent behind the code is.  Or the
  very least, the context.  Therefore, please first either create an issue, or start a discussion.
 Once you have explained why the PR is needed:
- - Fork the project
+ - Fork the project.
  - Enable Github Actions workflows on your fork so that our tests run before PRs are raised,
  where we the results are visible.
  - Consider creating a special branch for the PR on your fork.
