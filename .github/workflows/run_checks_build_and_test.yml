@@ -18,7 +18,7 @@ jobs:
       uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
       with:
         version: 0.13.6 # uv version
-        python-version: "3.14"
+        python-version: "3.15"
 
     - name: uv Sync project, asserting locked with dev dependency group
       run: uv sync --frozen --group lint
@@ -33,8 +33,8 @@ jobs:
     - name: Install the latest version of uv and set the python version
       uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
       with:
-        version: 0.11.15 # uv version
-        python-version: "3.14"
+        version: 0.13.6 # uv version
+        python-version: "3.15"
 
       # use latest mypy version here, (even though pinned to 1.19.1 in lint group for Python 3.9 support)
     - name: Run mypy --strict
@@ -45,9 +45,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v6
-    - uses: actions/setup-python@v6
+    - uses: actions/setup-python@v7
       with:
-        python-version: "3.13"
+        python-version: "3.15"
     - name: Build wheel from the project repo
       uses: ./.github/actions/build_wheel_and_sdist
 
@@ -57,28 +57,34 @@ jobs:
       fail-fast: false
       matrix:
         python-version: [
+          "3.15",
           "3.14",
           "3.13",
           "3.12",
-          "3.15-dev",
+          "3.15",
           "3.11",
           "3.10",
           "3.9",
         ]
         os: [
-          "ubuntu-24.04",
+          "ubuntu-latest",
         ]
-        include:
-          - python-version: "3.14"
+        exclude: # Don't just remove it from matrix in case we want
+                 # to run Property tests on Windows or MacOS too.
+          - python-version: "3.9"
             os: "ubuntu-latest"
-          - python-version: "3.14"
+
+        include:
+          - python-version: "3.15"
             os: "windows-latest"
-          - python-version: "3.14"
+          - python-version: "3.15"
             os: "macos-latest"
+          - python-version: "3.9"
+            os: "ubuntu-24.04"
 
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/setup-python@v6
+    - uses: actions/setup-python@v7
       with:
         python-version: ${{ matrix.python-version }}
 
@@ -99,24 +105,30 @@ jobs:
       fail-fast: false
       matrix:
         python-version: [
+          "3.15",
           "3.14",
           "3.13",
           "3.12",
-          "3.15-dev",
           "3.11",
           "3.10",
           "3.9",
         ]
         os: [
-          "ubuntu-24.04",
+          "ubuntu-latest",
           "windows-latest",
           "macos-latest",
         ]
+        exclude:
+          - python-version: "3.9"
+            os: "ubuntu-latest"
+        include:
+          - python-version: "3.9"
+            os: "ubuntu-24.04"
 
 
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/setup-python@v6
+    - uses: actions/setup-python@v7
       with:
         python-version: ${{ matrix.python-version }}
 
@@ -129,11 +141,11 @@ jobs:
       with:
         pyshp_repo_directory: ./Pyshp
 
-    - name: "Network tests (on Localhost ${{ !(matrix.os == 'ubuntu-24.04' && matrix.python-version == '3.14') }})"
+    - name: "Network tests (on Localhost ${{ !(matrix.os == 'ubuntu-latest' && matrix.python-version == '3.15') }})"
       uses: ./Pyshp/.github/actions/test
       with:
         extra_args: '-m network'
-        replace_remote_urls_with_localhost: ${{ !(matrix.os == 'ubuntu-24.04' && matrix.python-version == '3.14') }}
+        replace_remote_urls_with_localhost: ${{ !(matrix.os == 'ubuntu-latest' && matrix.python-version == '3.15') }}
         # Checkout to ./PyShp, as the test job also needs to check out the artefact repo
         pyshp_repo_directory: ./Pyshp
 
