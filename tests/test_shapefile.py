@@ -2209,5 +2209,3 @@ def test_read_latin1_shapefile_cpg_file(encoding, context, tmp_latin1_shapefile_
     r.close()
     if encoding == "latin1":
         assert rec == [2, u'Ñandú']
-
-

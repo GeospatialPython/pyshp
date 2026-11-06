@@ -556,6 +556,3 @@ VERSION 1.1.7
 	*README.txt (main) Added tests for iterShapes(), iterRecords(), __geo_interface__()
 
 	*README.txt (main) Updated "bbox" property documentation to match Esri specification.
-
-
-

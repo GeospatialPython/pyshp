@@ -6,21 +6,33 @@ repos:
       entry: uv run ruff check
       language: system
       pass_filenames: false
+
     - id: ruff-format
       name: ruff format
       entry: uv run ruff format
       language: system
       pass_filenames: false
+
     - id: mypy
       name: mypy
       entry: uv run mypy --strict .
       language: system
       pass_filenames: false
 
-- repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v6.0.0
-  hooks:
-    - id: check-yaml
     - id: trailing-whitespace
-      args: [--markdown-linebreak-ext=md]
+      name: trim trailing whitespace
+      entry: trailing-whitespace-fixer
+      language: system
+      types: [text]
 
+    - id: end-of-file-fixer
+      name: fix end of files
+      entry: end-of-file-fixer
+      language: system
+      types: [text]
+
+    - id: check-yaml
+      name: check yaml
+      entry: check-yaml
+      language: system
+      types: [yaml]
