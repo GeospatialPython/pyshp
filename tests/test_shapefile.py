@@ -9,11 +9,12 @@ import json
 import os.path
 from pathlib import Path
 import shutil
+import struct
 
-# third party imports
+# third party deps
 import pytest
 
-# our imports (the code under test)
+# The code under test
 import shapefile
 
 # helper functions
@@ -1353,6 +1354,26 @@ def test_reader_corrupt_files(tmp_path):
             end = sf.shp.tell()
             assert (end - stopped) == 5
 
+@pytest.mark.timeout(10)
+@pytest.mark.parametrize("corrupt_shape_length_16bw", [-4, -1])
+def test_reader_corrupt_shape_record_header(corrupt_shape_length_16bw: int):
+    """
+    Assert that reader raises on invalid shape record metadata.
+    """
+    shp_file = shapefiles_dir / "blockgroups.shp"
+    stream = io.BytesIO(shp_file.read_bytes())
+    # Initial file header is 100B.
+    # 4B more into Shape record header is its record length.
+    stream.seek(0)
+    stream.seek(104)
+    stream.write(struct.pack(">i",corrupt_shape_length_16bw))
+    stream.seek(0)
+    with pytest.raises(shapefile.CorruptShpShapeRecord):
+        with shapefile.Reader(shp=stream) as reader:
+            reader.shape(i=-1)
+
+
+
 
 def test_bboxfilter_shape():
     """
@@ -2209,5 +2230,3 @@ def test_read_latin1_shapefile_cpg_file(encoding, context, tmp_latin1_shapefile_
     r.close()
     if encoding == "latin1":
         assert rec == [2, u'Ñandú']
-
-

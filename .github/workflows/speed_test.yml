@@ -72,6 +72,3 @@ jobs:
       env:
         PYSHP_TEST_REPO: ./PyShp_test_shapefile
       run: python ./Pyshp/tests/run_benchmarks.py
-
-
-

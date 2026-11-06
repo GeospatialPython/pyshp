@@ -2834,6 +2834,10 @@ class ShapefileException(Exception):
     """An exception to handle shapefile specific problems."""
 
 
+class CorruptShpShapeRecord(ShapefileException):
+    """Indicates invalid metadata in Shape record headers."""
+
+
 class dbfFileException(ShapefileException):
     """Indicates a problem with the .dbf file."""
 
@@ -3402,7 +3406,11 @@ class ShpReader(_HasCheckedReadableFile):
             self.file.seek(header_pos)
             # Unpack the shape header only
             recNum, recLength_16bw = unpack(">2i", self.file.read(8))
-
+            if recLength_16bw <= 0:
+                raise CorruptShpShapeRecord(
+                    f"At offset: {header_pos} in .shp file got claimed record num: {recNum}"
+                    f" and non-positive shape record length: {recLength_16bw} (16 bit words)"
+                )
             shp_length_B = 2 * recLength_16bw
             shape_header_data = header_pos, shp_length_B, recNum
             self.headers_cache.append(shape_header_data)
@@ -3446,7 +3454,7 @@ class ShpReader(_HasCheckedReadableFile):
         """
         if offset is None or shape_len_B is None:
             offset, shape_len_B, _recNum = self.shape_header(index)
-        # Seek to 8B after the offset (past the shape's 8B header).
+        # Seek to 8B after the offset (past the shape's 8 byte header).
         self.file.seek(offset + 8)
         shape = self._shape(shape_len_B=shape_len_B, oid=index, bbox=bbox)
         return shape
@@ -3476,6 +3484,12 @@ class ShpReader(_HasCheckedReadableFile):
         except StructError as e:
             raise e
 
+        if shapeType not in (NULL, self.shapeType):
+            raise CorruptShpShapeRecord(
+                f"Shape type code in .shp file header: {self.shapeType} does not match "
+                f"the non-null shape type code in the shape record: {shapeType} (oid: {oid!r})"
+            )
+
         ShapeClass = SHAPE_CLASS_FROM_SHAPETYPE[shapeType]
         shape = ShapeClass.from_byte_stream(
             shapeType=shapeType,
@@ -3484,11 +3498,6 @@ class ShpReader(_HasCheckedReadableFile):
             oid=oid,
             bbox=bbox,
         )
-
-        # Seek to the end of this record as defined by the record header because
-        # the shapefile spec doesn't require the actual content to meet the header
-        # definition.  Probably allowed for lazy feature deletion.
-        # self.file.seek(next_shape_pos)
 
         return shape
 
@@ -4767,8 +4776,8 @@ class ShpWriter(_ShpWriterInfo):
             self.shapeType = s.shapeType
         if s.shapeType not in (NULL, self.shapeType):
             raise ShapefileException(
-                f"The shape's type ({s.shapeType}) must match "
-                f"the type of the shapefile ({self.shapeType})."
+                f"The shape's type: {s.shapeType} must be Null, or match "
+                f"the type of the shapefile: {self.shapeType}."
             )
 
         # For both single point and multiple-points non-null shapes,

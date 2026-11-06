@@ -148,4 +148,3 @@ jobs:
         replace_remote_urls_with_localhost: ${{ !(matrix.os == 'ubuntu-latest' && matrix.python-version == '3.15') }}
         # Checkout to ./PyShp, as the test job also needs to check out the artefact repo
         pyshp_repo_directory: ./Pyshp
-
