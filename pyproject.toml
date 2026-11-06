@@ -43,7 +43,7 @@ lint = [
     "pre-commit-hooks",
 ]
 test = [
-    "pytest", "hypothesis"
+    "pytest", "hypothesis", "pytest-timeout"
 ]
 
 [tool.uv]
