@@ -1355,7 +1355,8 @@ def test_reader_corrupt_files(tmp_path):
             assert (end - stopped) == 5
 
 @pytest.mark.timeout(10)
-def test_reader_corrupt_shape_record_header(tmp_path):
+@pytest.mark.parametrize("corrupt_shape_length_16bw", [-4, -1])
+def test_reader_corrupt_shape_record_header(corrupt_shape_length_16bw: int):
     """
     Assert that reader raises on invalid shape record metadata.
     """
@@ -1365,9 +1366,9 @@ def test_reader_corrupt_shape_record_header(tmp_path):
     # 4B more into Shape record header is its record length.
     stream.seek(0)
     stream.seek(104)
-    stream.write(struct.pack(">i",-4)) # Non-positive shape record length
+    stream.write(struct.pack(">i",corrupt_shape_length_16bw))
     stream.seek(0)
-    with pytest.raises(shapefile.CorruptShapefileRecordHeader):
+    with pytest.raises(shapefile.CorruptShpShapeRecord):
         with shapefile.Reader(shp=stream) as reader:
             reader.shape(i=-1)
 
