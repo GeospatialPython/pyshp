@@ -2834,6 +2834,10 @@ class ShapefileException(Exception):
     """An exception to handle shapefile specific problems."""
 
 
+class CorruptShapefileRecordHeader(ShapefileException):
+    """Indicates invalid metadata in Shape record headers."""
+
+
 class dbfFileException(ShapefileException):
     """Indicates a problem with the .dbf file."""
 
@@ -3446,7 +3450,7 @@ class ShpReader(_HasCheckedReadableFile):
         """
         if offset is None or shape_len_B is None:
             offset, shape_len_B, _recNum = self.shape_header(index)
-        # Seek to 8B after the offset (past the shape's 8B header).
+        # Seek to 8B after the offset (past the shape's 8 byte header).
         self.file.seek(offset + 8)
         shape = self._shape(shape_len_B=shape_len_B, oid=index, bbox=bbox)
         return shape

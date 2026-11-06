@@ -9,11 +9,12 @@ import json
 import os.path
 from pathlib import Path
 import shutil
+import struct
 
-# third party imports
+# third party deps
 import pytest
 
-# our imports (the code under test)
+# The code under test
 import shapefile
 
 # helper functions
@@ -1352,6 +1353,25 @@ def test_reader_corrupt_files(tmp_path):
             sf.shp.seek(0, 2)
             end = sf.shp.tell()
             assert (end - stopped) == 5
+
+@pytest.mark.timeout(10)
+def test_reader_corrupt_shape_record_header(tmp_path):
+    """
+    Assert that reader raises on invalid shape record metadata.
+    """
+    shp_file = shapefiles_dir / "blockgroups.shp"
+    stream = io.BytesIO(shp_file.read_bytes())
+    # Initial file header is 100B.
+    # 4B more into Shape record header is its record length.
+    stream.seek(0)
+    stream.seek(104)
+    stream.write(struct.pack(">i",-4)) # Non-positive shape record length
+    stream.seek(0)
+    with pytest.raises(shapefile.CorruptShapefileRecordHeader):
+        with shapefile.Reader(shp=stream) as reader:
+            reader.shape(i=-1)
+
+
 
 
 def test_bboxfilter_shape():
