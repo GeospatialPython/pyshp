@@ -8,8 +8,8 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 
 - **Author**: [Joel Lawhead](https://github.com/GeospatialPython)
 - **Maintainers**: [James Parrott](https://github.com/JamesParrott) & [Karim Bahgat](https://github.com/karimbahgat)
-- **Version**: 3.1.7.dev
-- **Date**: 6th Nov 2026
+- **Version**: 3.1.7
+- **Date**: 7th Nov 2026
 - **License**: [MIT](https://github.com/GeospatialPython/pyshp/blob/master/LICENSE.TXT)
 
 ## Contents
@@ -93,14 +93,13 @@ part of your geospatial project.
 
 # Recent version Changes
 See also the Older Version Changes section below
+## 3.1.7
+### Bug fix
+ - Non-positive .shp record lengths (@lunnuyenhi-dev) and mismatched shape types now raise CorruptShpShapeRecord instead of hanging forever, raising a KeyError, or passing silently.
+
 ## 3.1.6
 ### Feature
  - Encodings can now be read from .cpg files (and optionally written to them).
-
-## 3.1.5
-### Bug fix
- - Fixed another bug causing dates before the year 1000 to be encoded as less than 8 chars under "%Y%m%d (found by [Thomas Beierlein](https://github.com/GeospatialPython/pyshp/issues/435))
-
 
 
 # The Basics
@@ -1513,6 +1512,10 @@ Zac Miller
 ```
 
 # Older version changes
+
+## 3.1.5
+### Bug fix
+ - Fixed another bug causing dates before the year 1000 to be encoded as less than 8 chars under "%Y%m%d (found by [Thomas Beierlein](https://github.com/GeospatialPython/pyshp/issues/435))
 
 ## 3.1.4
 ### Bug fix

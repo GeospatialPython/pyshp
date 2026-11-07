@@ -8,7 +8,7 @@ Compatible with Python versions >=3.9
 
 from __future__ import annotations
 
-__version__ = "3.1.6"
+__version__ = "3.1.7"
 
 import abc
 import array

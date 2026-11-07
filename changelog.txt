@@ -1,3 +1,7 @@
+VERSION 3.1.7
+2026-11-07
+	* Improved handling of corrupt .shp record headers [@lunnuyenhi-dev] (see [issue 453](https://github.com/GeospatialPython/pyshp/issues/453))
+
 VERSION 3.1.6
 2026-07-25
 	* Encodings can now be read from .cpg files (and optionally written to them).
