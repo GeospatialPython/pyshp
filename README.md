@@ -92,7 +92,7 @@ part of your geospatial project.
 
 
 # Recent version Changes
-See also the Older Version Changes section below
+See also the Older version Changes section below
 ## 3.1.7
 ### Bug fix
  - Non-positive .shp record lengths (@lunnuyenhi-dev) and mismatched shape types now raise CorruptShpShapeRecord instead of hanging forever, raising a KeyError, or passing silently.
@@ -1486,6 +1486,7 @@ Kurt Schwehr
 Kyle Kelley
 Lionel Guez
 Louis Tiao
+Lun (lunnuyenhi-dev)
 Marcin Cuprjak
 mcuprjak
 Micah Cochran
