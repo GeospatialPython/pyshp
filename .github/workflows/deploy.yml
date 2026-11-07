@@ -40,7 +40,7 @@ jobs:
 
     - name: Publish package
       if: github.repository == 'GeospatialPython/pyshp'
-      uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
+      uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 #v1.14.3
       with:
         user: __token__
         password: ${{ secrets.PYPI_INTEGRATION }}
