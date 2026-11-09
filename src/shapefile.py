@@ -4371,6 +4371,7 @@ class DbfWriter(_HasCheckedWriteableFile):
             raise dbfFileException(
                 "Shapefile dbf header length exceeds maximum length."
             )
+        # + 1 for deletion flag.
         recordLength = sum(field.size for field in self.fields) + 1
         header = pack(
             "<BBBBLHH20x",
@@ -4757,7 +4758,7 @@ class ShpWriter(_ShpWriterInfo):
         self,
         s: Shape | HasGeoInterface | GeoJSONHomogeneousGeometryObject,
     ) -> tuple[int, int]:
-        """Appends s to the file.  Returns shape's offset and length in B"""
+        """Appends s to the file.  Returns shape's offset and length in Bytes"""
         if not isinstance(s, Shape):
             if isinstance(s, HasGeoInterface):
                 shape_dict = s.__geo_interface__
@@ -4774,7 +4775,7 @@ class ShpWriter(_ShpWriterInfo):
         return self._shp_record(s)
 
     def _shp_record(self, s: Shape) -> tuple[int, int]:
-        """Appends s to the file.  Returns shape's offset and length in B"""
+        """Appends s to the file.  Returns shape's offset and length in Bytes"""
         offset = self.file.tell()
         self.shpNum += 1
 
