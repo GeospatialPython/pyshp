@@ -4403,8 +4403,8 @@ class DbfWriter(_HasCheckedWriteableFile):
         fieldCount = sum(1 for field in self.fields if field[0] != "DeletionFlag")
         if recordList:
             record = list(recordList)
-            while len(record) < fieldCount:
-                record.append("")
+            record += [""] * (fieldCount - len(record))
+
         elif recordDict:
             record = []
             for field in self.fields:
