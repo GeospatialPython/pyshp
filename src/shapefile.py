@@ -2497,8 +2497,12 @@ class _Record(list[RecordValue]):
             self._oid = oid
         else:
             self._oid = -1
-        self.deletion_flag = deletion_flag
+        self._deletion_flag = deletion_flag
         list.__init__(self, values)
+
+    @property
+    def deletion_flag(self) -> bytes:
+        return self._deletion_flag
 
     def __getattr__(self, item: str) -> RecordValue:
         """
