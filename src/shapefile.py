@@ -8,7 +8,7 @@ Compatible with Python versions >=3.9
 
 from __future__ import annotations
 
-__version__ = "3.1.8"
+__version__ = "3.1.9.dev"
 
 import abc
 import array
@@ -236,6 +236,10 @@ for c in FieldType.__members__:
 
 
 class PossibleDataLoss(Warning):
+    pass
+
+
+class CorruptDbfRecord(Warning):
     pass
 
 
@@ -2479,6 +2483,7 @@ class _Record(list[RecordValue]):
         field_positions: dict[str, int],
         values: Iterable[RecordValue],
         oid: int | None = None,
+        deletion_flag: bytes = b" ",
     ):
         """
         A Record should be created by the Reader class
@@ -2492,7 +2497,12 @@ class _Record(list[RecordValue]):
             self._oid = oid
         else:
             self._oid = -1
+        self._deletion_flag = deletion_flag
         list.__init__(self, values)
+
+    @property
+    def deletion_flag(self) -> bytes:
+        return self._deletion_flag
 
     def __getattr__(self, item: str) -> RecordValue:
         """
@@ -3054,8 +3064,23 @@ class DbfReader(_HasCheckedReadableFile):
         fmt_size = calcsize(fmt)
         # total size of fields should add up to recordlength from the header
         # so calculate the difference, and concat a field of that many pad bytes.
-        if fmt_size < self._record_length:
-            num_pad_bytes = self._record_length - fmt_size
+
+        num_pad_bytes = self._record_length - fmt_size
+        if num_pad_bytes != 0:
+            msg = (
+                f"The (fixed) record length declared in the file header: {self._record_length} "
+                f"did not match the record size: {fmt_size} "
+                f"calculated from the struct format string: {fmt}"
+            )
+
+            if fmt_size > self._record_length or self.strict:
+                raise dbfFileException(msg)
+            else:
+                warnings.warn(
+                    f"{msg}. Struct fmt string will be padded with '{num_pad_bytes}x' (any such bytes in the record will be ignored). ",
+                    category=CorruptDbfRecord,
+                )
+
             fmt = f"{fmt}{num_pad_bytes}x"
 
         return fmt
@@ -3099,6 +3124,7 @@ class DbfReader(_HasCheckedReadableFile):
         recLookup: dict[str, int],
         recStruct: Struct,
         oid: int | None = None,
+        ignore_deletion_flag: bool = False,
     ) -> _Record | None:
         """Reads and returns a dbf record row as a list of values. Requires self.file
         to already be pointing to the start of the record (e.g. from a previous call
@@ -3111,15 +3137,24 @@ class DbfReader(_HasCheckedReadableFile):
         # The only format chars from self._record_fmt, in recStruct from _record_fields,
         # are s and x (ascii encoded str and pad byte) so everything in recordContents is bytes
         # https://docs.python.org/3/library/struct.html#format-characters
-        recordContents = recStruct.unpack(self.file.read(recStruct.size))
+        deletion_flag, *recordContents = recStruct.unpack(
+            self.file.read(recStruct.size)
+        )
 
-        # deletion flag field is always unpacked as first value (see _record_fmt)
-        if recordContents[0] != b" ":
-            # deleted record
-            return None
-
-        # drop deletion flag from values
-        recordContents = recordContents[1:]
+        if deletion_flag == b"*":
+            # "The byte's value is a space (0x20), if the record is active,
+            # or an asterisk (0x2A), if the record is deleted. "
+            # https://en.wikipedia.org/wiki/.dbf#Database_records
+            if not ignore_deletion_flag:
+                return None
+        elif deletion_flag != b" " and not ignore_deletion_flag:
+            msg = (
+                f"On record: {oid}, deletion flag not marked for deletion (not b'*') "
+                f"but also not an ascii space( not b' ').  Got: {deletion_flag!r}"
+            )
+            if self.strict:
+                raise dbfFileException(msg)
+            warnings.warn(msg, category=CorruptDbfRecord)
 
         # check that values match fields
         if len(fieldTuples) != len(recordContents):
@@ -3194,9 +3229,14 @@ class DbfReader(_HasCheckedReadableFile):
                 )
             record.append(value)
 
-        return _Record(recLookup, record, oid)
+        return _Record(recLookup, record, oid=oid, deletion_flag=deletion_flag)
 
-    def record(self, i: int = 0, fields: list[str] | None = None) -> _Record | None:
+    def record(
+        self,
+        i: int = 0,
+        fields: list[str] | None = None,
+        ignore_deletion_flag: bool = False,
+    ) -> _Record | None:
         """Returns a specific dbf record based on the supplied index.
         To only read some of the fields, specify the 'fields' arg as a
         list of one or more fieldnames.
@@ -3208,7 +3248,11 @@ class DbfReader(_HasCheckedReadableFile):
         self.seek_to_rec(index=i)
         fieldTuples, recLookup, recStruct = self._record_fields(fields)
         return self._record(
-            oid=i, fieldTuples=fieldTuples, recLookup=recLookup, recStruct=recStruct
+            oid=i,
+            fieldTuples=fieldTuples,
+            recLookup=recLookup,
+            recStruct=recStruct,
+            ignore_deletion_flag=ignore_deletion_flag,
         )
 
     def records(
