@@ -8,7 +8,7 @@ Compatible with Python versions >=3.9
 
 from __future__ import annotations
 
-__version__ = "3.1.7"
+__version__ = "3.1.8.dev"
 
 import abc
 import array
@@ -3038,7 +3038,7 @@ class DbfReader(_HasCheckedReadableFile):
         """All fields except the DeletionFlag."""
         return self.fields[1:]
 
-    def _record_fmt(self, fields: Container[str] | None = None) -> tuple[str, int]:
+    def _record_fmt(self, fields: Container[str] | None = None) -> str:
         """Calculates the format and size of a .dbf record. Optional 'fields' arg
         specifies which fieldnames to unpack and which to ignore. Note that this
         always includes the DeletionFlag at index 0, regardless of the 'fields' arg.
@@ -3056,11 +3056,12 @@ class DbfReader(_HasCheckedReadableFile):
         fmt = "".join(structcodes)
         fmt_size = calcsize(fmt)
         # total size of fields should add up to recordlength from the header
-        while fmt_size < self._record_length:
-            # if not, pad byte until reaches recordlength
-            fmt += "x"
-            fmt_size += 1
-        return (fmt, fmt_size)
+        # so calculate the difference, and concat a field of that many pad bytes.
+        if fmt_size < self._record_length:
+            num_pad_bytes = self._record_length - fmt_size
+            fmt = f"{fmt}{num_pad_bytes}x"
+
+        return fmt
 
     def _record_fields(
         self, fields: Iterable[str] | None = None
@@ -3076,7 +3077,7 @@ class DbfReader(_HasCheckedReadableFile):
             # first ignore repeated field names (order doesn't matter)
             unique_fields = list(set(fields))
             # get the struct
-            fmt, __fmt_size = self._record_fmt(fields=unique_fields)
+            fmt = self._record_fmt(fields=unique_fields)
             recStruct = Struct(fmt)
             # make sure the given fieldnames exist
             for name in unique_fields:
@@ -3109,7 +3110,7 @@ class DbfReader(_HasCheckedReadableFile):
 
         None is returned for 'deleted' records (those with their deletion flag marked).
         """
-        # The only format chars in from self._record_fmt, in recStruct from _record_fields,
+        # The only format chars from self._record_fmt, in recStruct from _record_fields,
         # are s and x (ascii encoded str and pad byte) so everything in recordContents is bytes
         # https://docs.python.org/3/library/struct.html#format-characters
         recordContents = recStruct.unpack(self.file.read(recStruct.size))
