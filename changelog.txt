@@ -1,3 +1,7 @@
+VERSION 3.1.8
+2026-11-07
+	* Avoid unnecessary seeks in Reader.iterShapeRecords with a bbox.  Removed lots of deletion field checks (prefer dbfReader.data_fields). Replace two while loops with simpler alternatives.
+
 VERSION 3.1.7
 2026-11-07
 	* Improved handling of corrupt .shp record headers [@lunnuyenhi-dev] (see [issue 453](https://github.com/GeospatialPython/pyshp/issues/453))
