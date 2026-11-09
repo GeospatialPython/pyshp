@@ -8,7 +8,7 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 
 - **Author**: [Joel Lawhead](https://github.com/GeospatialPython)
 - **Maintainers**: [James Parrott](https://github.com/JamesParrott) & [Karim Bahgat](https://github.com/karimbahgat)
-- **Version**: 3.1.8.dev
+- **Version**: 3.1.8
 - **Date**: 9th Nov 2026
 - **License**: [MIT](https://github.com/GeospatialPython/pyshp/blob/master/LICENSE.TXT)
 
@@ -93,13 +93,16 @@ part of your geospatial project.
 
 # Recent version Changes
 See also the Older version Changes section below
+
+## 3.1.8
+### Internal code improvements
+ - Avoid unnecessary seeks in Reader.iterShapeRecords with a bbox.
+ - Removed lots of deletion field checks (prefer dbfReader.data_fields).
+ - Replace two while loops with simpler alternatives.
+
 ## 3.1.7
 ### Bug fix
  - Non-positive .shp record lengths (@lunnuyenhi-dev) and mismatched shape types now raise CorruptShpShapeRecord instead of hanging forever, raising a KeyError, or passing silently.
-
-## 3.1.6
-### Feature
- - Encodings can now be read from .cpg files (and optionally written to them).
 
 
 # The Basics
@@ -423,22 +426,20 @@ A new field can be created as follows:
 
 Using this method the conversion from string to enum is done automatically.
 
-To see the fields for the Reader object above (sf) call the "fields"
+To see the fields for the Reader object above (sf) call the "data_fields"
 attribute:
 
+	>>> sf.data_fields
+	[Field(name="AREA", field_type=FieldType.N, size=18, decimal=5), Field(name="BKG_KEY", field_type=FieldType.C, size=12, decimal=0), Field(name="POP1990", field_type=FieldType.N, size=9, decimal=0), Field(name="POP90_SQMI", field_type=FieldType.N, size=10, decimal=1), Field(name="HOUSEHOLDS", field_type=FieldType.N, size=9, decimal=0), Field(name="MALES", field_type=FieldType.N, size=9, decimal=0), Field(name="FEMALES", field_type=FieldType.N, size=9, decimal=0), Field(name="WHITE", field_type=FieldType.N, size=9, decimal=0), Field(name="BLACK", field_type=FieldType.N, size=8, decimal=0), Field(name="AMERI_ES", field_type=FieldType.N, size=7, decimal=0), Field(name="ASIAN_PI", field_type=FieldType.N, size=8, decimal=0), Field(name="OTHER", field_type=FieldType.N, size=8, decimal=0), Field(name="HISPANIC", field_type=FieldType.N, size=8, decimal=0), Field(name="AGE_UNDER5", field_type=FieldType.N, size=8, decimal=0), Field(name="AGE_5_17", field_type=FieldType.N, size=8, decimal=0), Field(name="AGE_18_29", field_type=FieldType.N, size=8, decimal=0), Field(name="AGE_30_49", field_type=FieldType.N, size=8, decimal=0), Field(name="AGE_50_64", field_type=FieldType.N, size=8, decimal=0), Field(name="AGE_65_UP", field_type=FieldType.N, size=8, decimal=0), Field(name="NEVERMARRY", field_type=FieldType.N, size=8, decimal=0), Field(name="MARRIED", field_type=FieldType.N, size=9, decimal=0), Field(name="SEPARATED", field_type=FieldType.N, size=7, decimal=0), Field(name="WIDOWED", field_type=FieldType.N, size=8, decimal=0), Field(name="DIVORCED", field_type=FieldType.N, size=8, decimal=0), Field(name="HSEHLD_1_M", field_type=FieldType.N, size=8, decimal=0), Field(name="HSEHLD_1_F", field_type=FieldType.N, size=8, decimal=0), Field(name="MARHH_CHD", field_type=FieldType.N, size=8, decimal=0), Field(name="MARHH_NO_C", field_type=FieldType.N, size=8, decimal=0), Field(name="MHH_CHILD", field_type=FieldType.N, size=7, decimal=0), Field(name="FHH_CHILD", field_type=FieldType.N, size=7, decimal=0), Field(name="HSE_UNITS", field_type=FieldType.N, size=9, decimal=0), Field(name="VACANT", field_type=FieldType.N, size=7, decimal=0), Field(name="OWNER_OCC", field_type=FieldType.N, size=8, decimal=0), Field(name="RENTER_OCC", field_type=FieldType.N, size=8, decimal=0), Field(name="MEDIAN_VAL", field_type=FieldType.N, size=7, decimal=0), Field(name="MEDIANRENT", field_type=FieldType.N, size=4, decimal=0), Field(name="UNITS_1DET", field_type=FieldType.N, size=8, decimal=0), Field(name="UNITS_1ATT", field_type=FieldType.N, size=7, decimal=0), Field(name="UNITS2", field_type=FieldType.N, size=7, decimal=0), Field(name="UNITS3_9", field_type=FieldType.N, size=8, decimal=0), Field(name="UNITS10_49", field_type=FieldType.N, size=8, decimal=0), Field(name="UNITS50_UP", field_type=FieldType.N, size=8, decimal=0), Field(name="MOBILEHOME", field_type=FieldType.N, size=7, decimal=0)]
 
-	>>> sf.fields
-	[Field(name="DeletionFlag", field_type=FieldType.C, size=1, decimal=0), Field(name="AREA", field_type=FieldType.N, size=18, decimal=5), Field(name="BKG_KEY", field_type=FieldType.C, size=12, decimal=0), Field(name="POP1990", field_type=FieldType.N, size=9, decimal=0), Field(name="POP90_SQMI", field_type=FieldType.N, size=10, decimal=1), Field(name="HOUSEHOLDS", field_type=FieldType.N, size=9, decimal=0), Field(name="MALES", field_type=FieldType.N, size=9, decimal=0), Field(name="FEMALES", field_type=FieldType.N, size=9, decimal=0), Field(name="WHITE", field_type=FieldType.N, size=9, decimal=0), Field(name="BLACK", field_type=FieldType.N, size=8, decimal=0), Field(name="AMERI_ES", field_type=FieldType.N, size=7, decimal=0), Field(name="ASIAN_PI", field_type=FieldType.N, size=8, decimal=0), Field(name="OTHER", field_type=FieldType.N, size=8, decimal=0), Field(name="HISPANIC", field_type=FieldType.N, size=8, decimal=0), Field(name="AGE_UNDER5", field_type=FieldType.N, size=8, decimal=0), Field(name="AGE_5_17", field_type=FieldType.N, size=8, decimal=0), Field(name="AGE_18_29", field_type=FieldType.N, size=8, decimal=0), Field(name="AGE_30_49", field_type=FieldType.N, size=8, decimal=0), Field(name="AGE_50_64", field_type=FieldType.N, size=8, decimal=0), Field(name="AGE_65_UP", field_type=FieldType.N, size=8, decimal=0), Field(name="NEVERMARRY", field_type=FieldType.N, size=8, decimal=0), Field(name="MARRIED", field_type=FieldType.N, size=9, decimal=0), Field(name="SEPARATED", field_type=FieldType.N, size=7, decimal=0), Field(name="WIDOWED", field_type=FieldType.N, size=8, decimal=0), Field(name="DIVORCED", field_type=FieldType.N, size=8, decimal=0), Field(name="HSEHLD_1_M", field_type=FieldType.N, size=8, decimal=0), Field(name="HSEHLD_1_F", field_type=FieldType.N, size=8, decimal=0), Field(name="MARHH_CHD", field_type=FieldType.N, size=8, decimal=0), Field(name="MARHH_NO_C", field_type=FieldType.N, size=8, decimal=0), Field(name="MHH_CHILD", field_type=FieldType.N, size=7, decimal=0), Field(name="FHH_CHILD", field_type=FieldType.N, size=7, decimal=0), Field(name="HSE_UNITS", field_type=FieldType.N, size=9, decimal=0), Field(name="VACANT", field_type=FieldType.N, size=7, decimal=0), Field(name="OWNER_OCC", field_type=FieldType.N, size=8, decimal=0), Field(name="RENTER_OCC", field_type=FieldType.N, size=8, decimal=0), Field(name="MEDIAN_VAL", field_type=FieldType.N, size=7, decimal=0), Field(name="MEDIANRENT", field_type=FieldType.N, size=4, decimal=0), Field(name="UNITS_1DET", field_type=FieldType.N, size=8, decimal=0), Field(name="UNITS_1ATT", field_type=FieldType.N, size=7, decimal=0), Field(name="UNITS2", field_type=FieldType.N, size=7, decimal=0), Field(name="UNITS3_9", field_type=FieldType.N, size=8, decimal=0), Field(name="UNITS10_49", field_type=FieldType.N, size=8, decimal=0), Field(name="UNITS50_UP", field_type=FieldType.N, size=8, decimal=0), Field(name="MOBILEHOME", field_type=FieldType.N, size=7, decimal=0)]
+From this, e.g. to get a list of all field names:
 
-The first field of a dbf file is always a 1-byte field called "DeletionFlag",
-which indicates records that have been deleted but not removed. However,
-since this flag is very rarely used, PyShp currently will return all records
-regardless of their deletion flag, and the flag is also not included in the list of
-record values. In other words, the DeletionFlag field has no real purpose, and
-should in most cases be ignored. For instance, to get a list of all fieldnames:
+	>>> fieldnames = [f.name for f in sf.data_fields]
 
-
-	>>> fieldnames = [f[0] for f in sf.fields[1:]]
+The first byte of each dbf file record is a "DeletionFlag".  To preserve compatibility with older
+versions of PyShp, a list of fields starting with this pseudo-field is returned by sf.fields.  However,
+the DeletionFlag field is very rarely used, has no real purpose for shapefiles (as records and shapes must
+be balanced), and so should in most cases be ignored.
 
 You can get a list of the shapefile's records by calling the records() method:
 
@@ -448,8 +449,7 @@ You can get a list of the shapefile's records by calling the records() method:
 	>>> len(records)
 	663
 
-To read a single record call the record() method with the record's index:
-
+To read a single record, call the record() method with the record's index:
 
 	>>> rec = sf.record(3)
 
@@ -868,7 +868,7 @@ This can be particularly useful for copying from one file to another:
 	>>> r = shapefile.Reader('tests/shapefiles/test/polygon')
 
 	>>> w = shapefile.Writer('tests/shapefiles/test/copy')
-	>>> w.fields = r.fields[1:] # skip first deletion field
+	>>> w.fields = r.data_fields
 
 	>>> # adding existing Shape objects
 	>>> for shaperec in r.iterShapeRecords():
@@ -1003,7 +1003,7 @@ should give you the same unicode string you started with.
 
 
 	>>> w = shapefile.Writer("tests/shapefiles/test/latin_as_utf8.shp", encoding="utf8")
-	>>> w.fields = r.fields[1:]
+	>>> w.fields = r.data_fields
 	>>> w.record(*r.record(0))
 	>>> w.null()
 	>>> r.close()
@@ -1252,7 +1252,7 @@ memory. The following example copies the contents of a shapefile to a new file 1
 
 	>>> # copy over fields from the reader
 	>>> r = shapefile.Reader("tests/shapefiles/blockgroups")
-	>>> for field in r.fields[1:]:
+	>>> for field in r.data_fields:
 	...     w.field(*field)
 
 	>>> # copy the shapefile to writer 10 times
@@ -1285,7 +1285,7 @@ file one record at a time, modify or filter the contents, and write it back out.
 
 	>>> # copy over the relevant fields from the reader
 	>>> r = shapefile.Reader("tests/shapefiles/blockgroups")
-	>>> for field in r.fields[1:]:
+	>>> for field in r.data_fields:
 	...     if field[0] in keep_fields:
 	...         w.field(*field)
 
@@ -1513,6 +1513,10 @@ Zac Miller
 ```
 
 # Older version changes
+
+## 3.1.6
+### Feature
+ - Encodings can now be read from .cpg files (and optionally written to them).
 
 ## 3.1.5
 ### Bug fix

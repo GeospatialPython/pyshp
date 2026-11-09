@@ -1029,15 +1029,6 @@ def test_record_subfields_unordered():
     test_record_attributes(fields=fields)
 
 
-def test_record_subfields_delflag_notvalid():
-    """
-    Assert that reader does not consider DeletionFlag as a valid field name.
-    """
-    fields = ["DeletionFlag", "AREA", "POP1990", "MALES", "FEMALES", "MOBILEHOME"]
-    with pytest.raises(ValueError):
-        test_record_attributes(fields=fields)
-
-
 def test_record_subfields_duplicates():
     """
     Assert that reader correctly retrieves only a subset
