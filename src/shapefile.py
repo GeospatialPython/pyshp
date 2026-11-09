@@ -3100,9 +3100,11 @@ class DbfReader(_HasCheckedReadableFile):
         recStruct: Struct,
         oid: int | None = None,
     ) -> _Record | None:
-        """Reads and returns a dbf record row as a list of values. Requires specifying
-        a list of field info Field namedtuples 'fieldTuples', a record name-index dict 'recLookup',
-        and a Struct instance 'recStruct' for unpacking these fields.
+        """Reads and returns a dbf record row as a list of values. Requires self.file
+        to already be pointing to the start of the record (e.g. from a previous call
+        to self.file.seek).  Also requires specifying a list of field info Field
+        namedtuples 'fieldTuples', a record name-index dict 'recLookup', and a Struct
+        instance 'recStruct' for unpacking these fields.
 
         None is returned for 'deleted' records (those with their deletion flag marked).
         """
@@ -3203,9 +3205,7 @@ class DbfReader(_HasCheckedReadableFile):
         Returns None if record's deletion flag is marked.
         """
         i = ensure_within_bounds(i, self.numRecords)
-        recSize = self._record_length
-        self.file.seek(0)
-        self.file.seek(self._dbfHdrLength + (i * recSize))
+        self.seek_to_rec(index=i)
         fieldTuples, recLookup, recStruct = self._record_fields(fields)
         return self._record(
             oid=i, fieldTuples=fieldTuples, recLookup=recLookup, recStruct=recStruct
@@ -3232,9 +3232,7 @@ class DbfReader(_HasCheckedReadableFile):
         Set deleted_as_None=True to insert None for these, to preserve
         the indexing, as for DbfReader.record
         """
-        return [
-            record for record in self.iterRecords(fields, start, stop, deleted_as_None)
-        ]
+        return list(self.iterRecords(fields, start, stop, deleted_as_None))
 
     def iterRecords(
         self,
@@ -3276,8 +3274,7 @@ class DbfReader(_HasCheckedReadableFile):
             )
         elif stop < 0:
             stop = range(self.numRecords)[stop]
-        recSize = self._record_length
-        self.file.seek(self._dbfHdrLength + (start * recSize))
+        self.seek_to_rec(index=start)
         fieldTuples, recLookup, recStruct = self._record_fields(fields)
         for i in range(start, stop):
             r = self._record(
@@ -3285,6 +3282,10 @@ class DbfReader(_HasCheckedReadableFile):
             )
             if r is not None or deleted_as_None:
                 yield r
+
+    def seek_to_rec(self, index: int) -> None:
+        recSize = self._record_length
+        self.file.seek(self._dbfHdrLength + (index * recSize))
 
 
 class ShxReader(_HasCheckedReadableFile):
@@ -4153,16 +4154,23 @@ class Reader(_HasExitStack):
         shapes = Shapes(self.iterShapes(bbox=bbox))
         return shapes
 
-    def iterShapes(self, bbox: BBox | None = None) -> Iterator[Shape | None]:
+    def iterShapes(
+        self,
+        bbox: BBox | None = None,
+        outside_bbox_as_None: bool = False,
+    ) -> Iterator[Shape | None]:
         """Returns a generator of shapes in a shapefile. Useful
         for handling large shapefiles.
         To only read shapes within a given spatial region, specify the 'bbox'
-        arg as a list or tuple of xmin,ymin,xmax,ymax.
+        arg as a list or tuple of xmin,ymin,xmax,ymax.  To return None for
+        shapes outside bbox instead of skipping them, use outside_bbox_as_None=True.
         """
         shape_lengths_B = self.shx_reader.shape_lengths_B if self._shx else None
         bbox = BBox(*bbox) if bbox is not None else None
         yield from self.shp_reader.iterShapes(
-            shape_lengths_B=shape_lengths_B, bbox=bbox
+            shape_lengths_B=shape_lengths_B,
+            bbox=bbox,
+            outside_bbox_as_None=outside_bbox_as_None,
         )
         self.numShapes = len(self.shp_reader.headers_cache)
 
@@ -4224,14 +4232,22 @@ class Reader(_HasExitStack):
                 yield ShapeRecord(shape=shape, record=record)
         else:
             # Only yield ShapeRecords whose shape.bbox overlaps with bbox.
-            # TODO: internal _record method should be faster but would have to
-            # make sure to seek to correct file location...
 
-            # fieldTuples,recLookup,recStruct = self._record_fields(fields)
-            for shape in self.iterShapes(bbox=bbox):
+            fieldTuples, recLookup, recStruct = self.dbf_reader._record_fields(fields)
+            last_oid: None | int = None
+            for shape in self.iterShapes(bbox=bbox, outside_bbox_as_None=True):
                 if shape:
-                    # record = self._record(oid=i, fieldTuples=fieldTuples, recLookup=recLookup, recStruct=recStruct)
-                    record = self.dbf_reader.record(i=shape.oid, fields=fields)
+                    if shape.oid - 1 != last_oid:
+                        self.dbf_reader.seek_to_rec(index=shape.oid)
+
+                    record = self.dbf_reader._record(
+                        fieldTuples=fieldTuples,
+                        recLookup=recLookup,
+                        recStruct=recStruct,
+                        oid=shape.oid,
+                    )
+                    last_oid = shape.oid
+
                     yield ShapeRecord(shape=shape, record=record)
 
 
