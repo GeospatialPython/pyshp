@@ -8,7 +8,7 @@ Compatible with Python versions >=3.9
 
 from __future__ import annotations
 
-__version__ = "3.1.8"
+__version__ = "3.1.9.dev"
 
 import abc
 import array
@@ -236,6 +236,10 @@ for c in FieldType.__members__:
 
 
 class PossibleDataLoss(Warning):
+    pass
+
+
+class CorruptDbfRecord(Warning):
     pass
 
 
@@ -3054,8 +3058,23 @@ class DbfReader(_HasCheckedReadableFile):
         fmt_size = calcsize(fmt)
         # total size of fields should add up to recordlength from the header
         # so calculate the difference, and concat a field of that many pad bytes.
-        if fmt_size < self._record_length:
-            num_pad_bytes = self._record_length - fmt_size
+
+        num_pad_bytes = self._record_length - fmt_size
+        if num_pad_bytes != 0:
+            msg = (
+                f"The (fixed) record length declared in the file header: {self._record_length} "
+                f"did not match the record size: {fmt_size} "
+                f"calculated from the struct format string: {fmt}"
+            )
+
+            if fmt_size > self._record_length or self.strict:
+                raise dbfFileException(msg)
+            else:
+                warnings.warn(
+                    f"{msg}. Struct fmt string will be padded with '{num_pad_bytes}x' (any such bytes in the record will be ignored). ",
+                    category=CorruptDbfRecord,
+                )
+
             fmt = f"{fmt}{num_pad_bytes}x"
 
         return fmt
@@ -3111,15 +3130,22 @@ class DbfReader(_HasCheckedReadableFile):
         # The only format chars from self._record_fmt, in recStruct from _record_fields,
         # are s and x (ascii encoded str and pad byte) so everything in recordContents is bytes
         # https://docs.python.org/3/library/struct.html#format-characters
-        recordContents = recStruct.unpack(self.file.read(recStruct.size))
+        deletionFlag, *recordContents = recStruct.unpack(self.file.read(recStruct.size))
 
-        # deletion flag field is always unpacked as first value (see _record_fmt)
-        if recordContents[0] != b" ":
-            # deleted record
+        if deletionFlag == b"*":
+            # "The byte's value is a space (0x20), if the record is active,
+            # or an asterisk (0x2A), if the record is deleted. "
+            # https://en.wikipedia.org/wiki/.dbf#Database_records
             return None
 
-        # drop deletion flag from values
-        recordContents = recordContents[1:]
+        if deletionFlag != b" ":
+            warnings.warn(
+                (
+                    f"On record: {oid}, deletion flag not marked for deletion (not b'*') "
+                    f"but also not an ascii space( not b' ').  Got: {deletionFlag!r}"
+                ),
+                category=CorruptDbfRecord,
+            )
 
         # check that values match fields
         if len(fieldTuples) != len(recordContents):
