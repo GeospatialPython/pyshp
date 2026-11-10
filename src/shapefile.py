@@ -3531,15 +3531,14 @@ class ShpReader(_HasCheckedReadableFile):
         """Returns geometry for a single shape (or None if
         it is outside the specified bbox).
 
-        Requires the size in B of the shaps, and the .shp
-        file to have been .seeked to the start of the shape
-        (immediately after the shape's header).
+        Requires the size in B of the shape, and the .shp
+        file to have already been .seeked to the start of
+        the shape data (immediately after the shape's header).
         """
 
         # Read entire record into memory to avoid having to call
         # seek on the file afterwards
         b_io: ReadSeekableBinStream = io.BytesIO(self.file.read(shape_len_B))
-        # To avoid a .seek for the next shape's header (where we are already)
         b_io.seek(0)
 
         try:
