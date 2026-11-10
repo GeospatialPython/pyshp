@@ -135,6 +135,48 @@ class BBox(NamedTuple):
     ymax: float
 
 
+class RingSamplingError(Exception):
+    """An exception for geometric errors occurring when organising polygons."""
+
+
+class GeoJSON_Error(Exception):
+    """An exception to handle GeoJSON specific problems."""
+
+
+class ShapefileException(Exception):
+    """An exception to handle shapefile specific problems."""
+
+
+class CorruptShpShapeRecord(ShapefileException):
+    """Indicates invalid metadata in Shape record headers."""
+
+
+class dbfFileException(ShapefileException):
+    """Indicates a problem with the .dbf file."""
+
+
+class DbfStringDataLoss(ValueError):
+    """An exception to handle truncation of the user's text data (strict=True only)."""
+
+
+class CorruptDbfRecord(Warning):
+    """A Warning of possible corrupt data in the .dbf. record headers
+    (e.g. incorrect record lengths and deletionFlags).
+    """
+
+
+class PossibleDataLoss(Warning):
+    """A Warning of possible data loss when encoding or decoding."""
+
+
+class UnsuccessfulFileDownload(Warning):
+    """E.g. 404s"""
+
+
+class PossiblyCorruptFileHeader(Warning):
+    """A Warning of inconsistent file meta data in a .shp or .shx header ."""
+
+
 def _min_not_None(m1: float | None, m2: float | None) -> float | None:
     if m1 is None:
         return m2
@@ -233,18 +275,6 @@ for c in FieldType.__members__:
     FIELD_TYPE_ALIASES[c.lower()] = c
     FIELD_TYPE_ALIASES[c.encode("ascii").lower()] = c
     FIELD_TYPE_ALIASES[c.encode("ascii").upper()] = c
-
-
-class PossibleDataLoss(Warning):
-    pass
-
-
-class CorruptDbfRecord(Warning):
-    pass
-
-
-class DbfStringDataLoss(ValueError):
-    pass
 
 
 class Decoder(Protocol):
@@ -922,10 +952,6 @@ def ring_contains_point(coords: PointsT, p: Point2D) -> bool:
     return inside_flag
 
 
-class RingSamplingError(Exception):
-    pass
-
-
 def ring_sample(coords: PointsT, ccw: bool = False) -> Point2D:
     """Return a sample point guaranteed to be within a ring, by efficiently
     finding the first centroid of a coordinate triplet whose orientation
@@ -1108,10 +1134,6 @@ def organize_polygon_rings(
     # add as single exterior without any holes
     polys = [[ext] for ext in exteriors]
     return polys
-
-
-class GeoJSON_Error(Exception):
-    pass
 
 
 # Could be an Enum, but an isinstance check is still needed.
@@ -2731,12 +2753,6 @@ HTML_SIGNATURES_UC = (
 )
 
 
-class UnsuccessfulFileDownload(Warning): ...
-
-
-class PossiblyCorruptFileHeader(Warning): ...
-
-
 # Must be tuple of lower case strings (for str.lower.startswith(<tuple>)),
 # and must not include Windows drive letters.
 SUPPORTED_URL_SCHEMES = ("http", "https")
@@ -2838,18 +2854,6 @@ def ensure_within_bounds(i: int, num_records: int) -> int:
     if i < 0:
         i = range(num_records)[i]
     return i
-
-
-class ShapefileException(Exception):
-    """An exception to handle shapefile specific problems."""
-
-
-class CorruptShpShapeRecord(ShapefileException):
-    """Indicates invalid metadata in Shape record headers."""
-
-
-class dbfFileException(ShapefileException):
-    """Indicates a problem with the .dbf file."""
 
 
 # Use ExitStack to Support not closing opened file objects passed in e.g.(handled by some
@@ -2969,6 +2973,25 @@ class _HasCheckedReadableFile(_FileObjChecker[ReadSeekableBinStream]):
     def file(self) -> ReadSeekableBinStream:
         return self._ensure_file_obj()
 
+    def _check_file_length(self, declared_file_length_B: int) -> None:
+        if declared_file_length_B == self.file_size_B:
+            return
+
+        file_name = getattr(self.file, "name", self.ext)
+        if declared_file_length_B > self.file_size_B:
+            raise self.ExceptionClass(
+                f"Declared file size: {declared_file_length_B} in {file_name} header"
+                f"larger than actual file size: {self.file_size_B} (bytes)"
+            )
+
+        # TODO: If self.strict, raise instead?
+        msg = (
+            f"Declared file size in {file_name} header: {declared_file_length_B} "
+            f"smaller than actual file size: {self.file_size_B} "
+            "(both in bytes)"
+        )
+        warnings.warn(msg, category=PossiblyCorruptFileHeader)
+
 
 class DbfReader(_HasCheckedReadableFile):
     """Reads a dbf file's fields and records."""
@@ -3012,6 +3035,10 @@ class DbfReader(_HasCheckedReadableFile):
             tuple[int, int, int], unpack("<xxxxLHH20x", self.file.read(32))
         )
 
+        declared_file_length_B = (
+            self._dbfHdrLength + self.numRecords * self._record_length
+        )
+        self._check_file_length(declared_file_length_B)
         # read fields
         numFields = (self._dbfHdrLength - 33) // 32
         for __ in range(numFields):
@@ -3073,7 +3100,7 @@ class DbfReader(_HasCheckedReadableFile):
                 f"calculated from the struct format string: {fmt}"
             )
 
-            if fmt_size > self._record_length or self.strict:
+            if num_pad_bytes < 0 or self.strict:
                 raise dbfFileException(msg)
             else:
                 warnings.warn(
@@ -3352,9 +3379,11 @@ class ShxReader(_HasCheckedReadableFile):
 
     def _shxHeader(self) -> None:
         """Reads the header information from a .shx file."""
-        # File length (16-bit word * 2 = bytes) - header length
+        # Byte 24: File length (in 16-bit words (pairs of bytes)) (Esri spec, p4, Table 1)
         self.file.seek(24)
-        shx_records_length_B = (unpack(">i", self.file.read(4))[0] * 2) - 100
+        declared_file_length_B = 2 * unpack(">i", self.file.read(4))[0]
+        self._check_file_length(declared_file_length_B)
+        shx_records_length_B = declared_file_length_B - 100
         self.numShapes = shx_records_length_B // 8
 
     @functools.cache
@@ -3429,15 +3458,7 @@ class ShpReader(_HasCheckedReadableFile):
                 for m_bound in unpack("<2d", self.file.read(16))
             )
         )
-
-        if self.file_size_B != self.shp_file_size_B:
-            file_name = getattr(self.file, "name", ".shp")
-            msg = (
-                f"Declared file size in {file_name} header: {self.shp_file_size_B} "
-                f"not equal to actual file size: {self.file_size_B} "
-                "(both in bytes)"
-            )
-            warnings.warn(msg, category=PossiblyCorruptFileHeader)
+        self._check_file_length(self.shp_file_size_B)
 
     @functools.cache  # Only read through the shape headers (e.g. on disk), at most once.
     def _headers_cached_gen(self) -> Iterator[ShapeHeaderInfoT]:
