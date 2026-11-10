@@ -3593,12 +3593,6 @@ class ShpReader(_HasCheckedReadableFile):
 
         bbox = BBox(*bbox) if bbox is not None else None
 
-        # Found shapefiles which report incorrect
-        # shp file length in the header. Can't trust
-        # that so we seek to the end of the file
-        # and figure it out.
-        # self.file.seek(0, 2)
-        # file_size_B = self.file.tell()
         if shape_lengths_B is not None:
             pos = 108  # Skip first shape's header
             # Iterate exactly the number of shapes as shape
