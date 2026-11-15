@@ -2886,7 +2886,7 @@ class _HasExitStack:
         self.exit_stack.close()
 
 
-FileObjT = TypeVar("FileObjT", bound=ReadableBinStream | WriteSeekableBinStream)
+FileObjT = TypeVar("FileObjT", bound=Union[ReadableBinStream, WriteSeekableBinStream])
 
 
 class _HasFileObj(Protocol[FileObjT]):
