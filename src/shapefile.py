@@ -23,7 +23,7 @@ import time
 import warnings
 import zipfile
 from collections.abc import Container, Iterable, Iterator, Reversible, Sequence
-from contextlib import AbstractContextManager, ExitStack
+from contextlib import ExitStack
 from datetime import date, datetime
 from os import PathLike
 from pathlib import Path
@@ -2862,9 +2862,18 @@ def ensure_within_bounds(i: int, num_records: int) -> int:
 # This will only ever hold at most one context manager.
 # But an ExitStack is the right tool for the job
 # when the number of context manager(s) depends on user input.
-class _HasExitStack(AbstractContextManager["_HasExitStack", None]):
+class _HasExitStack:
+    """This mixin / base class lets all 8 Reader and Writer
+    instances be used as context managers without
+    repeating the typed __exit__signature, and without
+    adding ExitStack's other 'public' methods to their API.
+    """
+
     def __init__(self) -> None:
         self.exit_stack = ExitStack()
+
+    def __enter__(self) -> _HasExitStack:
+        return self
 
     def __exit__(
         self,
