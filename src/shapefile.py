@@ -10,7 +10,6 @@ from __future__ import annotations
 
 __version__ = "3.1.9.dev"
 
-import abc
 import array
 import functools
 import io
@@ -23,7 +22,7 @@ import time
 import warnings
 import zipfile
 from collections.abc import Container, Iterable, Iterator, Reversible, Sequence
-from contextlib import AbstractContextManager, ExitStack
+from contextlib import ExitStack
 from datetime import date, datetime
 from os import PathLike
 from pathlib import Path
@@ -2862,9 +2861,18 @@ def ensure_within_bounds(i: int, num_records: int) -> int:
 # This will only ever hold at most one context manager.
 # But an ExitStack is the right tool for the job
 # when the number of context manager(s) depends on user input.
-class _HasExitStack(AbstractContextManager["_HasExitStack", None]):
+class _HasExitStack:
+    """This mixin / base class lets all 8 Reader and Writer
+    instances be used as context managers without
+    repeating the typed __exit__ signature, and without
+    adding ExitStack's other 'public' methods to their API.
+    """
+
     def __init__(self) -> None:
         self.exit_stack = ExitStack()
+
+    def __enter__(self) -> _HasExitStack:
+        return self
 
     def __exit__(
         self,
@@ -2878,74 +2886,55 @@ class _HasExitStack(AbstractContextManager["_HasExitStack", None]):
         self.exit_stack.close()
 
 
-FileProtoT = TypeVar("FileProtoT")
+FileObjT = TypeVar("FileObjT", bound=Union[ReadableBinStream, WriteSeekableBinStream])
 
 
-class _FileObjChecker(_HasExitStack, Generic[FileProtoT]):
-    """Base class that verifies its file-like object."""
+class _HasFileObj(Protocol[FileObjT]):
+    _file: str | os.PathLike[Any] | FileObjT
+    FileObj: type[FileObjT]
+    mode: Literal["rb", "w+b"]
+    ext: Literal[".shp", ".shx", ".dbf", ""]
+    exit_stack: ExitStack
+    ExceptionClass: type[ShapefileException]
 
-    @property
-    @abc.abstractmethod
-    def FileProto(self) -> type[FileProtoT]: ...
 
-    @property
-    @abc.abstractmethod
-    def new_file_obj_mode(self) -> Literal["rb", "w+b"]: ...
+def _ensure_file_obj(file_mgr: _HasFileObj[FileObjT]) -> FileObjT:
 
-    @property
-    @abc.abstractmethod
-    def ext(self) -> Literal[".shp", ".shx", ".dbf", None]: ...
+    file = file_mgr._file
+    FileObj = file_mgr.FileObj
+    mode = file_mgr.mode
+    ext = file_mgr.ext
+    exit_stack = file_mgr.exit_stack
+    ExceptionClass = file_mgr.ExceptionClass
 
-    ExceptionClass = ShapefileException
+    if isinstance(file, (str, os.PathLike)):
+        path = Path(file).with_suffix(ext)
 
-    def __init__(
-        self,
-        file: str | os.PathLike[Any] | FileProtoT | None,
-    ):
-        super().__init__()
-        if self.ext is None:
-            return
-        self._file: Path | FileProtoT | None
-        if isinstance(file, (str, os.PathLike)):
-            self._file = Path(file).with_suffix(self.ext)
-        else:
-            self._file = file
+        parent = path.parent
+        if parent:
+            parent.mkdir(exist_ok=True, parents=True)
+        fp = path.open(mode)
 
-    def _ensure_file_obj(
-        self,
-        f: str | os.PathLike[Any] | FileProtoT | None = None,
-    ) -> FileProtoT:
-        # Also used by Writer on constituent files self._shp & self._shx
+        # Only push files created here to the exit stack.
+        # The user must close their own file objects.
+        exit_stack.enter_context(fp)
+        return cast(FileObjT, fp)
 
-        f = f or self._file
+    # See Minor hack below, to get these instance checks to work.
+    if isinstance(file, FileObj):
+        return file
 
-        if isinstance(f, (str, os.PathLike)):
-            path = Path(f)
-            dir_ = path.parent
-            if dir_:
-                dir_.mkdir(exist_ok=True, parents=True)
-            fp = path.open(self.new_file_obj_mode)
+    # Ugly, but perhaps needed to avoid weird Python 3.14
+    # specific bug in run_benchmarks.py on Windows
+    # if (
+    #     (attrs := getattr(FileObj, "__protocol_attrs__", None))
+    #     and all(hasattr(file, attr) for attr in attrs)
+    # ):
+    #     return file
 
-            # Only push files created here to the exit stack.
-            # The user must close their own file objects.
-            self.exit_stack.enter_context(fp)
-            return cast(FileProtoT, fp)
-
-        # See Minor hack below.
-        if isinstance(f, self.FileProto):
-            return f
-
-        # Ugly, but perhaps needed to avoid weird Python 3.14
-        # specific bug in run_benchmarks.py on Windows
-        # if (
-        #     (attrs := getattr(self.FileProto, "__protocol_attrs__", None))
-        #     and all(hasattr(f, attr) for attr in attrs)
-        # ):
-        #     return f
-
-        raise self.ExceptionClass(
-            f"Unsupported file-like object: {f}.  Must satisfy: {self.FileProto}"
-        )
+    raise ExceptionClass(
+        f"Unsupported file-like object: {file}.  Must satisfy: {FileObj}"
+    )
 
 
 # Minor hack.  Relies on Protocols being ABC subclasses.
@@ -2960,10 +2949,15 @@ ReadSeekableBinStream.register(tempfile._TemporaryFileWrapper)
 WriteSeekableBinStream.register(tempfile._TemporaryFileWrapper)
 
 
-class _HasCheckedReadableFile(_FileObjChecker[ReadSeekableBinStream]):
-    def __init__(self, file: str | PathLike[Any] | ReadSeekableBinStream):
+class _HasCheckedReadableFile(_HasExitStack, _HasFileObj[ReadSeekableBinStream]):
+    FileObj = ReadSeekableBinStream
+    mode = "rb"
+    ext = ""
+    ExceptionClass = ShapefileException
 
-        super().__init__(file)
+    def __init__(self, file: str | PathLike[Any] | ReadSeekableBinStream):
+        super().__init__()
+        self._file = file
 
         self.file.seek(0, 2)  # offset=0, whence = 2 => EOF
         self.file_size_B = self.file.tell()
@@ -2971,7 +2965,7 @@ class _HasCheckedReadableFile(_FileObjChecker[ReadSeekableBinStream]):
 
     @functools.cached_property
     def file(self) -> ReadSeekableBinStream:
-        return self._ensure_file_obj()
+        return _ensure_file_obj(self)
 
     def _check_file_length(self, declared_file_length_B: int) -> None:
         if declared_file_length_B == self.file_size_B:
@@ -2996,8 +2990,6 @@ class _HasCheckedReadableFile(_FileObjChecker[ReadSeekableBinStream]):
 class DbfReader(_HasCheckedReadableFile):
     """Reads a dbf file's fields and records."""
 
-    FileProto = ReadSeekableBinStream
-    new_file_obj_mode = "rb"
     ext = ".dbf"
     ExceptionClass = dbfFileException
 
@@ -4327,16 +4319,19 @@ def _try_to_flush_file_obj(f: WriteSeekableBinStream | str | None) -> None:
         pass
 
 
-class _HasCheckedWriteableFile(_FileObjChecker[WriteSeekableBinStream]):
-    FileProto = WriteSeekableBinStream
-    new_file_obj_mode = "w+b"
+class _HasCheckedWriteableFile(_HasExitStack, _HasFileObj[WriteSeekableBinStream]):
+    FileObj = WriteSeekableBinStream
+    mode = "w+b"
+    ext = ""
+    ExceptionClass = ShapefileException
 
     def __init__(self, file: str | PathLike[Any] | WriteSeekableBinStream):
-        super().__init__(file)
+        self._file = file
+        super().__init__()
 
     @functools.cached_property
     def file(self) -> WriteSeekableBinStream:
-        return self._ensure_file_obj()
+        return _ensure_file_obj(self)
 
     def is_open(self) -> bool:
         return bool(self.file and _is_file_obj_open(self.file))
