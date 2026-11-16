@@ -1,3 +1,7 @@
+VERSION 3.1.9
+2026-11-16
+	* Write EOF byte after .dbf file body, but only logger.info it if it's missing (PyShp has never written them until now).  Raises if strict=True.
+
 VERSION 3.1.8
 2026-11-07
 	* Avoid unnecessary seeks in Reader.iterShapeRecords with a bbox.  Removed lots of deletion field checks (prefer dbfReader.data_fields). Replace two while loops with simpler alternatives.
