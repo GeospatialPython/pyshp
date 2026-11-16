@@ -4691,6 +4691,30 @@ class DbfWriter(_WriterBase):
         self.recNum += 1
 
 
+class _ShpWriterInfo(Protocol):
+    """The info about a .shp file, needed to write its .shx file."""
+
+    @property
+    def shapeType(self) -> int | None: ...
+    @property
+    def shpNum(self) -> int: ...
+    @property
+    def bbox(self) -> BBox | None: ...
+    @property
+    def zbox(self) -> ZBox | None: ...
+    @property
+    def mbox(self) -> MBox | None: ...
+
+
+def _pad_out_shp_or_shx_header(file: WriteSeekableBinStream) -> None:
+    # Initiate with empty headers, to be finalized upon closing
+    file.seek(0)
+    file.write(b"9" * 100)
+
+
+def _shp_or_shx_header(shp_info: _ShpWriterInfo) -> None: ...
+
+
 class _ShpShxHeaderWriter(_WriterBase):
     def __init__(self, file: str | PathLike[Any] | WriteSeekableBinStream):
         super().__init__(file=file)
@@ -4721,7 +4745,7 @@ class _ShpShxHeaderWriter(_WriterBase):
         # Not sure what that means, so for now just setting to 0s, which is the same behavior as in previous versions.
         # This would also make sense since the Z and M bounds are similarly set to 0 for non-Z/M type shapefiles.
         # bbox: BBox = (0, 0, 0, 0)
-        bbox = shp_info._bbox or (0, 0, 0, 0)
+        bbox = shp_info.bbox or (0, 0, 0, 0)
         try:
             f.write(pack("<4d", *bbox))
         except StructError:
@@ -4732,12 +4756,12 @@ class _ShpShxHeaderWriter(_WriterBase):
         # Elevation
         # As per the ESRI shapefile spec, the zbox for non-Z type shapefiles are set to 0s
         # zbox : ZBox = (0, 0).  We also do this for empty shapefiles and null-shapes only files.
-        zbox = shp_info._zbox or (0, 0)
+        zbox = shp_info.zbox or (0, 0)
 
         # Ms
         # As per the ESRI shapefile spec, the mbox for non-M type shapefiles are set to 0s
         # mbox: Mbox = (0, 0).  We also do this for empty shapefiles and null-shapes only files.
-        mbox = shp_info._mbox or (0, 0)
+        mbox = shp_info.mbox or (0, 0)
 
         # Try writing
         try:
@@ -4748,7 +4772,10 @@ class _ShpShxHeaderWriter(_WriterBase):
             )
 
 
-class _ShpWriterInfo(_ShpShxHeaderWriter):
+class ShpWriter(_ShpShxHeaderWriter):
+    ext = ".shp"
+    _ctx = _WriteableFileCtx(ext=".shp")
+
     def __init__(
         self,
         shp: str | PathLike[Any] | WriteSeekableBinStream,
@@ -4761,25 +4788,6 @@ class _ShpWriterInfo(_ShpShxHeaderWriter):
         self._bbox: BBox | None = None
         self._zbox: ZBox | None = None
         self._mbox: MBox | None = None
-
-    def bbox(self) -> BBox | None:
-        """Returns the current bounding box for the shapefile which is
-        the lower-left and upper-right corners. It does not contain the
-        elevation or measure extremes."""
-        return self._bbox
-
-    def zbox(self) -> ZBox | None:
-        """Returns the current z extremes for the shapefile."""
-        return self._zbox
-
-    def mbox(self) -> MBox | None:
-        """Returns the current m extremes for the shapefile."""
-        return self._mbox
-
-
-class ShpWriter(_ShpWriterInfo):
-    ext = ".shp"
-    _ctx = _WriteableFileCtx(ext=".shp")
 
     def _header(self) -> None:
         super()._shp_or_shx_header(shp_info=self)
@@ -4849,6 +4857,23 @@ class ShpWriter(_ShpWriterInfo):
         else:
             # first time mbox is being set
             self._mbox = mbox
+
+    @property
+    def bbox(self) -> BBox | None:
+        """Returns the current bounding box for the shapefile which is
+        the lower-left and upper-right corners. It does not contain the
+        elevation or measure extremes."""
+        return self._bbox
+
+    @property
+    def zbox(self) -> ZBox | None:
+        """Returns the current z extremes for the shapefile."""
+        return self._zbox
+
+    @property
+    def mbox(self) -> MBox | None:
+        """Returns the current m extremes for the shapefile."""
+        return self._mbox
 
     def shape(
         self,
