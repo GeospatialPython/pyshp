@@ -8,7 +8,7 @@ Compatible with Python versions >=3.9
 
 from __future__ import annotations
 
-__version__ = "3.1.9.dev"
+__version__ = "3.1.9"
 
 import array
 import functools
@@ -23,6 +23,7 @@ import warnings
 import zipfile
 from collections.abc import Container, Iterable, Iterator, Reversible, Sequence
 from contextlib import ExitStack
+from dataclasses import dataclass
 from datetime import date, datetime
 from os import PathLike
 from pathlib import Path
@@ -2886,34 +2887,40 @@ class _HasExitStack:
         self.exit_stack.close()
 
 
-FileObjT = TypeVar("FileObjT", bound=Union[ReadableBinStream, WriteSeekableBinStream])
+FileObjT = TypeVar(
+    "FileObjT", bound=Union[ReadSeekableBinStream, WriteSeekableBinStream]
+)
 
 
-class _HasFileObj(Protocol[FileObjT]):
-    _file: str | os.PathLike[Any] | FileObjT
-    FileObj: type[FileObjT]
-    mode: Literal["rb", "w+b"]
-    ext: Literal[".shp", ".shx", ".dbf", ""]
-    exit_stack: ExitStack
-    ExceptionClass: type[ShapefileException]
+@dataclass(frozen=True)
+class _ReadableFileCtx:
+    ext: Literal[".shp", ".shx", ".dbf"]
+    mode: Literal["rb"] = "rb"
+    ExceptionClass: type[ShapefileException] = ShapefileException
+    FileObj = ReadSeekableBinStream
 
 
-def _ensure_file_obj(file_mgr: _HasFileObj[FileObjT]) -> FileObjT:
+@dataclass(frozen=True)
+class _WriteableFileCtx:
+    ext: Literal[".shp", ".shx", ".dbf"]
+    mode: Literal["w+b"] = "w+b"
+    ExceptionClass: type[ShapefileException] = ShapefileException
+    FileObj = WriteSeekableBinStream
 
-    file = file_mgr._file
-    FileObj = file_mgr.FileObj
-    mode = file_mgr.mode
-    ext = file_mgr.ext
-    exit_stack = file_mgr.exit_stack
-    ExceptionClass = file_mgr.ExceptionClass
+
+def _ensure_file_obj(
+    file: str | os.PathLike[Any] | FileObjT,
+    exit_stack: ExitStack,
+    ctx: _ReadableFileCtx | _WriteableFileCtx,
+) -> FileObjT:
 
     if isinstance(file, (str, os.PathLike)):
-        path = Path(file).with_suffix(ext)
+        path = Path(file).with_suffix(ctx.ext)
 
         parent = path.parent
         if parent:
             parent.mkdir(exist_ok=True, parents=True)
-        fp = path.open(mode)
+        fp = path.open(ctx.mode)
 
         # Only push files created here to the exit stack.
         # The user must close their own file objects.
@@ -2921,7 +2928,7 @@ def _ensure_file_obj(file_mgr: _HasFileObj[FileObjT]) -> FileObjT:
         return cast(FileObjT, fp)
 
     # See Minor hack below, to get these instance checks to work.
-    if isinstance(file, FileObj):
+    if isinstance(file, ctx.FileObj):
         return file
 
     # Ugly, but perhaps needed to avoid weird Python 3.14
@@ -2932,8 +2939,8 @@ def _ensure_file_obj(file_mgr: _HasFileObj[FileObjT]) -> FileObjT:
     # ):
     #     return file
 
-    raise ExceptionClass(
-        f"Unsupported file-like object: {file}.  Must satisfy: {FileObj}"
+    raise ctx.ExceptionClass(
+        f"Unsupported file-like object: {file}.  Must satisfy: {ctx.FileObj}"
     )
 
 
@@ -2949,47 +2956,47 @@ ReadSeekableBinStream.register(tempfile._TemporaryFileWrapper)
 WriteSeekableBinStream.register(tempfile._TemporaryFileWrapper)
 
 
-class _HasCheckedReadableFile(_HasExitStack, _HasFileObj[ReadSeekableBinStream]):
-    FileObj = ReadSeekableBinStream
-    mode = "rb"
-    ext = ""
-    ExceptionClass = ShapefileException
+def _ensure_readable_file_obj(
+    file: str | os.PathLike[Any] | ReadSeekableBinStream,
+    exit_stack: ExitStack,
+    ctx: _ReadableFileCtx,
+) -> tuple[ReadSeekableBinStream, int]:
 
-    def __init__(self, file: str | PathLike[Any] | ReadSeekableBinStream):
-        super().__init__()
-        self._file = file
+    file_obj = _ensure_file_obj(file, exit_stack, ctx)
+    file_obj.seek(0, 2)  # offset=0, whence = 2 => EOF
+    file_size_B = file_obj.tell()
 
-        self.file.seek(0, 2)  # offset=0, whence = 2 => EOF
-        self.file_size_B = self.file.tell()
+    return file_obj, file_size_B
 
-    @functools.cached_property
-    def file(self) -> ReadSeekableBinStream:
-        return _ensure_file_obj(self)
 
-    def _check_file_length(self, declared_file_length_B: int) -> None:
-        if declared_file_length_B == self.file_size_B:
-            return
+def _check_file_length(
+    declared_file_length_B: int,
+    actual_file_size_B: int,
+    file: ReadSeekableBinStream,
+    ctx: _ReadableFileCtx,
+) -> None:
+    if declared_file_length_B == actual_file_size_B:
+        return
 
-        file_name = getattr(self.file, "name", self.ext)
-        if declared_file_length_B > self.file_size_B:
-            raise self.ExceptionClass(
-                f"Declared file size: {declared_file_length_B} in {file_name} header"
-                f"larger than actual file size: {self.file_size_B} (bytes)"
-            )
-
-        msg = (
-            f"Declared file size in {file_name} header: {declared_file_length_B} "
-            f"smaller than actual file size: {self.file_size_B} "
-            "(both in bytes)"
+    file_name = getattr(file, "name", ctx.ext)
+    if declared_file_length_B > actual_file_size_B:
+        raise ctx.ExceptionClass(
+            f"Declared file size: {declared_file_length_B} in {file_name} header"
+            f"larger than actual file size: {actual_file_size_B} (bytes)"
         )
-        warnings.warn(msg, category=PossiblyCorruptFileHeader)
+
+    msg = (
+        f"Declared file size in {file_name} header: {declared_file_length_B} "
+        f"smaller than actual file size: {actual_file_size_B} "
+        "(both in bytes)"
+    )
+    warnings.warn(msg, category=PossiblyCorruptFileHeader)
 
 
-class DbfReader(_HasCheckedReadableFile):
+class DbfReader(_HasExitStack):
     """Reads a dbf file's fields and records."""
 
-    ext = ".dbf"
-    ExceptionClass = dbfFileException
+    _ctx = _ReadableFileCtx(ext=".dbf", ExceptionClass=dbfFileException)
 
     def __init__(
         self,
@@ -2999,7 +3006,11 @@ class DbfReader(_HasCheckedReadableFile):
         encodingErrors: str = "strict",
         strict: bool = False,
     ):
-        super().__init__(file=dbf)
+        super().__init__()
+
+        self.file, self.file_size_B = _ensure_readable_file_obj(
+            dbf, self.exit_stack, self._ctx
+        )
 
         self.encoding = encoding
         self.encodingErrors = encodingErrors
@@ -3044,7 +3055,9 @@ class DbfReader(_HasCheckedReadableFile):
             logger.info(msg)
 
         else:
-            self._check_file_length(declared_file_length_B)
+            _check_file_length(
+                declared_file_length_B, self.file_size_B, self.file, self._ctx
+            )
 
     def __len__(self) -> int:
         """Returns the number of records in the .dbf file."""
@@ -3381,20 +3394,21 @@ class DbfReader(_HasCheckedReadableFile):
         self.file.seek(self._dbfHdrLength + (index * recSize))
 
 
-class ShxReader(_HasCheckedReadableFile):
+class ShxReader(_HasExitStack):
     """Reads an shx file (a file of file positions
     of shapes in a .shp file).
     """
 
-    FileProto = ReadSeekableBinStream
-    new_file_obj_mode = "rb"
-    ext = ".shx"
+    _ctx = _ReadableFileCtx(ext=".shx")
 
     def __init__(
         self,
         shx: str | PathLike[Any] | ReadSeekableBinStream,
     ):
-        super().__init__(file=shx)
+        super().__init__()
+        self.file, self.file_size_B = _ensure_readable_file_obj(
+            shx, self.exit_stack, self._ctx
+        )
         self.numShapes: int
         self._shxHeader()
         self._shxRecords_16bw: array.array[int] | None = None
@@ -3404,7 +3418,9 @@ class ShxReader(_HasCheckedReadableFile):
         # Byte 24: File length (in 16-bit words (pairs of bytes)) (Esri spec, p4, Table 1)
         self.file.seek(24)
         declared_file_length_B = 2 * unpack(">i", self.file.read(4))[0]
-        self._check_file_length(declared_file_length_B)
+        _check_file_length(
+            declared_file_length_B, self.file_size_B, self.file, self._ctx
+        )
         shx_records_length_B = declared_file_length_B - 100
         self.numShapes = shx_records_length_B // 8
 
@@ -3436,21 +3452,19 @@ class ShxReader(_HasCheckedReadableFile):
 ShapeHeaderInfoT = tuple[int, int, int]
 
 
-class ShpReader(_HasCheckedReadableFile):
+class ShpReader(_HasExitStack):
     """Reads a .shp file."""
 
-    FileProto = ReadSeekableBinStream
-    new_file_obj_mode = "rb"
-    ext = ".shp"
+    _ctx = _ReadableFileCtx(ext=".shp")
 
     def __init__(
         self,
         shp: str | PathLike[Any] | ReadSeekableBinStream,
     ):
-        super().__init__(file=shp)
-        # self.bbox: BBox
-        # self.zbox: ZBox
-        # self.mbox: MBox
+        super().__init__()
+        self.file, self.file_size_B = _ensure_readable_file_obj(
+            shp, self.exit_stack, self._ctx
+        )
         self.shapeType: int
         self._shpHeader()
         self.headers_cache: list[ShapeHeaderInfoT] = []
@@ -3480,7 +3494,7 @@ class ShpReader(_HasCheckedReadableFile):
                 for m_bound in unpack("<2d", self.file.read(16))
             )
         )
-        self._check_file_length(self.shp_file_size_B)
+        _check_file_length(self.shp_file_size_B, self.file_size_B, self.file, self._ctx)
 
     @functools.cache  # Only read through the shape headers (e.g. on disk), at most once.
     def _headers_cached_gen(self) -> Iterator[ShapeHeaderInfoT]:
@@ -4349,11 +4363,8 @@ def _try_to_flush_file_obj(f: WriteSeekableBinStream | str | None) -> None:
         pass
 
 
-class _HasCheckedWriteableFile(_HasExitStack, _HasFileObj[WriteSeekableBinStream]):
-    FileObj = WriteSeekableBinStream
-    mode = "w+b"
-    ext = ""
-    ExceptionClass = ShapefileException
+class _HasCheckedWriteableFile(_HasExitStack):
+    _ctx = _WriteableFileCtx(ext=".shp")
 
     def __init__(self, file: str | PathLike[Any] | WriteSeekableBinStream):
         self._file = file
@@ -4361,7 +4372,7 @@ class _HasCheckedWriteableFile(_HasExitStack, _HasFileObj[WriteSeekableBinStream
 
     @functools.cached_property
     def file(self) -> WriteSeekableBinStream:
-        return _ensure_file_obj(self)
+        return _ensure_file_obj(self._file, self.exit_stack, self._ctx)
 
     def is_open(self) -> bool:
         return bool(self.file and _is_file_obj_open(self.file))
@@ -4379,8 +4390,7 @@ class _HasCheckedWriteableFile(_HasExitStack, _HasFileObj[WriteSeekableBinStream
 class DbfWriter(_HasCheckedWriteableFile):
     """Writes .dbf files (dBASE database files), in particular those of Shapefiles."""
 
-    ext = ".dbf"
-    ExceptionClass = dbfFileException
+    _ctx = _WriteableFileCtx(ext=".dbf", ExceptionClass=dbfFileException)
 
     def __init__(
         self,
@@ -4483,6 +4493,7 @@ class DbfWriter(_HasCheckedWriteableFile):
 
     def close(self) -> None:
         # EOF byte (0x1a from dbf spec https://en.wikipedia.org/wiki/.dbf#File_format_of_Level_5_DOS_dBASE)
+        self.file.seek(0, 2)
         self.file.write(b"\x1a")
         super().close()
 
@@ -4772,6 +4783,7 @@ class _ShpWriterInfo(_ShpShxHeaderWriter):
 
 class ShpWriter(_ShpWriterInfo):
     ext = ".shp"
+    _ctx = _WriteableFileCtx(ext=".shp")
 
     def _header(self) -> None:
         super()._shp_or_shx_header(shp_info=self)
@@ -4927,6 +4939,7 @@ class ShpWriter(_ShpWriterInfo):
 
 class ShxWriter(_ShpShxHeaderWriter):
     ext = ".shx"
+    _ctx = _WriteableFileCtx(ext=".shx")
 
     def __init__(
         self,
@@ -4961,13 +4974,6 @@ class ShxWriter(_ShpShxHeaderWriter):
 
 class Writer(_HasExitStack):
     """Provides write support for ESRI Shapefiles."""
-
-    # W = TypeVar("W", bound=WriteSeekableBinStream)
-
-    FileProto = WriteSeekableBinStream
-    new_file_obj_mode = "w+b"
-    ext = None
-    ExceptionClass = ShapefileException
 
     def __init__(
         self,
