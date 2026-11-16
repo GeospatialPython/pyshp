@@ -1336,7 +1336,7 @@ def test_reader_corrupt_files(tmp_path):
             stopped = sf.dbf.tell()
             sf.dbf.seek(0, 2)
             end = sf.dbf.tell()
-            assert (end - stopped) == 5
+            assert (end - stopped) == 5 + 1 # length of byte string above, plus .dbf EOF byte
             # assert that shapes are read without error
             assert len(sf.shapes()) == 10
             # assert that didn't read the extra junk data

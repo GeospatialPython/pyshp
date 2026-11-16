@@ -15,9 +15,7 @@ from typing import cast, Iterable
 import shapefile
 
 # For shapefiles from https://github.com/JamesParrott/PyShp_test_shapefile
-DEFAULT_PYSHP_TEST_REPO = (
-    rf"{os.getenv('USERPROFILE')}\Coding\repos\PyShp_test_shapefile"
-)
+DEFAULT_PYSHP_TEST_REPO = Path(__file__).parent.parent.parent / "PyShp_test_shapefile"
 PYSHP_TEST_REPO = Path(os.getenv("PYSHP_TEST_REPO", DEFAULT_PYSHP_TEST_REPO))
 REPO_ROOT = Path(__file__).parent
 

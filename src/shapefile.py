@@ -2961,7 +2961,6 @@ class _HasCheckedReadableFile(_HasExitStack, _HasFileObj[ReadSeekableBinStream])
 
         self.file.seek(0, 2)  # offset=0, whence = 2 => EOF
         self.file_size_B = self.file.tell()
-        self.file.seek(0)
 
     @functools.cached_property
     def file(self) -> ReadSeekableBinStream:
@@ -2978,7 +2977,6 @@ class _HasCheckedReadableFile(_HasExitStack, _HasFileObj[ReadSeekableBinStream])
                 f"larger than actual file size: {self.file_size_B} (bytes)"
             )
 
-        # TODO: If self.strict, raise instead?
         msg = (
             f"Declared file size in {file_name} header: {declared_file_length_B} "
             f"smaller than actual file size: {self.file_size_B} "
@@ -3012,6 +3010,42 @@ class DbfReader(_HasCheckedReadableFile):
 
         self._dbfHeader()
 
+        self.file.seek(-1, 2)  # one byte before EOF
+        self._last_byte = self.file.read(1)
+        last_byte_int = int.from_bytes(self._last_byte, byteorder="big")
+
+        declared_file_length_B = (
+            self._dbfHdrLength + self.numRecords * self._record_length + 1
+        )
+
+        if declared_file_length_B == self.file_size_B:
+            if last_byte_int != 0x1A:
+                msg = (
+                    "Actual file size matches declared file size (header and records size + 1) "
+                    f"but EOF byte: {last_byte_int:#x} is not 0x1a "
+                )
+                if self.strict:
+                    raise dbfFileException(msg)
+                warnings.warn(msg)
+        elif declared_file_length_B - 1 == self.file_size_B:
+            # Missing EOF byte
+            msg = (
+                "File length is exactly the declared header and records size, "
+                "but misses the EOF byte. "
+            )
+            if last_byte_int == 0x1A:
+                msg += f"Last byte: {last_byte_int:#x} is not 0x1a (EOF byte special value) "
+            else:
+                msg += "Last byte is 0x1a, but that value could also be from the last record's data. "
+            msg += "Note: In previous versions of PyShp, Writers did not output a .dbf EOF byte "
+            if self.strict:
+                raise PossiblyCorruptFileHeader(msg)
+            msg += "so no warning will be given.  Set strict=True to raise an Exception for this instead. "
+            logger.info(msg)
+
+        else:
+            self._check_file_length(declared_file_length_B)
+
     def __len__(self) -> int:
         """Returns the number of records in the .dbf file."""
         return self.numRecords
@@ -3027,10 +3061,6 @@ class DbfReader(_HasCheckedReadableFile):
             tuple[int, int, int], unpack("<xxxxLHH20x", self.file.read(32))
         )
 
-        declared_file_length_B = (
-            self._dbfHdrLength + self.numRecords * self._record_length
-        )
-        self._check_file_length(declared_file_length_B)
         # read fields
         numFields = (self._dbfHdrLength - 33) // 32
         for __ in range(numFields):
@@ -3064,7 +3094,7 @@ class DbfReader(_HasCheckedReadableFile):
         return [Field("DeletionFlag", FieldType.C, 1, 0), *self.data_fields]
 
     def _record_fmt(self, fields: Container[str] | None = None) -> str:
-        """Calculates the struct format string for of a .dbf record. Optional 'fields' arg
+        """Calculates the struct format string for a .dbf record. Optional 'fields' arg
         specifies which fieldnames to unpack and which to ignore. Note that this
         The DeletionFlag is always included at index 0 (to correctly unpack the dbf record).
         The items in fields may appear in any order.
@@ -4450,6 +4480,11 @@ class DbfWriter(_HasCheckedWriteableFile):
 
         # Terminator (0x0d from dbf spec https://en.wikipedia.org/wiki/.dbf#File_header)
         f.write(b"\r")
+
+    def close(self) -> None:
+        # EOF byte (0x1a from dbf spec https://en.wikipedia.org/wiki/.dbf#File_format_of_Level_5_DOS_dBASE)
+        self.file.write(b"\x1a")
+        super().close()
 
     def record(
         self,
