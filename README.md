@@ -8,8 +8,8 @@ The Python Shapefile Library (PyShp) reads and writes ESRI Shapefiles in pure Py
 
 - **Author**: [Joel Lawhead](https://github.com/GeospatialPython)
 - **Maintainers**: [James Parrott](https://github.com/JamesParrott) & [Karim Bahgat](https://github.com/karimbahgat)
-- **Version**: 3.1.9.dev
-- **Date**: 9th Nov 2026
+- **Version**: 3.1.9
+- **Date**: 16th Nov 2026
 - **License**: [MIT](https://github.com/GeospatialPython/pyshp/blob/master/LICENSE.TXT)
 
 ## Contents
@@ -94,15 +94,15 @@ part of your geospatial project.
 # Recent version Changes
 See also the Older version Changes section below
 
+## 3.1.9
+### Bug fix
+ - Write EOF byte after .dbf file body, but only logger.info it if it's missing (PyShp has never written them until now).  Raises if strict=True.
+
 ## 3.1.8
 ### Internal code improvements
  - Avoid unnecessary seeks in Reader.iterShapeRecords with a bbox.
  - Removed lots of deletion field checks (prefer dbfReader.data_fields).
  - Replace two while loops with simpler alternatives.
-
-## 3.1.7
-### Bug fix
- - Non-positive .shp record lengths (@lunnuyenhi-dev) and mismatched shape types now raise CorruptShpShapeRecord instead of hanging forever, raising a KeyError, or passing silently.
 
 
 # The Basics
@@ -1513,6 +1513,10 @@ Zac Miller
 ```
 
 # Older version changes
+
+## 3.1.7
+### Bug fix
+ - Non-positive .shp record lengths (@lunnuyenhi-dev) and mismatched shape types now raise CorruptShpShapeRecord instead of hanging forever, raising a KeyError, or passing silently.
 
 ## 3.1.6
 ### Feature
