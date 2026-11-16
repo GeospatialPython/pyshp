@@ -4399,6 +4399,10 @@ class DbfWriter(_WriterBase):
         # Keep kwargs even though unused, to preserve PyShp 2.4 API
         **kwargs: Any,
     ):
+
+        super().__init__(file=dbf)
+        _reserve_bytes_for_shp_or_shx_header(self.file)
+
         super().__init__(file=dbf)
 
         self.encoding = encoding
@@ -4706,73 +4710,65 @@ class _ShpWriterInfo(Protocol):
     def mbox(self) -> MBox | None: ...
 
 
-def _pad_out_shp_or_shx_header(file: WriteSeekableBinStream) -> None:
-    # Initiate with empty headers, to be finalized upon closing
+def _reserve_bytes_for_shp_or_shx_header(file: WriteSeekableBinStream) -> None:
+    # Write 100 bytes of
     file.seek(0)
     file.write(b"9" * 100)
 
 
-def _shp_or_shx_header(shp_info: _ShpWriterInfo) -> None: ...
+def _shp_or_shx_header(
+    f: WriteSeekableBinStream,
+    shp_info: _ShpWriterInfo,
+    file_size_B: int,
+) -> None:
+    """Writes the specified header type to the specified file-like object.
+    Several of the shapefile formats are so similar that a single generic
+    method to read or write them is warranted."""
+    f.seek(0)
+    # File code, Unused bytes
+    f.write(pack(">6i", 9994, 0, 0, 0, 0, 0))
+
+    # File length (Bytes / 2 = 16-bit words).
+    # Hook for shx and shp specific subclasses to implement.
+
+    size_16b_words = file_size_B // 2
+    f.write(pack(">i", size_16b_words))
+
+    f.write(pack("<2i", 1000, shp_info.shapeType or NULL))
+
+    # BBox, the shapefile's bounding box (lower left, upper right)
+    # In such cases of empty shapefiles, ESRI spec says the bbox values are 'unspecified'.
+    # Not sure what that means, so for now just setting to 0s, which is the same behavior as in previous versions.
+    # This would also make sense since the Z and M bounds are similarly set to 0 for non-Z/M type shapefiles.
+    # bbox: BBox = (0, 0, 0, 0)
+    bbox = shp_info.bbox or (0, 0, 0, 0)
+    try:
+        f.write(pack("<4d", *bbox))
+    except StructError:
+        raise ShapefileException(
+            "Failed to write shapefile bounding box. Floats required."
+        )
+
+    # Elevation
+    # As per the ESRI shapefile spec, the zbox for non-Z type shapefiles are set to 0s
+    # zbox : ZBox = (0, 0).  We also do this for empty shapefiles and null-shapes only files.
+    zbox = shp_info.zbox or (0, 0)
+
+    # Ms
+    # As per the ESRI shapefile spec, the mbox for non-M type shapefiles are set to 0s
+    # mbox: Mbox = (0, 0).  We also do this for empty shapefiles and null-shapes only files.
+    mbox = shp_info.mbox or (0, 0)
+
+    # Try writing
+    try:
+        f.write(pack("<4d", *zbox, *replace_None_with_NODATA(mbox)))
+    except StructError:
+        raise ShapefileException(
+            "Failed to write shapefile elevation and measure values. Floats required."
+        )
 
 
-class _ShpShxHeaderWriter(_WriterBase):
-    def __init__(self, file: str | PathLike[Any] | WriteSeekableBinStream):
-        super().__init__(file=file)
-        # Initiate with empty headers, to be finalized upon closing
-        self.file.seek(0)
-        self.file.write(b"9" * 100)
-
-    def _write_file_length(self) -> None:
-        raise NotImplementedError
-
-    def _shp_or_shx_header(self, shp_info: _ShpWriterInfo) -> None:
-        """Writes the specified header type to the specified file-like object.
-        Several of the shapefile formats are so similar that a single generic
-        method to read or write them is warranted."""
-        f = self.file
-        f.seek(0)
-        # File code, Unused bytes
-        f.write(pack(">6i", 9994, 0, 0, 0, 0, 0))
-
-        # File length (Bytes / 2 = 16-bit words).
-        # Hook for shx and shp specific subclasses to implement.
-        self._write_file_length()
-
-        f.write(pack("<2i", 1000, shp_info.shapeType or NULL))
-
-        # BBox, the shapefile's bounding box (lower left, upper right)
-        # In such cases of empty shapefiles, ESRI spec says the bbox values are 'unspecified'.
-        # Not sure what that means, so for now just setting to 0s, which is the same behavior as in previous versions.
-        # This would also make sense since the Z and M bounds are similarly set to 0 for non-Z/M type shapefiles.
-        # bbox: BBox = (0, 0, 0, 0)
-        bbox = shp_info.bbox or (0, 0, 0, 0)
-        try:
-            f.write(pack("<4d", *bbox))
-        except StructError:
-            raise ShapefileException(
-                "Failed to write shapefile bounding box. Floats required."
-            )
-
-        # Elevation
-        # As per the ESRI shapefile spec, the zbox for non-Z type shapefiles are set to 0s
-        # zbox : ZBox = (0, 0).  We also do this for empty shapefiles and null-shapes only files.
-        zbox = shp_info.zbox or (0, 0)
-
-        # Ms
-        # As per the ESRI shapefile spec, the mbox for non-M type shapefiles are set to 0s
-        # mbox: Mbox = (0, 0).  We also do this for empty shapefiles and null-shapes only files.
-        mbox = shp_info.mbox or (0, 0)
-
-        # Try writing
-        try:
-            f.write(pack("<4d", *zbox, *replace_None_with_NODATA(mbox)))
-        except StructError:
-            raise ShapefileException(
-                "Failed to write shapefile elevation and measure values. Floats required."
-            )
-
-
-class ShpWriter(_ShpShxHeaderWriter):
+class ShpWriter(_WriterBase):
     ext = ".shp"
     _ctx = _WriteableFileCtx(ext=".shp")
 
@@ -4782,6 +4778,7 @@ class ShpWriter(_ShpShxHeaderWriter):
         shapeType: int | None = None,
     ):
         super().__init__(file=shp)
+        _reserve_bytes_for_shp_or_shx_header(self.file)
         self.shapeType: int | None = shapeType
         # Geometry record offsets and lengths for writing shx file.
         self.shpNum: int = 0
@@ -4790,16 +4787,8 @@ class ShpWriter(_ShpShxHeaderWriter):
         self._mbox: MBox | None = None
 
     def _header(self) -> None:
-        super()._shp_or_shx_header(shp_info=self)
-
-    def _write_file_length(self) -> None:
-        # self.file required to be at correct position, e.g.
-        # if called by self._header
-
-        # Calculate size as 16-bit words
-        size_B = self._shp_file_length_B()
-        size_16b_words = size_B // 2
-        self.file.write(pack(">i", size_16b_words))
+        file_size_B = self._shp_file_length_B()
+        _shp_or_shx_header(self.file, shp_info=self, file_size_B=file_size_B)
 
     def _shp_file_length_B(self) -> int:
         """Calculates the file length of the shp file."""
@@ -4958,7 +4947,7 @@ class ShpWriter(_ShpShxHeaderWriter):
         return offset, n
 
 
-class ShxWriter(_ShpShxHeaderWriter):
+class ShxWriter(_WriterBase):
     ext = ".shx"
     _ctx = _WriteableFileCtx(ext=".shx")
 
@@ -4968,6 +4957,7 @@ class ShxWriter(_ShpShxHeaderWriter):
         shp_writer: _ShpWriterInfo,
     ):
         super().__init__(file=shx)
+        _reserve_bytes_for_shp_or_shx_header(self.file)
         self.shp_writer = shp_writer
 
     def _shx_record(self, offset_B: int, length_B: int) -> None:
@@ -4985,12 +4975,8 @@ class ShxWriter(_ShpShxHeaderWriter):
         f.write(pack(">2i", offset_16bw, length_16bw))
 
     def _header(self) -> None:
-        super()._shp_or_shx_header(shp_info=self.shp_writer)
-
-    def _write_file_length(self) -> None:
-        # self.file required to be at correct position, e.g.
-        # if called by self._header
-        self.file.write(pack(">i", ((100 + (self.shp_writer.shpNum * 8)) // 2)))
+        file_size_B = 100 + (self.shp_writer.shpNum * 8)
+        _shp_or_shx_header(self.file, shp_info=self.shp_writer, file_size_B=file_size_B)
 
 
 class Writer(_HasExitStack):
