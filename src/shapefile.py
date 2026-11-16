@@ -4363,16 +4363,12 @@ def _try_to_flush_file_obj(f: WriteSeekableBinStream | str | None) -> None:
         pass
 
 
-class _HasCheckedWriteableFile(_HasExitStack):
+class _WriterBase(_HasExitStack):
     _ctx = _WriteableFileCtx(ext=".shp")
 
     def __init__(self, file: str | PathLike[Any] | WriteSeekableBinStream):
-        self._file = file
         super().__init__()
-
-    @functools.cached_property
-    def file(self) -> WriteSeekableBinStream:
-        return _ensure_file_obj(self._file, self.exit_stack, self._ctx)
+        self.file = _ensure_file_obj(file, self.exit_stack, self._ctx)
 
     def is_open(self) -> bool:
         return bool(self.file and _is_file_obj_open(self.file))
@@ -4387,7 +4383,7 @@ class _HasCheckedWriteableFile(_HasExitStack):
         super().close()
 
 
-class DbfWriter(_HasCheckedWriteableFile):
+class DbfWriter(_WriterBase):
     """Writes .dbf files (dBASE database files), in particular those of Shapefiles."""
 
     _ctx = _WriteableFileCtx(ext=".dbf", ExceptionClass=dbfFileException)
@@ -4695,7 +4691,7 @@ class DbfWriter(_HasCheckedWriteableFile):
         self.recNum += 1
 
 
-class _ShpShxHeaderWriter(_HasCheckedWriteableFile):
+class _ShpShxHeaderWriter(_WriterBase):
     def __init__(self, file: str | PathLike[Any] | WriteSeekableBinStream):
         super().__init__(file=file)
         # Initiate with empty headers, to be finalized upon closing
