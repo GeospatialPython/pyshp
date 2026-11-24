@@ -1403,6 +1403,71 @@ ESRI White Paper](http://downloads.esri.com/support/whitepapers/ao_/J9749_MultiP
 
 
 
+# Cookbook
+
+The following recipes combine the basic reader and writer APIs for common
+data-processing tasks.
+
+### Copy selected records to a new shapefile
+
+Use the source fields and shapes while filtering records with a predicate:
+
+```python
+import shapefile
+
+with shapefile.Reader("input.shp") as source:
+    fields = source.fields[1:]
+    selected = [
+        (shape, record)
+        for shape, record in zip(source.shapes(), source.records())
+        if record[0] == "active"
+    ]
+
+    with shapefile.Writer("active.shp") as target:
+        target.fields = fields
+        for shape, record in selected:
+            target.shape(shape)
+            target.record(*record)
+```
+
+### Read a shapefile from a file-like object
+
+PyShp can read from streams, which is useful when a file is downloaded or
+provided by another application without first writing it to disk:
+
+```python
+from io import BytesIO
+from zipfile import ZipFile
+from urllib.request import urlopen
+
+import shapefile
+
+with urlopen("https://example.com/data.zip") as response:
+    with ZipFile(BytesIO(response.read())) as archive:
+        reader = shapefile.Reader(
+            shp=BytesIO(archive.read("data.shp")),
+            shx=BytesIO(archive.read("data.shx")),
+            dbf=BytesIO(archive.read("data.dbf")),
+        )
+    for shape_record in reader.iterShapeRecords():
+        print(shape_record.record, shape_record.shape.points)
+```
+
+### Export shapes as GeoJSON-like mappings
+
+Each shape exposes a `__geo_interface__` mapping that can be passed to tools
+that support the GeoJSON protocol:
+
+```python
+import shapefile
+
+with shapefile.Reader("input.shp") as source:
+    for shape in source.iterShapes():
+        geometry = shape.__geo_interface__
+        print(geometry["type"], geometry["coordinates"])
+```
+
+
 # Testing
 
 The testing framework is pytest, and the tests are located in ./tests.
