@@ -2643,7 +2643,7 @@ class _Record(list[RecordValue]):
         if date_strings:
             for k, v in dct.items():
                 if isinstance(v, date):
-                    dct[k] = f"{v.year:04d}{v.month:02d}{v.day:02d}"
+                    dct[k] = v.strftime("%Y%m%d")
         return dct
 
     def __repr__(self) -> str:
@@ -4429,10 +4429,10 @@ class DbfWriter(_WriterBase):
         size: int = 50,
         decimal: int = 0,
     ) -> None:
-        """Adds a dbf field descriptor to the shapefile."""
+        """Adds a dbf field descriptor to the .dbf file (in its header)."""
         if len(self.fields) >= self.max_num_fields:
             raise dbfFileException(
-                f".dbf Shapefile Writer reached maximum number of fields: {self.max_num_fields}."
+                f".dbf Writer reached maximum number of fields: {self.max_num_fields}."
             )
         field = Field.from_unchecked(
             name=name,
@@ -4500,6 +4500,10 @@ class DbfWriter(_WriterBase):
     def record(
         self,
         *recordList: RecordValue,
+        # "set_deletion_flag" is more than 10 characters, so can't be a .dbf field name.
+        # Nonetheless, I'm unsure how best to support _record's option here in the public API
+        # (e.g. a _Record with a deletion_flag could be required here - users are really
+        # unlikely to want to use this, it's mainly for testing PyShp's handling of del flags).
         **recordDict: RecordValue,
     ) -> None:
         """Creates a dbf attribute record. You can submit either a sequence of
@@ -4535,7 +4539,7 @@ class DbfWriter(_WriterBase):
         self,
         record: list[RecordValue],
         set_deletion_flag: bool = False,
-        ) -> None:
+    ) -> None:
         """Writes the dbf records."""
 
         # TODO:  Pre-fill with pad bytes, and seek to each field value's start?
@@ -4548,8 +4552,8 @@ class DbfWriter(_WriterBase):
             self._header()
         # first byte of the record is deletion flag
         # (b" " for not deleted, b"*" for deleted).
-        record_stream.write(b"*" if set_deletion_flag else b" ")
-        # begin
+        deletion_flag = b"*" if set_deletion_flag else b" "
+        record_stream.write(deletion_flag)
 
         for (fieldName, fieldType, size, deci), value in zip(self.fields, record):
             # write
