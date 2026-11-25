@@ -4531,7 +4531,11 @@ class DbfWriter(_WriterBase):
             record = ["" for _ in range(fieldCount)]
         self._record(record)
 
-    def _record(self, record: list[RecordValue]) -> None:
+    def _record(
+        self,
+        record: list[RecordValue],
+        set_deletion_flag: bool = False,
+        ) -> None:
         """Writes the dbf records."""
 
         # TODO:  Pre-fill with pad bytes, and seek to each field value's start?
@@ -4544,7 +4548,7 @@ class DbfWriter(_WriterBase):
             self._header()
         # first byte of the record is deletion flag
         # (b" " for not deleted, b"*" for deleted).
-        record_stream.write(b" ")
+        record_stream.write(b"*" if set_deletion_flag else b" ")
         # begin
 
         for (fieldName, fieldType, size, deci), value in zip(self.fields, record):
