@@ -1477,6 +1477,7 @@ Evan Heidtmann
 ezcitron
 Felix Oesterle
 fiveham
+Fizza Hussain
 geospatialpython
 Hannes
 Ignacio Martinez Vazquez
