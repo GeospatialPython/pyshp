@@ -151,8 +151,24 @@ class CorruptShpShapeRecord(ShapefileException):
     """Indicates invalid metadata in Shape record headers."""
 
 
+class CorruptShxShapeRecord(ShapefileException):
+    """.shx offset and shape length requires .shp shape records to overlap."""
+
+
 class dbfFileException(ShapefileException):
     """Indicates a problem with the .dbf file."""
+
+
+class UnsuccessfulFileDownload(Warning):
+    """E.g. 404s"""
+
+
+class PossiblyCorruptFileHeader(Warning):
+    """A Warning of inconsistent file meta data in a .shp or .shx header ."""
+
+
+class PossibleDataLoss(Warning):
+    """A Warning of possible data loss when encoding or decoding."""
 
 
 class DbfStringDataLoss(ValueError):
@@ -165,16 +181,14 @@ class CorruptDbfRecord(Warning):
     """
 
 
-class PossibleDataLoss(Warning):
-    """A Warning of possible data loss when encoding or decoding."""
+class CorruptShxRecord(Warning):
+    """.shx offset starts before previous offset + previous record length."""
 
 
-class UnsuccessfulFileDownload(Warning):
-    """E.g. 404s"""
-
-
-class PossiblyCorruptFileHeader(Warning):
-    """A Warning of inconsistent file meta data in a .shp or .shx header ."""
+class LazyDeletion(Warning):
+    """Shape offset doesn't follow on immediately after the
+    previous shape in the .shx file.
+    """
 
 
 def _min_not_None(m1: float | None, m2: float | None) -> float | None:
@@ -1447,6 +1461,7 @@ class Shape:
                     "coordinates": self.points,
                 }
 
+            # assert len(self.parts) > 1
             # multilinestring
             ps = None
             coordinates = []
@@ -1458,7 +1473,6 @@ class Shape:
                 coordinates.append(list(self.points[ps:part]))
                 ps = part
 
-            # assert len(self.parts) > 1
             # from previous if len(self.parts) checks so part is defined
             coordinates.append(list(self.points[part:]))
             return {"type": "MultiLineString", "coordinates": coordinates}
@@ -3404,14 +3418,23 @@ class ShxReader(_HasExitStack):
     def __init__(
         self,
         shx: str | PathLike[Any] | ReadSeekableBinStream,
+        suppress_shape_record_overlap_exception: bool = False,
+        suppress_lazy_deletion_warning: bool = True,
     ):
         super().__init__()
         self.file, self.file_size_B = _ensure_readable_file_obj(
             shx, self.exit_stack, self._ctx
         )
         self.numShapes: int
+        self._shape_lengths_B: list[int]
+        self._offsets: list[int]
+        self._lazy_deletion: list[tuple[int, int, int]] = []
         self._shxHeader()
         self._shxRecords_16bw: array.array[int] | None = None
+        self._suppress_shape_record_overlap_exception = (
+            suppress_shape_record_overlap_exception
+        )
+        self._suppress_lazy_deletion_warning = suppress_lazy_deletion_warning
 
     def _shxHeader(self) -> None:
         """Reads the header information from a .shx file."""
@@ -3434,19 +3457,49 @@ class ShxReader(_HasExitStack):
         if sys.byteorder != "big":
             self._shxRecords_16bw.byteswap()
 
+        self._shape_lengths_B = []
+        self._offsets = []
+        next_available_offset = 50  # Initialise to header
+
+        for i, (offset, shape_length) in enumerate(
+            zip(*[iter(self._shxRecords_16bw)] * 2)
+        ):
+            if offset < next_available_offset:
+                msg = (
+                    f"Shx record index {i}'s offset (16bw): {offset} starts too early "
+                    f"in the middle of the previous record (before {next_available_offset}) "
+                )
+                if not self._suppress_shape_record_overlap_exception:
+                    raise CorruptShxShapeRecord(msg)
+                warnings.warn(msg, category=CorruptShxRecord)
+
+            if offset > next_available_offset:
+                self._lazy_deletion.append((i, next_available_offset, offset))
+                if not self._suppress_lazy_deletion_warning:
+                    warnings.warn(
+                        (
+                            f"Shape(s) before shape at index: {i} possibly skipped. "
+                            f".shx file requires bytes {next_available_offset} to {offset}"
+                            "to  be skipped in the .shp file. "
+                        ),
+                        category=LazyDeletion,
+                    )
+
+            next_available_offset = offset + shape_length
+            # Convert from 16b Words to Bytes (8b).
+            self._offsets.append(2 * offset)
+            self._shape_lengths_B.append(2 * shape_length)
+
     # Only read .shx file body lazily
     @functools.cached_property
     def offsets(self) -> list[int]:
         self._read_shxRecords()
-        # Convert from offsets in 16b Words to Bytes (8b).
-        offsets_ = [2 * el for el in cast(Sequence[int], self._shxRecords_16bw)[::2]]
-        assert len(offsets_) == self.numShapes, f"{self.numShapes=}, {len(offsets_)=}"
-        return offsets_
+        return self._offsets
 
     @functools.cached_property
     def shape_lengths_B(self) -> list[int]:
         self._read_shxRecords()
-        return [2 * x for x in cast(Sequence[int], self._shxRecords_16bw)[1::2]]
+        return self._shape_lengths_B
 
 
 ShapeHeaderInfoT = tuple[int, int, int]
@@ -3637,7 +3690,9 @@ class ShpReader(_HasExitStack):
                 shape = self._shape(shape_len_B=shape_len_B, oid=i, bbox=bbox)
                 if shape is not None or outside_bbox_as_None:
                     yield shape
-                pos += shape_len_B + 8
+                pos += (
+                    shape_len_B + 8
+                )  # TODO:  Use .shx offsets instead, for lazy deletion?
 
             # MAYBE: check if more left of file or exit early?
             return
@@ -3656,7 +3711,23 @@ class ShpReader(_HasExitStack):
             if shape is not None or outside_bbox_as_None:
                 yield shape
 
-        assert n == len(self.headers_cache), f"{n=}, {len(self.headers_cache)=}"
+        if n < len(self.headers_cache):
+            warnings.warn(
+                f"Total shapes found: {n} was less than {len(self.headers_cache)=}. "
+                "Calling iterShapes again may error - "
+                "consider creating a new ShpReader instance. "
+                "Was self.headers_cache mutated, by inserting or adding an extra item?"
+            )
+        if n > len(self.headers_cache):
+            warnings.warn(
+                (
+                    f"Total shapes found: {n} was more than {len(self.headers_cache)=}. "
+                    "Calling iterShapes again may skip a shape - "
+                    "consider creating a new ShpReader instance. "
+                    "Was self.headers_cache mutated, by popping or deleting an item?"
+                ),
+                category=PossibleDataLoss,
+            )
 
 
 # Could be an enum, but an isinstance check is still needed.
@@ -4895,7 +4966,7 @@ class ShpWriter(_WriterBase):
     def _shp_record(self, s: Shape) -> tuple[int, int]:
         """Appends s to the file.  Returns shape's offset and length in Bytes"""
         offset = self.file.tell()
-        self.shpNum += 1
+        self.shpNum += 1  # "Record numbers begin at 1." (page 5 of the ESRI spec).
 
         # Shape Type
         if self.shapeType is None and s.shapeType != NULL:
