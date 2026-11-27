@@ -68,8 +68,7 @@ jobs:
         os: [
           "ubuntu-latest",
         ]
-        exclude: # Don't just remove it from matrix in case we want
-                 # to run Property tests on Windows or MacOS too.
+        exclude:
           - python-version: "3.9"
             os: "ubuntu-latest"
 
@@ -115,7 +114,6 @@ jobs:
         os: [
           "ubuntu-latest",
           "windows-latest",
-          "macos-latest",
         ]
         exclude:
           - python-version: "3.9"
@@ -123,7 +121,10 @@ jobs:
         include:
           - python-version: "3.9"
             os: "ubuntu-24.04"
-
+          - python-version: "3.9"
+            os: "ubuntu-24.04"
+          - python-version: "3.15"
+            os: "macos-latest"
 
     runs-on: ${{ matrix.os }}
     steps:
