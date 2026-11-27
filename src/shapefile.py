@@ -3461,27 +3461,28 @@ class ShxReader(_HasExitStack):
         self._shape_lengths_B = []
         self._offsets = []
         self._continuous_undeleted_runs = []
-        next_available_offset = 50  # Initialise to header
+        next_available_offset_B = 100  # Initialise to header
         undeleted_run_without_gaps: list[tuple[int, int, int]] = []
-        for i, (offset, shape_length) in enumerate(
-            zip(*[iter(self._shxRecords_16bw)] * 2)
-        ):
-            if offset < next_available_offset:
+        it_B = (2 * x for x in self._shxRecords_16bw)
+        for i, (offset_B, shape_length_B) in enumerate(zip(it_B, it_B)):
+            data = (i, next_available_offset_B, offset_B)
+            # Convert from 16b Words to Bytes (8b).
+            if offset_B < next_available_offset_B:
                 msg = (
-                    f"Shx record index {i}'s offset (16bw): {offset} starts too early "
-                    f"in the middle of the previous record (before {next_available_offset}) "
+                    f"Shx record index {i}'s offset: {offset_B} starts too early "
+                    f"in the middle of the previous record (before {next_available_offset_B}) "
                 )
                 if not self._suppress_shape_record_overlap_exception:
                     raise CorruptShxShapeRecord(msg)
                 warnings.warn(msg, category=CorruptShxRecord)
 
-            elif offset > next_available_offset:
-                self._lazy_deletion_gaps.append((i, next_available_offset, offset))
+            elif offset_B > next_available_offset_B:
+                self._lazy_deletion_gaps.append(data)
                 if not self._suppress_lazy_deletion_warning:
                     warnings.warn(
                         (
                             f"Shape(s) before shape at index: {i} possibly skipped. "
-                            f".shx file requires bytes {next_available_offset} to {offset}"
+                            f".shx file requires bytes {next_available_offset_B} to {offset_B}"
                             "to  be skipped in the .shp file. "
                         ),
                         category=LazyDeletion,
@@ -3489,11 +3490,10 @@ class ShxReader(_HasExitStack):
                 self._continuous_undeleted_runs.append(undeleted_run_without_gaps)
                 undeleted_run_without_gaps = []
 
-            next_available_offset = offset + shape_length
-            # Convert from 16b Words to Bytes (8b).
-            self._offsets.append(2 * offset)
-            self._shape_lengths_B.append(2 * shape_length)
-            undeleted_run_without_gaps.append((i, next_available_offset, offset))
+            next_available_offset_B = offset_B + shape_length_B
+            self._offsets.append(offset_B)
+            self._shape_lengths_B.append(shape_length_B)
+            undeleted_run_without_gaps.append(data)
 
         self._continuous_undeleted_runs.append(undeleted_run_without_gaps)
 
