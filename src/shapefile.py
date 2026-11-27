@@ -3032,6 +3032,8 @@ class DbfReader(_HasExitStack):
 
         self.data_fields: list[Field] = []
         self._fieldLookup: dict[str, int] = {}
+        self._deletion_flags: dict[int, bytes] | None = None
+        self._continuous_undeleted_runs: list[list[int]] | None = None
 
         self._dbfHeader()
 
@@ -3114,6 +3116,42 @@ class DbfReader(_HasExitStack):
         __fieldTuples, recLookup, recStruct = self._record_fields(fieldnames)
         self._fullRecStruct = recStruct
         self._fullRecLookup = recLookup
+
+    @functools.cache
+    def find_deletion_flagged_records(self) -> None:
+        current_pos = self.file.tell()
+
+        self._deletion_flags = {}
+        self._continuous_undeleted_runs = []
+        current_run: list[int] = []
+
+        for i in range(self.numRecords):
+            self.seek_to_rec(i)
+            deletion_flag = self.file.read(1)
+
+            self._deletion_flags[i] = deletion_flag
+
+            if deletion_flag == b"*":
+                self._continuous_undeleted_runs.append(current_run)
+                current_run = []
+
+            elif deletion_flag != b" ":
+                msg = (
+                    f"On record index: {i}, deletion flag not marked for deletion (not b'*') "
+                    f"but also not an ascii space( not b' ').  Got: {deletion_flag!r}"
+                )
+                if self.strict:
+                    self.file.seek(current_pos)
+                    raise dbfFileException(msg)
+                msg += f". {self.strict=}, treating as not deleted. "
+                warnings.warn(msg, category=CorruptDbfRecord)
+
+            current_run.append(i)
+
+        if len(current_run) >= 1:
+            self._continuous_undeleted_runs.append(current_run)
+
+        self.file.seek(current_pos)
 
     @property
     def fields(self) -> list[Field]:
@@ -3429,7 +3467,7 @@ class ShxReader(_HasExitStack):
         self._shape_lengths_B: list[int]
         self._offsets: list[int]
         self._continuous_undeleted_runs: list[list[tuple[int, int, int]]]
-        self._lazy_deletion_gaps: list[tuple[int, int, int]] = []
+        self._lazy_deletion_gaps: list[tuple[int, int, int]]
         self._shxHeader()
         self._shxRecords_16bw: array.array[int] | None = None
         self._suppress_shape_record_overlap_exception = (
@@ -3461,6 +3499,7 @@ class ShxReader(_HasExitStack):
         self._shape_lengths_B = []
         self._offsets = []
         self._continuous_undeleted_runs = []
+        self._lazy_deletion_gaps = []
         next_available_offset_B = 100  # Initialise to header
         undeleted_run_without_gaps: list[tuple[int, int, int]] = []
         it_B = (2 * x for x in self._shxRecords_16bw)
