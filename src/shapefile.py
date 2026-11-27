@@ -3428,7 +3428,8 @@ class ShxReader(_HasExitStack):
         self.numShapes: int
         self._shape_lengths_B: list[int]
         self._offsets: list[int]
-        self._lazy_deletion: list[tuple[int, int, int]] = []
+        self._continuous_undeleted_runs: list[list[tuple[int, int, int]]]
+        self._lazy_deletion_gaps: list[tuple[int, int, int]] = []
         self._shxHeader()
         self._shxRecords_16bw: array.array[int] | None = None
         self._suppress_shape_record_overlap_exception = (
@@ -3459,8 +3460,9 @@ class ShxReader(_HasExitStack):
 
         self._shape_lengths_B = []
         self._offsets = []
+        self._continuous_undeleted_runs = []
         next_available_offset = 50  # Initialise to header
-
+        undeleted_run_without_gaps: list[tuple[int, int, int]] = []
         for i, (offset, shape_length) in enumerate(
             zip(*[iter(self._shxRecords_16bw)] * 2)
         ):
@@ -3473,8 +3475,8 @@ class ShxReader(_HasExitStack):
                     raise CorruptShxShapeRecord(msg)
                 warnings.warn(msg, category=CorruptShxRecord)
 
-            if offset > next_available_offset:
-                self._lazy_deletion.append((i, next_available_offset, offset))
+            elif offset > next_available_offset:
+                self._lazy_deletion_gaps.append((i, next_available_offset, offset))
                 if not self._suppress_lazy_deletion_warning:
                     warnings.warn(
                         (
@@ -3484,11 +3486,16 @@ class ShxReader(_HasExitStack):
                         ),
                         category=LazyDeletion,
                     )
+                self._continuous_undeleted_runs.append(undeleted_run_without_gaps)
+                undeleted_run_without_gaps = []
 
             next_available_offset = offset + shape_length
             # Convert from 16b Words to Bytes (8b).
             self._offsets.append(2 * offset)
             self._shape_lengths_B.append(2 * shape_length)
+            undeleted_run_without_gaps.append((i, next_available_offset, offset))
+
+        self._continuous_undeleted_runs.append(undeleted_run_without_gaps)
 
     # Only read .shx file body lazily
     @functools.cached_property
