@@ -3032,6 +3032,8 @@ class DbfReader(_HasExitStack):
 
         self.data_fields: list[Field] = []
         self._fieldLookup: dict[str, int] = {}
+        self._deletion_flags: dict[int, bytes] | None = None
+        self._continuous_undeleted_runs: list[list[int]] | None = None
 
         self._dbfHeader()
 
@@ -3114,6 +3116,42 @@ class DbfReader(_HasExitStack):
         __fieldTuples, recLookup, recStruct = self._record_fields(fieldnames)
         self._fullRecStruct = recStruct
         self._fullRecLookup = recLookup
+
+    @functools.cache
+    def find_deletion_flagged_records(self) -> None:
+        current_pos = self.file.tell()
+
+        self._deletion_flags = {}
+        self._continuous_undeleted_runs = []
+        current_run: list[int] = []
+
+        for i in range(self.numRecords):
+            self.seek_to_rec(i)
+            deletion_flag = self.file.read(1)
+
+            self._deletion_flags[i] = deletion_flag
+
+            if deletion_flag == b"*":
+                self._continuous_undeleted_runs.append(current_run)
+                current_run = []
+
+            elif deletion_flag != b" ":
+                msg = (
+                    f"On record index: {i}, deletion flag not marked for deletion (not b'*') "
+                    f"but also not an ascii space( not b' ').  Got: {deletion_flag!r}"
+                )
+                if self.strict:
+                    self.file.seek(current_pos)
+                    raise dbfFileException(msg)
+                msg += f". {self.strict=}, treating as not deleted. "
+                warnings.warn(msg, category=CorruptDbfRecord)
+
+            current_run.append(i)
+
+        if len(current_run) >= 1:
+            self._continuous_undeleted_runs.append(current_run)
+
+        self.file.seek(current_pos)
 
     @property
     def fields(self) -> list[Field]:
@@ -3428,7 +3466,8 @@ class ShxReader(_HasExitStack):
         self.numShapes: int
         self._shape_lengths_B: list[int]
         self._offsets: list[int]
-        self._lazy_deletion: list[tuple[int, int, int]] = []
+        self._continuous_undeleted_runs: list[list[tuple[int, int, int]]]
+        self._lazy_deletion_gaps: list[tuple[int, int, int]]
         self._shxHeader()
         self._shxRecords_16bw: array.array[int] | None = None
         self._suppress_shape_record_overlap_exception = (
@@ -3459,36 +3498,43 @@ class ShxReader(_HasExitStack):
 
         self._shape_lengths_B = []
         self._offsets = []
-        next_available_offset = 50  # Initialise to header
-
-        for i, (offset, shape_length) in enumerate(
-            zip(*[iter(self._shxRecords_16bw)] * 2)
-        ):
-            if offset < next_available_offset:
+        self._continuous_undeleted_runs = []
+        self._lazy_deletion_gaps = []
+        next_available_offset_B = 100  # Initialise to header
+        undeleted_run_without_gaps: list[tuple[int, int, int]] = []
+        it_B = (2 * x for x in self._shxRecords_16bw)
+        for i, (offset_B, shape_length_B) in enumerate(zip(it_B, it_B)):
+            data = (i, next_available_offset_B, offset_B)
+            # Convert from 16b Words to Bytes (8b).
+            if offset_B < next_available_offset_B:
                 msg = (
-                    f"Shx record index {i}'s offset (16bw): {offset} starts too early "
-                    f"in the middle of the previous record (before {next_available_offset}) "
+                    f"Shx record index {i}'s offset: {offset_B} starts too early "
+                    f"in the middle of the previous record (before {next_available_offset_B}) "
                 )
                 if not self._suppress_shape_record_overlap_exception:
                     raise CorruptShxShapeRecord(msg)
                 warnings.warn(msg, category=CorruptShxRecord)
 
-            if offset > next_available_offset:
-                self._lazy_deletion.append((i, next_available_offset, offset))
+            elif offset_B > next_available_offset_B:
+                self._lazy_deletion_gaps.append(data)
                 if not self._suppress_lazy_deletion_warning:
                     warnings.warn(
                         (
                             f"Shape(s) before shape at index: {i} possibly skipped. "
-                            f".shx file requires bytes {next_available_offset} to {offset}"
+                            f".shx file requires bytes {next_available_offset_B} to {offset_B}"
                             "to  be skipped in the .shp file. "
                         ),
                         category=LazyDeletion,
                     )
+                self._continuous_undeleted_runs.append(undeleted_run_without_gaps)
+                undeleted_run_without_gaps = []
 
-            next_available_offset = offset + shape_length
-            # Convert from 16b Words to Bytes (8b).
-            self._offsets.append(2 * offset)
-            self._shape_lengths_B.append(2 * shape_length)
+            next_available_offset_B = offset_B + shape_length_B
+            self._offsets.append(offset_B)
+            self._shape_lengths_B.append(shape_length_B)
+            undeleted_run_without_gaps.append(data)
+
+        self._continuous_undeleted_runs.append(undeleted_run_without_gaps)
 
     # Only read .shx file body lazily
     @functools.cached_property
